@@ -46,7 +46,11 @@
 // divide, and dividing nothing three ways is what "messy" was.
 
 import React from 'react';
-import { T, Panel, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
+import {
+  T, Panel, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton,
+  committedDriftParts,
+} from '../ui';
+import type { NumberFieldRefusalDetail } from '../ui';
 import { Field, Hint, Card, Advisory } from './column-layout';
 import { actAndDropFocus } from '../ui/act-and-drop-focus';
 import { deleteSceneGuarded } from '../../shell/effects-delete-guard';
@@ -133,7 +137,8 @@ import {
 // the V-deform row's last line.
 import { vDeformRampAdvisory } from '../../providers/effects-preset';
 import {
-  EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS, rowRemapPlaneYRefusal, rowRemapBuildableToday,
+  EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS, rowRemapPlaneYRefusal, rowRemapPlaneYRefusalParts,
+  rowRemapBuildableToday,
 } from '../../../core/formats/effects/scene-ui';
 import type { EffectsPresetLibrary } from '../../../core/formats/effects/preset';
 
@@ -415,12 +420,26 @@ export default function EffectsScenePanel(): React.ReactElement {
   // refusal under layer 0's box. `NumberField` clears it on focus and on any
   // value that commits, so a stale sentence cannot outlive the number beside it.
   const [driftRefusal, setDriftRefusal] = React.useState<Record<number, string | null>>({});
-  // THE PLANE-LINE BOX'S REFUSAL, PER LAYER — same shape and same reason as the
-  // drift box's above. It matters more here: `plane_y`'s ceiling has NO
-  // enforcement in aeon at all (the ensure tests >= 0 only), so this sentence is
-  // the only thing between an author and a window that builds clean and points
-  // nowhere.
-  const [planeYRefusal, setPlaneYRefusal] = React.useState<Record<number, string | null>>({});
+  // THE PLANE-LINE BOX'S REFUSAL, PER LAYER — same reason as the drift box's
+  // above, and one field wider.
+  //
+  // ⚠ THIS COMMENT USED TO SAY `plane_y`'s ceiling had NO enforcement in aeon at
+  // all, "the ensure tests >= 0 only". That stopped being true when aeon landed
+  // an engine-side guard alongside it, and the vendored contract now calls this
+  // schema ONE OF TWO ENFORCEMENTS. Aurora's is still the one an author meets and
+  // the only one that acts before a build, which is why the sentence is worth
+  // this much machinery; it is no longer the only one that exists.
+  //
+  // ⚠ AND IT KEEPS THE FACTS, NOT JUST THE SENTENCE. Composed as one paragraph
+  // this refusal measured 280px inside a scroller 129px tall and no scroll
+  // position showed it whole (EW-LAYER-CARD-SCROLLER's own bar; `[5b2]` in
+  // `scratchpad/row-remap-control-harness.mjs`). It is painted as an `Advisory`
+  // instead, which needs the halves rather than the finished string — so what is
+  // held here is `NumberField`'s refusal DETAIL, and the halves are re-derived
+  // from it by the same functions that composed the sentence. Storing the string
+  // and cutting it up here is the one thing this must not do.
+  const [planeYRefusal, setPlaneYRefusal] =
+    React.useState<Record<number, NumberFieldRefusalDetail | null>>({});
   // THE REEL BOXES' REFUSALS, PER STRIP — same shape as the two above, keyed by
   // STRIP INDEX, which here is a screen position (strip `i` owns screen X
   // `64i..64i+63`) rather than a list position. It matters as much as
@@ -1131,7 +1150,19 @@ export default function EffectsScenePanel(): React.ReactElement {
                   being silently omitted. */}
               {(() => {
                 const rr = rowRemapFieldValue(layer);
-                const why = planeYRefusal[i] ?? null;
+                // THE REFUSAL, IN THE THREE HALVES `Advisory` TAKES. Both
+                // producers of this prose are asked for their own split; nothing
+                // here decides where a sentence ends, and nothing here slices
+                // one. `mechanism` is `undefined` rather than `''` when both
+                // halves are absent, because an empty one draws a disclosure
+                // button with nothing behind it.
+                const refused = planeYRefusal[i] ?? null;
+                const planeParts = refused === null
+                  ? null : rowRemapPlaneYRefusalParts(refused.value);
+                const driftParts = refused === null ? null : committedDriftParts(
+                  refused.heldAtFocus, refused.holdsNow, refused.committedSinceFocus);
+                const whyMechanism = [planeParts?.mechanism, driftParts?.mechanism]
+                  .filter((s): s is string => s !== undefined).join(' ');
                 const unbuildable = rr === null ? null : rowRemapBuildableToday(rr.height_shift);
                 const unmet = selected === null ? [] : rowRemapPreconditionParts(selected, i);
                 // THE ONE THING ABOUT A REMAP THAT IS A FUNCTION OF THE OPEN
@@ -1173,7 +1204,8 @@ export default function EffectsScenePanel(): React.ReactElement {
                             max={EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS.max}
                             width={64} value={rr.plane_y}
                             refuse={(n) => rowRemapPlaneYRefusal(n)}
-                            onRefusal={(r) => setPlaneYRefusal((st) => ({ ...st, [i]: r }))}
+                            onRefusal={(r, d) => setPlaneYRefusal(
+                              (st) => ({ ...st, [i]: r === null ? null : d ?? null }))}
                             onChange={(n) => run(setLayerFieldCommand(
                               library, selected.id, i, 'rowRemap', rowRemapWithPlaneY(rr, n)))} />
                           <Select title={`Layer ${i} ${LAYER_ROW_REMAP_ROW.heightTitle}`}
@@ -1190,7 +1222,30 @@ export default function EffectsScenePanel(): React.ReactElement {
                       )}
                     </Field>
                     <Hint under style={{ marginBottom: 0 }}>{LAYER_ROW_REMAP_ROW.hint}</Hint>
-                    {why !== null && <Hint under tone="warning">{why}</Hint>}
+                    {/* ⚠ AN ADVISORY, NOT A HINT, AND THE REASON IS THE SAME ONE
+                        THE REACH ADVISORY BELOW WAS CONVERTED FOR. As one
+                        paragraph this refusal measured 280px inside a scroller
+                        129px tall, and unlike the reach block it is composed at
+                        REFUSAL time, so a census of standing prose could not see
+                        it: `NumberField` appends the already-moved tail, and
+                        every refusal on this box carries that tail because every
+                        prefix of a number past the ceiling is itself a legal
+                        plane line and commits on the way. The finding an author
+                        acts on (the bound, and that their value has moved) and
+                        the two edits stay on screen; the ladder-ceiling history
+                        and the per-keystroke explanation are the WHY, which is
+                        what the disclosure is for. Nothing was deleted:
+                        `rowRemapPlaneYRefusal` and `refusalWithCommittedDrift`
+                        still return the same sentences, byte for byte, for every
+                        caller with room to print one. */}
+                    {planeParts !== null && (
+                      <Advisory under testid={`layer-${i}-rowremap-planey-refusal`}
+                        diagnosis={driftParts === null
+                          ? planeParts.diagnosis
+                          : `${planeParts.diagnosis} ${driftParts.finding}`}
+                        mechanism={whyMechanism === '' ? undefined : whyMechanism}
+                        remedies={driftParts?.remedies} />
+                    )}
                     {unbuildable !== null
                       && <Hint under tone="warning">{unbuildable}</Hint>}
                     {/* THE SPAN IS NOT DECORATION. `Hint` takes {children,

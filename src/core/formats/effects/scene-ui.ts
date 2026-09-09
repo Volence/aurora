@@ -1620,19 +1620,58 @@ export function rowRemapHeightLines(shift: number): number {
   return 1 << shift;
 }
 
-/** Why `plane_y` is not a legal plane line, or null when it is. */
-export function rowRemapPlaneYRefusal(planeY: number): string | null {
+/**
+ * Why `plane_y` is not a legal plane line, IN THE TWO HALVES `Advisory` TAKES,
+ * or null when it is legal.
+ *
+ * ⚠ THE SPLIT EXISTS BECAUSE THE COMPOSED SENTENCE DOES NOT FIT ITS BOX
+ * (EW-LAYER-CARD-SCROLLER; `[5b2]` in `scratchpad/row-remap-control-harness.mjs`,
+ * and `docs/reviews/2026-09-06-rowremap-three-red.md` section 3). Measured on the
+ * running app: this refusal, with `NumberField`'s drift tail on it, painted as
+ * one paragraph of 280px inside a scroller 129px tall, so no scroll position
+ * showed it whole. That is the same bar the two standing row-remap blocks in this
+ * same card were converted for, and the same repair: the FINDING stays on screen,
+ * the MECHANISM goes behind the disclosure.
+ *
+ * ⚠ THE STRING FORM IS COMPOSED FROM THIS, NEVER TYPED TWICE. `rowRemapPlaneYRefusal`
+ * joins these two halves with a space and is byte-identical to what it returned
+ * before the split, so every caller that wants one sentence keeps getting it and
+ * there is one place the words live. A second copy of this prose is how a
+ * disclosure and a plain hint drift apart without either being wrong on its own.
+ *
+ * `mechanism` is absent, not empty, when the diagnosis already carries the why:
+ * `Advisory` draws no button for an absent one, and an empty string would buy a
+ * control with nothing behind it.
+ */
+export function rowRemapPlaneYRefusalParts(
+  planeY: number,
+): { diagnosis: string; mechanism?: string } | null {
   if (!Number.isInteger(planeY)) {
-    return `a plane line is a whole number; ${planeY} is not an integer.`;
+    return { diagnosis: `a plane line is a whole number; ${planeY} is not an integer.` };
   }
   const { min, max } = EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS;
   if (planeY < min || planeY > max) {
-    return `${planeY} is outside the Plane-B line range ${min}..${max}. This bound is ONE OF TWO `
-      + 'ENFORCEMENTS of the ceiling, with the engine-side guard aeon landed alongside it; '
-      + 'before that guard existed aeon checked the floor and not the ceiling, and a larger '
-      + 'value built clean and emitted a window pointing nowhere.';
+    return {
+      diagnosis: `${planeY} is outside the Plane-B line range ${min}..${max}.`,
+      mechanism: 'This bound is ONE OF TWO '
+        + 'ENFORCEMENTS of the ceiling, with the engine-side guard aeon landed alongside it; '
+        + 'before that guard existed aeon checked the floor and not the ceiling, and a larger '
+        + 'value built clean and emitted a window pointing nowhere.',
+    };
   }
   return null;
+}
+
+/**
+ * Why `plane_y` is not a legal plane line as ONE sentence, or null when it is.
+ *
+ * The composition of `rowRemapPlaneYRefusalParts`, for `NumberField`'s `refuse`
+ * and for every caller that has one string to paint.
+ */
+export function rowRemapPlaneYRefusal(planeY: number): string | null {
+  const parts = rowRemapPlaneYRefusalParts(planeY);
+  if (parts === null) return null;
+  return parts.mechanism === undefined ? parts.diagnosis : `${parts.diagnosis} ${parts.mechanism}`;
 }
 
 /**

@@ -99,13 +99,68 @@ function numberFieldText(value: number): string {
 export function refusalWithCommittedDrift(
   why: string, heldAtFocus: number | null, holdsNow: number, committedSinceFocus: number,
 ): string {
-  if (committedSinceFocus === 0) return why;
-  if (heldAtFocus === null || !Number.isFinite(heldAtFocus)) return why;
-  if (heldAtFocus === holdsNow) return why;
-  return `${why} ⚠ AND IT HAS ALREADY MOVED: this box held ${heldAtFocus} when you clicked into `
-    + `it, and now holds ${holdsNow}. It commits on every keystroke, so a shorter number that is `
-    + 'legal on its own lands on the way to a longer one. Retype the whole value, or undo.';
+  const drift = committedDriftParts(heldAtFocus, holdsNow, committedSinceFocus);
+  if (drift === null) return why;
+  return `${why} ${drift.finding} ${drift.mechanism} ${drift.remedies}`;
 }
+
+/**
+ * THE SAME CLAUSE IN THE THREE HALVES `Advisory` TAKES, or null when it does not
+ * apply.
+ *
+ * ⚠ THE SPLIT IS NOT COSMETIC, AND THE STRING FORM IS COMPOSED FROM IT. Appended
+ * to a provider's own refusal this tail roughly doubles the block, and on the
+ * effects layer cards that pushed the whole paragraph to 280px inside a scroller
+ * 129px tall: a block no scroll position shows whole, which is the bar
+ * `Advisory`'s docblock (EW-LAYER-CARD-SCROLLER) already converts prose for. A
+ * caller with room paints `refusalWithCommittedDrift`; a caller in a small box
+ * paints these three, and both are the same words because one is built out of the
+ * other. Two hand-kept copies would drift apart with neither being wrong alone.
+ *
+ * WHICH HALF IS WHICH, and why it is not a free choice: `finding` is what
+ * happened to THIS author's document and can never be folded; `remedies` is what
+ * to do about it and O15 forbids folding a remedy that exists; `mechanism` is the
+ * why, which is exactly what O15 says may go behind a disclosure.
+ */
+export function committedDriftParts(
+  heldAtFocus: number | null, holdsNow: number, committedSinceFocus: number,
+): { finding: string; mechanism: string; remedies: string } | null {
+  if (committedSinceFocus === 0) return null;
+  if (heldAtFocus === null || !Number.isFinite(heldAtFocus)) return null;
+  if (heldAtFocus === holdsNow) return null;
+  return {
+    finding: `⚠ AND IT HAS ALREADY MOVED: this box held ${heldAtFocus} when you clicked into `
+      + `it, and now holds ${holdsNow}.`,
+    mechanism: 'It commits on every keystroke, so a shorter number that is '
+      + 'legal on its own lands on the way to a longer one.',
+    remedies: 'Retype the whole value, or undo.',
+  };
+}
+
+/**
+ * THE FACTS BEHIND A `NumberField` REFUSAL, handed to `onRefusal` beside the
+ * sentence.
+ *
+ * ⚠ FACTS, NEVER PROSE. A caller that must paint the refusal in more than one
+ * block (an `Advisory` with a disclosure, say) needs the provider's own halves
+ * and the drift's own halves, and it cannot get them by cutting up the composed
+ * string: slicing prose at a character count is how a "show more" hides the half
+ * an author acts on. So this carries the four numbers the sentence was built
+ * from, and the caller calls the same parts functions the composition did.
+ *
+ * `value` is the number that was REFUSED, so a caller can re-derive the
+ * provider's halves from the same input `refuse` saw.
+ */
+export type NumberFieldRefusalDetail = {
+  /** The value that was refused: what `refuse` was called with. */
+  value: number;
+  /** What the document held when focus arrived, or null when this box has not been focused. */
+  heldAtFocus: number | null;
+  /** What the document holds now. */
+  holdsNow: number;
+  /** How many values THIS box has landed since focus arrived. */
+  committedSinceFocus: number;
+};
 
 /**
  * A number box that REFUSES an empty one instead of committing a `0` for it.
@@ -189,8 +244,16 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
    * back with the reason still on screen beside it.
    */
   refuse?: (v: number) => string | null;
-  /** Called with the refusal sentence, or null when a value commits cleanly. */
-  onRefusal?: (reason: string | null) => void;
+  /**
+   * Called with the refusal sentence, or null when a value commits cleanly.
+   *
+   * The second argument carries the FACTS that sentence was composed from, for a
+   * caller that must paint it in more than one block. It is absent on the null
+   * call and on every caller that never reads it, which is all of them but the
+   * row-remap plane line: adding an argument nobody is obliged to take is what
+   * kept this change off the other call sites.
+   */
+  onRefusal?: (reason: string | null, detail?: NumberFieldRefusalDetail) => void;
 }) {
   const [text, setText] = React.useState(() => numberFieldText(value));
   const [editing, setEditing] = React.useState(false);
@@ -239,8 +302,16 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
         const n = parseNumberFieldText(raw);
         if (n === undefined) return;
         const why = refuse?.(n) ?? null;
-        onRefusal?.(why === null ? null : refusalWithCommittedDrift(
-          why, focusState.current.held, value, focusState.current.commits));
+        onRefusal?.(
+          why === null ? null : refusalWithCommittedDrift(
+            why, focusState.current.held, value, focusState.current.commits),
+          why === null ? undefined : {
+            value: n,
+            heldAtFocus: focusState.current.held,
+            holdsNow: value,
+            committedSinceFocus: focusState.current.commits,
+          },
+        );
         if (why === null) {
           focusState.current.commits += 1;
           onChange(n);
