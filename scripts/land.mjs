@@ -151,7 +151,30 @@ say('running the full suite on THIS tree, the one that will be pushed...');
 try {
   execFileSync('npm', ['test'], { stdio: 'inherit' });
 } catch {
-  die('the suite failed on the tree you were about to push. Nothing was pushed.');
+  // ⚠ THE POINTER BELOW IS THE ONLY CHANGE THIS PARCEL MAKES TO THIS SCRIPT, and
+  // it is a string inside an existing refusal: no control flow, no new refusal,
+  // no change to any exit code. The reason it is here at all is that a reader
+  // who tails this output sees the refusal and NOT the `failure-class:` block a
+  // few lines above it, which is exactly the reader who then re-runs the suite
+  // hoping the red goes away. That habit is right for a timeout and wrong for an
+  // assertion, and it cost five full suite runs once already.
+  //
+  // The prefix is SPELLED here rather than imported. An import would make this
+  // script, which lands every parcel, die at startup if that reporter were ever
+  // deleted, and a cosmetic pointer must not be able to break a landing. The
+  // coupling is checked instead by a row in test/config/failure-class-wiring.test.ts,
+  // which reads this file's text and compares it against the reporter's own
+  // exported PREFIX, so a rename reddens a test instead of breaking a push.
+  die('the suite failed on the tree you were about to push. Nothing was pushed.\n'
+    + '  READ THE FAILURES BY CLASS BEFORE YOU RE-RUN. The `failure-class:` block a few lines\n'
+    + '  above counts them, because a tail of this output cannot tell them apart:\n'
+    + '    ASSERTION      a finding NOW, whatever this machine was doing. Re-running is not\n'
+    + '                   an answer to one of these.\n'
+    + '    TIMEOUT        load-manufactured until proven otherwise, since landing verification\n'
+    + '                   and agent builds share one box here. Re-run it on a quiet box to\n'
+    + '                   judge, and remember load OPENS narrow windows as well as inventing\n'
+    + '                   delays: one that repeats when nothing else is running is a finding.\n'
+    + '    UNCLASSIFIED   no signature the reporter recognises. Read it yourself.');
 }
 
 // HEAD must not have moved under the run: a parallel session or an auto-commit
