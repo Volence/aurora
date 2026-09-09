@@ -92,6 +92,56 @@ describe('AetherClient handshake', () => {
     await expect(p).rejects.toThrow(/protocol/i);
     expect(client.status).toBe('disconnected');
   });
+
+  /**
+   * THE OTHER DIRECTION, which the row above cannot see. It only ever offers a
+   * NEWER server, so relaxing `!==` to `>` — a one-character edit, and the
+   * obvious "be lenient with old servers" one — left the whole suite green
+   * (plant P12).
+   *
+   * An older server is not a lenient case. `protocolVersion` bumps ONLY on a
+   * breaking envelope change (protocol.md D5), so a server two versions back is
+   * speaking a different envelope, and half-speaking it is what this refusal
+   * exists to prevent. The refusal has to be symmetric, and now it is measured
+   * that way.
+   */
+  it('refuses an OLDER protocol version too, not just a newer one', async () => {
+    const sock = new MockSocket();
+    const client = new AetherClient({ connect: () => sock, socketPath: '/tmp/test.sock' });
+    const p = client.connect();
+    sock.open();
+    await vi.waitFor(() => expect(sock.sent().length).toBeGreaterThan(0));
+    sock.reply({ jsonrpc: '2.0', id: sock.sent()[0].id, result: { ...INIT_RESULT, protocolVersion: 0 } });
+    await expect(p).rejects.toThrow(/protocol/i);
+    expect(client.status).toBe('disconnected');
+  });
+
+  /**
+   * THE CEILINGS AND THE CAPABILITY OBJECT REACH THE HANDSHAKE RECORD.
+   *
+   * `limits` is REQUIRED and top-level (protocol.md §2.1, registered by §11.5)
+   * precisely because a ceiling is not optional: `maxReadLen` is the largest
+   * `len` this server accepts, and §6's parenthetical `(≤4096)` describes THE
+   * CATALOG rather than the server answering. Aurora used to drop the object on
+   * the floor, which is how `scratchpad/warp-tearing-harness.mjs` came to retype
+   * 4096 out of §6, read half a plane, and call it "whole-plane".
+   *
+   * Nothing held it: deleting `limits` from the handshake record, and deleting
+   * `capabilities` beside it, were each green across the whole suite (P48, P49).
+   * Kept raw and unvalidated, exactly as the field's contract says — this row
+   * asserts ARRIVAL, not shape, because the consumer that needs a field is the
+   * one that knows what shape it needs.
+   */
+  it('records the raw limits and capabilities objects the server sent', async () => {
+    const limits = { maxReadLen: 65536, maxWriteLen: 4096 };
+    const { client } = await connected({ initResult: { ...INIT_RESULT, limits } });
+
+    // Anti-vacuous: a handshake was really completed.
+    expect(client.handshake).not.toBeNull();
+
+    expect(client.handshake?.limits).toEqual(limits);
+    expect(client.handshake?.capabilities).toEqual(INIT_RESULT.capabilities);
+  });
 });
 
 describe('AetherClient framing', () => {

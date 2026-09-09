@@ -275,6 +275,36 @@ describe('every field the status payload promises arrives ON THE PUSH', () => {
 });
 
 /**
+ * THE REFUSAL THAT NEVER DIALS.
+ *
+ * A socket path past SUN_LEN is refused before `net.connect` is called, and
+ * that branch builds its payload BY HAND rather than through `statusPayload` —
+ * which is exactly how it came to be the one payload that need not carry the
+ * path. Dropping `socketPath` from it was green across the whole suite (P22).
+ *
+ * It is the payload where the path matters most: there is no client to ask
+ * afterwards, the whole complaint is ABOUT a path, and the reason this refusal
+ * exists at all is that the server dies with a bare "path must be shorter than
+ * SUN_LEN" naming neither the path nor the limit.
+ */
+describe('a socket path too long to dial still says which path', () => {
+  it('names the refused path on the connect handler’s return', async () => {
+    const long = `/tmp/${'a'.repeat(200)}/oracle.sock`;
+    process.env.ORACLE_SOCKET = long;
+    pushes = [];
+    const handler = handlers.get(IPC_CHANNELS.AETHER_CONNECT);
+    if (handler === undefined) throw new Error('the bridge registered no connect handler');
+    const returned = await handler() as AetherStatusPayload;
+
+    // Anti-vacuous: it really refused, and refused for the LENGTH.
+    expect(returned.status).toBe('disconnected');
+    expect(returned.error).toMatch(/shorter|under/i);
+
+    expect(returned.socketPath).toBe(long);
+  });
+});
+
+/**
  * THE LINK CAN DIE WITH NOBODY ASKING — the emulator window is closed, the
  * process is killed. `client.ts` clears its method set on teardown for exactly
  * this reason ("a stale capability is a lie"), and the bridge owes the palette
