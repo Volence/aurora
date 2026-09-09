@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { peerRepo, resolveRev, isAncestor } from '../support/peer-repo';
 import { siblingRoot } from '../support/sibling-root.mjs';
+import { announceFixture, READ_MODES } from '../../scratchpad/lib/fixture-provenance.mjs';
 import { verticalBandDocument } from '../support/vertical-band';
 import {
   documentBands, shiftedPhaseBanks,
@@ -72,6 +73,19 @@ const ARCHIVE_PATHS = [
 const aeon = peerRepo('aeon');
 let work: string | null = null;
 let setupWhy = '';
+/**
+ * THE PROVENANCE BLOCK THIS RUN PRINTED, captured so a row can assert it was
+ * printed at all.
+ *
+ * Aurora's lens ledger, FIXTURE-REVISION-UNSTAMPED: a harness that does not
+ * record which revision of a sibling it ran against makes a stale fixture
+ * indistinguishable from a fresh one. This file archives aeon at a PIN, so it
+ * was never at risk of drifting silently -- but its result said the revision
+ * only inside a test TITLE, which is not where a reader of a suite summary
+ * looks, and which no row could check. The stamp goes to the run's output and
+ * the row below asserts it names the pin.
+ */
+let provenance = '';
 
 function python(): string | null {
   return spawnSync('python3', ['--version']).status === 0 ? 'python3' : null;
@@ -83,6 +97,16 @@ beforeAll(() => {
     setupWhy = `aeon ${AXIS_REV} does not resolve in ${aeon} (fetch it)`; return;
   }
   if (python() === null) { setupWhy = 'no python3 on PATH'; return; }
+  // WHICH REVISION THIS RUN IS ABOUT TO READ, said before it reads it. The mode
+  // is COMMITTED because the next statement is `git archive`: the bytes come out
+  // of aeon's object database, so aeon's working tree may be as dirty as it
+  // likes without any of it reaching this row.
+  provenance = '';
+  announceFixture(
+    { peer: 'aeon', mode: READ_MODES.COMMITTED, ref: AXIS_REV, dir: aeon, dirSource: 'peerRepo(\'aeon\')' },
+    (s: string) => { provenance += s; },
+  );
+  process.stderr.write(provenance);
   const dir = mkdtempSync(join(tmpdir(), 'aurora-aeon-axis-'));
   // `git archive | tar -x` — a READ of aeon's object database into a directory
   // this test owns. The aeon checkout is never written to and never imported
@@ -210,6 +234,20 @@ describe('the pin this parcel was built against is still aeon history', () => {
       + 'commit; re-read tools/EFFECTS_CONSUMER_CONTRACT.md §1.2 and tools/inject_editor_bg.py '
       + 'at the new tip before trusting anything in bg-anim-band-axis.test.ts.',
     ).toBe(true);
+  });
+
+  it('this run STAMPED the aeon revision it read, and the stamp names the pin', (ctx) => {
+    if (skipUnlessReady(ctx)) return;
+    // Derived from the record, not typed: the stamp must carry the resolved
+    // 40-hex SHA of the pin, and it must say the bytes came from the object
+    // database rather than from aeon's working tree.
+    const sha = resolveRev(aeon!, AXIS_REV);
+    expect(sha, `aeon ${AXIS_REV} resolved during setup but not now`).not.toBeNull();
+    expect(provenance, 'the run printed no fixture provenance at all, so a reader of this '
+      + 'result cannot tell which aeon revision decided it').not.toBe('');
+    expect(provenance).toContain(sha!);
+    expect(provenance).toContain('COMMITTED OBJECTS');
+    expect(provenance).toContain('working tree was never opened');
   });
 });
 
