@@ -6,7 +6,7 @@
 // unreachable, or it means the same thing as the value it replaces, or it is
 // funnelled straight into a loud `throw`.
 //
-// ONE is different — `preset.ts:958`:
+// ONE is different — `preset.ts:979`:
 //
 //     return /lowers into EffectsPreset\.ep_patched/.test(String(node.description ?? ''));
 //
@@ -77,7 +77,7 @@ function patchedArmFromSchema(s: VendoredSchema): string {
   return hits[0];
 }
 
-describe('preset.ts:958 `node.description ?? \'\'`: the census\'s one conflating site', () => {
+describe('preset.ts:979 `node.description ?? \'\'`: the census\'s one conflating site', () => {
   afterEach(() => {
     vi.doUnmock(SCHEMA_MODULE);
     vi.resetModules();
@@ -116,7 +116,7 @@ describe('preset.ts:958 `node.description ?? \'\'`: the census\'s one conflating
     expect(
       poisoned.EFFECTS_PRESET_PATCHED_ARMS,
       `the ${arm} description key was deleted and the patched set did NOT collapse, so the `
-      + '`?? \'\'` at preset.ts:958 is not on the path this row believes it is on',
+      + '`?? \'\'` at preset.ts:979 is not on the path this row believes it is on',
     ).toEqual([]);
     expect(poisoned.EFFECTS_PRESET_RASTER_CHANNELS).toContain(arm);
 
@@ -126,13 +126,13 @@ describe('preset.ts:958 `node.description ?? \'\'`: the census\'s one conflating
     // reported as a finding. The hand-written dropdown label still says the arm
     // is patched, the derivation now says it is not, and
     // `PROGRAM_ARM_OPTIONS` compares the two in both directions at module load.
-    // If this stops throwing, the census's verdict on preset.ts:958 is wrong and
+    // If this stops throwing, the census's verdict on preset.ts:979 is wrong and
     // the site becomes a real finding: an arm silently offered a raster editor.
     await expect(
       import(PROVIDER_MODULE),
       'the provider loaded with the patched arm counted as a raster channel. An absent '
       + '`description` is now indistinguishable from one that does not claim ep_patched, with no '
-      + 'loud consequence anywhere. preset.ts:958 has become a CONFLATING site and the census '
+      + 'loud consequence anywhere. preset.ts:979 has become a CONFLATING site and the census '
       + 'row for it must be re-opened.',
     ).rejects.toThrow(/PROGRAM_ARM_LABELS/);
   });
