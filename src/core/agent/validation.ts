@@ -226,6 +226,33 @@ export function validateCollisionWritePlane(plane: unknown): string | null {
     + `undo step), got ${JSON.stringify(plane)}`;
 }
 
+/**
+ * ⚠ THE LAYOUT TWIN OF `validateCollisionWritePlane`, AND IT EXISTS FOR THE SAME
+ * REASON ONE ROW LATER. `classicSetLayoutCells` picks its grid with
+ * `plane === 'bg' ? doc.bg : doc.fg`, so ANY value that is not `'bg'` writes the
+ * FOREGROUND — not a refusal, a silent redirection of a destructive edit onto a
+ * plane nobody named. The collision write had the identical shape and was
+ * measured doing it: `plane: "c"` painted plane A and reported success.
+ *
+ * NOT A LIVE BUG TODAY, and the reason is worth stating rather than implying: the
+ * MCP road and the Aether road both validate against `EDITOR_METHODS.params`,
+ * where this key is `z.enum(['fg', 'bg'])`, so an off-schema value cannot arrive
+ * over either. This is the second line, for a road that reaches the handler
+ * without passing the registry. Its sibling's docblock makes the same argument
+ * and that sibling is why this one is here.
+ *
+ * THE OTHER TWO CALLERS ARE TYPED and need nothing: the viewport passes a
+ * `LayoutPlane` the compiler checks, and the store's own signature says
+ * `LayoutPlane`. Only the request road carries a value the type system never saw,
+ * which is why the guard belongs at the boundary rather than inside the store —
+ * putting it in the store would refuse a value TypeScript has already proven
+ * impossible for every caller that has a type.
+ */
+export function validateLayoutWritePlane(plane: unknown): string | null {
+  if (plane === 'fg' || plane === 'bg') return null;
+  return `plane must be "fg" or "bg" (the layout plane to stamp), got ${JSON.stringify(plane)}`;
+}
+
 export function validatePaintRegion(
   section: number,
   x: number, y: number, w: number, h: number,

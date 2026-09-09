@@ -14,7 +14,7 @@ import {
 // omitted state got answered with "off". See core/editing/brush-word.ts.
 import { brushNametableWord, brushPriorityFromOptional } from '../../core/editing/brush-word';
 import type { Tile, Zone, Act } from '../../core/model/s4-types';
-import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane, validatePaintCollisionRect, validateCollisionWrite, validateCollisionReadPlane, validateCollisionWritePlane } from '../../core/agent/validation';
+import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane, validatePaintCollisionRect, validateCollisionWrite, validateCollisionReadPlane, validateCollisionWritePlane, validateLayoutWritePlane } from '../../core/agent/validation';
 import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
 import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
@@ -1438,6 +1438,14 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
 
     case 'classic-set-layout-region': {
       requireClassicDoc();
+      // ⚠ THE PLANE FIRST, the layout twin of the collision backstop above. The
+      // store picks its grid with `plane === 'bg' ? doc.bg : doc.fg`, so any
+      // value that is not `'bg'` writes the FOREGROUND silently. Measured on the
+      // collision twin one row earlier: an off-schema plane painted plane A and
+      // reported success. See `validateLayoutWritePlane` for why the two typed
+      // callers need nothing and this one does.
+      const planeErr = validateLayoutWritePlane(req.plane);
+      if (planeErr) throw new Error(planeErr);
       const cells: { x: number; y: number; chunkId: number }[] = [];
       for (let dy = 0; dy < req.chunkIds.length; dy++) {
         const row = req.chunkIds[dy];

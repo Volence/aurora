@@ -284,6 +284,42 @@ describe('classic-set-layout-region', () => {
   it('errors when no level is open', async () => {
     await expect(handleAgentRequest({ kind: 'classic-set-layout-region', plane: 'fg', x: 0, y: 0, chunkIds: [[0]] })).rejects.toThrow(/no classic level is open/);
   });
+
+  // CLASSIC-LAYOUT-PLANE-NO-BACKSTOP — the layout twin of the collision write
+  // backstop, and the same asymmetry: the store picks its grid with
+  // `plane === 'bg' ? doc.bg : doc.fg`, so before the guard ANY value that was
+  // not `'bg'` wrote the FOREGROUND and reported success. Measured on the
+  // collision twin one parcel earlier, where `plane: "c"` painted plane A.
+  //
+  // THE REFUSAL IS THE CHEAP HALF. What cannot be faked is the foreground still
+  // holding what it held: a guard that threw AND wrote would satisfy a
+  // rejects.toThrow perfectly well, which is why the bytes are asserted too.
+  //
+  // Off-schema cannot arrive over /mcp or /aether today (both validate against
+  // `EDITOR_METHODS.params`, where this key is `z.enum(['fg','bg'])`), so this is
+  // a second line for a road that reaches the handler without the registry. The
+  // cast is deliberate and is the point: it stands in for exactly such a road,
+  // and it is the only way to hand the handler a value tsc has already refused.
+  it('refuses a plane the schema does not admit, and the foreground is untouched', async () => {
+    openReady();
+    const before = Array.from(lvl().doc!.fg.cells);
+    await expect(handleAgentRequest({
+      kind: 'classic-set-layout-region', plane: 'c', x: 0, y: 0, chunkIds: [[1]],
+    } as unknown as Parameters<typeof handleAgentRequest>[0]))
+      .rejects.toThrow(/plane must be "fg" or "bg"/);
+    expect(Array.from(lvl().doc!.fg.cells)).toEqual(before);
+    expect(lvl().dirty.fg).toBeUndefined();
+  });
+
+  // CONTROL, and it is load-bearing: without it a guard that refused EVERYTHING
+  // would pass the row above. `bg` is the value the store's own ternary tests
+  // for, so it is the one a too-narrow guard is likeliest to break.
+  it('CONTROL: bg still stamps the background plane', async () => {
+    openReady();
+    const res = await handleAgentRequest({ kind: 'classic-set-layout-region', plane: 'bg', x: 0, y: 0, chunkIds: [[1]] });
+    expect(res).toEqual({ plane: 'bg', cells: 1 });
+    expect(Array.from(lvl().doc!.bg.cells)[0]).toBe(1);
+  });
 });
 
 describe('classic-edit-chunk', () => {
