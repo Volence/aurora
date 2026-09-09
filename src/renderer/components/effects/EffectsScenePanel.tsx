@@ -1029,10 +1029,12 @@ export default function EffectsScenePanel(): React.ReactElement {
                   </Field>
                 ))}
               <Hint under style={{ marginBottom: 0 }}>{LAYER_SHIFT_ROW.hint}</Hint>
-              {/* THE STATE NO BUILD WILL EVER REPORT: a live shift with no table
-                  to sample is flat-pathed at runtime - the scene compiles, ships
-                  and does not move. Warning-toned because the author asked for
-                  motion and will not get it. */}
+              {/* THE STATE NO BUILD WILL EVER REPORT. The claim itself is
+                  `FLAT_PATH_CLAIM` in effects-aeon.ts, which the advisory
+                  interpolates and a register re-reads against aeon; it is not
+                  restated here, because a comment restating a cross-system claim
+                  is a second author with no arbiter. Warning-toned because the
+                  author asked for motion and will not get it. */}
               {layerShiftAdvisories(selected, i).map((a) => (
                 <Hint key={a} under tone="warning" style={{ marginBottom: 0 }}>
                   <span data-testid={`layer-${i}-shift-advisory`}>{a}</span>
@@ -1798,12 +1800,13 @@ export default function EffectsScenePanel(): React.ReactElement {
                         </Field>
                       ))}
                     <Hint under style={{ marginBottom: 0 }}>{ANCHOR_ROW.bindingHint}</Hint>
-                    {/* THE STATE NO BUILD WILL EVER REPORT. A live shift with no
-                        table to sample is flat-pathed at runtime: the scene
-                        compiles, ships and does not move. Warning-toned because
-                        the author asked for motion and will not get it — unlike
-                        the ramp note below, which is a consequence of a
-                        legitimate choice. */}
+                    {/* THE STATE NO BUILD WILL EVER REPORT. The claim itself is
+                        `FLAT_PATH_CLAIM` in effects-aeon.ts, on the same
+                        reasoning as the layer row's twin above: a comment
+                        restating a cross-system claim is a second author with no
+                        arbiter. Warning-toned because the author asked for motion
+                        and will not get it — unlike the ramp note below, which is
+                        a consequence of a legitimate choice. */}
                     {anchorDeformAdvisories(selected).map((a) => (
                       <Hint key={a} under tone="warning" style={{ marginBottom: 0 }}>
                         <span data-testid="anchor-deform-advisory">{a}</span>

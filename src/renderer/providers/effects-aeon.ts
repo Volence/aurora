@@ -4136,6 +4136,32 @@ export function setLayerShiftCommand(
  * document still saves. Silence means "nothing to say", which is the truth about
  * a strip whose planes are both off.
  */
+/**
+ * THE FLAT-PATH CLAIM, AUTHORED ONCE.
+ *
+ * ⚠ IT WAS TYPED TWICE, INDEPENDENTLY, and that is the finding
+ * `CROSS-SYSTEM-STRINGS-UNPOLICED` names. `layerShiftAdvisories` below and
+ * `anchorDeformAdvisories` at the bottom of this file both spelled out the same
+ * assertion about aeon's runtime, in their own words, with nothing comparing the
+ * two. It is the shape `scripts/check-prose-constants.mjs` refuses for numbers,
+ * for the same reason: two authors and no arbiter, rotting on separate clocks.
+ * They had already drifted in punctuation before anyone read them side by side.
+ *
+ * THE CLAIM IS AEON'S, not ours. Its precondition-1 message says it in one
+ * clause: *"A live shift with NO table is flat-pathed at runtime and does not
+ * count"* (`engine/level/scene_dsl.emp`). Because this is now standing copy
+ * rather than a sentence built inside a function, it is carried by the register
+ * in `test/formats/engine-claim-register.test.ts`, which re-reads that clause
+ * from aeon at a committed revision on every run. That is the arbiter neither
+ * copy had.
+ *
+ * It is NOT a build refusal, which is the whole reason a warning exists: the
+ * scene compiles, ships and renders a flat plane.
+ */
+export const FLAT_PATH_CLAIM =
+  'The engine flat-paths a live shift with no table: the build stays green and the plane does '
+  + 'not move.';
+
 export function layerShiftAdvisories(scene: EffectsScene, index: number): string[] {
   const layer = scene.layers[index];
   if (layer === undefined) return [];
@@ -4149,8 +4175,7 @@ export function layerShiftAdvisories(scene: EffectsScene, index: number): string
     if (shift === EFFECTS_LAYER_SHIFT_NONE) continue;
     if (anyOwn || sceneDeformValue(scene, key) !== null) continue;
     out.push(`this strip deforms ${plane} (${field} ${shift}) but the scene attaches no table `
-      + `it can sample - ${label} is off and no strip attaches its own. The engine flat-paths `
-      + 'a live shift with no table: the build stays green and the plane does not move. '
+      + `it can sample - ${label} is off and no strip attaches its own. ${FLAT_PATH_CLAIM} `
       + `Attach ${label}, or take ${plane} to off.`);
   }
   return out;
@@ -4925,6 +4950,10 @@ export function setAnchorShiftCommand(
  * ships and renders a flat plane. Nothing else on this panel would say so,
  * because until this parcel nothing could author the shift.
  *
+ * THE CLAIM ITSELF IS `FLAT_PATH_CLAIM` and is no longer typed here. This
+ * advisory and `layerShiftAdvisories` had each spelled it out separately; see
+ * that constant's docblock for why one copy and where its arbiter is.
+ *
  * THE TABLE RULE IS THE ENGINE'S, transcribed from `scene_dsl.emp`'s own
  * comment on the left-column guard: "that plane's scene-level attachment
  * (deform_fg for A, deform_bg for B — band_table_a/b resolve exactly this
@@ -4947,9 +4976,8 @@ export function anchorDeformAdvisories(scene: EffectsScene): string[] {
     if (at[field] === EFFECTS_ANCHOR_SHIFT_BOUNDS[field].max) continue;
     if (anyOwn || sceneDeformValue(scene, key) !== null) continue;
     out.push(`the anchor deforms ${plane} (${field} ${at[field]}) but this scene attaches no `
-      + `table it can sample: ${label} is off and no strip attaches its own. The engine `
-      + 'flat-paths a live shift with no table: the build stays green and the plane does not '
-      + `move. Attach ${label}, or take ${plane} to off.`);
+      + `table it can sample: ${label} is off and no strip attaches its own. ${FLAT_PATH_CLAIM} `
+      + `Attach ${label}, or take ${plane} to off.`);
   }
   return out;
 }
