@@ -2229,7 +2229,7 @@ export async function loadEffectsPresetLibrary(
       severity: 'error',
       message:
         `${dir} could not be read (${because}), so Aurora is showing NO raster presets ` +
-        'for this project — which is not the same as there being none. Nothing in that ' +
+        'for this project. That is not the same as there being none. Nothing in that ' +
         'directory will be written or deleted while this is true; fix the directory and reopen.',
     });
     return { presets, unreadable, notices, loadedPaths };
