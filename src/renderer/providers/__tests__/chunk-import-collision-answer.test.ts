@@ -24,7 +24,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { importChunkFiles, chunkImportOutcomeToast } from '../chunk-library-import';
+import {
+  importChunkFiles, chunkImportOutcomeToast, chunkImportBlindRefusal,
+} from '../chunk-library-import';
 import { useProjectStore } from '../../state/projectStore';
 import { useToastStore } from '../../state/toastStore';
 import type { CollisionProfile, CollisionProfileSet } from '../../../core/collision/collision-model';
@@ -134,28 +136,34 @@ describe('chunk import: the author is told WHICH answer the collision lookup gav
     expect(toast.message).toMatch(/^Imported \d+ chunks -- Save to keep$/);
   });
 
-  it('NO PROFILES LOADED: the chunks still arrive, and the toast says the tables did not load', async () => {
+  it('NO PROFILES LOADED: the import is REFUSED, and no chunk arrives at all', async () => {
     // The reachable case. An aeon project opens with `collisionProfiles` null
     // whenever its collision tables are missing, renamed, or in the other of the
     // two well-known locations — `loadCollisionProfilesFa` returns null on any
     // such miss BY DESIGN, so the overlay can degrade, and the open succeeds.
+    //
+    // ⚠ THIS ROW CHANGED ON 2026-09-09 and the change is the answer to
+    // `d-36b-air-collision-import-split-closed`, not a drift. It used to assert
+    // that the chunks still arrived with a warning. The owner ruled
+    // `refuse_a_warn_b`: case A refuses. The full proof that NOTHING is written
+    // and NO dirty flag is set lives in the sibling file
+    // chunk-import-refuses-when-blind.test.ts, because a refusal message and an
+    // unmutated project are two different claims and that file asserts the
+    // second one. What stays here is this file's own subject: which of the
+    // answers the author is told about.
     useProjectStore.setState({ collisionProfiles: null });
 
-    await expect(importChunkFiles()).resolves.toBe(true);
+    await expect(importChunkFiles(), 'a refusal resolves false').resolves.toBe(false);
 
-    // The import is NOT refused — that is d-36's call, not this parcel's.
-    expect(library().length).toBeGreaterThan(0);
-    // And every cell is air, which is the fact the sentence has to carry.
-    expect(anySolidCell()).toBe(false);
+    expect(library().length, 'a refusal writes no chunks').toBe(0);
 
     const toast = onlyToast();
-    expect(toast.type).toBe('warning');
-    expect(toast.message).toMatch(/NO COLLISION/);
+    expect(toast.type).toBe('error');
     expect(toast.message, 'must name the blindness: the tables did not load')
       .toMatch(/tables did not load/i);
-    // ⚠ AND IT MUST NOT STILL BE THE OLD SENTENCE. The defect was a plain
-    // success claim; a message that merely gained words in front of it would
-    // still read as one.
+    // ⚠ AND IT MUST NOT STILL BE THE OLD SENTENCE. The original defect was a
+    // plain success claim; a message that merely gained words in front of it
+    // would still read as one.
     expect(toast.message).not.toMatch(/^Imported \d+ chunks -- Save to keep$/);
   });
 
@@ -176,11 +184,16 @@ describe('chunk import: the author is told WHICH answer the collision lookup gav
   });
 
   it('⚠ the two blind sentences are DIFFERENT: the conflation, at the surface the author reads', () => {
-    // Held against each other directly, through the pure decider, because the
-    // failure this parcel exists to prevent is precisely two different facts
+    // Held against each other directly, through the pure deciders, because the
+    // failure this file exists to prevent is precisely two different facts
     // arriving as one message. Operands asserted non-empty first: two undefined
     // messages would satisfy `not.toBe` between themselves.
-    const couldNotLook = chunkImportOutcomeToast(7, { status: 'no-profiles' });
+    //
+    // The two now come from DIFFERENT functions, which is the shape of the
+    // owner's ruling: "could not look" is a refusal and never reaches
+    // `chunkImportOutcomeToast` at all — the type says so, and this row would
+    // not compile if it did.
+    const couldNotLook = chunkImportBlindRefusal(['data/collision/base/', 'data/collision/']);
     const bankHasNone = chunkImportOutcomeToast(7, { status: 'no-full-block' });
     const found = chunkImportOutcomeToast(7, { status: 'found', shapeId: 2 });
 
@@ -188,12 +201,15 @@ describe('chunk import: the author is told WHICH answer the collision lookup gav
     expect(bankHasNone.message.length).toBeGreaterThan(0);
     expect(couldNotLook.message).not.toBe(bankHasNone.message);
     // Neither blind answer may wear the success tone, which is the tone the
-    // defect wore.
+    // original defect wore.
     expect(couldNotLook.type).not.toBe('success');
     expect(bankHasNone.type).not.toBe('success');
     expect(found.type).toBe('success');
-    // Every one of them still names the count, so the truthful sentence does not
-    // cost the author the fact they came for.
-    for (const o of [couldNotLook, bankHasNone, found]) expect(o.message).toMatch(/\b7\b/);
+    // The two that describe an import that HAPPENED still name the count, so the
+    // truthful sentence does not cost the author the fact they came for. The
+    // refusal cannot: nothing was imported, so there is no count to name.
+    for (const o of [bankHasNone, found]) expect(o.message).toMatch(/\b7\b/);
+    expect(couldNotLook.message, 'a refusal must not claim a number of imported chunks')
+      .not.toMatch(/Imported \d+ chunks/);
   });
 });

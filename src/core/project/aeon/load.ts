@@ -76,23 +76,70 @@ export function legacyAtlasPath(chunkLibraryPath: string): string {
 }
 
 /**
+ * The three tables `loadCollisionProfilesFa` needs TOGETHER, in one directory.
+ * A directory holding two of them yields nothing: the reads go out as one
+ * `Promise.all`, so one miss abandons that location entirely.
+ *
+ * Exported because a REFUSAL has to name them. `chunk-library-import.ts` stops
+ * the import when this set never loaded (decision
+ * `d-36b-air-collision-import-split-closed`, answered `refuse_a_warn_b`) and
+ * tells the author which files to go find. That sentence reads this constant
+ * rather than restating it, so a rename here cannot leave the message naming a
+ * file the loader stopped asking for.
+ *
+ * ⚠ KEYED BY ROLE, NOT AN ARRAY, on purpose. The loader destructures the three
+ * reads into `{ heightmaps, angles, solidity }`, so a positional list would make
+ * a reordering of this constant silently hand the adapter the wrong table. A
+ * role key cannot be reordered into a defect.
+ */
+export const COLLISION_TABLE_FILES = {
+  heightmaps: 'heightmaps.bin',
+  angles: 'angles.bin',
+  solidity: 'solidity.bin',
+} as const;
+
+/**
+ * Every directory `loadCollisionProfilesFa` actually reads for one candidate
+ * dir, in probe order. Same reason for existing as `COLLISION_TABLE_FILES`: the
+ * refusal claims "here is where it looked", and a claim like that must be
+ * derived from the loader rather than written from a second opinion about its
+ * layout. The loader below consumes this, so the two cannot drift.
+ */
+export function collisionTableProbeDirs(relDir: string): string[] {
+  const dir = relDir.endsWith('/') ? relDir : `${relDir}/`;
+  // The palette shows the fixed BASE BANK (the imported S&K vocabulary), not the
+  // sparse interned runtime tables the bake writes to `${dir}*.bin`. Prefer the
+  // base bank; fall back to the flat tables (pre-flag builds / if base absent).
+  return [`${dir}base/`, dir];
+}
+
+/**
+ * Every directory the collision tables are looked for in when a project with
+ * this `project.json` opens: each candidate dir (`collisionDataPathCandidates`)
+ * expanded through the loader's own base-then-flat probe. Pure, no I/O, so the
+ * refusal path can name the locations without touching the disk a second time.
+ */
+export function collisionTableSearchPaths(raw: S4ProjectConfig): string[] {
+  return collisionDataPathCandidates(raw).flatMap(collisionTableProbeDirs);
+}
+
+/**
  * Load the engine's four collision tables from `relDir` and decode them via the
  * s4 adapter. Returns null on any missing/unreadable table so the overlay
  * degrades gracefully (the view falls back to flat cell fills) rather than
  * crashing. Ported from load-collision.ts's loadCollisionProfiles behind
  * FileAccess (reads go through `fa.read` instead of window.api.readBinaryFile).
+ *
+ * ⚠ THE NULL IS DELIBERATE AND IS NOT THE BUG, whatever a consumer does with
+ * it. See the header of core/collision/full-block-shape.ts.
  */
 export async function loadCollisionProfilesFa(fa: FileAccess, relDir: string): Promise<CollisionProfileSet | null> {
-  const dir = relDir.endsWith('/') ? relDir : `${relDir}/`;
-  // The palette shows the fixed BASE BANK (the imported S&K vocabulary), not the
-  // sparse interned runtime tables the bake writes to `${dir}*.bin`. Prefer the
-  // base bank; fall back to the flat tables (pre-flag builds / if base absent).
-  for (const sub of [`${dir}base/`, dir]) {
+  for (const sub of collisionTableProbeDirs(relDir)) {
     try {
       const [heightmaps, angles, solidity] = await Promise.all([
-        fa.read(`${sub}heightmaps.bin`),
-        fa.read(`${sub}angles.bin`),
-        fa.read(`${sub}solidity.bin`),
+        fa.read(`${sub}${COLLISION_TABLE_FILES.heightmaps}`),
+        fa.read(`${sub}${COLLISION_TABLE_FILES.angles}`),
+        fa.read(`${sub}${COLLISION_TABLE_FILES.solidity}`),
       ]);
       return s4CollisionAdapter.decodeProfiles({ heightmaps, angles, solidity });
     } catch {
