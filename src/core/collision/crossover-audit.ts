@@ -60,6 +60,51 @@ import { CELL_SUBTILE_COLS, CELL_SUBTILE_ROWS, spanForTileCol } from './collisio
 export const AUDIT_SAMPLE_CAP = 16;
 
 /**
+ * THE CROSSOVER AT ONE INDEX, OR NULL WHEN THERE IS NO CELL THERE.
+ *
+ * ⚠ THIS EXISTS BECAUSE `readCrossover` CANNOT DO THIS JOB AND MUST NOT BE ASKED
+ * TO. Its parameter is `number | undefined` and it folds `undefined` to 0, so it
+ * answers `'none'` for a word nobody wrote. That fold is correct where it lives:
+ * a caller holding a word wants a name for it. It is exactly wrong as an answer
+ * about an INDEX, because a cell that does not exist and a cell carrying no
+ * crossover are then the same answer, and this file's whole job is to notice
+ * marks. An audit that reads past an end and folds the nothing into `'none'`
+ * UNDER-REPORTS, and under-reporting is the direction that hurts: a clean audit
+ * is what somebody acts on.
+ *
+ * So the remedy is a value the caller has to answer for rather than one that
+ * happens to look benign, which is the same ruling `crossoverLocus` states at
+ * length for a missing stride: a flag is ignorable, a null is not.
+ *
+ * A HOLE INSIDE THE LENGTH IS ALSO NULL. A sparse array's missing element is not
+ * a zero cell either, and nothing in Aurora produces one; a foreign or
+ * hand-built plane can, and the honest answer is the same as past the end.
+ */
+export function crossoverInPlane(plane: ArrayLike<number>, index: number): CrossoverRead | null {
+  if (!Number.isInteger(index) || index < 0 || index >= plane.length) return null;
+  const word = plane[index];
+  if (word === undefined) return null;
+  return readCrossover(word);
+}
+
+/**
+ * How many sub-tile ROWS the cancellation scan can walk over `length` words at
+ * `stride`, which is ZERO whenever the words do not fill one whole row.
+ *
+ * ONE AUTHOR FOR THAT ARITHMETIC, and it is why this is exported rather than
+ * inlined twice. `scanCancellingRuns` needs it to bound its walk and
+ * `auditCrossovers` needs it to know whether the walk saw anything at all. Two
+ * copies would let the audit report `cancellingMeasured: true` over a scan that
+ * looked at nothing, which is precisely the defect this parcel closed: the flag
+ * used to be set from the STRIDE ALONE, so a section whose second plane was one
+ * word long claimed the check had run.
+ */
+export function cancellingScanRows(length: number, stride: number): number {
+  if (!Number.isInteger(stride) || stride <= 0 || !(length > 0)) return 0;
+  return Math.floor(length / stride);
+}
+
+/**
  * WHERE A SAMPLE INDEX IS, when that is knowable at all.
  *
  * Every list in `CrossoverAudit` names FLAT SUB-TILE INDICES, and an index is
@@ -183,6 +228,30 @@ export function formatCrossoverLocus(locus: CrossoverLocus | null, index: number
 export interface CrossoverAudit {
   /** Cells examined (the shorter of the two planes' lengths). */
   cells: number;
+  /**
+   * ⚠ CELLS THE AUDIT NEVER LOOKED AT, AND THE REASON A ZERO ELSEWHERE MAY NOT
+   * BE READ AS CLEAN.
+   *
+   * The scan is index-wise over two parallel arrays, so it can only speak for
+   * the cells BOTH planes have; `cells` is the shorter length and this is what
+   * the longer one has beyond it. It is the whole of the present plane when the
+   * other is absent, and 0 when both are absent (nothing to examine is not a
+   * gap).
+   *
+   * Non-zero means every count above is a LOWER BOUND. A self-mark past the
+   * shorter plane's end used to report `severity: 'ok'` with a null message,
+   * which is a clean bill of health for a document that hard-errors aeon's bake,
+   * and it is the shape a section whose plane B was never seeded actually takes.
+   * `crossoverAuditMessage` therefore says this in words and is NEVER null while
+   * it is non-zero.
+   *
+   * ⚠ IT DOES NOT MOVE `crossoverAuditSeverity`, deliberately. That predicate
+   * answers one question, "will aeon's bake refuse this document", and an
+   * instrument that could not read the whole document has not found a defect to
+   * grade. Same ruling as `cancellingMeasured`, which is also reported in prose
+   * rather than as a tier.
+   */
+  unexamined: number;
   /** Cells whose plane-A word carries a crossover (any non-`none` value). */
   marksA: number;
   /** Same on plane B. */
@@ -218,8 +287,13 @@ export interface CrossoverAudit {
    *  a caller that does not pass one gets `cancellingMeasured: false` and this
    *  stays 0. A count of 0 is not "clean" unless that flag is true. */
   cancelling: number;
-  /** Whether the cancellation scan actually ran (a stride was supplied). LOUD
-   *  ON UNMEASURABLE: `cancelling: 0` means two different things without it. */
+  /** Whether the cancellation scan actually WALKED A ROW. LOUD ON UNMEASURABLE:
+   *  `cancelling: 0` means two different things without it.
+   *
+   *  ⚠ IT IS NOT "a stride was supplied", which is what it used to be. A usable
+   *  stride over fewer words than one row scans nothing at all
+   *  (`cancellingScanRows` returns 0), and the flag then claimed a check that
+   *  never happened. The message names WHICH of the two reasons applies. */
   cancellingMeasured: boolean;
   /** First sub-tile index of each cancelling run, capped like the others. */
   cancellingAt: number[];
@@ -306,16 +380,26 @@ export function auditCrossovers(
 ): CrossoverAudit {
   const usableStride = typeof stride === 'number' && Number.isInteger(stride) && stride > 0;
   const out: CrossoverAudit = {
-    cells: 0, marksA: 0, marksB: 0, pairs: 0, oneWay: 0,
+    cells: 0, unexamined: 0, marksA: 0, marksB: 0, pairs: 0, oneWay: 0,
     selfMarks: 0, reserved: 0, divergent: 0, solidBoth: 0,
     cancelling: 0, cancellingMeasured: false, cancellingAt: [],
     selfMarkAt: [], reservedAt: [], oneWayAt: [],
     stride: usableStride ? stride : null,
     section: section ?? null,
   };
-  if (!planeA || !planeB) return out;
-  const n = Math.min(planeA.length, planeB.length);
+  // WHAT THIS RUN COULD NOT SEE, COMPUTED BEFORE THE FIRST EARLY RETURN so the
+  // absent-plane case carries it too. That case is not hypothetical: a section
+  // whose plane B has never been seeded reaches all three call sites, and it
+  // used to produce a record indistinguishable from a clean audit.
+  const lenA = planeA ? planeA.length : 0;
+  const lenB = planeB ? planeB.length : 0;
+  if (!planeA || !planeB) {
+    out.unexamined = Math.max(lenA, lenB);
+    return out;
+  }
+  const n = Math.min(lenA, lenB);
   out.cells = n;
+  out.unexamined = Math.max(lenA, lenB) - n;
   for (let i = 0; i < n; i++) {
     const wa = planeA[i], wb = planeB[i];
     const ca = readCrossover(wa), cb = readCrossover(wb);
@@ -352,10 +436,18 @@ export function auditCrossovers(
   // 2026-09-06 this read `stride && stride > 0`, which admits a FRACTIONAL
   // stride: the scan would then walk rows that are not rows, and a locus
   // computed from the same number would name a cell that does not exist.
+  //
+  // ⚠ AND IT GATES ON THE ROWS THE SCAN CAN ACTUALLY WALK, not on the stride
+  // being present. `cancellingScanRows(n, stride)` is 0 whenever the two planes
+  // between them do not offer one whole row, and the flag used to be set to true
+  // regardless: `cancelling: 0, cancellingMeasured: true` over a scan that
+  // looked at nothing is the same benign-looking zero this parcel is about.
   if (out.stride !== null) {
-    out.cancellingMeasured = true;
-    for (const run of scanCancellingRuns(planeA, planeB, n, out.stride)) {
-      push(out.cancellingAt, run.index, out.cancelling++);
+    out.cancellingMeasured = cancellingScanRows(n, out.stride) > 0;
+    if (out.cancellingMeasured) {
+      for (const run of scanCancellingRuns(planeA, planeB, n, out.stride)) {
+        push(out.cancellingAt, run.index, out.cancelling++);
+      }
     }
   }
   return out;
@@ -397,10 +489,22 @@ export function auditCrossovers(
  * those would fire on the correct answer.
  */
 export function scanCancellingRuns(
-  planeA: ArrayLike<number>, planeB: ArrayLike<number>, length: number, stride: number,
+  planeA: ArrayLike<number>, planeB: ArrayLike<number>,
+  /** How many words to consider. ⚠ IT IS NOT TRUSTED: see `extent` below. */
+  length: number,
+  stride: number,
 ): CrossoverRun[] {
   const out: CrossoverRun[] = [];
-  const rows = Math.floor(length / stride);
+  // ⚠ `length` IS A CALLER'S CLAIM AND THIS FUNCTION IS EXPORTED, so the claim
+  // gets checked against the arrays rather than believed. A length past either
+  // plane's end read `undefined`, `readCrossover` folded that to `'none'`, and a
+  // cell that does not exist was indistinguishable from a cell with no mark: the
+  // scan then reported no run where it had no data, which is an UNDER-REPORT
+  // wearing a clean answer. `auditCrossovers` passes the shorter plane's length
+  // and was never the caller that could do it; every other caller is a test, a
+  // harness or the next parcel, and none of them should have to know.
+  const extent = Math.min(length, planeA.length, planeB.length);
+  const rows = cancellingScanRows(extent, stride);
   const fires = (w: number | undefined, on: CollisionPlaneId): CollisionPlaneId | null => {
     const c = readCrossover(w);
     if (c === 'reserved' || c === 'none') return null;
@@ -408,8 +512,13 @@ export function scanCancellingRuns(
     // A self-mark cannot fire — reading a plane's mark means being on it.
     return to === null || to === on ? null : to;
   };
+  // THROUGH THE REFUSING READER, NOT `readCrossover`. Inside `extent` a null is
+  // unreachable by construction; it is read through the accessor anyway so that
+  // the boundary rule lives in ONE place and a future caller that widens the
+  // walk cannot reintroduce the fold by forgetting it. `crossoverInPlane`'s own
+  // null behaviour is asserted directly in crossover-audit-bounds.test.ts.
   const markedAt = (i: number): boolean => {
-    const a = readCrossover(planeA[i]), b = readCrossover(planeB[i]);
+    const a = crossoverInPlane(planeA, i), b = crossoverInPlane(planeB, i);
     return a === 'to-a' || a === 'to-b' || b === 'to-a' || b === 'to-b';
   };
   for (let row = 0; row < rows; row += CELL_SUBTILE_ROWS) {
@@ -421,7 +530,7 @@ export function scanCancellingRuns(
       const width = end - col + 1;
       let pairs = 0;
       for (let c = col; c <= end; c++) {
-        const a = readCrossover(planeA[base + c]), b = readCrossover(planeB[base + c]);
+        const a = crossoverInPlane(planeA, base + c), b = crossoverInPlane(planeB, base + c);
         const ma = a === 'to-a' || a === 'to-b', mb = b === 'to-a' || b === 'to-b';
         if (ma && mb) pairs++;
       }
@@ -509,6 +618,20 @@ export function crossoverAuditMessage(a: CrossoverAudit): string | null {
       + 'the same as firing once). It is a MISTAKE only if you meant a single two-way handoff and '
       + 'marked one plane; then mark the other plane at the same place, at "Half (8px)" mark width.');
   }
+  // ⚠ WHAT THE AUDIT DID NOT LOOK AT, AND IT IS NOT PARENTHESISED LIKE THE TWO
+  // CAVEATS BELOW. Those two say a coordinate or a traversal is missing from an
+  // otherwise complete report; this one says the report is INCOMPLETE, so every
+  // count above is a lower bound. It is also the only line that can be the whole
+  // message: an audit that examined nothing has nothing else to say, and null
+  // there would be a clean bill of health nobody measured.
+  if (a.unexamined > 0) {
+    parts.push(`${a.unexamined} cell${a.unexamined === 1 ? '' : 's'} of these planes `
+      + `${a.unexamined === 1 ? 'was' : 'were'} NOT EXAMINED (this audit read ${a.cells}): the two `
+      + 'planes are different lengths, and an index-wise scan of two parallel arrays can only '
+      + 'speak for the cells both of them have. Every count here is therefore a LOWER BOUND, and '
+      + 'a clean report is not a clean document. The usual cause is a section whose second '
+      + 'collision plane was never seeded; seed it (ensureCollisionPlanes) and audit again.');
+  }
   // THE OTHER HALF OF THE SAME REFUSAL, and it fires on the classes above
   // rather than on `pairs`: without a stride every "first at" line degraded to
   // a bare index, and a bare index beside a real defect is exactly the thing
@@ -521,8 +644,18 @@ export function crossoverAuditMessage(a: CrossoverAudit): string | null {
   if (!a.cancellingMeasured && (a.pairs > 0)) {
     // LOUD ON UNMEASURABLE. `cancelling: 0` beside a real pair count is the one
     // combination a reader would otherwise take as an all-clear.
-    parts.push('(The two-way cancellation check did NOT run: this audit was called without a row '
-      + 'stride, so nothing here says whether these pairs actually change the player\'s path.)');
+    //
+    // ⚠ AND IT NAMES WHICH OF THE TWO REASONS APPLIES. Until this parcel the flag
+    // could only be false for a missing stride, so the sentence said so; it can
+    // now also be false with a perfectly good stride and too few words to fill
+    // one row, and a correct rule stating the wrong reason is how the rule gets
+    // applied in the wrong place later.
+    parts.push('(The two-way cancellation check did NOT run, so nothing here says whether these '
+      + 'pairs actually change the player\'s path: '
+      + (a.stride === null
+        ? 'this audit was called without a row stride.)'
+        : `these ${a.cells} cell${a.cells === 1 ? '' : 's'} do not fill one row of ${a.stride}, `
+          + 'so the scan had no row to walk.)'));
   }
   return parts.length ? parts.join(' ') : null;
 }
