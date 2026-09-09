@@ -537,6 +537,11 @@ async function sectionClean() {
       + 'the probe is installed on it',
       typeof installed.listenersBefore === 'number' && installed.pid > 0,
       `main pid ${installed.pid}; app close listeners before the probe: ${installed.listenersBefore}`);
+    // ⚠ WHAT THIS ROW DOES AND DOES NOT SAY. It says the probe is LAST, which is
+    // what makes every `defaultPrevented` below the app's decision. It does NOT
+    // say the listeners it counted are the GUARD's: under MUT-D (the guard never
+    // installed) the count was still 1, because registerAetherBridge registers a
+    // `close` listener of its own. Row [1b] is what proves the guard is there.
     check('0b', "ANTI-VACUOUS: the app registered its OWN `close` listener BEFORE the probe's, so "
       + 'every `defaultPrevented` below is the app\'s decision and not the probe\'s',
       installed.listenersBefore >= 1,
@@ -808,9 +813,25 @@ async function sectionWindowClose() {
       unmeasurable('4b', 'window.close() raises no close event', 'a close event was already recorded');
       return;
     }
-    // Fire-and-forget: the page is about to go, so the evaluate reply may never
-    // come back. That is expected and is not the measurement.
-    s.R.send('Runtime.evaluate', { expression: 'setTimeout(() => window.close(), 0)' }).catch(() => {});
+    // ── the trigger, and its DETECTOR CONTROL ─────────────────────────────
+    //
+    // [4b] is an ABSENCE, and the product has no mutation that can make an
+    // absence red — Electron's routing of `window.close()` is not our code. So
+    // the plant is on the DETECTOR instead, which is the honest place for it:
+    // PLANT=wclose-control swaps the renderer's `window.close()` for a
+    // browser-process `win.close()`, which DOES raise the event. [4b] must go
+    // red on that run, or it is a row that cannot tell the two apart and its
+    // green means nothing.
+    if (PLANT === 'wclose-control') {
+      note('PLANT', 'wclose-control — §4 closes from the MAIN process instead of calling '
+        + 'window.close() in the renderer. A close event IS raised on that path, so [4b] MUST go RED.');
+      s.M.evalExpr("(() => { const { BrowserWindow } = require('electron');"
+        + ' const w = BrowserWindow.getAllWindows()[0]; if (w) w.close(); return 1; })()').catch(() => {});
+    } else {
+      // Fire-and-forget: the page is about to go, so the evaluate reply may never
+      // come back. That is expected and is not the measurement.
+      s.R.send('Runtime.evaluate', { expression: 'setTimeout(() => window.close(), 0)' }).catch(() => {});
+    }
     const t0 = Date.now();
     let t = null;
     while (Date.now() - t0 < 8000) {
