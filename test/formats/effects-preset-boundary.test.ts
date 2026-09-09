@@ -594,6 +594,66 @@ describe('the two refusals the schema CANNOT express, and the one it never will'
     expect(inverted).not.toContain('line-in-band');
   });
 
+  /**
+   * ⚠ THE TWO ROWS ABOVE TEST THESE PREDICATES A COMFORTABLE DISTANCE FROM
+   * THEIR EDGE, and a plant-and-count audit found that is where they stop
+   * (docs/reviews/2026-09-09-guard-residue-validators.md). An inverted band of
+   * a hundred lines and a default line ninety lines outside its band are both
+   * caught by a predicate loosened by one, so both rows stayed green with the
+   * comparison moved. The `line-in-band` row does assert both ENDPOINTS, but
+   * only that they are accepted; nothing said the first line PAST each end is
+   * refused, and a one-sided assertion about a bound is what a widened bound
+   * looks like from inside the suite.
+   *
+   * These are the minimal cases, and they are also the realistic ones: an
+   * author who mistypes a band gets `lo` one past `hi`, not two hundred past.
+   */
+  it('the MINIMAL inversion earns lo-hi, and the equal-ended band does not', () => {
+    expect(
+      boundaryAdvisories(withB({ lo: 121, hi: 120 })).map((x) => x.rule),
+      'a band whose lo is one line past its hi is still empty, and is still the '
+      + 'thing the generator refuses',
+    ).toContain('lo-hi');
+    // The other side of the same comparison: a band of exactly one line is
+    // legal, so a predicate that warns on it would be warning on real documents.
+    expect(boundaryAdvisories(withB({ lo: 120, hi: 120, line: 120 })).map((x) => x.rule))
+      .not.toContain('lo-hi');
+  });
+
+  it('a line ONE past either end of the band earns line-in-band', () => {
+    expect(boundaryAdvisories(withB({ line: 99, lo: 100, hi: 200 })).map((x) => x.rule))
+      .toContain('line-in-band');
+    expect(boundaryAdvisories(withB({ line: 201, lo: 100, hi: 200 })).map((x) => x.rule))
+      .toContain('line-in-band');
+  });
+
+  /**
+   * `no-motion` DOES NOT TALK OVER THE SCHEMA. Its own words are that an
+   * out-of-range channel is the schema's refusal, so it says nothing there;
+   * without this row the boundary of that range is untested in the direction
+   * that matters, and a channel index the schema rejects would earn a second,
+   * confusing sentence claiming the document is legal and still.
+   */
+  it('no-motion says nothing about a channel the schema itself refuses', () => {
+    const outOfRange = boundaryAdvisories(withB({ channel: EFFECTS_PRESET_MAX_PATCH }));
+    expect(outOfRange.map((x) => x.rule)).not.toContain('no-motion');
+    // ANTI-VACUOUS CONTROL: the last IN-range channel, with nothing seeding or
+    // sweeping it, does earn the sentence. Without this the row above is met by
+    // a `no-motion` that never fires at all.
+    expect(boundaryAdvisories(withB({ channel: EFFECTS_PRESET_MAX_PATCH - 1 })).map((x) => x.rule))
+      .toContain('no-motion');
+  });
+
+  it('a document with no boundary at all earns nothing, and does not throw', () => {
+    // `null` and `undefined` are separate spellings of absence here and the
+    // module folds them together; a guard that handled only one would reach
+    // into null for a channel index.
+    expect(boundaryAdvisories({ ...base } as Partial<EffectsPreset>)).toEqual([]);
+    expect(
+      boundaryAdvisories({ ...base, boundary: null } as unknown as Partial<EffectsPreset>),
+    ).toEqual([]);
+  });
+
   it('NOTHING here refuses: an advisory-only document still parses and saves', () => {
     // Stated as its own row because it is the load-bearing half of "advisory".
     const d = withB({ lo: 200, hi: 100 });
