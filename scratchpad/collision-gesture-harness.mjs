@@ -421,7 +421,7 @@ const panelShape = (c) => c.evalExpr(`(() => {
  * that never landed.
  */
 const swatchList = (unusedOnly, avoid) =>
-  `[...document.querySelectorAll('button[title]')].filter((b) => /^shape \\d+ /.test(b.title)`
+  `[...document.querySelectorAll('button[title]')].filter((b) => /^shape \\d+,/.test(b.title)`
   + ` && b.getBoundingClientRect().width > 0`
   + (unusedOnly ? ` && /not used in this zone yet$/.test(b.title)` : '')
   + ` && Number(/^shape (\\d+)/.exec(b.title)[1]) !== ${avoid})`;
