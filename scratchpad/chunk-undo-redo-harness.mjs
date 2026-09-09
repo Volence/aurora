@@ -78,9 +78,10 @@
 //                 ladder, which is what "the author's own new art, not somebody
 //                 else's edit" looks like.
 //       R1, R1v   staged the misfire's victim. They now assert the press took
-//                 the author's own gesture and left e3 intact — and the FATAL
-//                 check is kept, inverted: a run where the misfire reproduces
-//                 stops there as a regression.
+//                 the author's own gesture and left e3 intact. The old FATAL
+//                 check is NOT simply inverted: a returning misfire is reported
+//                 and the run CONTINUES, so S3 and X3 are still executed and
+//                 still shown to fail. Only "the press did neither" is fatal.
 //       R3, R4    asked whether Redo rescued the eaten edit and whether it
 //                 disturbed the author's stroke. They now assert the round trip:
 //                 the gesture goes out on Ctrl+Z and comes back on Ctrl+Y.
@@ -766,9 +767,20 @@ async function main() {
       tookOwn,
       `zoneArtHash after Ctrl+Z #1: ${rZoneAfterZ1} (${nameOf(rZoneAfterZ1)}), want ${Z3v}; `
       + `doc pixel ${rDoc0} -> ${rDoc1} (stroke) -> ${rDoc2} (Ctrl+Z)`);
-    if (ate) throw new Error('REGRESSION: the misfire reproduced — Ctrl+Z on a chunk document '
-      + 'destroyed an edit made on another document (owner ruling d-37 closed this)');
-    if (!tookOwn) throw new Error('the first Ctrl+Z did neither: every row below would be vacuous');
+    // ⚠ THE MISFIRE IS NOT FATAL AND MUST NOT BE, even though the old row's
+    // ABSENCE of it was. If it comes back, every row below is measuring the
+    // world d-37 removed and will say so one row at a time — S3 and X3 included,
+    // which are the two rows a reader checks first. Stopping here would leave
+    // them UNRUN, and an unrun row cannot be shown to discriminate. The one case
+    // that IS fatal is the third: a press that did neither, which means the
+    // instrument is broken rather than the app.
+    if (ate) {
+      console.log('        ⚠ REGRESSION: the misfire reproduced. Every row below now measures the '
+        + 'behaviour owner ruling d-37 removed, and is reported rather than skipped.');
+    } else if (!tookOwn) {
+      throw new Error('the first Ctrl+Z did neither — it left the zone art at '
+        + `${rZoneAfterZ1} and the doc pixel at ${rDoc2}: every row below would be vacuous`);
+    }
 
     // ── CELL 2: is the Redo control enabled at that moment? ──────────────────
     const rChips2 = await chips();
