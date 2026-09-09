@@ -847,7 +847,7 @@ async function loadFullProject(
       // silent — there is nothing this could have migrated.
       if (fullBlock.status !== 'found' && parsed.some(c => c.collision && c.collision.length > 0)) {
         console.warn(`[load] legacy chunk collision NOT migrated: ${fullBlock.status === 'no-profiles'
-          ? 'no collision profiles loaded (tables missing or unreadable) — nothing was searched'
+          ? 'no collision profiles loaded (tables missing or unreadable), so nothing was searched'
           : 'the loaded collision bank contains no full-block shape to migrate with'}`);
       }
     } catch {

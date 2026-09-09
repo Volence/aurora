@@ -120,7 +120,7 @@ describe('lookupFullBlockShape', () => {
     expect(lookupFullBlockShape(set)).toEqual({ status: 'no-full-block' });
   });
 
-  it('⚠ the two blind answers are NOT the same value — the defect this replaced', () => {
+  it('⚠ the two blind answers are NOT the same value: the defect this replaced', () => {
     // The one row that would have been impossible to write before. Both of
     // these used to be the number 0, which is exactly why a caller could spend
     // one believing it was the other.

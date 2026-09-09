@@ -175,7 +175,7 @@ describe('chunk import: the author is told WHICH answer the collision lookup gav
     expect(toast.message).not.toMatch(/tables did not load/i);
   });
 
-  it('⚠ the two blind sentences are DIFFERENT — the conflation, at the surface the author reads', () => {
+  it('⚠ the two blind sentences are DIFFERENT: the conflation, at the surface the author reads', () => {
     // Held against each other directly, through the pure decider, because the
     // failure this parcel exists to prevent is precisely two different facts
     // arriving as one message. Operands asserted non-empty first: two undefined
