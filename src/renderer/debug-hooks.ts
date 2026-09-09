@@ -372,6 +372,15 @@ interface AeonProbeApi {
   /** Can the focused document's stack undo? Drives the "one gesture, one step" count. */
   canUndo(): boolean;
   /**
+   * Can the focused document's stack REDO? The store-side twin of the Redo
+   * chip's `disabled`, and read for the same reason `canUndo` is read beside
+   * the Undo chip: "enabled and wrong" and "disabled and inert" are different
+   * defects, and after a Ctrl+Z on a chunk document has taken back an edit on
+   * some OTHER document, whether that edit is recoverable at all is the
+   * difference between a confusing misfire and silent data loss. Read-only.
+   */
+  canRedo(): boolean;
+  /**
    * WHICH DOCUMENT Ctrl+Z WOULD REACH — `editorStore.focusedDocId()` verbatim,
    * the app's one undo resolution, read rather than reasoned about.
    *
@@ -1163,6 +1172,7 @@ function installAeonProbe(): AeonProbeApi {
       };
     },
     canUndo: () => focusedHistory()?.canUndo ?? false,
+    canRedo: () => focusedHistory()?.canRedo ?? false,
     focusedDocId: () => focusedDocId(),
     // The zone-art witness. FNV over every tile in the open zone's tileset, in
     // pool order, so one number answers "is the zone art the same as it was".
