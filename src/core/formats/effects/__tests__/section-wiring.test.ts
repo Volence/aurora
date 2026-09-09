@@ -818,7 +818,7 @@ describe('GUARD-SEAT-RESIDUE: the plants the rows above survived', () => {
     // existing seam rows never reach it for the same reason: their off-record
     // threading lands on a shared section.
     expect(sectionWiringConditions(elsewhere, 0, CH).threaded.verdict,
-      'condition 2 is existence and answers yes — that is not the defect').toBe('yes');
+      'condition 2 is existence and answers yes: that is not the defect').toBe('yes');
     expect(sectionConditionsAgreeWithState(elsewhere, 0, CH)).toBe(true);
   });
 
