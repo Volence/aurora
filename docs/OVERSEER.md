@@ -282,8 +282,12 @@ What stays live:
 - **Read `implementation`, never `serverName`.** `implementation` (`"oracle-rs"`) names WHICH
   SERVER; `serverBuild` = `{id, source, dirty}` names WHICH BUILD; they fail **independently**,
   which was the whole ask. **`serverName` is still `"oracle-next"` and `serverVersion` still
-  `0.0.0`** — a config default and a literal that has never moved. Neither can tell you which
-  server answered.
+  `0.0.0`** — a struct-literal default nothing assigns and a literal that has never moved.
+  Neither can tell you which server answered. **Ruled 2026-09-09 as protocol §2.1/§11.44
+  (empyrean `f4ad3a6`, read there): `serverName` is a build-time constant that must not
+  discriminate implementations nor two processes of one implementation, nothing on the wire
+  can, and a client wanting to know WHICH PROCESS answered reads the socket path it dialled —
+  the one identity a server cannot forge, because this side chose it.**
 - ⚠ **`serverBuild.id` IS A TREE IDENTITY, NOT A CODE IDENTITY.** It names *whatever HEAD was at
   build time* — the id on the shipped binary resolved to a **docs-only commit** — so two binaries
   with byte-identical behaviour can report different ids. **Use it for "is this the same binary I
