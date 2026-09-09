@@ -142,6 +142,27 @@ describe('an art file the author cannot read produces a notice, not a silent hex
     expect(errors[0].message).toContain('disk on fire');
   });
 
+  it('STILL one notice when the failures arrive at different times', async () => {
+    // The row above does not actually test the suppression: three builds launched
+    // together all reject before any of them resumes, so the first drain happens to
+    // find all three and coalesces them even with the suppression removed (measured
+    // — that mutation left it green). STAGGER the rejections and the difference is
+    // real: without the batch guard the first drain emits before the later failures
+    // exist, and the refresh produces one notice per sprite.
+    for (const id of UNLINKED) expect(resolveObjectArt(id, ZONE)).toBeFalsy();
+    __setObjectSpriteBuilderForTest(async (id) => {
+      // A real delay per id, not a microtask count: microtask staggering is too
+      // fine to separate the drains (measured), and the hazard is a build that
+      // finishes late, which is what a slow file read actually is.
+      await new Promise((r) => setTimeout(r, 5 * (UNLINKED.indexOf(id) + 1)));
+      throw new Error(`build ${id} broke`);
+    });
+    await refreshClassicObjectSprites('dir', docOf(UNLINKED), ZONE, clk(1));
+    const errors = toasts().filter((t) => t.type === 'error');
+    expect(errors.length, 'the refresh emitted a notice per failed sprite').toBe(1);
+    expect(errors[0].message).toContain(`${UNLINKED.length} object sprites`);
+  });
+
   it('the DIRECT path (a thumbnail, a preview) notices too', async () => {
     // `loadObjectSprite` is what ObjectThumb / ObjectPreview / the armed placement
     // ghost call. A queue drained only by a refresh would hold their failures until
