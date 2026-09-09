@@ -57,7 +57,7 @@ quotes it back from disk with `git diff --stat`, runs `npx vitest run`, records
 the aggregate, and restores with `git checkout --` from the COMMITTED baseline
 (the tree was clean before each run).
 
-Sixteen mutations so far. **Fourteen killed, two survived.**
+Twenty-five mutations. **Twenty-two killed, three survived.**
 
 Killed (defect classes the suite really does catch): `flipHeightYByte` losing its
 full-block case; `facesRight` boundary; `columnSolidRun` losing its 16px clamp;
@@ -66,7 +66,21 @@ full-block case; `facesRight` boundary; `columnSolidRun` losing its 16px clamp;
 `unexamined` zeroed; `resolvePlaneWords` accepting a short plane;
 `scanCancellingRuns` walking every sub-row; `classifyProfile`'s solid predicate;
 `isEmptyBlock` dropping a word; s4 `solidCount` off by one; the region read's
-four-sub-tile mixed test dropping one comparison.
+four-sub-tile mixed test dropping one comparison; `spanForTileCol` swapping
+left and right; `buildBothPlanesEntries` copying the aimed plane's crossover
+onto the other plane (the self-mark trap); `outwardNormalFromTangent` losing
+`VERTICAL_EPS`; `packCollisionCell` widening the shape mask into the X-flip bit;
+the mixed-cell crossover count sampling top-left instead of any sub-tile;
+`heightSparkline` round→floor; `solidEdges` dropping `bottom` from
+`sides-bottom`.
+
+⚠ ONE MORE "SURVIVOR" THAT IS NOT A GAP, recorded so nobody re-finds it and
+files it. Dropping `index >= plane.length` from `crossoverInPlane` leaves the
+suite green, but the very next line (`word === undefined`) already answers for
+every realistic `ArrayLike` — a typed array and a plain array both read
+`undefined` past their end. The guard is unobservable defence in depth, not
+untested behaviour, and a test for it would have to hand-build
+`{length: 2, 5: 9}`. Not reported as a finding.
 
 ### SURVIVOR 1 — `full-block-shape.ts`, and it reaches authored data
 
@@ -87,14 +101,54 @@ the suite says so. `test/collision/full-block-shape.test.ts` is 38 lines and
 pins the sentinel and the search order; it never asserts that the returned shape
 is actually FULL.
 
-### SURVIVOR 2 — `collision-angle-mark.ts` `surfaceAnchor` median
+FIXED in `test/collision/full-block-shape.test.ts`: the decoy is now one pixel
+short and sits before the answer, and a new row measures the returned shape's
+every column through `columnSolidRun` rather than restating the module's `>= 16`.
+Red-first proof: with `h >= 15` on disk the file failed 3 of 4, and each failure
+named the planted mechanism (`expected 3 to be 4` — the near-miss won;
+`{y:1,h:15}` where `{y:0,h:16}` was required; `expected 2 to be +0` on a bank
+with no full block).
+
+### SURVIVOR 2 — `crossover-audit.ts` `crossoverAuditSeverity`, and it is the
+### module's own headline defect
+
+    -  if (a.cancelling > 0 || a.oneWay > 0) return 'warn';
+    +  if (a.oneWay > 0) return 'warn';
+
+Whole suite still **8108 passed, 0 failed**. A two-way pair painted at the
+DEFAULT mark width is exactly `pairs > 0, oneWay == 0, cancelling > 0` —
+layer-transition.ts's own words are that every two-way pair paintable at cell
+width nets to nothing, "not a corner case, every one of them". So the mutated
+predicate grades the defect this whole parcel exists to close as `ok`, on the
+single most likely thing an author does with the feature, and
+`crossoverAuditSeverity` is what `CollisionPalette` colours on and what
+`paint_collision` returns to an agent.
+
+A TEST PER COMPONENT AND NONE ACROSS THE SEAM: `crossover-span.test.ts` asserts
+`audit.cancelling` and the run simulation, `crossover-audit.test.ts` asserts the
+severity for one-way / self-mark / reserved, and neither ever asked what the
+predicate says about a cancelling run. Each file looks complete alone.
+
+FIXED in `test/collision/crossover-span.test.ts` on the fixtures that already
+drive the shipped painters end to end: the cell-width pair asserts
+`severity === 'warn'` with `oneWay`/`selfMarks`/`reserved` pinned to 0 first (the
+control — `oneWay` is the other arm of the same tier), and the half-width pair
+asserts `severity === 'ok'` so the first row cannot be met by a predicate that
+warns on everything. Red-first proof: exactly one failure,
+`expected 'ok' to be 'warn'` at the new line, with the three controls passing
+above it.
+
+### SURVIVOR 3 — `collision-angle-mark.ts` `surfaceAnchor` median
 
     -  const c = solid[(solid.length - 1) >> 1];
     +  const c = solid[solid.length >> 1];
 
 Whole suite still 8107 passed. Cosmetic (moves the mark's anchor column by one
 on even-width solid runs), and the 518-line angle-mark suite does not pin it.
-Recorded, not ranked as a correctness defect.
+NOT FIXED and deliberately so: for an even count of solid columns there is no
+unique median, both answers are defensible, and a row asserting one of them
+would be a test pinning an assumption rather than a behaviour — the exact thing
+this audit was sent to find. Reported for the controller to rule on.
 
 ## 5. Findings formed so far, not yet all proven
 
@@ -132,7 +186,24 @@ Recorded, not ranked as a correctness defect.
   `markTier`. A second copy of the rule the module was created to own. Agrees
   today.
 
-## 6. Not yet reached
+## 6. What this audit did NOT fix, and why
+
+- **`chunk-library-import.ts`'s silent success on a 0 full-block shape.**
+  Outside this tree, and whether the right answer is a refusal, a warning toast
+  or a notice is a design call about a user gesture. Recommendation: refuse the
+  import when `findFullBlockShapeId` returns 0 and say which of the two reasons
+  applies, because the alternative is a project saved with every imported chunk
+  collisionless and no way to tell it apart from a bank that genuinely has no
+  full block.
+- **`surfaceAnchor`'s median on an even run.** No unique right answer; pinning
+  one would be a test encoding an assumption.
+- **`flipProfile` recomputing `hasAngle` from s4's odd-byte rule.** Changing it
+  to carry the input's `hasAngle` through is a one-line fix, but it is a
+  cross-engine contract decision and today no adapter can tell the difference.
+- **Nothing that changes authored output** was touched. Both landed changes are
+  test-side only; no file under `src/core/collision/` is modified on this branch.
+
+## 7. Not yet reached
 
 - The remaining `test/collision/` files read only for vacuity patterns, not
   line by line.
