@@ -403,6 +403,97 @@ describe('standing copy asserting engine behaviour is registered against a sourc
 });
 
 /**
+ * A CLAIM THAT SOMETHING IN AEON HAS NOT LANDED YET IS A CLAIM WITH A CLOCK, AND
+ * THIS ONE HAD RUN OUT.
+ *
+ * Found by the census the finding asked for, not by the finding itself. Four
+ * author-facing sites told an author that `sprite_mask` was refused because
+ * aeon's left-column strip emission *"has not landed"* / *"cannot emit this
+ * yet"*, which reads as: wait, and it will arrive. aeon's own assertion message
+ * at `origin/master` says the opposite in as many words:
+ *
+ *     "SpriteMask is declared, and it is RULED OUT ... The strip emission is
+ *      cancelled, not pending"
+ *
+ * One of the four was self-contradictory on top of that: it said the build
+ * *"refuses in every scene"* and, in the same sentence, that *"the declaration
+ * would be accepted while the sliver stays uncovered"*. A comment eleven lines
+ * away had the right answer the whole time (*"the engine refuses it
+ * unconditionally"*), which is what a claim with no arbiter looks like: the file
+ * disagreeing with itself, in prose, for months.
+ *
+ * ⚠ THE EXPECTATION IS DERIVED FROM AEON'S SENTENCE, NOT FROM MY READING OF IT.
+ * The row below requires aeon to still say `cancelled, not pending` before it
+ * requires anything of Aurora, so the day aeon revives the emission this check
+ * fails LOUDLY and tells the next lane to re-read rather than quietly licensing
+ * the old copy again. A pending-vocabulary ban with no producer-side anchor
+ * would be the wrong instrument: it would forbid the true sentence too.
+ */
+describe('the sprite_mask copy states aeon position, which is cancelled and not pending', () => {
+  const FILES = [
+    'src/renderer/providers/effects-aeon.ts',
+    'src/renderer/components/effects/EffectsScenePanel.tsx',
+  ];
+  /**
+   * Forms that PROMISE ARRIVAL. Not bare `yet` or `until`, which appear all over
+   * legitimate prose; each of these asserts that the engine will gain something.
+   *
+   * ⚠ AND THE POPULATION IS EVERY STRING IN THESE FILES, not the ones that
+   * mention `sprite_mask`. The first version of this row filtered on that token
+   * and came back green over two of the four offenders, because the two most
+   * author-facing of them -- the disabled option's own tooltip and its label mark
+   * -- never spell the value they are attached to: the tie is `value ===
+   * 'sprite_mask'` in the code, not a word in the sentence. A matcher keyed on
+   * the subject appearing in the text is exactly the shape that finds three of
+   * four and reports a clean sweep.
+   */
+  const PENDING = /\b(has not landed|have not landed|not landed|cannot emit this yet|is not emitted yet|does not emit yet|when it lands|once it lands|still pending)\b/i;
+  const aeon = peerRepo('aeon');
+
+  it('aeon still calls the strip emission cancelled rather than pending', (ctx) => {
+    if (aeon === null) {
+      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR); CANNOT'
+        + ' MEASURE whether the strip emission is still cancelled, so the Aurora-side row below'
+        + ' would be asserting a position nothing confirms');
+      return;
+    }
+    const tip = resolveRev(aeon, AEON_TIP);
+    if (tip === null) {
+      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon}; CANNOT MEASURE`
+        + ' whether the strip emission is still cancelled');
+      return;
+    }
+    const at = readAtRev(aeon, tip, 'engine/level/scene_dsl.emp');
+    expect(at.ok, at.ok ? '' : `${NOT_OURS} ${at.why}`).toBe(true);
+    if (!at.ok) return;
+    expect(
+      at.text.includes('cancelled, not pending'),
+      `${NOT_OURS}\n`
+      + `  aeon engine/level/scene_dsl.emp at ${AEON_TIP} (${tip}) no longer says the strip\n`
+      + '  emission is "cancelled, not pending". READ THAT ASSERTION AGAIN before touching the\n'
+      + '  Aurora copy: if the emission has been revived, the sprite_mask strings and the schema\n'
+      + '  enum both need work, and the row below must be retired rather than satisfied.',
+    ).toBe(true);
+  });
+
+  for (const file of FILES) {
+    it(`${file} does not tell an author to wait for the strip emission`, () => {
+      const offenders = allStringLiterals(file)
+        .filter((s) => PENDING.test(s.text))
+        .map((s) => `${file}:${s.line} ${s.text.slice(0, 140)}`);
+      expect(
+        offenders,
+        'AN AUTHOR-FACING STRING SAYS AEON HAS NOT LANDED THE STRIP EMISSION YET. aeon calls it'
+        + ' CANCELLED, not pending (owner decision d-40, 2026-08-29): the sliver is repaired in the'
+        + ' engine and there is nothing left for a bar to cover, so a declaration is refused'
+        + ' outright and always will be. Say that instead of promising arrival.\n'
+        + `  ${offenders.join('\n  ')}`,
+      ).toEqual([]);
+    });
+  }
+});
+
+/**
  * ONE CLAIM ABOUT AEON, TYPED ONCE.
  *
  * The row that named this file's finding also named a duplicate: the flat-path
