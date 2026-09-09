@@ -75,7 +75,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
-import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { runTarget, announceRunRoot, assertDebugBuild } from './lib/run-root.mjs';
+import {
+  openEffectsSection, SECTION_TILE_ANIMATIONS, SECTION_NEW_TILE_ANIMATION,
+} from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9394);
 // ROOT defaults to the tree this harness FILE lives in, never a hardcoded path.
@@ -91,6 +94,10 @@ const ROOT = AURORA_DIR;
 // in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
 // it is not this one. See scratchpad/lib/run-root.mjs.
 const RUN = announceRunRoot(runTarget(ROOT));
+// Every row below reads `window.__dbg`, which only a debug build has
+// (BUILD-FLAVOUR-INVISIBLE). Refused here, naming the command, rather than
+// several hundred lines down on an absent hook.
+assertDebugBuild(RUN);
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
 /**
@@ -212,53 +219,18 @@ function cdp(wsUrl) {
   return { ready, send, evalExpr, json, close: () => ws.close() };
 }
 
-// ═══ "New band" ARRIVES COLLAPSED (ROADMAP item 41) ═══
-// It is a creation form and was measured as the tallest box in the effects
-// column (474px of 1229px), so the item-41 layout pass gave it
-// `defaultCollapsed`. A collapsed CollapsibleSection renders NO children at
-// all, so every control below this point would come back `null` and read as
-// "the control is missing" — which is exactly the defect these harnesses were
-// written to detect. Opened the way a human opens it: a click on its header.
-const OPEN_NEW_BAND = String.raw`
-(() => {
-  const isHeader = (el) => {
-    if (el.tagName !== 'DIV') return false;
-    const cs = getComputedStyle(el);
-    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
-      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
-  };
-  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
-    .find((h) => (h.firstElementChild.textContent || '').trim() === 'New band');
-  if (!hdr) return 'no-section';
-  if (hdr.parentElement.parentElement.children.length > 1) return 'already-open';
-  hdr.click();
-  return 'clicked';
-})()`;
-
-// ⚠ `BG animation bands` ARRIVES COLLAPSED TOO, since ROADMAP item 45's open
-// tail (the 1280x800 parcel): the column could not reach zero at that height
-// with five sections open, and the band list is the one section in it that is
-// not about the parallax scene the facet arrives on. The same reasoning as
-// `New band` above therefore applies to it, and so does the same fix — a
-// collapsed CollapsibleSection renders NO children, so the band cards, the
-// Demote/Remove buttons and the blob-budget readout below all come back `null`
-// and read as "missing" unless this runs first. Opened by clicking its header,
-// the way a human opens it.
-const OPEN_BAND_LIST = String.raw`
-(() => {
-  const isHeader = (el) => {
-    if (el.tagName !== 'DIV') return false;
-    const cs = getComputedStyle(el);
-    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
-      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
-  };
-  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
-    .find((h) => /^BG animation bands/.test((h.firstElementChild.textContent || '').trim()));
-  if (!hdr) return 'no-section';
-  if (hdr.parentElement.parentElement.children.length > 1) return 'already-open';
-  hdr.click();
-  return 'clicked';
-})()`;
+// ═══ BOTH TILE-ANIMATION SECTIONS ARRIVE COLLAPSED, AND BEHIND A SUB-TAB ═══
+//
+// A collapsed CollapsibleSection renders NO children, so every control below
+// would come back `null` and read as "the control is missing" - the defect
+// this harness exists to detect. `New tile animation` has arrived collapsed
+// since ROADMAP item 41, `Tile animations` since item 45's open tail.
+//
+// ⚠ AND SINCE d-26b THEY ARE ON A SUB-TAB THE FACET DOES NOT ARRIVE ON. This
+// file opened them by their old titles (`BG animation bands`, `New band`),
+// retired by the tile-animation vocabulary rename, on a tab that never held
+// them: BGANIM-HARNESS-REPAIR. Both doors now go through
+// `lib/effects-sections.mjs`, which selects on the ids the app routes on.
 
 const results = [];
 const fails = [];
@@ -431,16 +403,24 @@ async function main() {
         : clickedPill === 'disabled' ? 'found but DISABLED'
           : 'NOT FOUND — no button matching /^Effects$/ in the document');
     await sleep(1500);
-    await c.evalExpr(OPEN_BAND_LIST);
+    const openedList = await openEffectsSection(c, SECTION_TILE_ANIMATIONS);
+    if (openedList.tab === 'no-tab') {
+      throw new Error('the Effects sub-tab bar is not on screen, so the tile-animation sections '
+        + 'cannot be reached at all');
+    }
     await sleep(400);
-    const openedNewBand = await c.evalExpr(OPEN_NEW_BAND);
-    if (openedNewBand === 'no-section') throw new Error('no "New band" section on screen');
+    const openedNewBand = await openEffectsSection(c, SECTION_NEW_TILE_ANIMATION);
+    if (openedNewBand.section === 'no-section') {
+      throw new Error(`no ${SECTION_NEW_TILE_ANIMATION} section on screen `
+        + `(tab=${openedNewBand.tab}, list=${JSON.stringify(openedList)})`);
+    }
     await sleep(900);
     const headings = await c.json(
       `[...document.querySelectorAll('span')].map(e => (e.textContent||'').trim())
-        .filter(t => /^(BG animation bands|New band$|From existing tiles$)/.test(t))`);
+        .filter(t => /^(Tile animations|New tile animation$|From existing tiles$)/.test(t))`);
     check('2b', 'the BAND panel is mounted [instrument check]',
-      headings.some((h) => h.startsWith('BG animation bands')) && headings.includes('From existing tiles'),
+      headings.some((h) => h.startsWith('Tile animations'))
+      && headings.includes('From existing tiles'),
       JSON.stringify(headings));
 
     // ---- 3. PRECONDITIONS. Every one of these gates the comparison. -----

@@ -14,6 +14,15 @@
 // every scrollable container to the bottom does not reveal the field either.
 // Only the ten SCENE/LAYER number inputs are ever in the DOM.
 //
+// ⚠ RE-READ THAT DEAD END AFTER BGANIM-HARNESS-REPAIR (2026-09-09). It was
+// recorded while this file selected the header by the title `BG animation
+// bands` and clicked whatever `.pop()` returned, and while the section sat on
+// a sub-tab this probe never activated. So "a real click on that header does
+// not open it" may have been a click on the wrong element, or on no element at
+// all, rather than a fact about the disclosure. The selector is repaired; the
+// dead end is NOT re-measured here and should be treated as unverified until
+// someone runs this probe again.
+//
 // The field lives in the promote form, which renders only once a BAND CANDIDATE
 // exists — and `__dbg.aeon` exposes `bandCandidate()` as a GETTER ONLY, with no
 // setter. The way in is therefore to CREATE a candidate the way a user does: a
@@ -29,7 +38,10 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url'; import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
-import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { runTarget, announceRunRoot, assertDebugBuild } from './lib/run-root.mjs';
+import {
+  OPEN_EFFECTS_SUB_TAB, TILE_ANIM_SUB_TAB, SECTION_TILE_ANIMATIONS,
+} from './lib/effects-sections.mjs';
 const PORT = Number(process.env.PORT ?? 9399);
 const ROOT = AURORA_DIR;
 // WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
@@ -38,6 +50,10 @@ const ROOT = AURORA_DIR;
 // in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
 // it is not this one. See scratchpad/lib/run-root.mjs.
 const RUN = announceRunRoot(runTarget(ROOT));
+// Every row below reads `window.__dbg`, which only a debug build has
+// (BUILD-FLAVOUR-INVISIBLE). Refused here, naming the command, rather than
+// several hundred lines down on an absent hook.
+assertDebugBuild(RUN);
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
 const AEONDIR = siblingPathOrUnresolved('aeon');
@@ -78,10 +94,22 @@ try {
   await c.ev(`(() => { const b=[...document.querySelectorAll('button')].find(e=>/^Effects$/.test((e.textContent||'').trim())); if(b)b.click(); return !!b; })()`);
   await sleep(2000);
 
-  // Expand the bands section with a REAL click (synthetic .click() misses the handler).
-  const hdr = await c.json(`(() => { const el=[...document.querySelectorAll('*')].filter(e=>/^BG animation bands/i.test((e.textContent||'').trim())).pop();
+  // THE SECTION IS ON A SUB-TAB THE FACET DOES NOT ARRIVE ON (d-26b), so it is
+  // not in the DOM until that tab is activated. This is a synthetic click and
+  // it is enough: the tab is a plain `<button onClick>`.
+  const tab = await c.ev(OPEN_EFFECTS_SUB_TAB(TILE_ANIM_SUB_TAB));
+  console.log(`  tile-anim sub-tab: ${tab}`);
+  await sleep(1200);
+  // Expand the section with a REAL click (synthetic .click() misses the handler).
+  //
+  // BY SECTION ID, not by header text: this read `/^BG animation bands/i`,
+  // which the tile-animation vocabulary rename retired
+  // (BGANIM-HARNESS-REPAIR). `CollapsibleSection` puts the id on the wrapper
+  // and the clickable header is its first child.
+  const hdr = await c.json(`(() => { const sec=document.querySelector('[data-section=${JSON.stringify(SECTION_TILE_ANIMATIONS)}]');
+    const el = sec && sec.firstElementChild;
     if(!el) return null; const r=el.getBoundingClientRect(); return {x:r.left,y:r.top,w:r.width,h:r.height}; })()`);
-  console.log(`  bands header: ${JSON.stringify(hdr)}`);
+  console.log(`  ${SECTION_TILE_ANIMATIONS} header: ${JSON.stringify(hdr)}`);
   if (hdr) { const x = Math.round(hdr.x + hdr.w/2), y = Math.round(hdr.y + hdr.h/2);
     await c.send('Input.dispatchMouseEvent', { type:'mousePressed', x, y, button:'left', clickCount:1 });
     await c.send('Input.dispatchMouseEvent', { type:'mouseReleased', x, y, button:'left', clickCount:1 }); }

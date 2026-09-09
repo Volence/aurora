@@ -112,6 +112,9 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 
 import { auroraBuiltTree, AURORA_BUILT_TREE_ENV } from '../../test/support/sibling-root.mjs';
+import {
+  BUILD_FLAVOUR_REL, BUILD_FLAVOUR_STAMP_VERSION, DEBUG_BUILD_COMMAND, DEBUG_ENV, FLAVOURS,
+} from '../../scripts/build-flavour-stamp.mjs';
 
 /** How far up the walk climbs before giving up. */
 const MAX_LEVELS = 8;
@@ -649,5 +652,156 @@ export function assertFreshBuild(run, write = (s) => process.stderr.write(s)) {
     }
   }
   write(`${describeFreshness(f, drift)}\n`);
+  // FLAVOUR IS PRINTED BY EVERY CALLER, NOT ONLY BY THE ONES THAT REQUIRE THE
+  // HOOKS. This call is the repo's one provenance line about the bundle, and
+  // the whole of BUILD-FLAVOUR-INVISIBLE is that flavour was in no instrument's
+  // output at all. It is a PRINT and not a refusal here: a plain build is a
+  // legitimate thing to run against (window-icon, xvfb-reap and the profile
+  // probes never touch `window.__dbg`), so the refusal belongs to the
+  // instruments that need the hooks and is `assertDebugBuild` below.
+  write(`${describeBuildFlavour(buildFlavour(run))}\n`);
+  return f;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WHICH FLAVOUR THE BUILT TREE IS - BUILD-FLAVOUR-INVISIBLE, booked 2026-09-06
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `VITE_AURORA_DEBUG=1 npm run build` puts `window.__dbg` in the renderer
+ * bundle (`src/renderer/index.tsx` imports `debug-hooks.ts` behind that flag);
+ * a plain `npm run build` tree-shakes it out. Both are correct builds and both
+ * are byte-fresh, so `buildFreshness` above - which stats mtimes - says FRESH
+ * to either one. That is the whole defect: the ~180 instruments in this
+ * directory that query `window.__dbg` ran against a plain build, were told
+ * FRESH, and died several hundred lines later on `__dbg` absent, naming
+ * neither the cause nor the command that fixes it.
+ *
+ * ⚠ THREE STATES, AND THE THIRD IS NOT A SHADE OF THE OTHER TWO. The obvious
+ * cheap reader greps the bundle for `__dbg` and calls its absence PLAIN. That
+ * reproduces the defect one layer down: such a reader cannot tell "I looked
+ * and the symbol is not there" from "I could not look" - a moved file, a
+ * renamed chunk, a mangled symbol - and renders both as PLAIN, which is a
+ * confident wrong answer. So the BUILD writes down what it was
+ * (`scripts/build-flavour-stamp.mjs`, mounted in `electron.vite.config.ts`)
+ * and this reads that. Anything that stops it reading the stamp is UNKNOWN,
+ * said in those words, and `assertDebugBuild` refuses on UNKNOWN exactly as it
+ * refuses on PLAIN. An unknown is never rendered as either state.
+ */
+
+/**
+ * `{ flavour, root, path, why?, stamp? }` for the tree the run is against.
+ * `flavour` is one of:
+ *
+ *   `'debug'`    the stamp says this build had VITE_AURORA_DEBUG=1, so
+ *                `window.__dbg` is in its renderer bundle.
+ *   `'plain'`    the stamp says it did not, so `window.__dbg` is absent.
+ *   `'unknown'`  the stamp is missing, unreadable, of an unknown version, or
+ *                older than the bundle it would describe. `why` says which.
+ */
+export function buildFlavour(run) {
+  const root = run.root;
+  const path = join(root, BUILD_FLAVOUR_REL);
+  const main = distMain(root);
+  const unknown = (why) => ({ flavour: 'unknown', root, path, main, why });
+
+  let raw;
+  try { raw = readFileSync(path, 'utf8'); }
+  catch (e) {
+    return unknown(`there is no readable build-flavour stamp at ${path} (${e.code ?? e.message}). `
+      + 'A build made by a toolchain that records its flavour always leaves one, so either this '
+      + 'bundle predates that or the file was removed');
+  }
+  let parsed;
+  try { parsed = JSON.parse(raw); }
+  catch (e) {
+    return unknown(`${path} is not readable JSON (${e.message}), so what it says about this `
+      + 'bundle cannot be read at all');
+  }
+  if (parsed === null || typeof parsed !== 'object') {
+    return unknown(`${path} does not hold an object, so it carries no flavour to read`);
+  }
+  if (parsed.stamp !== BUILD_FLAVOUR_STAMP_VERSION) {
+    return unknown(`${path} is stamp version ${JSON.stringify(parsed.stamp)} and this reader `
+      + `knows version ${BUILD_FLAVOUR_STAMP_VERSION}, so its fields may not mean what they `
+      + 'used to and are not read');
+  }
+  if (!FLAVOURS.includes(parsed.flavour)) {
+    return unknown(`${path} names a flavour this reader does not know `
+      + `(${JSON.stringify(parsed.flavour)}); the known ones are ${FLAVOURS.join(', ')}`);
+  }
+
+  // ⚠ A STAMP OLDER THAN THE BUNDLE DESCRIBES AN EARLIER BUILD. The stamp is
+  // written by a plugin mounted on ALL THREE electron-vite builds, so the last
+  // one to finish writes it and it cannot legitimately predate `dist/main`.
+  // If it does, something built this tree without the plugin, and answering
+  // from the older file would be answering about a bundle that is gone.
+  let stampMs, distMs;
+  try { stampMs = statSync(path).mtimeMs; distMs = statSync(main).mtimeMs; }
+  catch (e) {
+    return unknown(`the stamp at ${path} could not be compared against ${main} `
+      + `(${e.code ?? e.message}), so nothing establishes that it describes THIS bundle`);
+  }
+  if (stampMs < distMs) {
+    return unknown(`the stamp at ${path} is ${((distMs - stampMs) / 1000).toFixed(0)}s OLDER than `
+      + `${main}, so it describes an earlier build. Something rebuilt this tree without writing `
+      + 'a stamp');
+  }
+
+  return { flavour: parsed.flavour, root, path, main, stamp: parsed, stampMs, distMs };
+}
+
+/** The provenance line, rendered from the value. Never a second derivation. */
+export function describeBuildFlavour(f) {
+  if (f.flavour === 'debug') {
+    return `build flavour: DEBUG (${DEBUG_ENV}=${f.stamp[DEBUG_ENV]} at ${f.stamp.at}), so `
+      + 'window.__dbg is in this bundle';
+  }
+  if (f.flavour === 'plain') {
+    return `build flavour: PLAIN (${DEBUG_ENV}=${JSON.stringify(f.stamp[DEBUG_ENV])} at `
+      + `${f.stamp.at}), so window.__dbg is NOT in this bundle. Every instrument that queries `
+      + `it will fail against this tree; ${DEBUG_BUILD_COMMAND} in ${f.root} fixes that`;
+  }
+  return `build flavour: UNKNOWN - ${f.why}. This is NOT a report that the build is plain, and `
+    + 'not a report that it is debug: it is a report that the question could not be answered '
+    + 'here';
+}
+
+/**
+ * REFUSE A RUN WHOSE BUNDLE CANNOT BE SHOWN TO CARRY `window.__dbg`.
+ *
+ * The call an instrument that queries `window.__dbg` makes, beside its
+ * `announceRunRoot` / `assertFreshBuild`:  `assertDebugBuild(RUN);`
+ *
+ *   THROWS  `plain`    the stamp says the hooks were built out. Every `__dbg`
+ *                      row below would fail, several hundred lines from here.
+ *   THROWS  `unknown`  the stamp could not be read, so nothing establishes
+ *                      that the hooks are there. Same conclusion reached by
+ *                      not being able to ask, which is the rule the borrowed
+ *                      drift check above already follows.
+ *   PASSES  `debug`    and prints the provenance line.
+ *
+ * ⚠ BOTH REFUSALS NAME THE VARIABLE AND THE COMMAND, in the tree the run is
+ * against. That is the difference between this and a better error message: an
+ * instrument that says "window.__dbg is undefined" has told a person what
+ * broke and nothing about what to type.
+ */
+export function assertDebugBuild(run, write = (s) => process.stderr.write(s)) {
+  const f = buildFlavour(run);
+  if (f.flavour === 'plain') {
+    throw new Error(`THIS IS A PLAIN BUILD AND THIS INSTRUMENT NEEDS THE DEBUG HOOKS. `
+      + `${f.path} says ${DEBUG_ENV} was ${JSON.stringify(f.stamp[DEBUG_ENV])} when ${f.main} `
+      + 'was built, so src/renderer/debug-hooks.ts was tree-shaken out and window.__dbg is not '
+      + 'in the renderer bundle. Every row below would fail on an absent hook rather than on '
+      + `its subject. Run:  ${DEBUG_BUILD_COMMAND}  in ${f.root}`);
+  }
+  if (f.flavour === 'unknown') {
+    throw new Error(`BUILD FLAVOUR UNKNOWN, AND THIS INSTRUMENT NEEDS THE DEBUG HOOKS - ${f.why}. `
+      + 'That is not a claim that the build is plain: it is a claim that nothing here '
+      + 'establishes window.__dbg is in the bundle, and a run whose every row may fail on an '
+      + 'absent hook refuses rather than proceeding. Run:  '
+      + `${DEBUG_BUILD_COMMAND}  in ${f.root}, which writes the stamp as it builds.`);
+  }
+  write(`${describeBuildFlavour(f)}\n`);
   return f;
 }
