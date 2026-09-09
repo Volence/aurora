@@ -372,22 +372,33 @@ describe('a drag does not survive an act switch', () => {
    * THE SWITCH WITH REACT DELIBERATELY HELD BACK, for the two rows about the
    * guards at the WRITE SITES rather than the guard in the effect.
    *
-   * `abandonStaleGestures` runs in three places — the act-switch effect, the top
-   * of `handleMouseMove`, and the top of `finishGesture` — and the last two are
-   * consumer-side guards: they hold even if the effect never fires, which is the
-   * only reason a new call site cannot defeat them. If a row let the effect run
-   * first, the effect would do the work inside the row's own sample window and the
-   * row would report the write-site guard as working whether it existed or not.
+   * ═══ WHY THESE TWO ROWS NEED THEIR OWN HELPER ═══
    *
-   * So this helper asserts the revert has NOT happened yet. That is what keeps the
-   * two rows below measuring what they name.
+   * `abandonStaleGestures` runs in THREE places — the act-switch effect, the top
+   * of `handleMouseMove`, and the top of `finishGesture` — and the last two are
+   * consumer-side guards. They are what makes the property hold even if the effect
+   * never fires, which is the only reason a NEW call site cannot defeat it. But a
+   * row that lets the effect run first has the effect do the work inside its own
+   * sample window, and then reports the write-site guard as working whether it
+   * exists or not: a control that acts where it was supposed to do nothing.
+   *
+   * ⚠ AND THE FIRST DRAFT OF THIS FILE FELL EXACTLY INTO THAT. It asserted "the
+   * revert has not happened yet" and then reached for the handler through
+   * `s.on()` — which calls `el()`, which FLUSHES. The assertion passed and the
+   * effect then ran on the very next line. Measured: with the `handleMouseMove`
+   * guard commented out on disk, both rows stayed GREEN. The handler has to be
+   * captured BEFORE the switch, which is what `held` is for.
+   *
+   * So the capture and the switch are ONE call, and it returns the only handlers
+   * the row may use afterwards. There is no way to write these rows the wrong way
+   * round through this helper, which is the point of it existing at all.
    */
-  function switchActUnsettled(actId: string): void {
-    focusAct(actId);
-    expect(bothActs().act1,
-      'the act-switch effect already ran, so the row below would measure IT and not '
-      + 'the guard at the write site it names')
-      .toEqual({ x: 96, y: 96 });
+  function switchActHoldingReact(
+    s: Surface, actId: string,
+  ): Record<string, (e: unknown) => void> {
+    const held = { ...s.on() };   // captured BEFORE the switch: this read flushes
+    focusAct(actId);              // …and nothing after it reads the tree
+    return held;
   }
 
   /** Press on act1's object and drag it, which writes LIVE and commits nothing —
@@ -445,17 +456,25 @@ describe('a drag does not survive an act switch', () => {
     // The first half of the measured damage: once per mousemove the NEW act's
     // object took the cursor's coordinates, with no command at all.
     const s = await dragInFlight();
-    switchActUnsettled('act2');
-    s.on().onMouseMove(mouse(300, 300));
-    expect(bothActs()).toEqual({ act1: { x: 64, y: 64 }, act2: { x: 600, y: 400 } });
+    const held = switchActHoldingReact(s, 'act2');
+    held.onMouseMove(mouse(300, 300));
+    expect(bothActs(),
+      'with the act-switch effect held back, the guard at the top of handleMouseMove is '
+      + 'the only thing standing between this move and the document: act1\'s '
+      + 'uncommitted drag stays in the file if it is gone')
+      .toEqual({ act1: { x: 64, y: 64 }, act2: { x: 600, y: 400 } });
   });
 
   it('a release after the switch commits nothing to either act', async () => {
     // The second half, and the worse one: the release wrote act A's START
     // coordinates into act B's object through a real move command, which landed on
     // the undo stack under "Move object" and lost act A's move as well.
-    await dragInFlight();
-    switchActUnsettled('act2');
+    const s = await dragInFlight();
+    switchActHoldingReact(s, 'act2');
+    // The window mouseup listener was captured when its effect attached, so
+    // dispatching it reads no tree and lets no effect run: the guard at the top of
+    // `finishGesture` is on its own here, which is the arm a new call site to a
+    // commit cannot defeat.
     win!.dispatch('mouseup', {});
     expect(focusedHistory()?.canUndo ?? false, 'a move command was committed after the switch')
       .toBe(false);
