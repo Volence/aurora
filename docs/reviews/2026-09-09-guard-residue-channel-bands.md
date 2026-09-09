@@ -59,15 +59,19 @@ second React instance and no phantom failures here**. Base and tip are both exit
 
 `npm test` at this parcel's tip, **exit 0**:
 
-    check-test-collection: OK: 582 test-shaped file(s) on disk, all 582 collected by vitest.
-    Test Files  579 passed | 3 skipped (582)
-         Tests  8695 passed | 9 skipped (8704)
+    check-test-collection: OK: 583 test-shaped file(s) on disk, all 583 collected by vitest.
+    Test Files  580 passed | 3 skipped (583)
+         Tests  8712 passed | 9 skipped (8721)
     skip-report: OK. Every skip named its reason.
-    failure-class: no failures in this run (582 module(s) reported).
+    failure-class: no failures in this run (583 module(s) reported).
 
-`8652 + 43 = 8695`, so the 43 new rows displaced nothing. The repo's own gate
-counts 582 test-shaped files on disk and all 582 collected, the same 582 the
-totals line counts. **Zero source lines changed anywhere in this parcel.**
+`8652 + 43 + 17 = 8712`, so the 60 new rows displaced nothing. The repo's own
+gate counts 583 test-shaped files on disk and all 583 collected, the same 583
+the totals line counts. **Zero source lines changed anywhere in this parcel.**
+
+The intermediate measurement, after `channel-bands.ts` was closed and before
+`ramp-sign-lag.ts` was started, was also exit 0 at `Test Files 579 passed | 3
+skipped (582)` and `Tests 8695 passed | 9 skipped (8704)`.
 
 A full `npm test` is 36 to 71 seconds here, so **every plant was scored against
 the WHOLE suite**; no verdict below rests on a scope argument. The red-first
@@ -114,9 +118,14 @@ after the re-plant. 26 percent killed.** 46 of the 47 survivors are closed by 43
 new rows in one new file, with **zero source lines changed**. The 47th is
 reported and not closed.
 
-| | plants | non-discriminating | scored | killed | survived |
-|---|---|---|---|---|---|
-| `channel-bands.ts` | 65 | 1 | 64 | 17 | 47 |
+`ramp-sign-lag.ts` was also reached and is scored in section 9, which is where
+the comparison that explains this file's number lives.
+
+| file | plants | non-discriminating | uncompilable | scored | killed | survived |
+|---|---|---|---|---|---|---|
+| `channel-bands.ts` | 65 | 1 | 0 | 64 | 17 | 47 |
+| `ramp-sign-lag.ts` (section 9) | 40 | 1 | 1 | 38 | 26 | 12 |
+| **total** | **105** | **2** | **1** | **102** | **43** | **59** |
 
 ### THE PARTITION, WHICH IS THE FINDING AND IS NOT THE RATIO
 
@@ -447,10 +456,143 @@ refusals are asserted to name `hi` when hi moved and `lo` when lo moved, and
 explicitly NOT to name the other; `hi === lo - 1` is refused and `hi === lo` is
 accepted as a legal one-line band.
 
-## 9. `ramp-sign-lag.ts`
+## 9. `ramp-sign-lag.ts`, the "if budget allows" file, and it did
 
-See section 10.
+**40 plants. 1 shown not to discriminate, 1 that does not COMPILE. 38 scored: 26
+killed, 12 survived. 68 percent.** All 12 survivors closed by 17 new rows in
+`src/core/formats/effects/__tests__/ramp-sign-lag.test.ts`, beside the sibling
+`preset-lag.test.ts`, with zero source lines changed. 16 red-first legs, every
+one red by its own row.
+
+| half of `ramp-sign-lag.ts` | scored | killed | survived |
+|---|---|---|---|
+| WHICH ANSWER | 13 | 9 | 4 |
+| WHICH WORDS | 25 | 17 | 8 |
+
+- WHICH ANSWER killed: `RL01` `RL03` `RL04` `RL12` `RL13` `RL17` `RL30` `RL31`
+  `RL33`; survived: `RL02` `RL11` `RL14` `RL29`.
+- WHICH WORDS killed: `RL06` `RL08` `RL09` `RL10` `RL15` `RL16` `RL19` `RL20`
+  `RL21` `RL22` `RL23` `RL25` `RL28` `RL34` `RL36` `RL37` `RL39`; survived:
+  `RL05` `RL07` `RL24` `RL26` `RL27` `RL35` `RL38` `RL40`.
+- `RL18` is the control; `RL32` does not compile.
+
+### THE COMPARISON IS THE POINT, AND IT IS THE SAME SUITE ONE FILE OVER
+
+**`channel-bands.ts`'s words half is 0 of 9. `ramp-sign-lag.ts`'s is 17 of 25.**
+The difference is not that one module is better written; it is that
+`src/renderer/components/effects/__tests__/ramp-sign-lag-disclosure.test.ts`
+exists, and its whole job is to **replay the RETIRED premise explicitly** and
+assert the sentence it produces. The module's own header says why it must:
+"a sentence nobody asserts rots into gibberish while retired, and then re-arms
+as gibberish."
+
+`channel-bands.ts` has no such file because its sentences are REFUSALS, which
+have no retired state to replay: the only way to make one speak is to hand the
+module a document it must reject. **That is the whole content of the low number
+in section 3, stated as a difference between two files rather than as a ratio.**
+
+### AND TWO SURVIVORS ARE THE EXACT PAIR THE PREVIOUS PARCEL FIXED NEXT DOOR
+
+`docs/reviews/2026-09-09-guard-residue-ramp.md` found two survivors in
+`preset-lag.ts` and closed them: the measurement DATE, unheld because every row
+that touched it READ THE CONSTANT; and a default argument identical to the
+module's own premise list, unobservable from behaviour. **Both defects are here
+too**, in the sibling module, with the same shape, and neither moved when the
+other was fixed.
+
+`ramp-sign-lag.ts` makes the second one a **triple**: it has TWO functions
+defaulting to `RAMP_SIGN_FIELDS_AWAITING_AEON`, not one. A re-arm that detached
+one default would put the disclosure back on screen while the caveat stayed
+silent inside the refusal an author is about to act on, which is the one place
+the caveat exists for.
+
+### THE OTHER SURVIVORS, AND WHY EACH ONE MATTERS
+
+- **`RL07`, the measurement names a row that does not exist.** The sentence's
+  one actionable instruction is "here is the row that can retire this claim".
+  Repointing it at a neighbouring filename that is not in this repository left
+  the suite green. Closed with a row that resolves the cited path on disk.
+- **`RL24`, `RL26`, `RL27`, `RL38`, `RL40`: five clauses that carry WHY.** The
+  sharpest is `RL26`: restating `rrp_start`/`rrp_step` as `i32` instead of
+  `u32` describes a build failure that could not happen, because forwarding a
+  signed value RAW is only a defect when the destination is unsigned. `RL38` is
+  the clause that withdraws the authority of a nearest-value recommendation,
+  which is the reason the caveat was written at all.
+- **`RL35`, the caveat's leading space.** It is concatenated onto the end of a
+  refusal, so the space is the only thing between the last word of one sentence
+  and the first of the next in a message an author is reading to decide what to
+  type. Losing it runs them together.
+- **`RL14`, the canonical field order.** Filtering over the caller's premise
+  list instead of the module's own would make the sentence name the fields in
+  whatever order somebody happened to write the premise in.
+
+### PREDICTIONS, AS MADE, WRONG IN BOTH DIRECTIONS
+
+Wrong nine times out of forty, and recorded rather than retro-fitted.
+**Predicted killed, survived:** `RL07`, `RL24`, `RL26`, `RL27`, `RL38`, `RL40`.
+**Predicted survived or non-discriminating, killed:** `RL04`, `RL06`, `RL08`,
+`RL39`. I substantially under-estimated how much of this file's wording is
+asserted, and over-estimated how much of its PROVENANCE is.
+
+`RL04` is worth naming: dropping `Object.freeze` from the premise list was
+predicted to be a control (it was for the equivalent plant in `preset-lag.ts`,
+`PL16`, which that parcel reported unfixed) and it **died here**, because the
+disclosure test's own harness reads the premise and inverts with it rather than
+assuming a state. The same mutation, in two sibling modules, one week apart, has
+opposite verdicts. **A finding about one module is not a finding about its
+neighbour**, which is exactly the mistake this section would have made by
+reusing the previous parcel's verdict.
+
+### `RL32` DOES NOT COMPILE, AND THAT IS THE THIRD OUTCOME AGAIN
+
+Dropping the `n !== null` half of the caveat's neighbour filter leaves `n`
+possibly null inside the predicate. `npm test` exited 2 at `tsc`:
+
+    src/core/formats/effects/ramp-sign-lag.ts(314,54): error TS18047: 'n' is possibly 'null'.
+
+**The predicate is held by `tsc` and no test is holding it.** Under an
+`rc != 0 => KILLED` rule it would have been scored as a kill by the suite. It is
+reported as uncompilable and removed from the denominator, which is the second
+time in this parcel the scorer's own guard changed a verdict.
+
+### `RL18` IS THE ONE CONTROL, AND ITS PRECONDITION IS PROVEN
+
+`fields.length === 1` loosened to `<= 1` cannot discriminate, because the empty
+list has already returned `null` one line above, so length is at least 1
+wherever the selector is read. It is removed from the denominator and given a
+precondition row asserting the silence gate rather than arguing it. That row was
+**proven red against `RL17`**, the plant that disables the gate and ends the
+precondition, and against `RL12` as well.
 
 ## 10. Where the budget ended, named so nobody reads it as covered
 
-Filled in at the end of the parcel.
+- **`channel-bands.ts` is planted end to end.** 65 plants over every predicate
+  it holds: the schema pin, both prose leaves, the five sentence interlocks, the
+  travel parser and its two sanity checks, the ladder interlock and its four
+  parts, the eight predicates of the channels loader, the declared list, the
+  four predicates of `edge()` and both call sites, both verdict functions, the
+  document-band constructor, `fail()`'s own voice, and the type-level
+  no-clearance claim. **What is NOT planted in it**: the docblocks and the
+  interface declarations, which carry no predicate.
+- **`ramp-sign-lag.ts` is planted end to end.** 40 plants over its seven
+  constants, `rampSignLagFields`, `unitsOf`, and every predicate and clause of
+  `rampSignLagDisclosure` and `rampSignRateCaveat`.
+- **`CB63` is reported and NOT closed** (section 5), and it is the only plant in
+  this parcel with neither a kill nor a row. `throw new Error` becoming
+  `throw new TypeError` is observable and nothing depends on it; a row asserting
+  `err.constructor.name` would assert the spelling of a declaration.
+- **`GUARD-SEAT-RESIDUE`'s named module list for `src/core/formats/effects` is
+  now empty.** All four modules the first parcel named unreached
+  (`ramp-scroll-mode.ts`, `preset-lag.ts`, `channel-bands.ts`,
+  `ramp-sign-lag.ts`) are planted end to end and scored, across two parcels.
+- **The `??` sites across the effects tree remain unenumerated.** That was the
+  first parcel's blind spot 1 and it has now been open through five. It is the
+  one thing this row has carried the whole way without touching.
+- **`boundary.ts` and `scene.ts` in the same directory were never in any
+  parcel's scope** and nothing is claimed about them. `boundary.ts` is named
+  here specifically because `CB19` showed it reaches `anchorTravelPx` with any
+  integer `amp_shift` a document carries, which is a surface no parcel has
+  planted.
+- **No runtime confirmation anywhere.** No emulator touched, none attempted:
+  every row in this parcel is a pure-function or module-load assertion over
+  in-memory documents.
