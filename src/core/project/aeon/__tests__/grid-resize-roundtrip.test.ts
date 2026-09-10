@@ -35,7 +35,7 @@ import type { S4Level } from '../../../editing/commands';
 import { serializeNametable } from '../../../formats/s4-nametable';
 import { serializeTiles } from '../../../export/tile-dedup';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../model/s4-types';
-import type { Tile } from '../../../model/s4-types';
+import type { Act, Tile } from '../../../model/s4-types';
 
 function tile(fill: number): Tile {
   return { pixels: new Uint8Array(64).fill(fill) };
@@ -128,9 +128,17 @@ async function resizeSaveReopen(
   files: Map<string, Uint8Array>,
   newWidth: number,
   newHeight: number,
+  /**
+   * Runs on the loaded act BETWEEN the load and the save, which is the only
+   * seam where a state the CURRENT loader cannot produce can be handed to the
+   * plan builder. Used by the future-loader row below; every other row leaves
+   * it undefined and gets the unmodified round trip.
+   */
+  afterLoad?: (act: Act) => void,
 ) {
   const before = await loadAeonProject(memFa(files), '');
   const act = before.project.zones[0].acts[0];
+  afterLoad?.(act);
 
   // Exactly what SectionGridNav.tsx's applyGridOp does: run the pure op over a
   // snapshot of the live grid, then wrap before/after in one `set-sections`.
@@ -292,6 +300,80 @@ describe('aeon grid resize round trip', () => {
     // Meanwhile the sweep DID run in this same save: the file the loader read
     // at flat 3, whose section the resize moved to flat 4, is gone. A row that
     // only proved the refusal would also pass with the sweep switched off.
+    expect(plan.removals.map(r => r.path)).toContain(`${DATA_PATH}section_3.tiles.bin`);
+  });
+
+  /**
+   * THE GUARD ON THE GUARD — see docs/lens-findings.jsonl
+   * `SWEEP-SECOND-SUBTRACTION-UNGUARDED`.
+   *
+   * The row above passes THROUGH THE LOAD SIDE: today's loader never puts a
+   * refused path into `loadedPaths`, so the refused file is already outside the
+   * removable set before `removalsFor` subtracts `unreadablePaths` from it a
+   * second time. That second subtraction is therefore invisible to every
+   * standing row — deleting it (`act.sectionFiles.unreadablePaths` -> `[]` at
+   * the sweep's `removalsFor` call in save.ts) leaves the whole suite green,
+   * which is measured in docs/reviews/2026-09-10-resize-orphan-sweep.md as
+   * mutation M4 and is exactly how a defence-in-depth line gets removed as dead
+   * code at the moment it starts mattering. Precedent: O20, a gate resting on
+   * its neighbour is discovered the day the neighbour moves, so every gate gets
+   * a row asserting ITS OWN refusal reason.
+   *
+   * So this row asserts the SUBTRACTION, not the feature. It hands the plan
+   * builder the state the docblock names and today's loader cannot reach — an
+   * act whose `loadedPaths` wrongly contains a refused path — and requires the
+   * file to survive anyway. The M4 run needed a fixture invariant suspended by
+   * hand to get here; the injection below is that step made standing.
+   *
+   * Everything except the one injected push is real: the truncation, the
+   * loader's refusal, the resize, and the plan builder.
+   */
+  it('the refused subtraction is load-bearing: a loader that admitted a refused path to loadedPaths still does not get it deleted', async () => {
+    const files = fixtureFiles(2, 2);
+    const refusedPath = `${DATA_PATH}section_2.tiles.bin`;
+    const whole = files.get(refusedPath)!;
+    const truncated = whole.slice(0, whole.length - SECTION_TILES_WIDE * 2);
+    files.set(refusedPath, truncated);
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let plan;
+    let before;
+    try {
+      ({ plan, before } = await resizeSaveReopen(files, 3, 2, (act) => {
+        // THE FUTURE LOADER, in one line: a load.ts that recorded the refusal
+        // AND still admitted the path to the ledger of files it understood.
+        // Nothing today does this — that is the point; the subtraction exists
+        // so that when something does, the file is still not deleted.
+        expect(act.sectionFiles.unreadablePaths).toContain(refusedPath);
+        act.sectionFiles.loadedPaths.push(refusedPath);
+      }));
+    } finally {
+      warn.mockRestore();
+    }
+
+    const act = before.project.zones[0].acts[0];
+    // The injected state is what the plan builder actually saw. Without this
+    // the row could pass on an act where the push never landed, which is the
+    // same artifact as the property holding.
+    expect(act.sectionFiles.loadedPaths).toContain(refusedPath);
+    expect(act.sectionFiles.unreadablePaths).toContain(refusedPath);
+
+    // ANTI-VACUITY, and the reason this row discriminates: the path is not in
+    // the plan's `keep` set either, because `understood()` refuses to write a
+    // file the load could not read. So the FIRST subtraction (minus the paths
+    // this plan writes) does not save it, and the only thing standing between
+    // this file and an unlink is the second subtraction. If a future save ever
+    // did write refused files, this assertion goes red rather than letting the
+    // row pass for the wrong reason.
+    expect(plan.files.map(f => f.path)).not.toContain(refusedPath);
+
+    // THE PROPERTY. Red when the second subtraction is deleted.
+    expect(plan.removals.map(r => r.path)).not.toContain(refusedPath);
+    expect(files.get(refusedPath)).toEqual(truncated);
+
+    // And the sweep was live in this same save, so the row cannot pass by the
+    // removable set being empty for an unrelated reason: the file the loader
+    // READ at flat 3, re-indexed to flat 4, is gone.
     expect(plan.removals.map(r => r.path)).toContain(`${DATA_PATH}section_3.tiles.bin`);
   });
 
