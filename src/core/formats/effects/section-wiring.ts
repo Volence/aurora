@@ -81,11 +81,23 @@
 // describe a layout that had moved" — and this is that: a per-load derivation
 // from the artifacts themselves, not a cached literal.
 //
-// So the output is an ADVISORY. Nothing here disables a control. And the
-// refusal's hardest clause is honoured exactly: if the files are absent or
-// unparseable, the answer is "I could not read this", NEVER "you may not". A
-// control greyed out because a file could not be read is indistinguishable, to
-// the author, from one greyed out because the thing is impossible.
+// So the output is an ADVISORY. And the refusal's hardest clause is honoured
+// exactly: if the files are absent or unparseable, the answer is "I could not
+// read this", NEVER "you may not". A control greyed out because a file could
+// not be read is indistinguishable, to the author, from one greyed out because
+// the thing is impossible.
+//
+// ⚠ AMENDED 2026-09-10, AND THIS PARAGRAPH USED TO READ "Nothing here disables
+// a control." IT IS QUOTED RATHER THAN DELETED, because a reader who remembers
+// it must meet the correction instead of silently inheriting a different rule.
+// EXACTLY ONE THING HERE NOW DISABLES A CONTROL: `sectionArmExclusivity` and
+// the two functions beside it, on aeon's ruling at `92d744fc`
+// (`docs/DEFERRED_WORK.md`, `SECTION0-SPECIAL-CASE`, 2026-09-10). Read the ARM
+// EXCLUSIVITY banner further down before citing the old sentence against
+// anything, and before adding a second refusal beside it. Everything the three
+// conditions above derive is still ADVISORY and still refuses nothing: what
+// separates the new one is that it is not a MISSING LINE. There is no line to
+// write, because `preset()` will not let a record hold both arms at once.
 
 /** Where a wiring answer came from, and whether it could be had at all. */
 export interface WiringSource {
@@ -622,12 +634,12 @@ export function sectionArmExclusivityRefusal(
   const arm = sectionArmExclusivity(w, sectionIndex);
   if (arm.verdict !== 'barred') return null;
   return `Section ${sectionIndex} binds the preset record ${arm.record}, which passes `
-    + `patched: ${arm.patched}. aeon's preset() refuses a raster: beside a patched: — they are `
-    + 'the same channel and whichever installs last destroys the other (engine/effects/preset.emp: '
+    + `patched: ${arm.patched}. aeon's preset() refuses a raster: beside a patched:, because they `
+    + 'are the same channel and whichever installs last destroys the other (engine/effects/preset.emp: '
     + '"ep_raster and ep_patched are mutually exclusive"). A preset document authored here '
     + `carries bands, bands lower to a raster program, and effects_seam_gate.py requires it be `
-    + `threaded through ${chooserFn}(sec: ${sectionIndex}) — so binding one here would have to `
-    + `take ${arm.patched} out of section ${sectionIndex} first. That is a property of the `
+    + `threaded through ${chooserFn}(sec: ${sectionIndex}). So binding one here would have to take `
+    + `${arm.patched} out of section ${sectionIndex} first. That is a property of the `
     + 'mechanism and not a choice about this section (aeon, 2026-09-10: "THAT IS A STRUCTURAL GAP '
     + 'AND NOT A CHOICE"), which is why this control is disabled here and nowhere else. A '
     + 'programmer unbinds the patched arm in that record if this section is really the one you '
@@ -651,7 +663,7 @@ export function sectionArmExclusivityUnknownNotice(
   if (sectionArmExclusivity(w, sectionIndex).verdict !== 'unknown') return null;
   return `Aurora could not read ${w.library.path}`
     + `${w.library.reason ? ` (${w.library.reason})` : ''}, so it could not check whether section `
-    + `${sectionIndex}'s preset record binds a patched: program — which would make an `
+    + `${sectionIndex}'s preset record binds a patched: program, which would make an `
     + 'editor-authored band structurally impossible here, since aeon\'s preset() refuses a '
     + 'raster: beside a patched:. The control is left ENABLED and the binding is still written: a '
     + 'control greyed out because a file could not be read is indistinguishable from one greyed '
