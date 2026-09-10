@@ -43,3 +43,7 @@ export const IconClock   = svg(<><circle cx="8" cy="8" r="6" /><path d="M8 4.5V8
 export const IconClose   = svg(<path d="M4 4l8 8M12 4l-8 8" />);
 export const IconSearch  = svg(<><circle cx="7" cy="7" r="4" /><path d="M10 10l4 4" /></>);
 export const IconPanelToggle = svg(<><rect x="2" y="3" width="12" height="10" rx="1" /><path d="M6 3v10" /></>);
+// A PROMPT IN A BOX - the command palette's affordance (UX seat B, F6). The
+// chevron-and-underscore is the shared convention for "run a command"; the box
+// keeps it distinguishable at 12px from IconChevron, which is a bare chevron.
+export const IconCommand = svg(<><rect x="2" y="3" width="12" height="10" rx="1" /><path d="M5 7l1.8 1.6L5 10.2M8.6 10.6h2.6" /></>);

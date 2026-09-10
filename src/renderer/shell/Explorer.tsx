@@ -29,6 +29,10 @@ import { listCanvasNames, type CanvasListing } from '../state/canvas-file';
 import { openProjectDir } from '../state/open-project';
 import { useSessionStore } from '../state/sessionStore';
 import { editObjectArt } from '../components/sprite/export-sprite';
+import { openCommandPalette } from '../state/commandPaletteStore';
+import {
+  PALETTE_AFFORDANCE_TITLE, PALETTE_AFFORDANCE_LABEL, PALETTE_PRIMARY_SHORTCUT,
+} from './command-palette-chord';
 import type { RecentProject } from '../../shared/ipc-types';
 import { loadRecents } from '../state/recents';
 import type { ObjectDef } from '../../core/model/s4-types';
@@ -213,6 +217,16 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onI
           );
         })}
         <div style={{ flex: 1 }} />
+        {/* THE PALETTE IS REACHABLE FROM THE RAIL TOO (UX seat B, F6). The
+            labelled row below only exists while the explorer is open, and an
+            author who has collapsed it to 44px is exactly the author who wants
+            a keyboard-shaped control. Icon plus the same `title=` the row
+            carries - the app's own existing channel, which is how
+            `Collapse explorer (Ctrl+B)` two lines up already reads. */}
+        <button title={PALETTE_AFFORDANCE_TITLE} onClick={() => openCommandPalette()}
+          style={styles.railButton}>
+          <Icons.IconCommand size={16} />
+        </button>
         <button title="Expand explorer (Ctrl+B)" onClick={toggle} style={styles.railButton}>
           <Icons.IconPanelToggle size={16} />
         </button>
@@ -229,6 +243,42 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onI
           <Icons.IconPanelToggle size={14} />
         </button>
       </div>
+      {/* ═══ THE COMMAND PALETTE, NAMED IN PLAIN SIGHT (UX seat B, F6) ═══
+
+          THE FINDING IS NOT TWO WASTED KEYSTROKES. The seat pressed Ctrl+P and
+          Ctrl+Shift+P before Ctrl+K worked, and then disclosed that their three
+          presses are a FLOOR: they only knew a palette existed because they had
+          read `shell/commands.ts` while checking something else. A reader
+          without that prior presses nothing at all, and the whole feature - the
+          guides, Save All, Build & Run, New Sprite, every level in the project,
+          the only route to a first sprite - is invisible to them forever. So
+          the answer had to be something a person SEES, not another chord.
+
+          WHY A LABELLED ROW AND NOT AN ICON IN THE HEADER. An icon with a
+          tooltip is the app's existing channel and it is what the rail gets,
+          because 44px has room for nothing else. Here there is room, and a
+          tooltip is still a thing you must first suspect is there: it answers
+          "what does this button do", never "does this app have a command
+          palette". The row answers the second question by being readable
+          without a gesture, and it carries the shortcut on its right so the
+          reader who uses it once learns the chord and stops needing the row -
+          which is the same trade the tab strip's dirty dot lost (uxb F7) and
+          the reason a Save control now sits beside it.
+
+          ABOVE THE FILTER, NOT BELOW IT. The filter searches the tree in front
+          of it; this searches everything. Reading order puts the wider net
+          first, and it keeps the row out of the scrolling tree - a control that
+          scrolls away is a control a newcomer has to already know about.
+
+          IT IS NOT A SECOND SEARCH BOX. Deliberately a `<button>` with a raised
+          face and a shortcut chip, not an `<input>`: two text fields stacked
+          would be the confusion this is trying to remove. */}
+      <button type="button" title={PALETTE_AFFORDANCE_TITLE}
+        onClick={() => openCommandPalette()} style={styles.paletteRow}>
+        <Icons.IconCommand size={12} />
+        <span style={styles.paletteLabel}>{PALETTE_AFFORDANCE_LABEL}</span>
+        <span style={styles.paletteKeys}>{PALETTE_PRIMARY_SHORTCUT}</span>
+      </button>
       <div style={styles.filterWrap}>
         <Icons.IconSearch size={12} />
         <input
@@ -294,6 +344,19 @@ const styles: Record<string, React.CSSProperties> = {
   headerButton: {
     display: 'flex', alignItems: 'center', background: 'transparent', color: T.textLo,
     border: 'none', cursor: 'pointer', padding: 2, borderRadius: T.rSm,
+  },
+  // The palette launcher. Same margin/radius as the filter box below it so the
+  // two read as one block of chrome, and a RAISED face plus a shortcut chip so
+  // it reads as a button rather than a second thing to type into.
+  paletteRow: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    margin: '8px 8px 0', padding: '4px 8px',
+    background: T.raised, border: `1px solid ${T.border}`, borderRadius: T.rMd,
+    color: T.textLo, flexShrink: 0, cursor: 'pointer', font: 'inherit', textAlign: 'left' as const,
+  },
+  paletteLabel: { flex: 1, minWidth: 0, fontSize: T.tSm, color: T.textBase },
+  paletteKeys: {
+    fontSize: T.t2xs, fontFamily: T.fontMono, color: T.textFaint, flexShrink: 0,
   },
   filterWrap: {
     display: 'flex', alignItems: 'center', gap: 6, margin: 8, padding: '4px 8px',

@@ -83,8 +83,18 @@ export const EFFECTS_SUB_TABS: readonly EffectsSubTab[] = [
     // Parallax because it is a property of the raster PRESET document — the
     // same file as the bands, the cycles and the variants beside it — and not
     // of a scene's layers, however much "it moves" sounds like the scroll job.
-    sections: ['aeon.effects.timeline', 'aeon.effects.presets', 'aeon.effects.preset.bands',
-      'aeon.effects.preset.channels', 'aeon.effects.preset.anchors'],
+    // ⚠ COLUMN ORDER, AND IT CHANGED (UX seat A, F5). `aeon.effects.timeline`
+    // led this tab and now trails it: a seat following the in-app guide
+    // measured four wheel gestures from the top of the tab to `Preset id`, the
+    // control the guide calls step 1, because the timeline's ~440px of prose
+    // about raster SPLITS stood in front of the panel that authors BANDS. The
+    // timeline is still expanded and still mounted (its own header records why
+    // it must never be `defaultCollapsed`); only its position moved. This array
+    // is what `revealEffectsSection` routes on, so it has to keep saying what
+    // the facet actually renders - see effects-facet.tsx.
+    sections: ['aeon.effects.presets', 'aeon.effects.preset.bands',
+      'aeon.effects.preset.channels', 'aeon.effects.preset.anchors',
+      'aeon.effects.timeline'],
   },
   {
     id: 'tileAnim',

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { T, Z } from './ui';
 import { modalIsOpen } from '../state/modalStore';
+import { useCommandPaletteStore } from '../state/commandPaletteStore';
+import { paletteKeyAction } from '../shell/command-palette-chord';
 
 export interface Command {
   id: string;
@@ -10,38 +12,43 @@ export interface Command {
 }
 
 /**
- * Empyrean command palette (Ctrl/Cmd-K, a shared chrome convention). Self-
- * contained: owns its open state via a global key listener; filters the given
- * commands by substring; arrow keys navigate, Enter runs, Esc closes. Themed
- * from the design tokens (emerald accent on the active row).
+ * Empyrean command palette (Ctrl+K or Ctrl+Shift+P, both shared chrome
+ * conventions). Filters the given commands by substring; arrow keys navigate,
+ * Enter runs, Esc closes. Themed from the design tokens (emerald accent on the
+ * active row).
+ *
+ * ⚠ THE OPEN STATE IS NO LONGER PRIVATE, and that is UX seat B's F6. It lived
+ * in this component's `useState` and the only writer was the keydown listener
+ * below, so the palette could be reached by a chord and by nothing else - which
+ * is exactly the finding: no menu, no button, no badge, no hint, and a reader
+ * with no prior never presses anything. It now reads
+ * `commandPaletteStore`, which the Explorer's affordance can write. The chord
+ * DECISION moved too, to `shell/command-palette-chord.ts`, where a node suite
+ * can execute it; this component keeps the listener and the rendering.
  */
 export default function CommandPalette({ commands }: { commands: Command[] }) {
-  const [open, setOpen] = useState(false);
+  const open = useCommandPaletteStore((s) => s.open);
+  const setOpen = useCommandPaletteStore((s) => s.setOpen);
+  const toggle = useCommandPaletteStore((s) => s.toggle);
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
-        // A DIALOG IS WAITING FOR AN ANSWER — the palette does not open over it.
-        //
-        // It used to open UNDERNEATH: the palette sat at z-1000 and the dialogs
-        // at 1100, so Ctrl+K during a confirm swallowed the chord, focused an
-        // invisible search field, and typing went nowhere anybody could see.
-        // Raising it above would have been the other bug: a modal that can be
-        // walked around is not modal, and the commands behind it include Open
-        // Project, which is exactly what the confirm is asking about.
-        if (!open && modalIsOpen()) return;
-        e.preventDefault();
-        setOpen((v) => !v);
-      } else if (e.key === 'Escape' && open) {
-        setOpen(false);
-      }
+      // EVERY RULE IS IN `paletteKeyAction` - which chords open it, which
+      // spellings of a shifted key count, and the asymmetric modal guard (a
+      // chord may not OPEN the palette over a dialog; an open palette still
+      // answers). Nothing about the decision is re-stated here, so a node test
+      // of that function is a test of what actually fires.
+      const action = paletteKeyAction(e, open, modalIsOpen());
+      if (action === null) return;
+      e.preventDefault();
+      if (action === 'close') setOpen(false); else toggle();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
+  }, [open, setOpen, toggle]);
 
   useEffect(() => {
     if (open) { setQuery(''); setSel(0); requestAnimationFrame(() => inputRef.current?.focus()); }
