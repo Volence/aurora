@@ -221,7 +221,7 @@ describe('the shipped raster-binding limit agrees with aeon\'s real file', () =>
     const derived = derivedWiredSet();
     expect(bound.filter((s) => !derived.includes(s)),
       'a section binds a rasterRef that no preset threads. That tree is one aeon\'s seam gate '
-      + 'refuses by name, and the shipped sentence says it is refused — so this is a real finding '
+      + 'refuses by name, and the shipped sentence says it is refused, so this is a real finding '
       + 'about aeon\'s tree, not a wording problem here.').toEqual([]);
     expect(RASTER_SECTION_BINDING_LIMIT,
       'the sentence no longer claims the wired sections are bound; if that clause was rewritten '
@@ -234,8 +234,8 @@ describe('the shipped raster-binding limit agrees with aeon\'s real file', () =>
     // {5,6,7} with bound {5,6} is a fine aeon tree and a false Aurora sentence.
     expect(bound,
       `the sentence says BOTH ARE ALSO BOUND, but aeon threads {${derived.join(', ')}} and only `
-      + `{${bound.join(', ')}} carry a rasterRef. A wired section left unbound is legal — it is `
-      + 'the sentence\'s own case 2 — so the fix is to REWORD the clause to say which sections are '
+      + `{${bound.join(', ')}} carry a rasterRef. A wired section left unbound is legal (it is `
+      + 'the sentence\'s own case 2), so the fix is to REWORD the clause to say which sections are '
       + 'bound, not to bind anything in aeon\'s tree.')
       .toEqual(derived);
   });
