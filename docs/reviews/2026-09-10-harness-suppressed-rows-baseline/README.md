@@ -46,3 +46,44 @@ true of a session scratchpad which no longer exists, so the claim pointed at not
 could open. A BEFORE that only its author ever saw cannot hold an AFTER to anything.
 
 Absolute scratch paths are rewritten to `<scratch>`; the logs are otherwise verbatim.
+
+---
+
+# AFTER: the same two runs on the merged fix
+
+**Measured by the overseer in the foreground on master, immediately after merging
+`parcel/harness-suppressed-rows`.** One complete run per configuration, both exit 0.
+Same recipe, same copies, same box.
+
+| run | totals line | rows printed |
+|---|---|---|
+| `after-no-classic.log` | `13/20 rows PASS · 0 FAIL · 7 UNMEASURABLE · 15.1s` | 20 |
+| `after-with-classic.log` | `20/20 rows PASS · 0 FAIL · 0 UNMEASURABLE · 25.2s` | 20 |
+
+**The row count stops moving.** 14-vs-20 became 20-vs-20. The difference between the two
+configurations is now visible as UNMEASURABLE rather than as arithmetic, which is the whole
+point of the parcel.
+
+The seven suppressed rows print by name, each reason naming `CLASSIC_DIR`:
+
+```
+S3a  S3b  S2a1  S2a2  S2a3  S2b  S3c
+```
+
+A bare `S3` no longer appears in either run (`grep -c "^\S* *\[S3\] " = 0`), so the two logs
+are now diffable by id — which they were not before, because the refusing arm's `S3` carried
+`S3c`'s question under a different id.
+
+**`after-with-classic.log` is the control that matters**: its id list is identical to
+`run-with-classic.log` above, so the measuring path was not disturbed by the fix.
+
+## ⚠ A SECOND COUNT WAS WRONG, AND IT WAS THE OVERSEER'S
+
+Having corrected the ledger's *four* to *six*, I then told the agent to expect **six**
+UNMEASURABLEs in the fixed run. It is **seven**, and the agent said so before running anything:
+the non-classic block is 13 rows, so `20 − 13 = 7`, and the `S3`/`S3c` row was always one of the
+unmeasurables.
+
+**Six questions are LOST; seven rows are UNMEASURABLE.** Two different quantities, one number
+carried between them — which is the same defect this parcel exists to fix, committed by the
+person who had just measured it. A count names its unit or it is not a measurement.
