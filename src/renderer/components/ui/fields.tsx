@@ -264,6 +264,11 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
   // be a render per keystroke for a fact nothing draws.
   const focusState = React.useRef<{ held: number | null; commits: number }>(
     { held: null, commits: 0 });
+  // IS THE CLICK IN FLIGHT THE ONE THAT BROUGHT THIS BOX INTO FOCUS? Armed on
+  // `mousedown`, read on `mouseup`, and the whole reason is in the two handlers
+  // at the bottom of this component. A ref and not state for the reason above:
+  // it is written and read inside the same gesture, and nothing draws it.
+  const focusingClick = React.useRef(false);
 
   // Resync from the document — an undo, a drag on the canvas, a different
   // selection — but only when the author is not typing into this box.
@@ -273,6 +278,48 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
 
   return (
     <input type="number" title={title} value={text} min={min} max={max} step={step}
+      /**
+       * ═══ THE SELECT-ON-FOCUS THAT DID NOT STICK ═══
+       *
+       * `onFocus` below has called `select()` since EFFECTS-W1 defect 5, and it
+       * was RIGHT AND NOT ENOUGH. Measured, 9 arms, 2026-09-10
+       * (`docs/reviews/2026-09-10-numberfield-previous-visit.md`): click a box
+       * holding 156, type NOTHING, click away, click back, type `7` and the box
+       * reads `1567`. The `select()` runs in both arms of that pair. **What
+       * differs is that the click's own `mouseup` DEFAULT ACTION collapses the
+       * selection the `focus` handler just made** — the textbook cause of a
+       * select-on-focus that does not stick, and arm M proved the textbook
+       * remedy on the live element: with the mouseup default prevented, the
+       * same failing gesture replaces.
+       *
+       * ⚠ WHY THIS IS ARMED ON `mousedown` INSTEAD OF ALWAYS PREVENTING. A
+       * blanket `preventDefault` on every mouseup also kills a deliberate caret
+       * placement and a drag-selection INSIDE A BOX THE AUTHOR IS ALREADY IN —
+       * a real capability, and one the defect never touched: the insert only
+       * ever appears on the click that brings the box from unfocused to
+       * focused. So the guard is scoped to that one click. `mousedown` fires
+       * BEFORE the focus default action, so `editing` there is still the state
+       * from before this gesture and answers exactly the right question: was
+       * this box unfocused when the pointer went down?
+       *
+       * WHY `editing` AND NOT `document.activeElement`. They agree — `editing`
+       * is set true on focus and false on blur and nowhere else — and the
+       * component then reaches for no global, which is what lets the SCOPE be
+       * unit-tested in a suite with no DOM
+       * (`__tests__/number-field-empty.test.ts`, the mouseup-guard rows). The
+       * behaviour it protects is a native default action and is NOT unit
+       * testable; the scope is, and the scope is the part a later edit can
+       * silently widen.
+       *
+       * ⚠ PRIMARY BUTTON ONLY. A middle-click on X11 pastes the primary
+       * selection on mouseup, and that is not this component's to cancel.
+       */
+      onMouseDown={(e) => { focusingClick.current = e.button === 0 && !editing; }}
+      onMouseUp={(e) => {
+        if (!focusingClick.current) return;
+        focusingClick.current = false;
+        e.preventDefault();
+      }}
       onFocus={(e) => {
         setEditing(true);
         // SELECT ON FOCUS. Clicking a box holding `112` and typing `40` used to
@@ -281,6 +328,8 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
         // no warning anywhere). Selecting makes the first keystroke replace,
         // which is what every author expects of a small numeric field and what
         // makes the refusal below a backstop rather than a daily obstacle.
+        // ⚠ THIS LINE ALONE DOES NOT HOLD THE SELECTION. The mouseup guard
+        // above is the other half; see its block for the measurement.
         e.currentTarget.select();
         // The baseline for the drift clause: what the author is about to type
         // OVER. Reset the counter with it — a second visit to the same box is a
@@ -290,6 +339,13 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
       }}
       onBlur={() => {
         setEditing(false);
+        // DISARM. A mousedown that arms the guard and then finishes its mouseup
+        // somewhere else (a drag out of the box) would otherwise leave the arm
+        // set, and the NEXT mouseup to land here would be prevented on an
+        // already-focused box — the exact regression the scoping exists to
+        // avoid. Every later mousedown on this box recomputes the arm anyway;
+        // this closes the one window where none does.
+        focusingClick.current = false;
         // ⚠ THE COUNTER IS NOT CLEARED HERE, only on the next focus. The refusal
         // text stays painted after the box snaps back, and it is exactly then
         // that an author reads it — a clause deleted on blur would vanish at the
