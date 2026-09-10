@@ -31,8 +31,9 @@ called or attempted. `node_modules/.bin/electron` does not exist in this worktre
 | Currently **TRUE** against their producer | **44** |
 | Currently **FALSE** | **1** (R5, the §1 panel diagram's Colour column) |
 | Held by an existing test **before** this parcel | **1** (R17, and only half of it) |
-| Held by a test **after** this parcel | **26** |
+| Held by a test **after** this parcel | **26**, in **31 rows** |
 | Still unheld after this parcel, with reason | **19** (§5) |
+| Claims found by the red-first mutations that the census did NOT enumerate | **1** (§6.3) |
 
 The FALSE one is fixed in this parcel, in the guide, against the source. **No component
 behaviour, control label, mount order or UI was changed to make any sentence true** — that was
@@ -196,7 +197,7 @@ does not go unnoticed.
 
 ## 4 · The gate
 
-`src/renderer/components/guide/__tests__/guide-route-claims.test.ts`, executed by
+`src/renderer/components/guide/__tests__/guide-route-claims.test.ts`, **31 rows**, executed by
 `vitest run` inside `npm test` (the repo's vitest include glob is
 `src/**/__tests__/**/*.test.ts`).
 
@@ -263,6 +264,87 @@ never a measurement of where it appeared.
 
 ## 6 · Verification
 
-See the commit messages on `parcel/guide-route-claims` for the red-first evidence: each mutation
-was applied to a committed baseline, quoted back from disk, and the resulting failure named by
-row.
+### 6.1 Aggregate
+
+`npm test` on `parcel/guide-route-claims` at `396e2905`, whole chain including
+`check:guide-text`:
+
+```
+Test Files  596 passed | 3 skipped (599)
+     Tests  8905 passed | 9 skipped (8914)
+```
+
+All fourteen `check:*` gates OK, `check-guide-text` included (275 inline-code spans, 143
+distinct, 103 asserted against the source that renders them). Wall clock 49.9s on a machine
+carrying a 1-minute load average of 24.7 at the time; the suite's own reported duration was
+26.8s.
+
+The new file contributes **31 rows** in
+`src/renderer/components/guide/__tests__/guide-route-claims.test.ts`.
+
+### 6.2 Red-first, every mutation quoted from disk before its run
+
+Baseline for each was a committed tree; each was reverted with `git checkout HEAD --` on a tree
+whose only change was the mutation, and `git status --short` was empty before the next one.
+
+| | Mutation | Applied to | Result |
+|---|---|---|---|
+| **A** | put `RASTER TIMELINE` back at the top of the Colour column (the defect exactly as it stood) | `docs/guides/effects-first-run.md` | **1 failed / 29 passed** — `the Colour column lists the sections in the declared order` |
+| **B** | reorder the **provider's** colour `sections` so the timeline leads again, guide untouched | `providers/effects-sub-tabs.ts` | **2 failed / 28 passed** — the same column row, plus `step 1 calls it the FIRST section on the tab`. **The row reads the producer, not a stored order.** |
+| **C** | add `defaultCollapsed` to `aeon.effects.presets` | `BandPresetPanel.tsx` | **1 failed / 29 passed** — `the guide says RASTER BAND PRESETS arrives open, and the section agrees` |
+| **D** | delete `defaultCollapsed` from `aeon.effects.scene` | `EffectsScenePanel.tsx` | **1 failed / 29 passed** — `the guide says SCENE: <id> arrives shut, and the section agrees` |
+| **E** | flip the drift tooltip to `negative = rightward` | `providers/effects-aeon.ts` | **1 failed / 29 passed** — `the guide's drift direction word is the direction the control declares` |
+| **F** | hoist `{children}` above the three condition rows | `SectionPicker.tsx` | **1 failed / 29 passed** — `inside the strip, the buttons come after the three condition rows and the act line` |
+| **G** | rename the schematic's middle heading `Colour` to `Colours` | `docs/guides/effects-first-run.md` | ⚠ **30 passed, 0 failed.** See §6.3. |
+| **G2** | delete the middle heading outright | `docs/guides/effects-first-run.md` | **4 failed / 26 passed** — the landmark row plus all three column rows, loudly |
+| **G3** | mutation G again, after §6.3 | `docs/guides/effects-first-run.md` | **1 failed / 30 passed** — `each column is headed with the word the button actually carries` |
+| **H** | make `newAnchorSweep()` write `phase: 0` | `providers/effects-preset.ts` | **1 failed / 30 passed** — `a new sweep arrives with Start at absent, as the §5 table says` |
+| **I** | move `RASTER BAND PRESETS` to the `Tile anim` row of the §8 table | `docs/guides/effects-first-run.md` | **1 failed / 30 passed** — `every control the table places on a sub-tab is on the tab the provider says` |
+| **A (retry)** | mutation A again, under the amended harness | `docs/guides/effects-first-run.md` | **1 failed / 30 passed** — same row. Re-established because the method changed at §6.3. |
+
+**The control that says why this parcel exists:** `npm run check:guide-text` was run against the
+mutated guide under **A** and under **I** and passed both times, exit 0. The existing gate
+cannot see either, which is the coverage claim in §0 measured rather than asserted.
+
+### 6.3 ⚠ TWO HARNESS DEFECTS FOUND BY THE RED-FIRST RUN, NOT BY REVIEW
+
+Mutation **G** applied cleanly and every row stayed green. Applied-and-still-green is a defect
+to diagnose, never a pass, and the diagnosis had two parts:
+
+1. **`labels.every((l) => line.includes(l))` matches a superstring.** `Colours` contains
+   `Colour`, so the header was still found at the same offset and the reader carried on working.
+2. **The row that was supposed to catch it was vacuous.** `found` was
+   `starts.every((s) => s >= 0)`, and every offset is `>= 0` *by construction* at that point:
+   the header line had only been accepted because all three labels were in it. It asserted its
+   own search condition. That is a guard that reads as care and discriminates nothing.
+
+The repair (commit `fac93e2b`) made `found` require what the column slicing actually rests on:
+**three distinct, increasing offsets, in the order the bar paints them.** Mutation **G2** then
+went red on four rows.
+
+Mutation **G** was then re-applied and **was still green, correctly**. With rising distinct
+offsets the columns still sliced right and every order row still measured what it claimed. The
+real fault was that the picture now headed a column with a word no button carries, and **no row
+anywhere asked that** — `check-guide-text.mjs` cannot either, because its `DIAGRAM` rows are the
+entries and this is the fenced header line above them. So commit `396e2905` added a
+thirty-first row deriving each column's heading from `EFFECTS_SUB_TABS`, and G3 went red.
+
+**That is a claim the census did not enumerate**, because a column heading is a label claim
+rather than a route claim. It is recorded here rather than folded silently into the table: the
+census's boundary was drawn correctly and the mutation found something just outside it.
+
+### 6.4 What these rows do NOT prove
+
+* **No pixel.** No jsdom, no Electron, no CDP, no emulator. Declared order, source order and
+  arrival state only.
+* **Not the render.** The schematic rows compare the guide against
+  `providers/effects-sub-tabs.ts`. Whether `effects-facet.tsx` *mounts* the panels in that
+  declared order is a different seam, and it is
+  `colour-tab-arrival.test.ts`'s row `the facet mounts the panels in the order the provider
+  declares` that holds it. Neither file holds both halves alone.
+* **Not the sticky mechanism.** `§6`'s "pinned to the top of the panel" is held here only as
+  source ORDER. That the strip actually sticks is
+  `scratchpad/poisons-effects-section-strip.sh`'s poison 1, which is a foreground instrument.
+* **Not "the middle of the screen".** R24 is held as "the seed is the midpoint of the engine's
+  own fire-line band, and is not 0". Whether that reads to a person as the middle of the screen
+  is prose judgement.
