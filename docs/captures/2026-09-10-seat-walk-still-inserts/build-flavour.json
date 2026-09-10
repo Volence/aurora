@@ -1,0 +1,7 @@
+{
+  "stamp": 1,
+  "flavour": "debug",
+  "VITE_AURORA_DEBUG": "1",
+  "at": "2026-09-10T08:13:57.117Z",
+  "by": "scripts/build-flavour-stamp.mjs"
+}

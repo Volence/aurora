@@ -1,0 +1,102 @@
+root: /home/volence/sonic_hacks/aurora
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora
+=== cdp-sweep F4 harness (P2 FIRST, then P1, then P3) ===
+    node        : v24.15.0
+    loadavg     : 10.92 7.94 7.85
+    AEON_DIR    : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/3c0520dc-6fcd-4e96-8730-98700fefd1b4/scratchpad/aeon-copy
+    SHIPPED     : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/3c0520dc-6fcd-4e96-8730-98700fefd1b4/scratchpad/aeon-copy/games/sonic4/data/editor/effects/presets/authored_probe.json (id authored_probe, 2 band(s))
+    DISPLAY     : :97   PORT: 9471
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 202B [pid 395334 ALIVE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.sonic-level-editor/mcp.json 202B [pid 395334 ALIVE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178901793170
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-f4-harness-3777123-63c02cd4 — see HAZARD 6
+        aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  [0a] the COPIED aeon project is open   [load 10.01/7.85/7.82]
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  [0b] aeon's own authored_probe.json is loaded — a real band to type into   [load 9.53/7.78/7.80]
+        6 preset(s): ["aurora_ramp_witness","authored_probe","ojz_sec3_shimmer","ojz_sec5_showcase","ojz_sec6_baseswap","ramp_probe"]
+PASS  [0c] the Effects facet mounts   [load 9.53/7.78/7.80]
+PASS  [0d] both edge boxes are FOUND by the schema's own titles, painted and hit-testable   [load 9.09/7.72/7.78]
+        section open -> clicked
+        Top aim {"x":1218,"y":477,"dpr":1,"rect":{"x":1182,"y":464.90625,"width":72,"height":24,"top":464.90625,"right":1254,"bottom":488.90625,"left":1182},"hitIsTarget":true,"hitTag":"INPUT","hitTitle":"Screen line the effect turns ON; the ban"}
+        Bot aim {"x":1218,"y":477,"dpr":1,"rect":{"x":1182,"y":464.90625,"width":72,"height":24,"top":464.90625,"right":1254,"bottom":488.90625,"left":1182},"hitIsTarget":true,"hitTag":"INPUT","hitTitle":"Screen line the effect turns OFF: the de"}
+
+    dpr         : 1   (printed beside every coordinate row)
+
+──── P2: the seat's exact gesture, on the fixed build ────
+PASS  [P2a] ANTI-VACUOUS: the band resets to the seat's own numbers (top 112, bot 128)   [load 9.09/7.72/7.78]
+        band 0 = {"bot":128,"on":{"cram":{"addr":74,"colours":[14]}},"sh":false,"top":112}
+
+    ── the census, one run, one box each ──
+      A  INSERTED one key -> "1287", two -> "12872", model {"bot":128,"on":{"cram":{"addr":74,"colours":[14]}},"sh":false,"top":40}
+         focus before click: true, at click: true; the seat's walk: Top -> TAB -> click Bot -> type
+      B  REPLACED one key -> "7", two -> "72", model {"bot":72,"on":{"cram":{"addr":74,"colours":[14]}},"sh":false,"top":40}
+         focus before click: false, at click: true; same, but one blur() between the Tab and the click
+      C  REPLACED one key -> "7", two -> "72", model {"bot":72,"on":{"cram":{"addr":74,"colours":[14]}},"sh":false,"top":40}
+         focus before click: false, at click: true; same as B with NO gap between keystrokes (is the 40ms the variable?)
+      D  REPLACED one key -> "7", two -> "72", model {"bot":72,"on":{"cram":{"addr":74,"colours":[14]}},"sh":false,"top":40}
+         focus before click: false, at click: true; cold click on Bot: no Tab at all, blurred, no key gap
+      E  REPLACED one key -> "7", two -> "72", model {"bot":128,"on":{"cram":{"addr":74,"colours":[14]}},"sh":false,"top":72}
+         focus before click: false, at click: true; cold click on TOP — the committed refusal harness's own [5a] conditions
+      F  REPLACED one key -> "7", two -> "72", model {"bot":72,"on":{"cram":{"addr":74,"colours":[14]}},"sh":false,"top":40}
+         focus before click: false, at click: true; B, but a 2s settle between the blur and the click (a flush race?)
+      G  REPLACED one key -> "7", two -> "72", model {"bot":72,"on":{"cram":{"addr":74,"colours":[14]}},"sh":false,"top":40}
+         focus before click: false, at click: true; Bot focused by a CLICK (not a Tab), blurred, then clicked again
+PASS  [P2b] the Tab lands on `Bot` — so variant A's click IS on an already-focused box   [load 6.68/7.27/7.62]
+        {"found":true,"focused":true,"value":"128","start":null,"end":null,"title":"Screen line the effect turns OFF: the de"} — a null selection range is this engine's answer for input[type=number]; FOCUS is the variable, and it is what is read here
+PASS  [P2c] ANTI-VACUOUS FLOOR: a COLD click on the same boxes REPLACES, in this same run   [load 6.68/7.27/7.62]
+        D: REPLACED ("7"); E: REPLACED ("7") — E reproduces the committed effects-refusal-harness [5a] conditions on the Top box. Without this row the census could not tell "the gesture inserts" from "the app is broken".
+FAIL  [P2d] THE DISCRIMINATOR — Top -> Tab -> click Bot -> type 72: does Bot show 12872?   [load 6.68/7.27/7.62]
+        variant A: one key -> "1287" (INSERTED), two keys -> "12872", model band 0 = {"bot":128,"on":{"cram":{"addr":74,"colours":[14]}},"sh":false,"top":40}
+        aim {"x":1218,"y":477,"dpr":1,"rect":{"x":1182,"y":464.90625,"width":72,"height":24,"top":464.90625,"right":1254,"bottom":488.90625,"left":1182},"hitIsTarget":true,"hitTag":"INPUT","hitTitle":"Screen line the effect turns OFF: the de"}
+        REPLACED / 72 => seat A's F4 symptom is CLOSED. INSERTED / 12872 => NUMBERFIELD-FOCUSED-CLICK-INSERT is LIVE and F4's symptom REOPENS.
+PASS  [P2e] and the census SEPARATES the two: cold clicks replace where the tab-then-click does not   [load 6.68/7.27/7.62]
+        A=INSERTED B=REPLACED C=REPLACED D=REPLACED E=REPLACED F=REPLACED G=REPLACED — a census where EVERY variant inserts would indict the instrument, not the app; one where every variant replaces would say the mechanism is not reachable this way. Only a SPLIT answers the finding.
+PASS  [P2f] the blur() alone accounts for the split (B/C differ from A by that one call)   [load 6.68/7.27/7.62]
+        A=INSERTED B=REPLACED C=REPLACED D=REPLACED E=REPLACED — B and C agreeing rules the 40ms inter-key gap OUT as the variable.
+
+──── P1: does either box move when the group speaks? ────
+PASS  [P1a] ANTI-VACUOUS: band reset (top 112, bot 128) before the geometry rows   [load 6.55/7.24/7.61]
+        band 0 = {"bot":128,"on":{"cram":{"addr":74,"colours":[14]}},"sh":false,"top":112}
+PASS  [P1b] a refusal raised by `Top` is PAINTED (so the geometry row below is not vacuous)   [load 6.55/7.24/7.61]
+        messages after an illegal Top: [{"text":"preset \"authored_probe\" · Raster band 0 · Top: 999 is not a ","rects":1}]
+PASS  [P1c] `Bot`'s own y does NOT change when `Top` speaks   [load 6.55/7.24/7.61]
+        Bot y 492.91 -> 492.91; Top y 464.91 -> 464.91; S/H y 520.91 -> 739.41  (S/H moving is §2.4's NAMED RESIDUAL, not a failure of this row)
+PASS  [P1d] and `Top`'s own y does NOT change when `Bot` speaks (the other direction)   [load 6.55/7.24/7.61]
+        Top y 436.91 -> 436.91; Bot y 464.91 -> 464.91; S/H y 492.91 -> 595.91; msgs [{"text":"preset \"authored_probe\" · Raster band 0 · Bot: 999 is not a ","rects":1}]; band reset before = {"bot":128,"on":{"cram":{"addr":74,"colours":[14]}},"sh":false,"top":112}
+
+──── P3: the refusal at a squeezed column width ────
+PASS  [P3a] the refusal is PAINTED, inside its scroller, unclipped and hit-testable at the column's REAL width   [load 6.55/7.24/7.61]
+        scroller 300px (the fixed Colour column); msg {"x":1182,"y":492.90625,"width":190,"height":99,"top":492.90625,"right":1372,"bottom":591.90625,"left":1182}; dpr 1; insideScroller=true hit=true clipped=false overflowsRight=false
+PASS  [P3b] and it still carries its WHOLE sentence at that width (the rule, not a truncation)   [load 6.55/7.24/7.61]
+        text = "preset \"authored_probe\" · Raster band 0 · Bot: 999 is not a screen line: both of a band's edges are raster fires, and a fire must land on 3..223 (lines 0-2 belong to the priming records). Refused; Bot is still 128."
+UNMS  [P3c] P3's 129px condition is UNREACHABLE through the app's own layout   [load 6.26/7.17/7.58]
+        narrowing the window to 900px leaves the column at 300px — it did not move from 300px, because the column is FIXED at 300px (column-layout.tsx:77). P3's "129px" is the PARALLAX sub-tab's LAYERS LIST HEIGHT (2026-09-02-effects-sub-tabs.md; -drift-control.md §238), not a width of this column. The condition as written cannot be produced, so no verdict on it is offered.
+        FORCED-129px (NOT A STATE THE APP CAN BE IN, no verdict taken): msg becomes 19px wide and 1155px tall, insideScroller=false. The label column consumes the row, so the sentence wraps to about one character per line. This says what 129px would do to the text; it says nothing about the shipped app.
+
+    screenshots : /home/volence/sonic_hacks/aurora/scratchpad/shots-cdp-sweep/f4-p1-message.png, /home/volence/sonic_hacks/aurora/scratchpad/shots-cdp-sweep/f4-p3-squeezed.png
+cleanup: tree under pid 3777142 (11 process(es)):
+           3777142 /bin/sh /usr/bin/xvfb-run -n 97 -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora
+           3777151 Xvfb :97 -screen 0 1680x1050x24 -nolisten tcp
+           3785612 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           3785629 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           3785667 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3785668 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3785674 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3785822 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3785837 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3785871 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           3785904 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 1 ms; teardown 351 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ 15/17 rows PASS · 1 FAIL · 1 UNMEASURABLE · 62.6s ════
+     loadavg at start 10.92 7.94 7.85 · at end 6.26 7.17 7.58
+FAILING:
+  [P2d] THE DISCRIMINATOR — Top -> Tab -> click Bot -> type 72: does Bot show 12872? (load 6.68/7.27/7.62)
+UNMEASURABLE:
+  [P3c] P3's 129px condition is UNREACHABLE through the app's own layout (load 6.26/7.17/7.58)
