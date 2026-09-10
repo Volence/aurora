@@ -17,6 +17,7 @@ import { loadRecents } from '../../state/recents';
 import { normalizeProjectPath } from '../../../shared/project-path';
 import { GUIDES } from '../guide/guides';
 import { openGuide } from '../../state/guideStore';
+import OpenByPath from './OpenByPath';
 
 /**
  * THE GUIDES, ON HOME, IN BOTH STATES.
@@ -52,9 +53,17 @@ function GuideCards(): React.ReactElement {
 export interface HomeTabProps {
   onOpenProject: () => void;
   onOpenRecent: (path: string) => void;
+  /**
+   * THE SECOND DOOR (seat A's F1). Separate from `onOpenRecent` even though App
+   * passes the same function to both: a recent is a path Aurora already vouched
+   * for, a typed one is not, and a prop named for recents carrying hand-typed
+   * strings is the kind of name lie that survives until someone changes one of
+   * the two roads. See OpenByPath.tsx for why a field rather than argv.
+   */
+  onOpenPath: (dir: string) => void;
 }
 
-export default function HomeTab({ onOpenProject, onOpenRecent }: HomeTabProps) {
+export default function HomeTab({ onOpenProject, onOpenRecent, onOpenPath }: HomeTabProps) {
   const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
   const classicLabel = useClassicProjectStore((s) => s.label);
   const dir = useClassicProjectStore((s) => s.dir);
@@ -87,6 +96,11 @@ export default function HomeTab({ onOpenProject, onOpenRecent }: HomeTabProps) {
             </div>
           </div>
           <button onClick={onOpenProject} style={styles.primaryButton}>Open Project…</button>
+          {/* THE SECOND DOOR, beside the first and on the page a cold reader
+              lands on. It is here rather than behind a disclosure because the
+              reader who needs it is the one for whom the button above did
+              nothing, and a fallback you have to discover is not a fallback. */}
+          <OpenByPath onOpenPath={onOpenPath} label="…or type a project directory path" />
           <GuideCards />
           {recents.length > 0 && (
             <>
@@ -194,6 +208,11 @@ export default function HomeTab({ onOpenProject, onOpenRecent }: HomeTabProps) {
             </button>
           ))}
         </div>
+        {/* The same door in the switch case. A person with one project open and
+            a broken portal is as stuck as one with none, and the reason it is
+            outside the card grid is that a text field is not a card: it does not
+            open one named thing, it takes an argument. */}
+        <OpenByPath onOpenPath={onOpenPath} label="…or type another project directory path" />
       </div>
     </div>
   );

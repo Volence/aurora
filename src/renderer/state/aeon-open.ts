@@ -15,16 +15,60 @@ import { useEditorStore } from './editorStore';
 import { useViewStore } from './viewStore';
 import { useToastStore } from './toastStore';
 import { recordRecentProject } from './recents';
+// The classic project store, closed HERE rather than only on the road in.
+// No cycle: classicProjectStore imports the classic bridge and the classic level
+// store, neither of which reaches back into the aeon loader.
+import { useClassicProjectStore } from './classicProjectStore';
+import { useClassicLevelStore } from './classicLevelStore';
 // The cause clause and the name-some-and-count shape, both imported rather than
 // worded here: core owns what a cause MEANS (bgUnresolvedCauseText) and what a
 // coalesced summary looks like (notice.ts), and this toast is one reader of each.
 import { bgUnresolvedCauseText } from '../../core/formats/bg-library';
 import { nameSome } from '../../core/project/notice';
 
+/**
+ * A WINDOW HOLDS EXACTLY ONE PROJECT, and this is where the aeon loader keeps
+ * that promise instead of assuming its caller did.
+ *
+ * `openEngine()` (state/open-project.ts) gives CLASSIC PRECEDENCE by design:
+ * `classicProjectStore.status === 'open'` is answered before
+ * `projectStore.project !== null` is read at all. So an aeon project committed
+ * while a classic one is still resident is fully loaded and completely
+ * invisible - the facet bar, the savers and tab activation all read
+ * `openEngine()` and all of them still say 's1'.
+ *
+ * UX SEAT A'S F6 IS THAT STATE, observed. The seat opened aeon over an open
+ * classic project, got `undefined` back (see debug-hooks.ts - the hook was
+ * discarding the boolean, so `undefined` was a constant and not a signal), and
+ * watched the shell stay on `Sonic 1 Disassembly (GitHub)` with the classic
+ * facet pills. Nothing had failed. The project was there and masked.
+ *
+ * NO PRODUCTION ROAD COULD REACH IT and the fix is here anyway. Every user
+ * entry point funnels through `useProject.openPath`, which calls
+ * `classicProjectStore.openDirectory` FIRST, and its 'not-classic' branch does
+ * `set({ ...CLOSED })` on the way to that answer - so the mask was closed as a
+ * side effect of how the router happened to be ordered, by a store that is not
+ * this one, on a road this function cannot see. That is a safety property held
+ * by an accident of call order, which is the same bet
+ * `shell/project-open-guard.ts` records losing four times. It is cheap to stop
+ * betting: on the user road this is a no-op (classic is already closed one
+ * statement earlier), and on every other caller it is the difference between a
+ * loaded project and an invisible one.
+ *
+ * The classic LEVEL store goes too, exactly as `openDirectory` drops it at the
+ * start of a switch: a surviving doc holds a handle into the project being left.
+ */
+function closeResidentClassicProject(): void {
+  if (useClassicProjectStore.getState().status === 'closed') return;
+  useClassicLevelStore.getState().reset();
+  useClassicProjectStore.getState().reset();
+}
+
 export async function openAeonProject(dir: string): Promise<boolean> {
   const store = useProjectStore.getState();
   try {
     store.setLoading(true);
+    closeResidentClassicProject();
     const handle = await aeonAdapter.open(createIpcFileAccess(dir));
     const aeon = handle.aeon!;
     // Register in recents BEFORE the atomic commit: openLoaded flips the session

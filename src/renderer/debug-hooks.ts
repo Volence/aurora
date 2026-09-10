@@ -361,8 +361,16 @@ function installClassicProbe(): ClassicProbeApi {
  * gesture under test still goes through real pointer and keyboard events.
  */
 interface AeonProbeApi {
-  /** aeon's counterpart to `openDir`, via the same loader `useProject` uses. */
-  open(dir: string): Promise<void>;
+  /**
+   * aeon's counterpart to `openDir`, via the same loader `useProject` uses.
+   *
+   * RESOLVES TO THE LOADER'S OWN SUCCESS FLAG. It used to be typed `Promise<void>`
+   * and implemented as `.then(() => undefined)`, which is a constant: a
+   * successful open and a failed one were indistinguishable to a caller. UX seat
+   * A read that constant as "the open did nothing" (F6). It had in fact
+   * succeeded, and was masked by classic precedence.
+   */
+  open(dir: string): Promise<boolean>;
   state(): {
     open: boolean; zone: string | null; act: string | null; sections: number;
     /** The act's section grid — its world extent is this times SECTION_PIXEL_SIZE. */
@@ -1152,7 +1160,13 @@ function installAeonProbe(): AeonProbeApi {
   // against a broken write-back, which is the one thing they exist to catch.
   const bgDoc = () => useProjectStore.getState().project?.bgOverride.doc ?? null;
   return {
-    open: (dir) => openAeonProject(dir).then(() => undefined),
+    // RETURNS THE BOOLEAN. It used to be `.then(() => undefined)`, which
+    // discarded the loader's own success flag, so `undefined` came back from a
+    // successful open and from a failed one alike. UX seat A read that constant
+    // as "it did nothing" and spent a restart on it (F6); the open had in fact
+    // succeeded and was masked by classic precedence, which openAeonProject now
+    // closes for itself (state/aeon-open.ts).
+    open: (dir) => openAeonProject(dir),
     state: () => {
       const p = useProjectStore.getState();
       const e = useEditorStore.getState();
