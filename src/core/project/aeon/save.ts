@@ -313,6 +313,40 @@ export async function buildAeonSavePlan(
   // engine repos get games/<game>/data/editor/, never a repo-root data/ dir.
   const dataRoot = projectDataRoot(config.raw);
   let configChanged = false;
+
+  // THE ACT'S GRID DIMENSIONS, back into project.json.
+  //
+  // They live in two objects: the model's `Act.gridWidth`/`gridHeight`
+  // (core/model/s4-types.ts), which `set-sections` writes and the editor draws,
+  // and the config's `S4ActConfig.gridWidth`/`gridHeight`
+  // (core/config/s4-config.ts), which project.json holds and which load.ts
+  // reads back — every Act it builds is sized by
+  // `actConfig.gridWidth * actConfig.gridHeight`, so the config side is the
+  // only one a reopen can see. Until 2026-09-10 nothing here wrote it and
+  // nothing else did either (`set-sections` in core/editing/history.ts is the
+  // sole writer of the model side, and it touches only the model), so a grid
+  // resize did not merely fail to persist: the save wrote the RE-INDEXED
+  // sections to their new `section_N` paths while the reopen still enumerated
+  // the OLD dimensions, and a section that had moved past the old range came
+  // back as a duplicate of its neighbour and was then overwritten. See
+  // docs/reviews/2026-09-10-grid-resize-roundtrip.md and the round trip in
+  // __tests__/grid-resize-roundtrip.test.ts.
+  //
+  // ONE-WAY, model to config, and guarded by an inequality like every retarget
+  // below it: an act whose grid nobody touched adds no write. There is no
+  // repo-owned escape hatch here (no `editorGridWidth`) because there is no
+  // second reader to protect — unlike `tileset`/`bgLayout`, the dimensions name
+  // no file, and aeon's own act descriptor is authored under
+  // games/*/data/levels/ rather than read from this key.
+  const rawActGrid = config.raw.zones.find(rz => rz.id === zone.id)
+    ?.acts.find(ra => ra.id === act.id);
+  if (rawActGrid
+    && (rawActGrid.gridWidth !== act.gridWidth || rawActGrid.gridHeight !== act.gridHeight)) {
+    rawActGrid.gridWidth = act.gridWidth;
+    rawActGrid.gridHeight = act.gridHeight;
+    configChanged = true;
+  }
+
   for (const projZone of project.zones) {
     const rawZone = config.raw.zones.find(rz => rz.id === projZone.id);
     const tilesetDest = rawZone?.editorTilesetPath || `${dataRoot}editor/${projZone.id}_tiles.bin`;
