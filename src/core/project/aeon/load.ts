@@ -256,13 +256,35 @@ export async function loadAeonProject(fa: FileAccess, dir: string): Promise<Aeon
  * reason still reaches the console at the moment it happens, which is where it
  * has to be anyway when a summary names only the first few.
  */
+/**
+ * ONE ACT'S SECTION-FILE LEDGER, accumulated as its section loop runs.
+ *
+ * The two lists are the whole point and they are NOT symmetric conveniences: a
+ * path lands in `loaded` when a read RETURNED and parsed, and in `unreadable`
+ * when a read FAILED and the file is (or may be) there. A path in neither is
+ * one nothing was learned about. The save reads the finished pair off
+ * `Act.sectionFiles`, whose docblock carries the argument for why a sweep
+ * cannot be written without it.
+ *
+ * ⚠ `loaded` is the ONLY thing that ever authorises a deletion, so nothing may
+ * push a path here that was not actually read as a section document of this
+ * act. In particular the baked strip sources under `stripPath` are read in this
+ * same loop and must NOT enter it: they are aeon's, not the editor's.
+ */
+export interface SectionLoadLedger {
+  /** Section files read and understood, in load order. */
+  loaded: string[];
+  /** Section files that exist (or may) and refused, with the reason. */
+  unreadable: UnreadableItem[];
+}
+
 async function markUnreadable(
   fa: FileAccess,
   section: Section,
   path: string,
   suffix: string,
   error: unknown,
-  unreadable: UnreadableItem[],
+  ledger: SectionLoadLedger,
 ): Promise<void> {
   // A PROBE THAT COULD NOT ANSWER MEANS THE FILE MAY BE THERE, and this catch is
   // where the whole split used to be given away. It read `catch { present = false }`
@@ -285,7 +307,7 @@ async function markUnreadable(
 
   (section.unreadable ??= []).push(suffix);
   const reason = error instanceof Error ? error.message : String(error);
-  unreadable.push({ path, reason });
+  ledger.unreadable.push({ path, reason });
   // The per-file reason, unabridged and in load order. A coalesced summary names
   // three; this is where the other sixty live, and it is written as the failure
   // happens rather than reconstructed later.
@@ -337,7 +359,7 @@ export async function readCollisionPlaneFile(
   prefix: string,
   suffix: string,
   baseline: Uint8Array,
-  unreadable: UnreadableItem[],
+  ledger: SectionLoadLedger,
 ): Promise<Uint16Array> {
   const path = `${prefix}.${suffix}`;
   try {
@@ -347,9 +369,14 @@ export async function readCollisionPlaneFile(
         `collision plane is ${raw.length} bytes; this section needs ${SECTION_PLANE_WORDS * 2}`,
       );
     }
-    return parseCollAttr(raw);
+    const plane = parseCollAttr(raw);
+    // Recorded only HERE, after the length check and the parse: a file that
+    // reached the catch is not one Aurora understood, and `loaded` is a licence
+    // to delete.
+    ledger.loaded.push(path);
+    return plane;
   } catch (e) {
-    await markUnreadable(fa, section, path, suffix, e, unreadable);
+    await markUnreadable(fa, section, path, suffix, e, ledger);
     return resolvePlaneWords(null, baseline, SECTION_PLANE_WORDS);
   }
 }
@@ -497,6 +524,12 @@ async function loadFullProject(
     for (const actConfig of zoneConfig.acts) {
       const totalSections = actConfig.gridWidth * actConfig.gridHeight;
       const sections: (Section | null)[] = [];
+      // This act's own section-file ledger (Act.sectionFiles). Per-act rather
+      // than per-project because its one consumer, buildAeonSavePlan, plans ONE
+      // act and must never see another act's paths as removable. Its refusals
+      // are folded into the project-wide `unreadableFiles` after the loop, which
+      // keeps the notice summary's "in load order" true across acts.
+      const ledger: SectionLoadLedger = { loaded: [], unreadable: [] };
 
       for (let i = 0; i < totalSections; i++) {
         const prefix = `${actConfig.dataPath}section_${i}`;
@@ -511,13 +544,14 @@ async function loadFullProject(
           try {
             const ntRaw = await fa.read(`${prefix}.tiles.bin`);
             section.tileGrid.nametable = parseNametable(ntRaw, SECTION_TILES_WIDE, SECTION_TILES_HIGH);
+            ledger.loaded.push(`${prefix}.tiles.bin`);
             loaded = true;
           } catch (e) {
             // No editor nametable — try strip source. But a nametable that is
             // THERE and unreadable is not that: reseeding from the baked strips
             // silently replaces the artist's layout, and the next save writes
             // the reseed over it.
-            await markUnreadable(fa, section, `${prefix}.tiles.bin`, 'tiles.bin', e, unreadableFiles);
+            await markUnreadable(fa, section, `${prefix}.tiles.bin`, 'tiles.bin', e, ledger);
           }
 
           // The engine's real per-cell collision attr indices come from the baked
@@ -552,10 +586,10 @@ async function loadFullProject(
               section.engineCollision = engineColl;
               section.engineCollisionB = engineCollB;
               section.collisionEdit = await readCollisionPlaneFile(
-                fa, section, prefix, 'collattr.bin', engineColl, unreadableFiles,
+                fa, section, prefix, 'collattr.bin', engineColl, ledger,
               );
               section.collisionEditB = await readCollisionPlaneFile(
-                fa, section, prefix, 'collattrb.bin', engineCollB, unreadableFiles,
+                fa, section, prefix, 'collattrb.bin', engineCollB, ledger,
               );
               loaded = true;
             } catch (stripErr) {
@@ -574,9 +608,10 @@ async function loadFullProject(
             const objRaw = await fa.read(`${prefix}.objects.json`);
             const objText = new TextDecoder().decode(objRaw);
             section.objects = JSON.parse(objText) as ObjectPlacement[];
+            ledger.loaded.push(`${prefix}.objects.json`);
           } catch (e) {
             section.objects = [];
-            await markUnreadable(fa, section, `${prefix}.objects.json`, 'objects.json', e, unreadableFiles);
+            await markUnreadable(fa, section, `${prefix}.objects.json`, 'objects.json', e, ledger);
           }
 
           // Load rings
@@ -584,9 +619,10 @@ async function loadFullProject(
             const ringRaw = await fa.read(`${prefix}.rings.json`);
             const ringText = new TextDecoder().decode(ringRaw);
             section.rings = JSON.parse(ringText) as RingPlacement[];
+            ledger.loaded.push(`${prefix}.rings.json`);
           } catch (e) {
             section.rings = [];
-            await markUnreadable(fa, section, `${prefix}.rings.json`, 'rings.json', e, unreadableFiles);
+            await markUnreadable(fa, section, `${prefix}.rings.json`, 'rings.json', e, ledger);
           }
 
           // Load meta sidecar (bgLayoutRef/paletteRef/rasterRef/sceneRef) —
@@ -602,8 +638,9 @@ async function loadFullProject(
             section.paletteRef = meta.paletteRef;
             section.sceneRef = meta.sceneRef;
             section.rasterRef = meta.rasterRef;
+            ledger.loaded.push(`${prefix}.meta.json`);
           } catch (e) {
-            await markUnreadable(fa, section, `${prefix}.meta.json`, 'meta.json', e, unreadableFiles);
+            await markUnreadable(fa, section, `${prefix}.meta.json`, 'meta.json', e, ledger);
           }
 
           // Load the chunk-identity sidecar (owner ruling d-18c). ABSENT is the
@@ -623,8 +660,9 @@ async function loadFullProject(
               new TextDecoder().decode(linksRaw),
               section.tileGrid.nametable.length,
             );
+            ledger.loaded.push(`${prefix}.chunklinks.json`);
           } catch (e) {
-            await markUnreadable(fa, section, `${prefix}.chunklinks.json`, 'chunklinks.json', e, unreadableFiles);
+            await markUnreadable(fa, section, `${prefix}.chunklinks.json`, 'chunklinks.json', e, ledger);
           }
 
           sections.push(section);
@@ -633,6 +671,13 @@ async function loadFullProject(
           sections.push(null);
         }
       }
+
+      // This act's refusals join the project-wide collection that
+      // `summarizeUnreadable` folds into notices. Done HERE, once, rather than
+      // at each markUnreadable call site, so the ledger stays the single
+      // accumulator inside the section loop and the notice order stays load
+      // order (acts are processed sequentially).
+      unreadableFiles.push(...ledger.unreadable);
 
       // Load bg layout if present
       let bgLayout: Uint16Array | null = null;
@@ -726,6 +771,14 @@ async function loadFullProject(
         gridWidth: actConfig.gridWidth,
         gridHeight: actConfig.gridHeight,
         sections,
+        // WHAT WAS ON DISK AND WHETHER AURORA UNDERSTOOD IT — the record the
+        // save-side sweep of stranded `section_N` files is gated on. See
+        // ActSectionFileLedger in core/model/s4-types.ts for why an empty pair
+        // yields no deletions rather than a licence to delete everything.
+        sectionFiles: {
+          loadedPaths: ledger.loaded,
+          unreadablePaths: ledger.unreadable.map(u => u.path),
+        },
         startPosition: actConfig.startPosition,
         bgLayout,
         bgTiles,

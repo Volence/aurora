@@ -13,6 +13,8 @@ function makeAct(): Act {
     startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
     bgLayout: null,
     bgTiles: null,
+    // Hand-built: nothing was read, so nothing is removable (ActSectionFileLedger).
+    sectionFiles: { loadedPaths: [], unreadablePaths: [] },
     rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'), sceneRef: null, stripPath: null,
   };
 }

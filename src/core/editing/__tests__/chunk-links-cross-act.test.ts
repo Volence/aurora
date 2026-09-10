@@ -81,6 +81,8 @@ function act(id: string, sectionCount: number): Act {
   return {
     id, gridWidth: sectionCount, gridHeight: 1,
     sections: Array.from({ length: sectionCount }, (_, i) => createSection(i, `${id}-s${i}`)),
+    // Hand-built: nothing was read, so nothing is removable.
+    sectionFiles: { loadedPaths: [], unreadablePaths: [] },
     startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
     bgLayout: null, bgTiles: null, rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'), sceneRef: null, stripPath: null,
   };

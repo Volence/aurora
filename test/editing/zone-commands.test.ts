@@ -147,6 +147,8 @@ describe('set-bg command', () => {
     return {
       id: 'act1', gridWidth: 1, gridHeight: 1, sections: [],
       startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
+      // Hand-built: nothing was read, so nothing is removable (ActSectionFileLedger).
+      sectionFiles: { loadedPaths: [], unreadablePaths: [] },
       bgLayout: null, bgTiles: null, rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'), sceneRef: null, stripPath: null,
     };
   }
