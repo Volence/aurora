@@ -9,7 +9,7 @@ import type { Color } from '../../../core/model/s4-types';
 import { T } from '../ui';
 import PaletteGrid, { type PaletteGridShell, type PaletteSwatchProps } from '../art-shared/PaletteGrid';
 import {
-  useAeonPaletteGridPort, zonePaletteLineRefusal, ZONE_LINE0_REFUSAL,
+  useAeonPaletteGridPort, zoneCopyTargetRefusal, ZONE_LINE0_REFUSAL,
 } from '../../providers/palette-aeon';
 import PaletteCopyMenu, { type CopyMenuItem } from './PaletteCopyMenu';
 
@@ -146,7 +146,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }): Reac
    *  in one gesture with no slider to notice. Line 0 is Sonic and Tails across
    *  the whole game; see ZONE_LINE0_REFUSAL. */
   function zoneLineLocked(line: number): boolean {
-    return !standaloneSprite && zonePaletteLineRefusal(line) !== null;
+    return zoneCopyTargetRefusal(line, standaloneSprite) !== null;
   }
 
   /** Build "Copy to ▸" targets for a single swatch (index-preserving). `srcLine`

@@ -17,6 +17,7 @@ import {
   ZONE_LINE0_REFUSAL,
   ZONE_UNSAVABLE_LINES,
   zonePaletteLineRefusal,
+  zoneCopyTargetRefusal,
   aeonPaletteLines,
   aeonPaletteVersionKey,
   keepIndex0Transparent,
@@ -101,6 +102,30 @@ describe('the aeon policies', () => {
     expect(ZONE_LINE0_REFUSAL).toContain('Sonic and Tails');
     expect(ZONE_LINE0_REFUSAL).toContain('every zone');
     expect(ZONE_LINE0_REFUSAL).toContain('Lines 1 to 3');
+  });
+
+  /**
+   * THE COPY BRIDGE IS THE SECOND DOOR, and until 2026-09-10 it was open.
+   *
+   * The swatch grid's slider is not the only way to change a zone line:
+   * PaletteEditor's "Copy to" menu and its swatch/line drag-and-drop write one
+   * too, in a single gesture. That host computed its own lock as
+   * `line === 0 && !inSprite`, so with the palette open in the sprite pane the
+   * player palette was a legal copy TARGET while the slider refused it.
+   *
+   * FOUND BY A POISON THAT CAME BACK GREEN: putting `&& !inSprite` back passed
+   * the whole suite (595 files, 8863 rows), because nothing anywhere asserted
+   * the copy bridge's rule. This row is that assertion, and the source scan in
+   * art-shared/__tests__/palette-grid-wiring.test.ts is the other half.
+   */
+  it('refuses line 0 as a COPY TARGET too, in every mode but the standalone row', () => {
+    expect(zoneCopyTargetRefusal(0, false)).toBe(ZONE_LINE0_REFUSAL);
+    for (const line of ownedLines) {
+      expect(zoneCopyTargetRefusal(line, false), `line ${line}`).toBeNull();
+    }
+    // The standalone row is the sprite document's own 16 colours drawn as one
+    // row; its "line 0" is not a CRAM line and copying into it is the feature.
+    expect(zoneCopyTargetRefusal(0, true)).toBeNull();
   });
 
   /**

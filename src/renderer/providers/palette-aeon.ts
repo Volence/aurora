@@ -154,6 +154,25 @@ export function zonePaletteLineRefusal(line: number): string | null {
 }
 
 /**
+ * The same refusal, for the COPY BRIDGE: the swatch/line "Copy to" menu and the
+ * drag-and-drop target in components/art/PaletteEditor.tsx.
+ *
+ * ⚠ IT TAKES ONE ARGUMENT AND `inSprite` IS NOT IT. Until 2026-09-10 the host
+ * computed this itself as `line === 0 && !inSprite`, which reopened line 0 as a
+ * copy target whenever the palette was open in the sprite pane — a SECOND door
+ * onto the write the policy refuses, and a quieter one, because a copy lands in
+ * a single gesture with no slider to notice. The parameter that door was built
+ * on does not exist here, so reintroducing it means reintroducing an argument.
+ *
+ * `standaloneRow` is a different question and a real one: the sprite document's
+ * private palette is drawn as a single row the grid indexes as line 0, and it is
+ * not a CRAM line at all. See AEON_SPRITE_STANDALONE_PALETTE_POLICY.
+ */
+export function zoneCopyTargetRefusal(line: number, standaloneRow: boolean): string | null {
+  return standaloneRow ? null : zonePaletteLineRefusal(line);
+}
+
+/**
  * The repaint key. THREE parts, and each covers something the others cannot:
  *
  *  • `scope` — which palette is on screen (the zone, or a specific sprite doc).
