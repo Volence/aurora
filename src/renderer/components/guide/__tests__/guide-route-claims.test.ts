@@ -185,10 +185,16 @@ function sectionNamedBy(text: string, anchored: boolean): string | null {
 // the three tab labels slice each following line into three cells, so where an
 // entry sits is measured and not assumed.
 
-interface Schematic { columns: Map<EffectsSubTabId, string[]>; found: boolean; }
+interface Schematic {
+  columns: Map<EffectsSubTabId, string[]>;
+  found: boolean;
+  /** The heading each column is drawn under, as the reader sees it. */
+  headings: Map<EffectsSubTabId, string>;
+}
 
 function readSchematic(): Schematic {
   const columns = new Map<EffectsSubTabId, string[]>();
+  const headings = new Map<EffectsSubTabId, string>();
   const lines = guide.split('\n');
   const labels = EFFECTS_SUB_TABS.map((t) => t.label);
   let header = -1;
@@ -206,7 +212,7 @@ function readSchematic(): Schematic {
     if (i + 1 < lines.length && /^[\s─-╿]+$/.test(lines[i + 1])
       && /[─-╿]/.test(lines[i + 1])) { header = i; break; }
   }
-  if (header < 0) return { columns, found: false };
+  if (header < 0) return { columns, headings, found: false };
   const starts = labels.map((l) => lines[header].indexOf(l));
   // ⚠ `found` HAS TO BE MORE THAN "the labels are all in there". Every offset
   // is >= 0 by construction at this point, so asserting that proves nothing;
@@ -224,8 +230,11 @@ function readSchematic(): Schematic {
       if (cell !== '' && !/^[─-╿\s]+$/.test(cell)) cells.push(cell);
     }
     columns.set(EFFECTS_SUB_TABS[k].id, cells);
+    headings.set(EFFECTS_SUB_TABS[k].id,
+      lines[header].slice(starts[k], k + 1 < starts.length ? starts[k + 1] : undefined)
+        .trim());
   }
-  return { columns, found: ordered };
+  return { columns, headings, found: ordered };
 }
 
 const schematic = readSchematic();
@@ -241,6 +250,20 @@ describe('the guide is readable as an instrument at all', () => {
     for (const tab of EFFECTS_SUB_TABS) {
       expect(schematic.columns.get(tab.id)?.length ?? 0,
         `the schematic's ${tab.label} column came back empty`).toBeGreaterThan(0);
+    }
+  });
+
+  it('each column is headed with the word the button actually carries', () => {
+    // ⚠ THIS ROW EXISTS BECAUSE A MUTATION GOT PAST THE ONE ABOVE. Renaming the
+    // middle heading to `Colours` left the offsets distinct and rising, so the
+    // slicing kept working and every order row stayed green while the picture
+    // named a button that is not on screen. `check-guide-text.mjs` cannot cover
+    // it either: it reads DIAGRAM rows, and this is the fenced header above
+    // them. Derived from EFFECTS_SUB_TABS, which is what the bar paints.
+    for (const tab of EFFECTS_SUB_TABS) {
+      expect(schematic.headings.get(tab.id),
+        `the schematic heads a column with a word that is not on any sub-tab button; the bar `
+        + `paints "${tab.label}"`).toBe(tab.label);
     }
   });
 
