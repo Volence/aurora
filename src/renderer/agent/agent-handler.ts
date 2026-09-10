@@ -1010,15 +1010,21 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     // `changed: true`. The READER landed at aeon `4aa2abc0` (`effects_gen.py`
     // resolves `rasterRef` and emits the section's chooser); the CALL SITE
     // landed at aeon `9cdf32d8` — but for ONE section only. `OJZ_Preset_Sec5`
-    // threads `ojz_act1_sec_raster(sec: 5, hand: Raster_Program_None)` and no
-    // other `preset()` in `ojz_effects.emp` threads anything, so a ref on
-    // section 5 is resolved and a ref on any other section is written, counted,
-    // and consumed by nothing.
+    // threads `ojz_act1_sec_raster(sec: 5, hand: Raster_Program_None)`, so a ref
+    // on a THREADED section is resolved and a ref on any other section is
+    // written, counted, and consumed by nothing.
+    // ⚠ "AND NO OTHER `preset()` THREADS ANYTHING" WAS HERE UNTIL 2026-09-10 and
+    // had been false since aeon `6ae88363` (2026-09-03) threaded section 6. The
+    // threaded set is DERIVED, never fixed: `core/formats/effects/section-wiring.ts`
+    // per act on every load, and `core/formats/__tests__/raster-binding-threaded-set.test.ts`
+    // holds the shipped sentence to it.
     //
     // ⚠ SO THIS TOOL MUST NOT REPLY WITH A UNIVERSAL SENTENCE IN EITHER
-    // DIRECTION. "The band does not play" is now wrong for section 5, and "a
-    // bound section plays" is wrong for the other eight — and the second failure
-    // is silent, which is why the shared constant names the NUMBER. See
+    // DIRECTION. "The band does not play" is now wrong for a threaded section,
+    // and "a bound section plays" is wrong for an unthreaded one — and the second
+    // failure is silent, which is why the shared constant states the RULE and a
+    // dated reading rather than a bare number (the bare number was there until
+    // 2026-09-10 and was false for seven days). See
     // core/formats/raster-binding.ts, which owns the sentence, its case split
     // and its dated expiry; `PRESET_LIMITS`' first limit says it in the very
     // same words.
@@ -1156,8 +1162,10 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // one did. There, `changed: true` at least buys a repaint: the viewport
       // composites the assigned background and only the ROM half is missing.
       // Here the ref reaches aeon's GENERATOR and then goes exactly as far as
-      // the SECTION allows: at aeon `6e2495a5` section 5's `preset()` threads
-      // the chooser and no other section's does, and NOTHING on this side can
+      // the SECTION allows: only some sections' `preset()` threads the chooser
+      // (at aeon `6e2495a5` that was section 5 alone; at `6ae88363`, 2026-09-03,
+      // section 6 joined it, and the live answer is derived, not written down
+      // here), and NOTHING on this side can
       // tell the caller which of those they just did — `req.section` is a number
       // this handler does not interpret. Nor is there an observable consequence
       // either way: no preview draws it, no panel shows it, and the viewport

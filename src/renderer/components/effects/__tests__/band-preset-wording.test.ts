@@ -178,33 +178,59 @@ describe('the three limits say the words that carry them', () => {
     // because collapsing them is how "section 5 is wired" would drift into "a
     // bound section plays".
     //
-    // CASE 1 — section 5 is wired, and the NUMBER is asserted. aeon's drafting
-    // rule, adopted: a sentence naming the number has an obvious expiry that
-    // fires when the number moves; "a bound section plays" has none and goes
-    // wrong silently the first time someone binds section 6.
-    expect(l.body).toMatch(/ONLY SECTION 5 IS WIRED/);
-    expect(l.body).toMatch(/ojz_act1_sec_raster\(sec: 5, hand: Raster_Program_None\)/);
-    // CASE 2 — section 5 unbound is the `hand:` label and is a no-op.
-    expect(l.body).toMatch(/leaving section 5 unbound resolves to that hand: label/i);
-    // CASE 3 — THE REASON THIS SENTENCE EXISTS. Binding any OTHER section writes
-    // a key nothing consumes. Kept, and made section-specific rather than
-    // deleted.
-    expect(l.body).toMatch(/BINDING ANY OTHER SECTION STILL REACHES NOTHING/);
+    // CASE 1 — a wired section resolves, and the sentence says WHICH by giving
+    // the RULE, the INSTRUMENT and the COMMAND before it gives any reading.
+    //
+    // ⚠⚠ THIS ROW ASSERTED `/ONLY SECTION 5 IS WIRED/` UNTIL 2026-09-10, AND
+    // THAT IS THE DEFECT THIS PARCEL EXISTS FOR. aeon threaded section 6 on
+    // 2026-09-03 (`6ae88363`, arrived here 16:47:34 -0400); this row went on
+    // passing for seven days BECAUSE the panel's sentence was false, and it
+    // would have gone red on the correct repair. The drafting rule quoted above
+    // — "name the number, so the expiry is obvious" — was right that the expiry
+    // becomes obvious and wrong that anything would look: OBVIOUS TO A READER IS
+    // NOT THE SAME AS READ BY AN INSTRUMENT. So the number leaves this row, the
+    // sentence keeps a DATED reading beside the command that refutes it, and
+    // that reading is checked against aeon's real file by
+    // `core/formats/__tests__/raster-binding-threaded-set.test.ts`.
+    expect(l.body).toMatch(/THE WIRED SET IS DERIVED, NEVER FIXED/);
+    expect(l.body).toMatch(/a section is wired exactly when some preset\(\)/);
+    expect(l.body).toMatch(/grep -n sec_raster/);
+    // The retired absolute must not come back, by revert or by "just update it".
+    expect(l.body).not.toMatch(/ONLY SECTION \d+ IS WIRED/);
+    // CASE 2 — a wired section left unbound is the `hand:` label and a no-op.
+    expect(l.body).toMatch(/leaving a wired section unbound resolves to that hand: label/i);
+    // CASE 3 — THE REASON THIS SENTENCE EXISTS. Binding a section OUTSIDE the
+    // wired set writes a key nothing consumes.
+    expect(l.body).toMatch(/BINDING A SECTION OUTSIDE THE WIRED SET STILL REACHES NOTHING/);
     // ...and case 3 is no longer SILENT, which is a different author experience
     // and must not be understated either. Verified at aeon `9cdf32d8`, not taken
     // on report: `tools/effects_seam_gate.py`'s `raster_seam_faults` appends a
     // fault naming the section for every sidecar `rasterRef` no `preset()`
     // threads, and `fail()` exits 1. The two qualifiers ride with it, because a
     // refusal an author never sees is worse than one they are warned about: the
-    // gate is aeon's (nothing here warns) and `FAST=1 ./build.sh` skips it.
-    expect(l.body).toMatch(/tools\/effects_seam_gate\.py refuses a full build/i);
+    // gate is aeon's (nothing here warns).
+    //
+    // ⚠ THE SECOND QUALIFIER WAS RETIRED 2026-09-10 AND IT HAD BEEN FALSE FOR
+    // EIGHT DAYS. This row asserted `/nothing here warns, and FAST=1 skips that
+    // gate/`. aeon's 2026-09-02 walkthrough finding b4 put an unconditional
+    // `effects_seam_gate.py --source-only` pre-build check in `build.sh` under
+    // `FAST == 1 && GAME == sonic4`, and their
+    // `TestSourceOnlyMode::test_it_REACHES_the_raster_binding_step` pins that
+    // the raster block runs in it. That falsifier was IN the sentence's own
+    // EXPIRES list ("or build.sh runs it under FAST=1") and nothing read it —
+    // a second, independent instance of the same failure as the wired set.
+    expect(l.body).toMatch(/tools\/effects_seam_gate\.py refuses the build/i);
     expect(l.body).toMatch(/names the section and the id/i);
-    expect(l.body).toMatch(/nothing here warns, and FAST=1 skips that gate/i);
-    // The hand-work is a SPLIT plus a line, not "one line per section": sections
-    // 6-8 share one `EffectsPreset` record and threading a section-keyed chooser
-    // into a shared record is itself a seam-gate refusal, so the old phrasing
-    // would send an author to an edit the build rejects.
-    expect(l.body).toMatch(/a preset split plus one call-site line/i);
+    expect(l.body).toMatch(/no longer skippable by FAST/i);
+    expect(l.body).toMatch(/--source-only as an unconditional pre-build check/i);
+    expect(l.body).not.toMatch(/FAST=1 skips that gate/i);
+    // The hand-work is a SPLIT plus a line when the record is shared, and one
+    // line when it is not — stated as the rule, because "sections 6-8 share one
+    // record" was itself a snapshot and stopped being true at aeon `6ae88363`
+    // (section 6) and again at item 9c (section 7). Which sections share a
+    // record is derived here, like the wired set.
+    expect(l.body).toMatch(/a record SPLIT first if it shares one/i);
+    expect(l.body).not.toMatch(/sections 6-8 share one record/i);
     expect(l.body).toMatch(/costs ROM/i);
     // ⚠ SIXTH CORRECTION, 2026-08-30, AND THE ROWS BELOW WENT RED FIRST. The
     // expiry's first clause fired: aeon `c9a462be` commits section 5's sidecar
@@ -215,8 +241,16 @@ describe('the three limits say the words that carry them', () => {
     // Bindings = 1`), and NOT to a frame. Both halves pinned, because a limit
     // that gained the first and lost the second is the promise this file exists
     // to stop.
-    expect(l.body).toMatch(/SECTION 5 IS BOUND: aeon's c9a462be commits section_5\.meta\.json/);
-    expect(l.body).toMatch(/EditorRaster_OJZ_Act1_Bindings is 1/);
+    // ⚠ "Bindings is 1" BECAME 2 ON 2026-09-03 (aeon `6ae88363` bound section 6
+    // to `ojz_sec6_baseswap`; `effects_scenes.emp:315` reads
+    // `EditorRaster_OJZ_Act1_Bindings = 2` at aeon `a6aaf581`). The count is a
+    // peer's content, so it is matched loosely here and checked exactly by
+    // `core/formats/__tests__/raster-binding-threaded-set.test.ts`. What this
+    // row keeps is the load-bearing half: section 5's binding is attributed to
+    // the commit that carried it, and the sentence still says how far "bound"
+    // got — to aeon's generator and build, and NOT to a frame.
+    expect(l.body).toMatch(/section_5\.meta\.json carries rasterRef ojz_sec5_showcase \(aeon c9a462be/);
+    expect(l.body).toMatch(/EditorRaster_OJZ_Act1_Bindings is \d+/);
     // ⚠ SEVENTH CORRECTION, 2026-08-30, AND THIS ROW WENT RED FIRST. The
     // has-anyone-seen-it clause was attributed to aeon's `c9a462be` commit
     // message ("nothing has been seen on screen") because that was the only
@@ -315,10 +349,22 @@ describe('the three limits say the words that carry them', () => {
     // a later measurement of section 5 saying something else.
     expect(l.body).not.toMatch(/EXPIRES when a sidecar in aeon's tree actually carries a rasterRef/);
     expect(l.body).not.toMatch(/when a committed aeon artifact records the section-5 band measured on screen/i);
-    expect(l.body).toMatch(/EXPIRES when a second section is threaded/i);
-    expect(l.body).toMatch(/when sec: 5 becomes another index/i);
+    // ⚠ TWO MORE CLAUSES SPENT, 2026-09-10, AND THIS IS THE PARCEL'S FINDING.
+    // "EXPIRES when a second section is threaded" and "when sec: 5 becomes
+    // another index" were the FIRST TWO clauses of this list. A second section
+    // WAS threaded, at aeon `6ae88363` on 2026-09-03, and the list changed
+    // nothing because a prose EXPIRES list has no reader. They are asserted
+    // ABSENT now: an expiry naming an event that has already happened is one
+    // nobody will ever see fire again, and re-arming it would be the same
+    // non-event a third time. What replaced them is a GATE —
+    // `core/formats/__tests__/raster-binding-threaded-set.test.ts` — which
+    // reads aeon's real file every run, and the sentence says so.
+    expect(l.body).not.toMatch(/EXPIRES when a second section is threaded/i);
+    expect(l.body).not.toMatch(/when sec: 5 becomes another index/i);
+    expect(l.body).toMatch(/raster-binding-threaded-set\.test\.ts/);
+    expect(l.body).toMatch(/treat it as a re-read instruction and not as an alarm/i);
     expect(l.body).toMatch(/when section 5's sidecar stops naming ojz_sec5_showcase/i);
-    expect(l.body).toMatch(/stops refusing the unthreaded case or build\.sh runs it under FAST=1/i);
+    expect(l.body).toMatch(/stops refusing the unthreaded case or build\.sh stops running its source-only arm under FAST=1/i);
     expect(l.body).toMatch(/when docs\/research\/reference_captures\/2026-08-30-sec5-band\/ leaves aeon's tree or its README stops saying what is quoted here/i);
     expect(l.body).toMatch(/when a later aeon measurement of section 5 records something else/i);
     expect(l.body).toMatch(/when this viewport learns to composite a rasterRef/i);
@@ -328,9 +374,15 @@ describe('the three limits say the words that carry them', () => {
     // author quoting the constant elsewhere must get the new state with it: one
     // sidecar, checked against the threaded set. The retired phrasing is
     // asserted ABSENT so a revert cannot pass on the kept clauses alone.
-    expect(l.body).toMatch(/exactly one sidecar carries the key \(section 5's\)/i);
-    expect(l.body).toMatch(/the seam gate's section arm is no longer vacuous/i);
-    expect(l.body).toMatch(/counts 1 sidecar rasterRef and checks it against the threaded set/i);
+    // ⚠ THE COUNT LEFT THIS ROW 2026-09-10: it said "exactly one sidecar carries
+    // the key (section 5's)" and "counts 1 sidecar rasterRef", and both became
+    // wrong at aeon `6ae88363`. What the author needs is that the arm is NOT
+    // vacuous and that the sentence says how to count them; the number itself is
+    // aeon's content.
+    expect(l.body).toMatch(/the seam gate's section arm is not vacuous/i);
+    expect(l.body).toMatch(/counts the sidecar rasterRefs and checks them against the threaded set/i);
+    expect(l.body).toMatch(/grep rasterRef over games\/sonic4\/data\/editor\/ojz\/act1\//i);
+    expect(l.body).not.toMatch(/exactly one sidecar carries the key/i);
     expect(l.body).not.toMatch(/arm is vacuous and prints that it is/i);
     expect(l.body).not.toMatch(/no section number here has been exercised end to end/i);
     // The files to re-read are named IN the sentence, not left to the reader —
@@ -366,25 +418,29 @@ describe('the three limits say the words that carry them', () => {
    * and the expiry. The negatives catch the two wrong rewrites — a gate on
    * this side, or the refusal attributed to the FAST=1 build.
    */
-  it('LIMIT 1 discloses that aeon\'s full build refuses any tree but section 5 → ojz_sec5_showcase', () => {
+  it('LIMIT 1 discloses that aeon\'s full build refuses any tree but the bound set it pins', () => {
     const l = PRESET_LIMITS.find((x) => x.key === 'unbound')!;
     expect(l.body).toMatch(/AND THE BOUND SET ITSELF IS PINNED BY AEON'S FULL BUILD/);
-    expect(l.body).toMatch(/read at aeon 027ec162 \(2026-08-30\)/);
-    expect(l.body).toMatch(/section 5 bound to ojz_sec5_showcase is the ONLY state aeon's canonical build accepts/);
+    // ⚠ DE-LITERALISED 2026-09-10, same cause as the wired set. This row quoted
+    // aeon's own content back at itself — their test's NAME, their `[5]`
+    // literal, their message text — so it could only ever notice US changing
+    // OUR copy, never THEM changing the original. aeon `6ae88363` renamed the
+    // sibling test and moved the literal to `[5, 6]` on 2026-09-03 and every
+    // matcher below stayed green. The shape is what this row owns now.
+    expect(l.body).toMatch(/read at aeon [0-9a-f]{7,40} \(\d{4}-\d\d-\d\d\)/);
     expect(l.body).toMatch(/tools\/test_effects_seam_gate\.py::TestRasterSeamAgainstTheRealTree::test_the_bound_sections_are_exactly_the_threaded_ones/);
-    expect(l.body).toMatch(/test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document/);
+    expect(l.body).toMatch(/test_section_5[a-z0-9_]*_the_bound_ones?_and_(?:its|their)_ids?_(?:is|are)_the_shipped_documents?/);
     expect(l.body).toMatch(/tools\/test_raster_cycle_table_lint\.py::test_every_preset_document_is_REACHABLE/);
     // The unbind, in the author's terms — the select's own option is named.
-    expect(l.body).toMatch(/UNBINDING SECTION 5 \(null from this tool, or the select's Hand-authored raster option\)/);
-    expect(l.body).toMatch(/leaves the bound set empty and the document ojz_sec5_showcase\.json orphaned/);
+    expect(l.body).toMatch(/UNBINDING A BOUND SECTION \(null from this tool, or the select's Hand-authored raster option\)/);
+    expect(l.body).toMatch(/shrinks the bound set and orphans that section's document/);
     expect(l.body).toMatch(/"no sidecar carries a rasterRef — step 6's band is gone"/);
-    expect(l.body).toMatch(/"the bound sections are \[\], not \[5\]"/);
-    expect(l.body).toMatch(/reachable by NOTHING: \['ojz_sec5_showcase'\]/);
-    expect(l.body).toMatch(/BINDING ANY OTHER SECTION, beside 5 or instead of it, fails the exact-\[5\] assertion/);
+    expect(l.body).toMatch(/reachable by NOTHING/);
+    expect(l.body).toMatch(/BINDING A SECTION OUTSIDE THE BOUND SET fails the same exact-set assertion/);
     expect(l.body).toMatch(/runs only in the canonical FAST=0 build: FAST=1 sets NO_LINT=1, the pytest lane sits under NO_LINT, and FAST=1 builds the tree/);
     expect(l.body).toMatch(/NOTHING HERE PREVENTS THE WRITE/);
-    expect(l.body).toMatch(/THAT CLAUSE EXPIRES when the \[5\] literal in test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document changes/);
-    expect(l.body).toMatch(/or when a second binding ships \(owner: aeon's lane\)/);
+    expect(l.body).toMatch(/THAT CLAUSE IS A SNAPSHOT OF ANOTHER REPO'S TESTS/);
+    expect(l.body).toMatch(/\(owner: aeon's lane\)/);
     expect(l.body).not.toMatch(/(?:this editor|Aurora|the panel|this tool|the select) (?:refuses|prevents|blocks|greys out|disables)/i);
     expect(l.body).not.toMatch(/FAST=1 (?:also )?(?:refuses|rejects)/i);
     expect(l.body).not.toMatch(/FAST=0 builds (?:it|the tree)/i);
@@ -405,26 +461,27 @@ describe('the three limits say the words that carry them', () => {
    */
   it('LIMIT 1\'s case-split anchors match LIMIT 1 and nothing else on this surface', () => {
     const anchors = [
-      /ONLY SECTION 5 IS WIRED/,
-      /ojz_act1_sec_raster\(sec: 5, hand: Raster_Program_None\)/,
-      /leaving section 5 unbound resolves to that hand: label/i,
-      /BINDING ANY OTHER SECTION STILL REACHES NOTHING/,
-      /tools\/effects_seam_gate\.py refuses a full build/i,
-      /nothing here warns, and FAST=1 skips that gate/i,
-      /a preset split plus one call-site line/i,
+      /THE WIRED SET IS DERIVED, NEVER FIXED/,
+      /a section is wired exactly when some preset\(\)/,
+      /grep -n sec_raster/,
+      /leaving a wired section unbound resolves to that hand: label/i,
+      /BINDING A SECTION OUTSIDE THE WIRED SET STILL REACHES NOTHING/,
+      /tools\/effects_seam_gate\.py refuses the build/i,
+      /no longer skippable by FAST/i,
+      /a record SPLIT first if it shares one/i,
       /for section 5 as much as for any other/i,
       /Verified at aeon e6405428/,
-      /the seam gate's section arm is no longer vacuous/i,
-      /SECTION 5 IS BOUND: aeon's c9a462be commits section_5\.meta\.json/,
+      /the seam gate's section arm is not vacuous/i,
+      /section_5\.meta\.json carries rasterRef ojz_sec5_showcase \(aeon c9a462be/,
       /aeon's 4a4d3474 \(2026-08-30, docs\/research\/reference_captures\/2026-08-30-sec5-band\/\) records the section-5 band MEASURED on screen/,
       /nothing of that frame is visible in this editor/,
       // O62's disclosure anchors. LIMIT 2 also says "aeon's build fails
       // loudly" about reachability, so these are the phrases LIMIT 2 must not
       // grow into.
       /AND THE BOUND SET ITSELF IS PINNED BY AEON'S FULL BUILD/,
-      /read at aeon 027ec162/,
-      /UNBINDING SECTION 5/,
-      /test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document/,
+      /read at aeon [0-9a-f]{7,40} \(\d{4}-\d\d-\d\d\)/,
+      /UNBINDING A BOUND SECTION/,
+      /test_section_5[a-z0-9_]*_the_bound_ones?_and_(?:its|their)_ids?_(?:is|are)_the_shipped_documents?/,
       /NOTHING HERE PREVENTS THE WRITE/,
     ];
     const unbound = PRESET_LIMITS.find((x) => x.key === 'unbound')!.body;

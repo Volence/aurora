@@ -328,12 +328,34 @@ describe('the reply says where the binding stops', () => {
     // split. An agent gets both halves or it misleads its caller in one of two
     // directions: "nothing works" when the caller bound section 5, or "it works"
     // when they bound section 6.
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/ONLY SECTION 5 IS WIRED/);
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/BINDING ANY OTHER SECTION STILL REACHES NOTHING/);
+    //
+    // ⚠⚠ (3b) AND THIS ROW WAS PART OF THE 2026-09-10 DEFECT, WHICH IS WHY IT
+    // NO LONGER PINS A SECTION NUMBER. It asserted
+    // `toMatch(/ONLY SECTION 5 IS WIRED/)`. aeon threaded section 6 on
+    // 2026-09-03 (`6ae88363`); this row stayed GREEN for seven days BECAUSE the
+    // sentence was false, and would have gone RED on the correct repair. A
+    // wording test pins a STRING, not a FACT: pointed at a claim about another
+    // repo it is an anti-expiry, defending the snapshot from the correction.
+    // So it now pins the RULE and the shape of the disclosure, and the reading
+    // itself is checked against aeon's real file by
+    // `core/formats/__tests__/raster-binding-threaded-set.test.ts`.
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/THE WIRED SET IS DERIVED, NEVER FIXED/);
+    // The retired absolute is asserted ABSENT, so re-introducing a fixed set
+    // (by revert or by "just update the number") cannot pass this row.
+    expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/ONLY SECTION \d+ IS WIRED/);
+    // The rule and the command, which are what cannot go stale.
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/a section is wired exactly when some preset\(\)/);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/grep -n sec_raster/);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/BINDING A SECTION OUTSIDE THE WIRED SET STILL REACHES NOTHING/);
     // And the case-3 refusal, because "your build will fail and say which
     // section" is a materially different answer from silence — verified at
     // `9cdf32d8` in `tools/effects_seam_gate.py`, not taken on report.
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/effects_seam_gate\.py refuses a full build/i);
+    // ⚠ "a full build" DROPPED 2026-09-10: since aeon's 2026-09-02 walkthrough
+    // finding b4 the refusal also fires in `--source-only` before a FAST build,
+    // so the qualifier was false. That clause was in the sentence's own EXPIRES
+    // list too, and had been unread for eight days.
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/effects_seam_gate\.py refuses the build/i);
+    expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/FAST=1 skips that gate/);
     // And the half an agent reading a SUCCESS reply most needs since aeon
     // `c9a462be`: section 5 is bound and that binding reached aeon's build.
     // ⚠ THIS USED TO END "— and no further", AND THAT MATCHER WAS RED FIRST:
@@ -344,7 +366,13 @@ describe('the reply says where the binding stops', () => {
     // half would let its caller believe the band can be seen HERE, which is the
     // drift this row now exists to catch; the first half without the citation
     // would let it report a band it has no evidence for, which is the old one.
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/SECTION 5 IS BOUND/);
+    // ⚠ "AND SECTION 5 IS BOUND" BECAME "BOTH ARE ALSO BOUND" ON 2026-09-10:
+    // aeon bound section 6 to `ojz_sec6_baseswap` at `6ae88363` (2026-09-03), so
+    // a singular headline was a false claim about the bound set. Section 5's
+    // provenance is still named, because it is the first choice this editor's
+    // writer carried into aeon's build and that fact does not move.
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/BOTH ARE ALSO BOUND/);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/section_5\.meta\.json carries rasterRef ojz_sec5_showcase \(aeon c9a462be/);
     expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/and no further/);
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/aeon's 4a4d3474 \(2026-08-30, docs\/research\/reference_captures\/2026-08-30-sec5-band\/\) records the section-5 band MEASURED on screen/);
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/\$0000 on every one of those lines on the control ROM/);
@@ -442,12 +470,20 @@ describe('the agent path and the human path share one function', () => {
  *
  * Everything above says how far ONE binding travels. This block is about the
  * TREE the call leaves behind, because aeon's canonical build has an opinion
- * about that too and it is not the seam gate's: at aeon `origin/master`
- * `027ec162`, three CONTENT tests in `build.sh`'s pytest lane accept exactly
- * one bound set — `{5: 'ojz_sec5_showcase'}` — and refuse every other by name.
- * Unbinding section 5 (this tool's `null`, the select's empty option) leaves
- * the set empty and the preset document orphaned; binding any other section
- * fails the exact-`[5]` assertion. Aeon's own README says their control ROM
+ * about that too and it is not the seam gate's: three CONTENT tests in
+ * `build.sh`'s pytest lane accept exactly one bound set and refuse every other
+ * by name. Unbinding a bound section (this tool's `null`, the select's empty
+ * option) shrinks the set and orphans that preset document; binding a section
+ * outside it fails the exact-set assertion.
+ *
+ * ⚠ THE SET WAS `{5: 'ojz_sec5_showcase'}` AT AEON `027ec162` AND THIS BLOCK
+ * SAID SO AS A FACT UNTIL 2026-09-10. It became `{5: 'ojz_sec5_showcase', 6:
+ * 'ojz_sec6_baseswap'}` at aeon `6ae88363` on 2026-09-03, and no row here could
+ * notice, because every row quoted our own copy of their content. The rows now
+ * assert the disclosure's SHAPE; the content is checked against aeon's real file
+ * by `core/formats/__tests__/raster-binding-threaded-set.test.ts`.
+ *
+ * Aeon's own README also says their control ROM
  * could only be built with `FAST=1`. Nothing here refuses the write — the
  * STANDING REFUSAL in core/formats/raster-binding.ts — so the reply has to say
  * it, on the two calls that produce such a tree.
@@ -459,7 +495,7 @@ describe('the agent path and the human path share one function', () => {
  * asserted to arrive verbatim on each reply — derived, not pasted.
  */
 const DISCLOSURE_HEAD = 'AND THE BOUND SET ITSELF IS PINNED BY AEON\'S FULL BUILD';
-const DISCLOSURE_TAIL = 'Wiring a second section is a preset split';
+const DISCLOSURE_TAIL = 'Wiring a further section is hand work in aeon';
 
 /** The disclosure clause as the constant carries it — located, not retyped. */
 function disclosureClause(): string {
@@ -479,34 +515,54 @@ function disclosureClause(): string {
  * author or an agent would act on differently if it were missing.
  */
 function expectDisclosure(text: string): void {
-  // The only accepted state, by number and by id, anchored and dated.
-  expect(text).toMatch(/read at aeon 027ec162 \(2026-08-30\)/);
-  expect(text).toMatch(/section 5 bound to ojz_sec5_showcase is the ONLY state aeon's canonical build accepts/);
-  // The three tests, by path and name, so an author can go and read them.
+  // ⚠ RE-ANCHORED AND DE-LITERALISED 2026-09-10. Every matcher struck through
+  // below was GREEN while the sentence it guarded was FALSE: aeon threaded and
+  // bound section 6 on 2026-09-03 (`6ae88363`), which renamed the sibling test,
+  // moved its literal `[5]` to `[5, 6]`, and made "the ONLY state" wrong. A
+  // matcher that quotes a peer's content cannot notice the peer changing it —
+  // it can only notice US changing OUR copy — so the content-shaped ones are
+  // gone and what remains is the SHAPE of the disclosure. The content itself is
+  // checked against aeon's real file by
+  // `core/formats/__tests__/raster-binding-threaded-set.test.ts`.
+  //   was: /read at aeon 027ec162 \(2026-08-30\)/
+  //   was: /section 5 bound to ojz_sec5_showcase is the ONLY state …/
+  //   was: /test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document/
+  //   was: /"the bound sections are \[\], not \[5\]"/
+  //   was: /BINDING ANY OTHER SECTION, beside 5 or instead of it, fails the exact-\[5\] assertion/
+  // The clause is anchored and dated — at SOME revision, whichever it is.
+  expect(text).toMatch(/read at aeon [0-9a-f]{7,40} \(\d{4}-\d\d-\d\d\)/);
+  // The two tests whose NAMES are stable facts about aeon's harness, by path.
   expect(text).toMatch(/tools\/test_effects_seam_gate\.py::TestRasterSeamAgainstTheRealTree::test_the_bound_sections_are_exactly_the_threaded_ones/);
-  expect(text).toMatch(/test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document/);
   expect(text).toMatch(/tools\/test_raster_cycle_table_lint\.py::test_every_preset_document_is_REACHABLE/);
-  // UNBIND: empty set + orphaned document, and the three messages as the
-  // source spells them (all three refuse the unbind; the README's own list
-  // attributes two of them crosswise, which is why the source is quoted).
-  expect(text).toMatch(/UNBINDING SECTION 5/);
-  expect(text).toMatch(/leaves the bound set empty and the document ojz_sec5_showcase\.json orphaned/);
+  // The sibling content test, matched on the part of its name that is not the
+  // section list, so aeon adding a third bound section renames it without
+  // silently blanking this row.
+  expect(text).toMatch(/test_section_5[a-z0-9_]*_the_bound_ones?_and_(?:its|their)_ids?_(?:is|are)_the_shipped_documents?/);
+  // UNBIND: a shrunken set + an orphaned document, and the messages as aeon's
+  // source spells them (their README's own list attributes two of them
+  // crosswise, which is why the source is quoted and not the README).
+  expect(text).toMatch(/UNBINDING A BOUND SECTION/);
+  expect(text).toMatch(/shrinks the bound set and orphans that section's document/);
   expect(text).toMatch(/"no sidecar carries a rasterRef — step 6's band is gone"/);
-  expect(text).toMatch(/"the bound sections are \[\], not \[5\]"/);
-  expect(text).toMatch(/reachable by NOTHING: \['ojz_sec5_showcase'\]/);
-  // BIND-OTHER: the exact-[5] assertion, beside 5 or instead of it.
-  expect(text).toMatch(/BINDING ANY OTHER SECTION, beside 5 or instead of it, fails the exact-\[5\] assertion/);
+  expect(text).toMatch(/reachable by NOTHING/);
+  // BIND-OTHER: the exact-set assertion, stated as a rule rather than a list.
+  expect(text).toMatch(/BINDING A SECTION OUTSIDE THE BOUND SET fails the same exact-set assertion/);
   // WHEN it runs — and the mechanism, because "FAST=0" alone is a flag name:
   // FAST=1 sets NO_LINT=1 and the pytest lane sits under NO_LINT.
   expect(text).toMatch(/runs only in the canonical FAST=0 build: FAST=1 sets NO_LINT=1, the pytest lane sits under NO_LINT, and FAST=1 builds the tree/);
   expect(text).toMatch(/The canonical build REFUSES the control tree, by design/);
   // Nothing here gates — the standing refusal, said in the sentence.
   expect(text).toMatch(/NOTHING HERE PREVENTS THE WRITE/);
-  // Its own expiry, with the four falsifiers and an owner.
-  expect(text).toMatch(/THAT CLAUSE EXPIRES when the \[5\] literal in test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document changes/);
+  // Its own expiry, with an owner — and it now SAYS it is a snapshot of another
+  // repo's tests, which is the honest label for a clause no local gate reads.
+  // ⚠ "or when a second binding ships" was in this list, and it SHIPPED on
+  // 2026-09-03 with nothing to read the clause. The falsifier is not dropped —
+  // the wired-set reading is now gated against aeon's real file — but this row
+  // no longer pretends the prose list is an alarm.
+  expect(text).toMatch(/THAT CLAUSE IS A SNAPSHOT OF ANOTHER REPO'S TESTS and it expires when their pinned list changes/);
   expect(text).toMatch(/when those tests are renamed or the pytest lane leaves the NO_LINT block that FAST=1 switches off/);
   expect(text).toMatch(/when test_every_preset_document_is_REACHABLE drops its sidecar arm/);
-  expect(text).toMatch(/or when a second binding ships \(owner: aeon's lane\)/);
+  expect(text).toMatch(/\(owner: aeon's lane\)/);
   expect(text).toMatch(/re-read tools\/test_effects_seam_gate\.py, tools\/test_raster_cycle_table_lint\.py and build\.sh/);
   // ⚠ WRONG REWRITES, named: the refusal is aeon's and it is the FAST=0 build's.
   // A sentence that put the gate on this side, or on the FAST=1 build, would
@@ -569,9 +625,9 @@ describe('the reply discloses that aeon\'s full build will refuse the resulting 
     // retyped in the entry — a fork would be paraphrased, so sample several.
     const clause = disclosureClause();
     for (const p of [
-      'UNBINDING SECTION 5', 'NOTHING HERE PREVENTS THE WRITE',
-      'test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document',
-      'FAST=1 sets NO_LINT=1', 'THAT CLAUSE EXPIRES',
+      'UNBINDING A BOUND SECTION', 'NOTHING HERE PREVENTS THE WRITE',
+      'test_section_5_and_6_are_the_bound_ones_and_their_ids_are_the_shipped_documents',
+      'FAST=1 sets NO_LINT=1', 'THAT CLAUSE IS A SNAPSHOT',
     ]) {
       expect(clause, `sample phrase left the constant: ${p}`).toContain(p);
       expect(entry, `editor-methods.ts retypes the disclosure: ${p}`).not.toContain(p);

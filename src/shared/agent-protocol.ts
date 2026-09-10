@@ -133,7 +133,14 @@ export type AgentRequest =
   // `raster:` channel — `OJZ_Preset_Sec5`, on `sec: 5` (bound in their tree
   // since `c9a462be`). So section 5 resolves,
   // and every other section keeps its hand-authored program while the key sits
-  // there unread. This request carries no hint of which case it is in, and must
+  // there unread.
+  // ⚠ THAT COUNT IS A READING AT `6e2495a5` AND IT MOVED ON 2026-09-03: aeon
+  // `6ae88363` threaded and bound section 6 as well. The set is DERIVED, never
+  // fixed — `core/formats/effects/section-wiring.ts` re-derives it per act on
+  // every load, and `core/formats/__tests__/raster-binding-threaded-set.test.ts`
+  // is what keeps the shipped sentence honest about it. Nothing in this file
+  // acts on the number; see `core/formats/raster-binding.ts`'s 2026-09-10 block
+  // for why a count in prose here would go stale unread. This request carries no hint of which case it is in, and must
   // not grow one: the reply carries `RASTER_SECTION_BINDING_LIMIT` on success as
   // well as on the no-op, and that constant is where the case split (and the
   // number 5) is stated once — `assign-section-bg`'s rule, which exists because
