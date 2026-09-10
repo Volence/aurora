@@ -112,6 +112,20 @@ export interface SectionRasterWiring {
    * which is the `unknown` verdict and never a `no`.
    */
   channelThreadedBy: Record<string, Record<string, Record<number, number[]>>>;
+  /**
+   * THE OTHER ARM — preset record name → the non-zero `patched:` program it binds.
+   *
+   * From the SAME `<zone>_effects.emp` read as the two above. This is the ONE
+   * input the three advisory conditions could not supply, and it is what
+   * `sectionArmExclusivity` turns into the only structural refusal this module
+   * publishes. See that function's banner.
+   *
+   * A record absent from this map binds no `patched:` arm — which is the
+   * `preset()` DEFAULT (`patched: Label = 0`) and is the overwhelmingly common
+   * case. Empty while `library.parsed` is false is NOT that answer: every
+   * predicate reads the parse flag first and says `unknown`.
+   */
+  patchedArm: Record<string, string>;
   descriptor: WiringSource;
   library: WiringSource;
 }
@@ -123,6 +137,7 @@ export function unknownWiring(descriptorPath: string, libraryPath: string, reaso
     bindings: {},
     threadedBy: {},
     channelThreadedBy: {},
+    patchedArm: {},
     descriptor: { path: descriptorPath, parsed: false, reason },
     library: { path: libraryPath, parsed: false, reason },
   };
@@ -182,6 +197,68 @@ export function libraryRasterChooserCalls(lib: string, chooserFn: string): Recor
     if (hit) out[marks[i].name] = Number(hit[1]);
   }
   return out;
+}
+
+/**
+ * `{preset record name: the non-zero `patched:` program it binds}`.
+ *
+ * ═══ WHY THIS IS PARSED AT ALL, WHEN THE THREE CONDITIONS ARE ADVISORY ═══
+ *
+ * `engine/effects/preset.emp`'s `preset()` carries this `ensure`, read at aeon
+ * `f93f9f6fc9d29e8503a00442d36d41696c2c685c`:
+ *
+ *   > ensure(raster == 0 || patched == 0,
+ *   >        "preset(): ep_raster and ep_patched are mutually exclusive. Whichever
+ *   >         installs last wins DESTRUCTIVELY …")
+ *
+ * `patched:`'s own default in that signature is `0`, so "binds an arm" is
+ * exactly "passes a non-zero `patched:`". A record that does IS the one thing
+ * `raster:` can never be added to — which is what makes this, alone among
+ * everything this module derives, a STRUCTURAL fact rather than a missing line.
+ *
+ * ⚠ COMMENTS ARE STRIPPED FIRST, AND THAT IS NOT TIDINESS. The record split is
+ * `libraryRasterChooserCalls`', so a body runs from one declaration to the next
+ * and carries every comment in between — and `ojz_effects.emp` contains, in
+ * prose, the exact string this function looks for:
+ *
+ *   > // UNBINDING `patched: OJZ_TwoChannel` would have done the same thing …
+ *
+ * At aeon `f93f9f6f` that line is 1459 and the nearest preceding declaration is
+ * `OJZ_DepthVSplit` (:1366) — a raster PROGRAM no section binds as its preset,
+ * so today the false positive would land somewhere harmless. That is luck, not
+ * a property: one more record between them and Aurora would grey out a control
+ * on the strength of a sentence explaining why somebody did NOT do the thing.
+ * A refusal sourced from prose is the worst kind this repo can publish, so the
+ * comment text is removed before the match rather than hoped past.
+ *
+ * (`libraryRasterChooserCalls` has the same exposure and is deliberately left
+ * alone here: it is a different function, its false positive would be a ✓ and
+ * not a refusal, and widening a parcel into a neighbour's parse is how a change
+ * acquires a defect it did not come to fix.)
+ */
+export function libraryPatchedArmBindings(lib: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const decl = /\b(?:pub\s+)?(?:const|data)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:/g;
+  const marks: { name: string; at: number }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = decl.exec(lib)) !== null) marks.push({ name: m[1], at: m.index });
+  for (let i = 0; i < marks.length; i++) {
+    const body = stripLineComments(lib.slice(marks[i].at, marks[i + 1]?.at ?? lib.length));
+    const hit = /\bpatched\s*:\s*([A-Za-z_][A-Za-z0-9_]*|\d+)/.exec(body);
+    // `0` is `preset()`'s own default for this parameter and its only "off": a
+    // record spelling it explicitly binds no arm, exactly as an absent one does.
+    if (hit && hit[1] !== '0') out[marks[i].name] = hit[1];
+  }
+  return out;
+}
+
+/**
+ * `//` to end of line, removed. Deliberately NOT a general comment stripper:
+ * `.emp` has no block comment in any file this module reads, and a half-right
+ * one would be worse than none.
+ */
+function stripLineComments(s: string): string {
+  return s.replace(/\/\/[^\n]*/g, '');
 }
 
 /** The generated chooser's name for an act — aeon's `effects_gen` spelling. */
@@ -417,6 +494,212 @@ export function sectionConditionsAgreeWithState(
   const bothHold = c.ownPreset.verdict === 'yes' && c.threaded.verdict === 'yes'
     && c.threaded.record === c.ownPreset.record;
   return (sectionRasterState(w, sectionIndex) === 'wired') === bothHold;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ARM EXCLUSIVITY — THE ONE STRUCTURAL FACT, AND THE ONLY THING HERE THAT
+// DISABLES A CONTROL
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ─── THE QUESTION AURORA ASKED, AND THE ANSWER IT GOT BACK ───
+//
+// Binding a band to section 0 passed all three conditions above and then failed
+// aeon's build gate, so this editor was offering something the build refuses.
+// The row was filed under a rule decided BEFORE the answer was known:
+//
+//   > A permanent property earns a disabled control with a reason; an
+//   > incidental gap earns the enabled control with a disclosure we ship today.
+//
+// The missing input was whether the gap is permanent. Aeon ruled it at
+// `92d744fc` (`docs/DEFERRED_WORK.md`, `SECTION0-SPECIAL-CASE`, 2026-09-10),
+// and the ruling's first sentence is that **the binary was the wrong shape**:
+//
+//   sec 0     STABLE PROPERTY — `patched: OJZ_TwoChannel`. Disable, with the reason.
+//   sec 1,2,4 incidental, but OCCUPIED — a test raster, a test gradient, and the
+//             d-15 showcase sit in their raster channels. Content, reversible,
+//             and the OWNER'S call. Nothing here refuses them.
+//   sec 3     incidental AND FREE — its own preset, `Raster_Program_None` in its
+//             raster channel. The exact pair that made section 5 the first
+//             candidate. Never threaded, and nothing stops it.
+//
+// ⚠ A SINGLE VERDICT FOR "0-4" IS WRONG EITHER WAY ROUND, in aeon's own words:
+// it would either hide four reversible content calls behind a structural-
+// sounding refusal, or promise section 0 a binding the seam gate will refuse.
+// A checker with two states where the world has three reports the third as
+// whichever of its two is wrong.
+//
+// ─── WHY THIS IS DERIVED AND NOT `sectionIndex === 0` ───
+//
+// A hardcoded index would be correct today and silently wrong the day the tree
+// moves, which is the defect this whole module was written to end (see the
+// header: three wrong answers in one day, every one of them a list). So the
+// property is derived from the MECHANISM aeon named, which is a rule in
+// `engine/effects/preset.emp` rather than a fact about section 0:
+//
+//   a section is BARRED  ⟺  the preset record it binds passes a non-zero
+//                           `patched:`, because `preset()`'s `ensure` makes
+//                           `raster:` and `patched:` a hard either/or, and an
+//                           editor document's `bands` lower to a RASTER program
+//                           that `effects_seam_gate.py` requires be threaded
+//                           through `<act>_sec_raster(sec: N)`.
+//
+// ⚠ AND THE DERIVATION ALREADY DISAGREES WITH THE RULING'S PROSE, WHICH IS THE
+// POINT. Aeon's ruling says *"Section 0 is the only section in the tree with
+// live patch channels"*. That sentence is quoted from their own 2026-09-03
+// `OJZ_Preset_Sec5` block, and their `ojz_effects.emp` has said otherwise since
+// 2026-09-05: *"SECTION 7 IS THE ACT'S SECOND SECTION WITH LIVE PATCH
+// CHANNELS"* — `OJZ_Preset_Sec7` binds `patched: OJZ_WorldWater` (:1871 at aeon
+// `f93f9f6f`). A literal `=== 0` would have been born two days stale. This
+// derivation bars section 7 too, on the same `ensure`, and says so in the same
+// sentence — the mechanism is the claim, and the section list is its output.
+//
+// ─── WHAT IT DOES NOT DO ───
+//
+// It says nothing about sections 1, 2 and 4. What sits in their raster channels
+// is CONTENT: reversible, and the owner's to reverse. A UI that refused them
+// would be deciding a content question, which is not Aurora's to decide.
+//
+// And `unknown` is a third verdict that never folds into `barred`. With the
+// library unread, "this section binds a patched arm" is a claim nobody
+// measured, so the control stays ENABLED and the sentence says what could not
+// be checked — `raster-binding.ts`'s standing refusal, hardest clause: a
+// control greyed out because a file could not be read is indistinguishable,
+// to the author, from one greyed out because the thing is impossible.
+
+export type ArmExclusivityVerdict =
+  /** No `patched:` arm on this section's record. A band is structurally possible. */
+  | 'open'
+  /** Its record binds a `patched:` program, so `preset()` refuses a `raster:` beside it. */
+  | 'barred'
+  /** The effects library was not read. NOT a refusal, and not a clearance either. */
+  | 'unknown';
+
+export interface SectionArmExclusivity {
+  verdict: ArmExclusivityVerdict;
+  /** The preset record this section binds, when the descriptor was read. */
+  record: string | null;
+  /** The `patched:` program that record binds, when it binds one. */
+  patched: string | null;
+}
+
+/**
+ * Is an editor-authored raster band structurally impossible on this section?
+ *
+ * ⚠ THE LIBRARY IS ASKED FIRST, and that ordering is the `unknown` rule: with
+ * the library unread there is no answer to give, whatever the descriptor says.
+ * A section whose RECORD is unknown (descriptor unread, or it binds nothing) is
+ * `open` and not `unknown` — the arm is a property of a record, and no record
+ * is no arm. That is not a licence: conditions 1 and 2 already answer for a
+ * section that binds nothing, in their own words, and this predicate exists to
+ * refuse and must therefore stay silent wherever it cannot positively refuse.
+ */
+export function sectionArmExclusivity(w: SectionRasterWiring, sectionIndex: number)
+: SectionArmExclusivity {
+  if (!w.library.parsed) return { verdict: 'unknown', record: null, patched: null };
+  const record = w.bindings[sectionIndex] ?? null;
+  if (record === null) return { verdict: 'open', record: null, patched: null };
+  const patched = w.patchedArm[record] ?? null;
+  if (patched === null) return { verdict: 'open', record, patched: null };
+  return { verdict: 'barred', record, patched };
+}
+
+/**
+ * THE SENTENCE A PERSON SEES BESIDE A DISABLED CONTROL, or null when the
+ * control is not disabled.
+ *
+ * ⚠ IT NAMES THE MECHANISM, NOT AURORA. Every other advisory in this module is
+ * shaped by the same rule and this one is held to it harder, because it is the
+ * only one attached to a control that will not move: it says which record binds
+ * which program, which `ensure` in which of aeon's files closes the door, and
+ * what a programmer would have to change. "You cannot bind this section" would
+ * tell an author the tool is in the way; this tells them what the level data
+ * does. A disabled control with no reason is the same defect as a refusal that
+ * lives only in a hover tooltip, which this repo has already fixed once.
+ */
+export function sectionArmExclusivityRefusal(
+  w: SectionRasterWiring, sectionIndex: number, chooserFn: string,
+): string | null {
+  const arm = sectionArmExclusivity(w, sectionIndex);
+  if (arm.verdict !== 'barred') return null;
+  return `Section ${sectionIndex} binds the preset record ${arm.record}, which passes `
+    + `patched: ${arm.patched}. aeon's preset() refuses a raster: beside a patched: — they are `
+    + 'the same channel and whichever installs last destroys the other (engine/effects/preset.emp: '
+    + '"ep_raster and ep_patched are mutually exclusive"). A preset document authored here '
+    + `carries bands, bands lower to a raster program, and effects_seam_gate.py requires it be `
+    + `threaded through ${chooserFn}(sec: ${sectionIndex}) — so binding one here would have to `
+    + `take ${arm.patched} out of section ${sectionIndex} first. That is a property of the `
+    + 'mechanism and not a choice about this section (aeon, 2026-09-10: "THAT IS A STRUCTURAL GAP '
+    + 'AND NOT A CHOICE"), which is why this control is disabled here and nowhere else. A '
+    + 'programmer unbinds the patched arm in that record if this section is really the one you '
+    + 'want.';
+}
+
+/**
+ * WHAT COULD NOT BE CHECKED, said out loud — the `unknown` arm's sentence.
+ *
+ * ⚠ THE CONTROL STAYS ENABLED HERE AND THIS IS WHY THAT IS NOT SILENT. Three
+ * outcomes are possible and only two of them are acceptable: enabled-and-said
+ * (this), or disabled-and-explained (`sectionArmExclusivityRefusal`). Enabled
+ * and SILENT would let a structural impossibility present as an ordinary
+ * binding; disabled-for-the-structural-reason would state a mechanism nobody
+ * measured. Returns null whenever the library WAS read — there is a real answer
+ * then, and this sentence would be noise beside it.
+ */
+export function sectionArmExclusivityUnknownNotice(
+  w: SectionRasterWiring, sectionIndex: number,
+): string | null {
+  if (sectionArmExclusivity(w, sectionIndex).verdict !== 'unknown') return null;
+  return `Aurora could not read ${w.library.path}`
+    + `${w.library.reason ? ` (${w.library.reason})` : ''}, so it could not check whether section `
+    + `${sectionIndex}'s preset record binds a patched: program — which would make an `
+    + 'editor-authored band structurally impossible here, since aeon\'s preset() refuses a '
+    + 'raster: beside a patched:. The control is left ENABLED and the binding is still written: a '
+    + 'control greyed out because a file could not be read is indistinguishable from one greyed '
+    + 'out because the thing is impossible. aeon\'s build is the authority.';
+}
+
+/**
+ * IS THE PER-SECTION BINDING CONTROL DEAD? — the whole rule, in one place a
+ * test can reach.
+ *
+ * ⚠ IT LIVES HERE AND NOT IN THE COMPONENT BECAUSE THE COMPONENT CANNOT BE
+ * TESTED IN THIS REPO. Aurora's node suite has no jsdom, so a predicate written
+ * inline in `BandPresetPanel`'s JSX would be asserted by nothing but a CDP
+ * harness — and this rule has a second clause that is exactly the sort a
+ * never-run assertion would let rot.
+ *
+ * THE SECOND CLAUSE, AND WHY IT IS NOT A SOFTENING OF THE FIRST. A barred
+ * section with a `rasterRef` ALREADY BOUND is a tree aeon's seam gate is
+ * refusing right now, and this select is the only control in the app that can
+ * take that binding back out. Greying it there would trap the broken state and
+ * hide its one fix — a worse defect than the one the disable prevents. So the
+ * refusal sentence stays on screen in the warning tier and the control stays
+ * live until the binding is gone; then it greys.
+ *
+ * `rasterRef` is the SECTION's, from Aurora's own sidecar — never a wiring
+ * fact. Passing `null` for a section that carries one would grey a control the
+ * author needs.
+ */
+export function sectionBindingControlDisabled(
+  w: SectionRasterWiring, sectionIndex: number, rasterRef: string | null,
+): boolean {
+  return sectionArmExclusivity(w, sectionIndex).verdict === 'barred' && rasterRef === null;
+}
+
+/**
+ * The sections a band is structurally impossible on, in order. Derived.
+ *
+ * ⚠ EMPTY WHEN THE LIBRARY WAS NOT READ, and that is `unknown` collapsing to
+ * "name nobody" rather than to "name everybody" — the safe direction for a set
+ * whose only use is to refuse. Callers that need the distinction ask
+ * `sectionArmExclusivity` per section, which keeps all three verdicts.
+ */
+export function armBarredSections(w: SectionRasterWiring, sectionCount: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < sectionCount; i++) {
+    if (sectionArmExclusivity(w, i).verdict === 'barred') out.push(i);
+  }
+  return out;
 }
 
 /**

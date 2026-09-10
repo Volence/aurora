@@ -31,6 +31,8 @@ import {
   wiredSections, eligibleSections, sectionWiringConditions, threadedSections,
   ownPresetSections, boundSections, sectionConditionsAgreeWithState, libraryChannelCalls,
   libraryChannelChooserCalls, channelChooserName, sectionExtraChannelsCondition,
+  libraryPatchedArmBindings, sectionArmExclusivity, sectionArmExclusivityRefusal,
+  sectionArmExclusivityUnknownNotice, armBarredSections,
   extraChannelsAdvisory, EXTRA_SECTION_CHANNELS, type SectionRasterWiring,
 } from '../section-wiring';
 import { siblingPathOrUnresolved, siblingPathSource } from '../../../../../test/support/sibling-root.mjs';
@@ -115,6 +117,7 @@ function synthetic(): SectionRasterWiring {
     bindings: descriptorEffectsBindings(SYNTHETIC_DESC, 'zzz'),
     threadedBy: libraryRasterChooserCalls(SYNTHETIC_LIB, rasterChooserName('zzz', 'act1')),
     channelThreadedBy: libraryChannelCalls(SYNTHETIC_LIB, 'zzz', 'act1'),
+    patchedArm: libraryPatchedArmBindings(SYNTHETIC_LIB),
     descriptor: { path: '(synthetic)', parsed: true },
     library: { path: '(synthetic)', parsed: true },
   };
@@ -562,6 +565,7 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
       bindings: descriptorEffectsBindings(desc, 'ojz'),
       threadedBy: libraryRasterChooserCalls(lib, rasterChooserName('ojz', 'act1')),
       channelThreadedBy: libraryChannelCalls(lib, 'ojz', 'act1'),
+      patchedArm: libraryPatchedArmBindings(lib),
       descriptor: { path: DESC, parsed: true },
       library: { path: LIB, parsed: true },
     };
@@ -615,6 +619,7 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
       bindings: descriptorEffectsBindings(desc, 'ojz'),
       threadedBy: calls,
       channelThreadedBy: libraryChannelCalls(lib, 'ojz', 'act1'),
+      patchedArm: libraryPatchedArmBindings(lib),
       descriptor: { path: DESC, parsed: true },
       library: { path: LIB, parsed: true },
     };
@@ -639,6 +644,7 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
       bindings: descriptorEffectsBindings(desc, 'ojz'),
       threadedBy: libraryRasterChooserCalls(lib, chooser),
       channelThreadedBy: libraryChannelCalls(lib, 'ojz', 'act1'),
+      patchedArm: libraryPatchedArmBindings(lib),
       descriptor: { path: DESC, parsed: true },
       library: { path: LIB, parsed: true },
     };
