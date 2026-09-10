@@ -39,6 +39,12 @@ caller's rate is the argument that justified the method's shape, and a tight loo
 the thing the design bought. The load is printed beside every figure for the same reason: a
 frame-rate number with no statement of what the box was doing is not re-readable later.
 
+**Read a second time at 2.4× the load, after registering the harness by name** (`npm run
+harness:pacing-readout`): **10/10 again, fps 60/60/60/60 at load 18.74** where the first run sat
+at 7.90. The figure is not an artefact of a quiet moment on the box, and the two runs are stated
+as two runs rather than stitched into one — the environment varies here between runs and a claim
+needs its evidence from one of them.
+
 ## Why the schema rows are not the finding, and what is
 
 Every M-row passed — `presented` and `targetFps` numeric (M1), `fps` an object carrying its own
