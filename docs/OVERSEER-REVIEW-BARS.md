@@ -301,11 +301,20 @@ Each has caught a real defect here.
    hashing the extracted bytes, never by trusting the message that pairs them. A recipe
    carried in prose is a *claim* that it still reproduces the artifact; the blob **is**
    the artifact. Local instance: the effects codec pins empyrean's schema by git **blob**
-   hash (`cab3ca58…` today, `2d7a9fee…` before item 35's re-vendor;
-   `test/formats/effects-schema-drift.test.ts`) rather than by commit,
-   because the doc moved twice with the wire shape byte-identical underneath — a commit
-   citation would have read stale twice for nothing. The same reasoning is why the
-   three-way reconciliation compares **bytes**, not versions. **And the re-vendor is the
+   hash rather than by commit (`test/formats/effects-schema-drift.test.ts`), because
+   the doc moved with the wire shape byte-identical underneath — a commit citation would
+   have read stale for nothing. ⚠ **THIS SENTENCE USED TO NAME THE PIN AND THE PIN HAD
+   MOVED AT LEAST FOUR TIMES UNDER IT** (found 2026-09-10 by sigil's spent-condition sweep,
+   run here on the SPLIT half of the boot doc rather than the boot read): it said
+   ``cab3ca58…` today`, while the test's own comment already recorded
+   `cab3ca58 → d4345af5 → 0f661b70` and noted d4345af5 was *"still quoted after the fourth,
+   fifth and sixth had landed"*. **The pin is not hardcoded here or there** — the test reads
+   `PROV.empyrean.blob` from the vendored provenance file, which is why nothing was broken and
+   nothing went red. **NEVER WRITE THE HASH IN THIS FILE.** The command that answers it:
+   ```sh
+   git hash-object src/core/formats/effects/aurora-effects-scene.schema.json
+   ```
+   The same reasoning is why the three-way reconciliation compares **bytes**, not versions. **And the re-vendor is the
    other half of the lesson: when the pin DOES move, extract the new blob
    (`git -C ../empyrean show <rev>:<path> > <vendored>`) and re-hash it — never hand-edit
    the vendored copy to match a diff you read.**
