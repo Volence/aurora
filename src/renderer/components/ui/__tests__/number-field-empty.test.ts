@@ -51,8 +51,8 @@ interface Box {
   readonly selects: { count: number };
   /** A pointer going down on the box. `button` is the DOM code: 0 is primary. */
   mouseDown(button?: number): void;
-  /** A pointer coming up on the box. True when the field cancelled the default. */
-  mouseUp(): boolean;
+  /** A completed click on the box, dispatched after mouseup's default action. */
+  click(): void;
 }
 
 /** Render the real `NumberField` and drive the real `<input>` it returns. */
@@ -105,17 +105,15 @@ function box(
     // all. It is put to the browser, in
     // scratchpad/numberfield-selection-trace-harness.mjs, arms H and K.
     // What IS reachable is the half a later edit can silently widen: WHICH
-    // mouseup the field cancels. See the describe block for why that is the
-    // property worth a row.
+    // clicks make the field re-select. See the describe block for why that is
+    // the property worth a row.
     mouseDown: (button = 0) => {
       input().onMouseDown({ button } as unknown as ChangeEvent);
     },
-    mouseUp: () => {
-      let prevented = false;
-      input().onMouseUp(
-        { preventDefault: () => { prevented = true; } } as unknown as ChangeEvent,
-      );
-      return prevented;
+    click: () => {
+      input().onClick({
+        currentTarget: { select: () => { selects.count += 1; } },
+      } as unknown as ChangeEvent);
     },
     shown: () => input().value,
     setValue: (v) => { h.setProps({ value: v }); },
@@ -233,15 +231,23 @@ describe('NumberField: a clamp to a non-zero floor no longer rewrites the box mi
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// THE MOUSEUP GUARD, AND ONLY THE HALF THIS SUITE CAN HONESTLY ASK ABOUT
+// THE FOCUSING-CLICK RE-SELECT, AND ONLY THE HALF THIS SUITE CAN HONESTLY ASK
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // THE DEFECT (`docs/reviews/2026-09-10-numberfield-previous-visit.md`, 9 arms):
 // click a box holding 156, type NOTHING, click away, click back, type `7`, and
 // the box reads `1567`. `onFocus`'s `select()` runs in both arms of that pair;
 // what differs is that the click's own `mouseup` DEFAULT ACTION collapses the
-// selection it just made. The field now cancels that default, for the FOCUSING
-// click only.
+// selection it just made. The field now SELECTS AGAIN on `click`, which is
+// dispatched after that default action has run, and only for the click that
+// brought the box into focus.
+//
+// ⚠ THE FIRST REMEDY WAS A `preventDefault` ON THAT MOUSEUP AND IT BROKE THE
+// SPINNER. Chromium stops the spin button's auto-repeat in a mouseup default
+// handler, which Blink skips once preventDefault has been called: one click on
+// the down arrow of an unfocused box ran 156 to 119 and kept going (harness arm
+// S). Re-selecting suppresses no default action at all, which is why it is what
+// shipped. `fields.tsx` carries the full derivation.
 //
 // ⚠ WHAT IS NOT ASSERTED HERE, deliberately, and where it is. Whether the
 // selection survives is a fact about a native default action, and this suite has
@@ -253,86 +259,99 @@ describe('NumberField: a clamp to a non-zero floor no longer rewrites the box mi
 // INSERTED before this fix and REPLACE after it.
 //
 // WHAT IS ASSERTED HERE is the SCOPE, which is a different property with a
-// different failure mode. Cancelling every mouseup would also cancel a
+// different failure mode. Selecting on EVERY click would also destroy a
 // deliberate caret placement and a drag-selection inside a box the author is
 // already in. That is a real capability, it is the constraint the fix was
 // written to honour, and it is exactly the kind of thing a later edit widens by
 // accident while making some other row go green. The scope is decided by plain
 // component state (`editing`, and the arm ref), reachable without a browser,
-// and every row below fails if the guard reaches one mouseup more than it
+// and every row below fails if the field re-selects on one click more than it
 // should. The browser harness watches the same constraint from the other side
-// (arm N, a second click inside the already-focused box, which must still
-// place a caret).
+// (arm N, a second click inside the already-focused box, which must still place
+// a caret).
 
-describe('NumberField cancels the FOCUSING click\'s mouseup, and no other', () => {
-  it('cancels it on the click that brings the box from unfocused to focused', () => {
+describe('NumberField re-selects on the FOCUSING click, and no other', () => {
+  /** The gesture a pointer really makes on an unfocused box. */
+  const focusingClick = (b: Box): void => { b.mouseDown(); b.focus(); b.click(); };
+
+  it('selects again on the click that brings the box from unfocused to focused', () => {
     const b = box({ value: 156 });
-    b.mouseDown();
-    expect(b.mouseUp(), 'the focusing click\'s mouseup default must be cancelled').toBe(true);
+    focusingClick(b);
+    // Twice: once when focus arrived, and once after the click, which is the
+    // half that survives the mouseup default.
+    expect(b.selects.count, 'the focusing click must re-select after its own mouseup').toBe(2);
   });
 
   it('THE SCOPE: leaves a click inside a box that is ALREADY focused alone', () => {
-    // GREEN RULES OUT a field that has quietly become a blanket
-    // `preventDefault`, which would take the caret and the drag-selection with
-    // it. This is the row that fails if the fix is widened to make something
-    // else pass.
+    // GREEN RULES OUT a field that has quietly become a select-on-every-click,
+    // which would take the caret and the drag-selection with it. This is the row
+    // that fails if the fix is widened to make something else pass.
     const b = box({ value: 156 });
-    b.focus();
+    focusingClick(b);
+    const after = b.selects.count;
     b.mouseDown();
-    expect(b.mouseUp(), 'a click inside an already focused box must keep its default').toBe(false);
+    b.click();
+    expect(b.selects.count - after, 'a click inside an already focused box must select nothing')
+      .toBe(0);
   });
 
   it('and the two really are the same box in the same run (anti-vacuous)', () => {
     // Both halves on ONE field, so neither can be green because it was handed a
     // different component than the other row was.
     const b = box({ value: 156 });
+    focusingClick(b);
+    expect(b.selects.count, 'first click, unfocused').toBe(2);
     b.mouseDown();
-    expect(b.mouseUp(), 'first click, unfocused').toBe(true);
-    b.focus();
-    b.mouseDown();
-    expect(b.mouseUp(), 'second click, now focused').toBe(false);
+    b.click();
+    expect(b.selects.count, 'second click, now focused').toBe(2);
     b.blur();
-    b.mouseDown();
-    expect(b.mouseUp(), 'and a click after it lost focus is a focusing click again').toBe(true);
+    focusingClick(b);
+    expect(b.selects.count, 'and a click after it lost focus is a focusing click again').toBe(4);
   });
 
-  it('never cancels a non-primary button', () => {
-    // A middle click pastes the primary selection on mouseup under X11. That is
-    // not this component's to cancel, and the box being unfocused is exactly
-    // the case where an over-broad guard would have eaten it.
+  it('never arms on a non-primary button', () => {
+    // A middle click pastes the primary selection under X11. A field that
+    // grabbed the selection out from under that paste would be inventing a
+    // second defect out of the fix for the first, and the box being unfocused is
+    // exactly the case where an over-broad arm would do it.
     for (const button of [1, 2]) {
       const b = box({ value: 156 });
       b.mouseDown(button);
-      expect(b.mouseUp(), `button ${button} must keep its default`).toBe(false);
+      b.focus();
+      b.click();
+      expect(b.selects.count, `button ${button} must not re-select`).toBe(1);
     }
   });
 
-  it('fires ONCE per press: a second mouseup with no mousedown is not cancelled', () => {
+  it('fires ONCE per press: a second click with no mousedown does not re-select', () => {
     const b = box({ value: 156 });
-    b.mouseDown();
-    expect(b.mouseUp()).toBe(true);
-    expect(b.mouseUp(), 'the arm is spent, so a stray mouseup keeps its default').toBe(false);
+    focusingClick(b);
+    expect(b.selects.count).toBe(2);
+    b.click();
+    expect(b.selects.count, 'the arm is spent, so a stray click selects nothing').toBe(2);
   });
 
-  it('disarms on blur, so a drag that leaves the box cannot arm the next mouseup', () => {
+  it('disarms on blur, so a drag that leaves the box cannot arm the next click', () => {
     // The one window a later mousedown does not close by itself: press inside
-    // the box, drag out, release somewhere else. The arm would otherwise still
-    // be set when some later mouseup lands here.
+    // the box, drag out, release somewhere else. No click is dispatched here, so
+    // the arm would otherwise still be set when some later click lands.
     const b = box({ value: 156 });
     b.mouseDown();
     b.focus();
     b.blur();
-    expect(b.mouseUp(), 'the arm must not survive a blur').toBe(false);
+    const after = b.selects.count;
+    b.click();
+    expect(b.selects.count - after, 'the arm must not survive a blur').toBe(0);
   });
 
-  it('and the focusing click still SELECTS, which is the half the guard protects', () => {
-    // Anti-vacuous for the whole block: a field that had lost its select() would
-    // pass every row above and be exactly as broken as before.
+  it('and a Tab still selects, which has no click to land in', () => {
+    // Anti-vacuous for the whole block, and a real property: keyboard focus
+    // fires no mouse event at all, so `onFocus`'s own select() is the only thing
+    // that can serve it. A fix that moved the select() out of `onFocus` entirely
+    // would pass every row above and leave Tab inserting.
     const b = box({ value: 156 });
-    b.mouseDown();
     b.focus();
-    expect(b.selects.count, 'focus must still select the contents').toBe(1);
-    expect(b.mouseUp()).toBe(true);
+    expect(b.selects.count, 'focus alone must still select the contents').toBe(1);
   });
 });
 

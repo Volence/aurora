@@ -288,37 +288,56 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
        * reads `1567`. The `select()` runs in both arms of that pair. **What
        * differs is that the click's own `mouseup` DEFAULT ACTION collapses the
        * selection the `focus` handler just made** — the textbook cause of a
-       * select-on-focus that does not stick, and arm M proved the textbook
-       * remedy on the live element: with the mouseup default prevented, the
-       * same failing gesture replaces.
+       * select-on-focus that does not stick.
        *
-       * ⚠ WHY THIS IS ARMED ON `mousedown` INSTEAD OF ALWAYS PREVENTING. A
-       * blanket `preventDefault` on every mouseup also kills a deliberate caret
-       * placement and a drag-selection INSIDE A BOX THE AUTHOR IS ALREADY IN —
-       * a real capability, and one the defect never touched: the insert only
-       * ever appears on the click that brings the box from unfocused to
-       * focused. So the guard is scoped to that one click. `mousedown` fires
-       * BEFORE the focus default action, so `editing` there is still the state
-       * from before this gesture and answers exactly the right question: was
-       * this box unfocused when the pointer went down?
+       * ⚠ THE OBVIOUS REMEDY WAS TRIED FIRST, BUILT, AND MEASURED WRONG. The
+       * packet's arm M prevents that mouseup's default and arm H then replaces,
+       * so `preventDefault` on the focusing click's mouseup was written here
+       * and it DID fix the digits. It also broke the spinner. Chromium's number
+       * input carries a spin button in its UA shadow root; it STEPS on
+       * mousedown, which no mouseup guard can stop, and it STOPS ITS AUTO-REPEAT
+       * in a mouseup DEFAULT handler, which Blink skips once `preventDefault`
+       * has been called. Measured on this component with that remedy in place
+       * (harness arm S): one click on the down arrow of an unfocused box took
+       * 156 to 147 within 600ms and to 119 by 2s, still sliding. The spinner is
+       * a capability this repo has already refused to trade away once —
+       * `numberfield-empty-harness.mjs` check 4a exists to hold it — so the
+       * remedy moved rather than the constraint.
+       *
+       * WHAT IS HERE INSTEAD SUPPRESSES NOTHING. `click` is dispatched AFTER
+       * mouseup's default action has run, so re-selecting there restores what
+       * the collapse took, and every default action on the way — the spin
+       * button's, the caret's, the primary-selection paste's — happens exactly
+       * as the browser intended. It is a smaller claim than a `preventDefault`:
+       * it does not stop the selection being collapsed, it puts it back.
+       *
+       * ⚠ WHY IT IS ARMED ON `mousedown` AND NOT DONE ON EVERY CLICK. Selecting
+       * on every click would take a deliberate caret placement and a
+       * drag-selection INSIDE A BOX THE AUTHOR IS ALREADY IN — a real
+       * capability, and one the defect never touched: the insert appears only
+       * on the click that brings the box from unfocused to focused. So the arm
+       * is set on `mousedown`, which fires BEFORE the focus default action, and
+       * `editing` there still answers exactly the right question: was this box
+       * unfocused when the pointer went down?
        *
        * WHY `editing` AND NOT `document.activeElement`. They agree — `editing`
        * is set true on focus and false on blur and nowhere else — and the
        * component then reaches for no global, which is what lets the SCOPE be
        * unit-tested in a suite with no DOM
-       * (`__tests__/number-field-empty.test.ts`, the mouseup-guard rows). The
+       * (`__tests__/number-field-empty.test.ts`, the focusing-click rows). The
        * behaviour it protects is a native default action and is NOT unit
        * testable; the scope is, and the scope is the part a later edit can
        * silently widen.
        *
        * ⚠ PRIMARY BUTTON ONLY. A middle-click on X11 pastes the primary
-       * selection on mouseup, and that is not this component's to cancel.
+       * selection, and a field that grabbed the selection out from under that
+       * paste would be inventing a second defect out of the fix for the first.
        */
       onMouseDown={(e) => { focusingClick.current = e.button === 0 && !editing; }}
-      onMouseUp={(e) => {
+      onClick={(e) => {
         if (!focusingClick.current) return;
         focusingClick.current = false;
-        e.preventDefault();
+        e.currentTarget.select();
       }}
       onFocus={(e) => {
         setEditing(true);
@@ -328,8 +347,9 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
         // no warning anywhere). Selecting makes the first keystroke replace,
         // which is what every author expects of a small numeric field and what
         // makes the refusal below a backstop rather than a daily obstacle.
-        // ⚠ THIS LINE ALONE DOES NOT HOLD THE SELECTION. The mouseup guard
-        // above is the other half; see its block for the measurement.
+        // ⚠ THIS LINE ALONE DOES NOT HOLD THE SELECTION AGAINST A CLICK, and it
+        // is still the only thing that selects for a Tab, which has no click to
+        // land in. The `onClick` above is the other half; see its block.
         e.currentTarget.select();
         // The baseline for the drift clause: what the author is about to type
         // OVER. Reset the counter with it — a second visit to the same box is a
@@ -339,12 +359,12 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
       }}
       onBlur={() => {
         setEditing(false);
-        // DISARM. A mousedown that arms the guard and then finishes its mouseup
-        // somewhere else (a drag out of the box) would otherwise leave the arm
-        // set, and the NEXT mouseup to land here would be prevented on an
-        // already-focused box — the exact regression the scoping exists to
-        // avoid. Every later mousedown on this box recomputes the arm anyway;
-        // this closes the one window where none does.
+        // DISARM. A mousedown that arms the guard and then finishes somewhere
+        // else (a drag out of the box) fires no `click` here, so the arm would
+        // otherwise stay set and the NEXT click to land here would re-select
+        // inside an already-focused box — the exact regression the scoping
+        // exists to avoid. Every later mousedown on this box recomputes the arm
+        // anyway; this closes the one window where none does.
         focusingClick.current = false;
         // ⚠ THE COUNTER IS NOT CLEARED HERE, only on the next focus. The refusal
         // text stays painted after the box snaps back, and it is exactly then
