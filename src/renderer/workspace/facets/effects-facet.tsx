@@ -83,26 +83,45 @@ function EffectsSubTabBody(): React.ReactElement {
   if (tab === 'colour') {
     return (
       <>
-        {/* THE RASTER TIMELINE IS THE COLOUR JOB'S, and this is a call made
-            here rather than by the mockup, which does not draw it. Its PRESET
-            column is editable — drag a palette band's edge, split it — and
-            those bands are this tab's subject; its layer column is read-only
-            context. It stays above the preset form for the same reason it used
-            to sit under the scene: it is the picture of what the form edits.
-            Reversible in one line by moving it into the Parallax branch. */}
-        <RasterTimelineStrip />
         {/* A DIFFERENT DOCUMENT FROM THE SCENE PANEL, and the panel says so: a
             scene is a `parallax_config`, a preset is an `EffectsPreset` whose
             raster program is one channel. A `bands` key on a scene file is
             refused. They shared a column; they now do not even share a tab.
 
-            IT ARRIVES COLLAPSED AND CARRIES ITS OWN LIMITS. Nothing in THIS
-            editor draws one of these bands (one frame of one has been looked
-            at, once, in aeon's emulator — aeon `4a4d3474`, 2026-08-30 — and no
-            preview here is built against it), and saving a preset does not
-            install it — the panel states both in full, unhidden, because the
-            failure mode this surface has is a promise, not a bug. */}
+            IT CARRIES ITS OWN LIMITS. Nothing in THIS editor draws one of these
+            bands (one frame of one has been looked at, once, in aeon's emulator
+            — aeon `4a4d3474`, 2026-08-30 — and no preview here is built against
+            it), and saving a preset does not install it — the panel states both
+            in full, unhidden, because the failure mode this surface has is a
+            promise, not a bug.
+
+            ═══ IT IS NOW FIRST ON THE TAB (UX seat A, F5) ═══
+
+            It used to arrive second and collapsed, under the timeline. The seat
+            following the in-app guide measured FOUR WHEEL GESTURES from the top
+            of this tab to `Preset id` — the control the guide calls step 1 —
+            because ~440px of the timeline section stood in front of it, most of
+            it prose about raster SPLITS, which this panel is at pains to explain
+            is a DIFFERENT MECHANISM from a palette band. The tab's job is
+            authoring presets; the tab now opens on the thing it is for.
+
+            ⚠ THE TIMELINE IS NOT COLLAPSED TO ACHIEVE THIS, and that is
+            deliberate: `RasterTimelineStrip`'s own header records why it must
+            not be. `CollapsibleSection` does not mount a collapsed section's
+            children, so a collapsed timeline has no canvas, and the defect that
+            strip closed is that `vsplit.at` is authorable and UNSEEABLE.
+            Shipping that fix behind a disclosure would be shipping the defect
+            back. Order is not disclosure: the strip is still expanded, still
+            mounted, still one short scroll away. */}
         <BandPresetPanel />
+        {/* THE RASTER TIMELINE IS THE COLOUR JOB'S, and this is a call made
+            here rather than by the mockup, which does not draw it. Its PRESET
+            column is editable — drag a palette band's edge, split it — and
+            those bands are this tab's subject; its layer column is read-only
+            context. It is the picture of what the form edits, which is why it
+            lives on this tab at all rather than under the scene. Reversible in
+            one line by moving it into the Parallax branch. */}
+        <RasterTimelineStrip />
       </>
     );
   }

@@ -188,7 +188,8 @@ A raster band repaints part of the palette for a range of screen lines. It lives
 inside a **preset**, a document that can hold several bands. There is no control
 called "make a band"; you make a preset, and it comes with one.
 
-1. Press `Colour`, the middle sub-tab, and open `RASTER BAND PRESETS`.
+1. Press `Colour`, the middle sub-tab. `RASTER BAND PRESETS` is the first section
+   on it and arrives open.
 2. Type an id in `Preset id`: lower case, underscores, e.g. `ojz_water_tint`.
 3. Press `New`. You now have a preset with `Raster band 0` in it.
 4. Open `PRESET: <your id>` and fill the band in:

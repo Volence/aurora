@@ -345,14 +345,61 @@ export default function BandPresetPanel(): React.ReactElement | null {
 
   return (
     <>
-      <CollapsibleSection id="aeon.effects.presets" title="Raster band presets" defaultCollapsed>
+      <CollapsibleSection id="aeon.effects.presets" title="Raster band presets">
         <SectionBody>
           <LimitBlock />
+
+          {/* ═══ STEP 1 OF THE GUIDE IS STEP 1 OF THE COLUMN (UX seat A, F5) ═══
+
+              The guide's first instruction is "press Colour, open RASTER BAND
+              PRESETS, type an id in Preset id, press New". The seat measured
+              FOUR WHEEL GESTURES from the top of the sub-tab to that input:
+              ~440px of the timeline section's prose about raster SPLITS - which
+              this panel is at pains to say is a different thing - and then, once
+              the accordion was expanded, five more paragraphs. The preset LIST
+              was among them, and it grows without bound: the tenth preset pushes
+              the way to make an eleventh further down the column.
+
+              ⚠ IT DOES NOT GO ABOVE `LimitBlock`, WHICH IS THE SEAT'S LITERAL
+              REMEDY DECLINED WITH A REASON. What saving a preset does not do,
+              what looking at it costs, and what "it built" does not prove are
+              the three sentences this whole surface is shaped around, and
+              `band-preset-wording.test.ts` pins the block as the first thing
+              inside the body with nothing between - unconditionally, so no
+              future guard can decide an author has already read it. An author
+              who creates a preset without those on screen is the failure this
+              panel exists to prevent, and it costs one short block to prevent
+              it. What was actually in the way was everything AFTER the limits,
+              and that is what moved.
+
+              THE OTHER TWO GESTURES ARE PAID ELSEWHERE: this section now arrives
+              OPEN (it is the tab's subject) and the timeline section arrives
+              COLLAPSED (it is a picture, and it has nothing to picture until a
+              preset exists). Both are `defaultCollapsed` defaults only - a
+              persisted preference still wins, so nobody's arrangement moves. */}
+          <Field label="Preset id" title="Create a preset file under data/editor/effects/presets/"
+            style={{ marginTop: T.s3, marginBottom: 0 }}>
+            <input value={newId} placeholder="new_preset_id"
+              onChange={(e) => { setNewId(e.target.value); setRefusal(null); }}
+              style={textInput} />
+            <Chip onClick={create} disabled={newId.trim() === ''}>New</Chip>
+          </Field>
+          {refusal !== null && <Hint under tone="warning">{refusal}</Hint>}
+          {/* The id rule, said BEFORE the refusal rather than only after it. The
+              pattern comes from the schema via presetIdRefusal's own source, so
+              a probe of the empty string is the honest way to show it without
+              retyping the regex here. */}
+          {refusal === null && newId.trim() !== '' && (() => {
+            const why = presetIdRefusal(newId.trim(), library);
+            return why === null ? null : <Hint under>{why}</Hint>;
+          })()}
+
 
           {entries.length === 0 && (
             <Hint>
               No raster presets yet. A preset is one file under
-              {' '}<code>data/editor/effects/presets/</code>. Create one below.
+              {' '}<code>data/editor/effects/presets/</code>. Type an id in the box above
+              and press New.
             </Hint>
           )}
           {entries.length > 0 && (
@@ -398,23 +445,6 @@ export default function BandPresetPanel(): React.ReactElement | null {
               listed. Aurora will not overwrite {library.unreadable.length === 1 ? 'it' : 'them'}.
             </Hint>
           )}
-
-          <Field label="Preset id" title="Create a preset file under data/editor/effects/presets/"
-            style={{ marginTop: T.s3, marginBottom: 0 }}>
-            <input value={newId} placeholder="new_preset_id"
-              onChange={(e) => { setNewId(e.target.value); setRefusal(null); }}
-              style={textInput} />
-            <Chip onClick={create} disabled={newId.trim() === ''}>New</Chip>
-          </Field>
-          {refusal !== null && <Hint under tone="warning">{refusal}</Hint>}
-          {/* The id rule, said BEFORE the refusal rather than only after it. The
-              pattern comes from the schema via presetIdRefusal's own source, so
-              a probe of the empty string is the honest way to show it without
-              retyping the regex here. */}
-          {refusal === null && newId.trim() !== '' && (() => {
-            const why = presetIdRefusal(newId.trim(), library);
-            return why === null ? null : <Hint under>{why}</Hint>;
-          })()}
 
           {/* ═══ THE PER-SECTION BINDING (ROADMAP row 93's remaining half) ═══
 
