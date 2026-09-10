@@ -199,6 +199,27 @@ export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
   // .openDir` and `__aurora.aeon.open` (renderer/debug-hooks.ts). Those are the
   // only unguarded doors left, and neither is a user gesture.
   //
+  // ── ONE MECHANISM ABOVE MOVED (2026-09-10, UX seat A's F6) ───────────────
+  // The AEON paragraph's "`openEngine()` can flip from 'aeon' to 's1' only
+  // through `classicProjectStore.openDirectory`" still holds: that is the
+  // aeon-to-classic direction and nothing added a second way to take it.
+  //
+  // What changed is the OTHER direction. `openAeonProject` (state/aeon-open.ts)
+  // now closes a resident classic project itself, first thing, rather than
+  // inheriting the close from `openDirectory`'s 'not-classic' branch one
+  // statement earlier on the user road. It is written up there; the reason it is
+  // repeated here is that this census reasons from those mechanisms, and a
+  // census that quotes a mechanism which has since moved is exactly the rot the
+  // §2 test below exists to catch in the CALLERS and cannot catch in the prose.
+  //
+  // NO NEW DISCARD ROAD, which is the question a reader of this file will ask.
+  // That close resets `classicLevelStore` and so zeroes `classicDirty`. It is
+  // reachable from two places and neither is new: the user road, where
+  // `openDirectory` had already reset the same store before `openAeonProject`
+  // was called at all, and the unguarded debug door, which discarded that work
+  // regardless. No production caller reaches it with unsaved classic edits that
+  // `confirmProjectOpen` has not already asked about.
+  //
   // ⚠ AND THE STATED RISK OF TIGHTENING DID NOT SURVIVE THE LOOK EITHER, so do
   // not quote it as the reason. "It would drop the Save button in states this
   // guard is right about today" has no example: the classic-level saver's own
