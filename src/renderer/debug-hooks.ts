@@ -16,7 +16,8 @@
 // own and only calls existing store methods.
 
 import { useClassicProjectStore } from './state/classicProjectStore';
-import { useClassicLevelStore } from './state/classicLevelStore';
+import { useClassicLevelStore, type LayoutPlane } from './state/classicLevelStore';
+import { stampLayoutCell, type StampLayoutCellReport } from './debug-level-edit';
 import { useClassicObjectArtStore } from './state/classicObjectArtStore';
 import { useProjectStore, getCurrentAct, getCurrentZone } from './state/projectStore';
 import { useEditorStore, focusedHistory, focusedDocId } from './state/editorStore';
@@ -161,6 +162,27 @@ interface ClassicProbeApi {
   docHash(): number | null;
   setSelectedChunk(id: number): void;
   setComposerBlock(id: number): void;
+  /**
+   * THE ONE WRITE DOOR ON THIS PROBE THAT CHANGES THE LEVEL DOCUMENT, and the
+   * only member here that is not setup or a read.
+   *
+   * It exists for `docs/reviews/2026-09-10-cdp-sweep.md` §5: two foreground
+   * checks (S2, the "Saved!" flash; S3, the toast that names files) were parked
+   * UNMEASURABLE because four routes to a dirty LEVEL document all failed, and
+   * every one of those failures was about the harness's reach rather than about
+   * the app.
+   *
+   * IT DOES NOT SET A DIRTY FLAG. It calls `classicSetLayoutCells`, the exact
+   * function `ClassicLevelViewport`'s `endStroke` ends a real stamp gesture in,
+   * so everything downstream of the mouse is the app's own path: one undo entry,
+   * the real dirty domain, and the real file on the next save. A door that
+   * flipped `dirty` would make S2 vacuous — it would prove the chip reacts to a
+   * flag, which nobody doubts, rather than that an EDIT reaches the chip.
+   *
+   * The whole reasoning, and what it does NOT prove (the pointer gesture into
+   * that call is still unexercised), is in `debug-level-edit.ts`.
+   */
+  stampLayoutCell(plane?: LayoutPlane): StampLayoutCellReport;
 }
 
 function fnv1a(bytes: Uint8Array, offset: number, length: number): number {
@@ -320,6 +342,11 @@ function installClassicProbe(): ClassicProbeApi {
     },
     setSelectedChunk: (id) => state().setSelectedChunkId(id),
     setComposerBlock: (id) => state().setComposerBlockId(id),
+    // Straight through to the door module. Kept a one-line delegation on
+    // purpose: the reasoning, and the rule it must not break, live in one place
+    // (`debug-level-edit.ts`) and a copy of the commit here would be a second
+    // definition of "the app's own path".
+    stampLayoutCell: (plane) => stampLayoutCell(plane ?? 'fg'),
   };
 }
 
