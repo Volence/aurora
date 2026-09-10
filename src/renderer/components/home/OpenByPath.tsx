@@ -59,6 +59,14 @@ export default function OpenByPath({ onOpenPath, label }: OpenByPathProps): Reac
   // at makes you read somewhere else and then expires, and this app's own
   // refusal style (seat A's F4, quoted approvingly) is to say the rule, the
   // legal shape and what the value still is, in front of the control.
+  //
+  // AND IT RENDERS BELOW THE ROW, WHICH IS SEAT A'S F4 AVOIDED RATHER THAN
+  // REPEATED. F4 is a validation message that appeared BETWEEN two fields,
+  // moving the next one 120 px under the reader's hand so their typing landed
+  // appended to a value they thought they had replaced. A message inserted below
+  // the only control in this group cannot move that control: the input keeps
+  // focus and keeps its position, and everything that shifts is downstream
+  // content nobody is mid-gesture on.
   const [refusal, setRefusal] = useState<string | null>(null);
 
   // The decision lives in typed-path-open.ts, where a node-only suite can
