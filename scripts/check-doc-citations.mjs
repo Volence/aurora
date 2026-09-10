@@ -937,6 +937,21 @@ const EXEMPT = [
   { file: 'docs/reviews/2026-09-02-variant-cycle-controls.md', token: 'scratchpad/shots-variant-cycle/disclosure.png', why: EVIDENCE_GONE },
   { file: 'docs/reviews/2026-09-03-o51-artmode-defects.md', token: 'scratchpad/shots-canvas/repro-assign.png', why: EVIDENCE_GONE },
   { file: 'docs/superpowers/plans/2026-08-15-paint-through-cdp-report.md', token: 'scratchpad/shots-paint', why: EVIDENCE_GONE },
+
+  // Added 2026-09-10. This one is not lost evidence -- it is PROVENANCE, the third
+  // reason on the bar, and the citation is load-bearing rather than incidental: the
+  // sentence exists to tell a reader that the board file is UNTRACKED and that the
+  // change it describes therefore lives on one machine and in no commit. Naming the
+  // path is how that sentence does its job; removing it would leave "the removal is
+  // on disk only" pointing at nothing. The file is untracked BY CONTRACT
+  // (empyrean contract/LANE_STATUS.md), so it can never become openable and no
+  // repair is available or wanted. NOT a licence: a review offering EVIDENCE still
+  // puts it in docs/captures/, tracked.
+  { file: 'docs/2026-09-09-audit-briefing.md', token: 'docs/lane-status.json',
+    why: 'the sentence STATES PROVENANCE -- that the board file is untracked, so the change '
+       + 'it describes exists on disk and in no commit. The path is what the sentence is about; '
+       + 'deleting it would leave the claim pointing at nothing. Untracked by contract '
+       + '(empyrean contract/LANE_STATUS.md), so it cannot be made openable.' },
 ];
 
 // ---------------------------------------------------------------------------
