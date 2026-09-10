@@ -152,7 +152,19 @@ describe('the shipped raster-binding limit agrees with aeon\'s real file', () =>
     expect(provenance, 'these rows read aeon\'s file by path and the run printed no provenance, '
       + 'so nothing in this result says which aeon decided it').not.toBe('');
     expect(provenance).toContain('WORKING TREE');
-    expect(provenance).toContain('does NOT name the bytes this run read');
+    // ⚠ THREE STATES, NOT TWO, AND THE ROW SAYS WHICH. A revisioned checkout
+    // prints the base SHA with the sentence that stops it reading as an identity
+    // for these bytes; a checkout that is not a git repository at all prints a
+    // loud PROVENANCE INCOMPLETE instead. Both are honest; only SILENCE is not.
+    // Asserting the first spelling alone made this row red on the second for a
+    // reason that had nothing to do with what it measures — found by running the
+    // gate against a non-git fixture during its own red-first proof.
+    const named = provenance.includes('does NOT name the bytes this run read');
+    const loudlyUnknown = provenance.includes('PROVENANCE INCOMPLETE');
+    expect(named || loudlyUnknown,
+      'the provenance stamp neither carried the base-is-not-an-identity sentence nor declared '
+      + 'itself incomplete, so this run says something about its fixture that is not true')
+      .toBe(true);
   });
 
   it('the sentence carries a DATED, machine-findable reading at all', () => {
@@ -212,10 +224,19 @@ describe('the shipped raster-binding limit agrees with aeon\'s real file', () =>
       + 'refuses by name, and the shipped sentence says it is refused — so this is a real finding '
       + 'about aeon\'s tree, not a wording problem here.').toEqual([]);
     expect(RASTER_SECTION_BINDING_LIMIT,
-      'the sentence claims both wired sections are bound, and the sidecars disagree')
+      'the sentence no longer claims the wired sections are bound; if that clause was rewritten '
+      + 'deliberately, rewrite this row with it rather than deleting the check')
       .toMatch(/BOTH ARE ALSO BOUND/);
-    expect(bound, 'the wired set is fully bound in aeon\'s tree, which is what BOTH ARE ALSO '
-      + 'BOUND asserts; if it is not, the sentence must say which is unbound')
+    // ⚠ THIS IS NOT AN INVARIANT ABOUT AEON — a wired section left UNBOUND is a
+    // legal, documented state (the sentence's own case 2: it resolves to the
+    // `hand:` label and changes nothing). It is a check on OUR CLAIM: while the
+    // sentence says BOTH ARE ALSO BOUND, the two sets must coincide. Wired
+    // {5,6,7} with bound {5,6} is a fine aeon tree and a false Aurora sentence.
+    expect(bound,
+      `the sentence says BOTH ARE ALSO BOUND, but aeon threads {${derived.join(', ')}} and only `
+      + `{${bound.join(', ')}} carry a rasterRef. A wired section left unbound is legal — it is `
+      + 'the sentence\'s own case 2 — so the fix is to REWORD the clause to say which sections are '
+      + 'bound, not to bind anything in aeon\'s tree.')
       .toEqual(derived);
   });
 
