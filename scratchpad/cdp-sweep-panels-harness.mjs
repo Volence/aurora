@@ -48,6 +48,7 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { classicDirClause, classicGatedRefusals } from './lib/classic-gated-rows.mjs';
 
 const PORT = Number(process.env.PORT ?? 9473);
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 99);
@@ -128,6 +129,24 @@ function check(id, name, ok, detail) {
   results.push({ id, name, ok, load: la });
   if (ok === 'UNMEASURABLE') unmeasurable.push(`[${id}] ${name} (load ${la})`);
   else if (!ok) fails.push(`[${id}] ${name} (load ${la})`);
+}
+
+/**
+ * A REFUSING ARM OWES ITS READER ONE NAMED ROW PER QUESTION IT SUPPRESSED.
+ *
+ * HARNESS-ROWS-VANISH-ON-UNSET-GATE: with `CLASSIC_DIR` unset this file used to
+ * print ONE `UNMEASURABLE` and drop the other six rows on the floor, so the
+ * totals line read `13/14 PASS - 1 UNMEASURABLE` and was arithmetically honest
+ * about exactly the rows it chose to print. An absence dressed as an outcome.
+ *
+ * The enumeration is in `lib/classic-gated-rows.mjs` so both arms read the SAME
+ * list, and `test/harness-classic-gated-rows.test.ts` extracts the ids out of
+ * the measuring branch's own source and reddens when the two drift.
+ */
+function refuseClassicRows(because, opts) {
+  for (const r of classicGatedRefusals(because, opts)) {
+    check(r.id, r.name, 'UNMEASURABLE', r.detail);
+  }
 }
 
 const clickByText = (re, tag = 'button') => String.raw`
@@ -482,10 +501,12 @@ async function main() {
     // ═══════════════════════════════════════════════════════════════════════
     console.log('\n──── S3: the classic save toast ────');
     if (!CLASSICDIR || !existsSync(CLASSICDIR)) {
-      check('S3', 'a classic save\'s success toast NAMES the files it wrote', 'UNMEASURABLE',
-        `CLASSIC_DIR ${CLASSICDIR ? `(${CLASSICDIR}) does not exist` : 'is unset'} — the classic `
-        + 'toast cannot be raised without a classic project, and a green from the aeon toast '
-        + 'would be about a different sentence (`Project saved`, which deliberately names no files).');
+      // ⚠ ALL SEVEN, NOT ONE. The row that used to stand here was a single `S3`
+      // carrying the aeon-toast trap sentence, which is preserved as `S3c`'s
+      // `whenNoClassicDir` tail. The id changed from `S3` to `S3c` on purpose:
+      // it is the SAME QUESTION the measuring branch asks under `S3c`, and two
+      // ids for one question is what made the two logs impossible to diff.
+      refuseClassicRows(classicDirClause(CLASSICDIR), { dirTail: true });
     } else {
       const st2 = await c.evalExpr(`window.__dbg.openDir(${JSON.stringify(CLASSICDIR)})`)
         .catch((e) => `threw: ${e.message}`);
@@ -494,8 +515,12 @@ async function main() {
       check('S3a', 'the COPIED classic project is open', !!(ps && ps.status === 'open'),
         `openDir -> ${JSON.stringify(st2)}; projStatus ${JSON.stringify(ps)}`);
       if (!ps || ps.status !== 'open') {
-        check('S3b', 'a classic save\'s success toast NAMES the files it wrote', 'UNMEASURABLE',
-          'the classic project did not open, so no classic save could be raised');
+        // ⚠ THE SAME DEFECT ONE LEVEL IN, and it dropped FIVE rows rather than
+        // six: this arm used to emit `S3b` alone — and under the S3c QUESTION,
+        // not S3b's own, so one id carried two different questions depending on
+        // which path reached it. S2a1/S2a2/S2a3/S2b/S3c emitted nothing at all.
+        refuseClassicRows('the classic project did not open',
+          { only: ['S3b', 'S2a1', 'S2a2', 'S2a3', 'S2b', 'S3c'] });
       } else {
         // ⚠ `openAct(0, 0)` TAKES IDS, NOT INDICES, and the first version of
         // this row passed indices and got "no act 00 in zone tree" — which
