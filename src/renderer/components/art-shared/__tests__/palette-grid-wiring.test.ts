@@ -61,6 +61,31 @@ describe('one grid, mounted by both engines', () => {
     expect(src, `${name} declares its own edit selection again`).not.toMatch(/\bsetSel\b/);
   });
 
+  /**
+   * THE COPY BRIDGE READS THE PORT'S RULE, NOT ITS OWN.
+   *
+   * PaletteEditor's "Copy to" menu and its swatch/line drop both gate on one
+   * local predicate, `zoneLineLocked`. Until 2026-09-10 that predicate was
+   * `line === 0 && !inSprite`: a second, quieter door onto the shared Sonic and
+   * Tails palette, open exactly when the swatch grid's own policy was refusing
+   * the same write. It now delegates to `zoneCopyTargetRefusal`, whose argument
+   * list has no `inSprite` in it (providers/palette-aeon.ts), and the decision
+   * itself is executed in providers/__tests__/palette-aeon.test.ts.
+   *
+   * What is left for a scan is that the host still ASKS: a re-inlined `line ===
+   * 0` here would restore the fork with both files looking reasonable.
+   */
+  it('gates the aeon copy bridge on the port\'s refusal, with no mode of its own', () => {
+    const body = /function zoneLineLocked\(line: number\): boolean \{([\s\S]*?)\n  \}/.exec(EDITOR)?.[1];
+    expect(body, 'PaletteEditor no longer declares zoneLineLocked: this scan measures nothing')
+      .toBeTruthy();
+    expect(body!, 'the copy bridge stopped consulting the port and decides for itself again')
+      .toMatch(/zoneCopyTargetRefusal\(/);
+    expect(body!, 'the copy bridge reads inSprite again: line 0 is a copy target in the sprite pane')
+      .not.toMatch(/\binSprite\b/);
+    expect(body!, 'the copy bridge hard-codes a line number again').not.toMatch(/line === \d/);
+  });
+
   it('leaves the classic host as a host and nothing else', () => {
     // ~30 lines, almost all docblock. If this grows back past a screen, something
     // engine-specific has been put back into a file whose whole job is to pick a

@@ -49,7 +49,10 @@ import {
 } from '../../formats/effects/section-wiring';
 import { loadEffectsPresetLibrary } from '../../formats/effects/preset';
 import { loadBgOverride } from '../../formats/bg-override/bg-override-io';
-import { buildPalette } from '../../formats/palette';
+import {
+  buildPalette, CRAM_LINE_ENTRIES,
+  ZONE_PALETTE_BYTES, ZONE_PALETTE_FIRST_LINE, ZONE_PALETTE_WORDS,
+} from '../../formats/palette';
 import { parseNametable } from '../../formats/s4-nametable';
 import { parseCollAttr } from '../../formats/s4-collattr';
 import { parseSectionChunkLinks } from '../../formats/section-chunk-links';
@@ -68,6 +71,7 @@ import type {
   ObjectPlacement,
   RingPlacement,
   BgLibraryEntry,
+  ZonePaletteFile,
 } from '../../model/s4-types';
 
 /** Derive the legacy chunk-tiles atlas path from the chunk-library JSON path. */
@@ -506,8 +510,44 @@ async function loadFullProject(
 
     // Load palette — level art at CRAM lines 1–3 (destOffset 16), and the shared
     // player palette (Sonic/Tails) into line 0, which every zone carries in-game.
+    //
+    // THE TWO SOURCES ARE NOT SYMMETRIC ON THE WAY OUT, and `paletteFile` below
+    // is what carries that asymmetry to the save. The zone's own file is this
+    // zone's to write; `art/palettes/SonicAndTails.bin` is ONE file for the
+    // entire game, so an edit to line 0 would recolour Sonic and Tails in every
+    // zone. Aurora refuses that edit rather than writing the shared file — see
+    // formats/palette.ts serializeZonePalette, which cannot emit line 0 at all,
+    // and providers/palette-aeon.ts, which refuses the gesture with a sentence.
     const palData = await fa.read(zoneConfig.palette);
-    const sources = [{ data: palData, srcOffset: 0, destOffset: 16, length: Math.min(48, Math.floor(palData.length / 2)) }];
+    const paletteWordsRead = Math.min(ZONE_PALETTE_WORDS, Math.floor(palData.length / 2));
+    const paletteFile: ZonePaletteFile = {
+      path: zoneConfig.palette,
+      complete: paletteWordsRead === ZONE_PALETTE_WORDS,
+      // slice, not subarray: a view would keep the whole read buffer alive and,
+      // worse, would alias bytes a later reader could mutate under the save.
+      tail: palData.slice(ZONE_PALETTE_BYTES),
+    };
+    if (!paletteFile.complete) {
+      // LOUD, because the consequence is silent otherwise: the missing entries
+      // are showing as black in the editor and the save will decline to write
+      // this file at all, so a colour picked now will not survive the reopen.
+      notices.push({
+        severity: 'warning',
+        message: `${zoneConfig.palette} holds ${paletteWordsRead} of the `
+          + `${ZONE_PALETTE_WORDS} colours a zone palette needs, so the rest are showing `
+          + 'as black. Aurora will not write this file back until it is the full '
+          + `${ZONE_PALETTE_BYTES} bytes, so palette edits in zone "${zoneConfig.id}" will not save.`,
+      });
+    }
+    // destOffset derived, not typed as 16: it is "the first entry of the first
+    // line the file owns", the same fact ZONE_PALETTE_FIRST_LINE states for the
+    // serializer, so the read and the write cannot drift apart by a line.
+    const sources = [{
+      data: palData,
+      srcOffset: 0,
+      destOffset: ZONE_PALETTE_FIRST_LINE * CRAM_LINE_ENTRIES,
+      length: paletteWordsRead,
+    }];
     try {
       const playerPal = await fa.read('art/palettes/SonicAndTails.bin');
       sources.unshift({ data: playerPal, srcOffset: 0, destOffset: 0, length: 16 });
@@ -801,6 +841,7 @@ async function loadFullProject(
       acts,
       tileset,
       palette,
+      paletteFile,
     });
 
     // Load the zone's BG library (editor-owned, optional): index JSON of

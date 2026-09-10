@@ -218,3 +218,96 @@ export function buildPalette(entries: Array<{ data: Uint8Array; srcOffset: numbe
 
   return { lines };
 }
+
+// ---------------------------------------------------------------------------
+// WRITING A ZONE PALETTE BACK
+// ---------------------------------------------------------------------------
+//
+// ═══ THE DEFECT THIS EXISTS FOR ═══════════════════════════════════════════
+//
+// Until 2026-09-10 this file had no serializer at all. `buildPalette` above
+// turned bytes into a `Palette` and NOTHING turned a `Palette` back into bytes,
+// so every colour the author picked lived in the model until the next reopen
+// and then vanished. The save plan (project/aeon/save.ts) contained no palette
+// file: there was no missing STEP, there was no missing DESTINATION.
+//
+// It was invisible for the same reason aeon's own six-month palette defect was
+// (aeon tools/ojz_common.py, "THE ACT PALETTE: EXACTLY ONE WRITER"): the
+// editor's live preview pushes CRAM straight into a running game, so the
+// emulator DID show the new colour. THE LIVE PATH WORKING IS WHAT HID IT.
+//
+// ═══ WHERE THE BYTES GO, AND WHY THREE LINES AND NOT FOUR ═════════════════
+//
+// An authored zone palette file is 48 big-endian CRAM words that load starting
+// at CRAM LINE 1. Line 0 is not in the file and must never be written from
+// here: it is the shared player palette (art/palettes/SonicAndTails.bin), one
+// file for the entire game. See ZONE_PALETTE_FIRST_LINE below.
+//
+// Three independent statements of that geometry already exist in this
+// repository and they agree: `buildPalette`'s caller in project/aeon/load.ts
+// reads the file at `destOffset: 16`; `aether/palette-push.ts` fixes
+// `PAL_BASE_BYTES = 96` over `PAL_BASE_FIRST_LINE = 1` to `PAL_BASE_LAST_LINE
+// = 3` and THROWS on line 0; and `agent/validation.ts` refuses a line-0 write
+// from the agent tool. The constants below are derived from the CRAM geometry
+// at the top of this file rather than typed as 1/3/96, and
+// __tests__/zone-palette-write.test.ts cross-checks them against the
+// `PAL_BASE_*` set, which was written independently of this block.
+
+/**
+ * The CRAM line an authored zone palette file's FIRST word lands on.
+ *
+ * ⚠ NOT ZERO, and the whole line-0 policy is downstream of this one number.
+ * Reading a 96-byte palette as "the palette" and starting at line 0 slides
+ * every line down by one and paints the terrain's colours onto Sonic.
+ */
+export const ZONE_PALETTE_FIRST_LINE = 1;
+
+/** Lines an authored zone palette file holds: every CRAM line except line 0. */
+export const ZONE_PALETTE_LINE_COUNT = CRAM_LINE_COUNT - ZONE_PALETTE_FIRST_LINE;
+
+/** Bytes an authored zone palette file holds. 3 lines x 16 entries x 2 bytes. */
+export const ZONE_PALETTE_BYTES
+  = ZONE_PALETTE_LINE_COUNT * CRAM_LINE_ENTRIES * CRAM_WORD_BYTES;
+
+/** Words an authored zone palette file holds. */
+export const ZONE_PALETTE_WORDS = ZONE_PALETTE_LINE_COUNT * CRAM_LINE_ENTRIES;
+
+/**
+ * The bytes of a zone's authored palette file: CRAM lines 1 to 3, big-endian,
+ * in the order `buildPalette` reads them, followed by `tail` verbatim.
+ *
+ * LINE 0 IS NOT IN THE OUTPUT AND CANNOT BE PUT THERE. The loop starts at
+ * `ZONE_PALETTE_FIRST_LINE`, so there is no argument, flag or palette shape
+ * that makes this function emit the player palette. That is the `refuse_line0`
+ * ruling expressed as a function signature rather than as a check someone can
+ * forget.
+ *
+ * `tail` is whatever the file held PAST those 96 bytes. The format says there
+ * is nothing there, and aeon's real file is exactly 96 bytes, but a file that
+ * is longer holds something this reader did not model, and re-emitting only
+ * the part it understood would TRUNCATE it. Passing the tail back through is
+ * what makes a save non-destructive on a file whose shape we were wrong about.
+ *
+ * Alpha is dropped on purpose: `buildPalette` forces index 0 of every line to
+ * `a: 0` because the VDP shows the backdrop there, and that is a rendering
+ * fact about the editor, not a bit the file carries. `encodeGenesisColor`
+ * reads only r/g/b, so index 0 round-trips as its stored colour.
+ */
+export function serializeZonePalette(
+  palette: Palette,
+  tail: Uint8Array = new Uint8Array(0),
+): Uint8Array {
+  const out = new Uint8Array(ZONE_PALETTE_BYTES + tail.length);
+  let at = 0;
+  for (let line = ZONE_PALETTE_FIRST_LINE; line < CRAM_LINE_COUNT; line++) {
+    const colors = palette.lines[line]?.colors ?? [];
+    for (let entry = 0; entry < CRAM_LINE_ENTRIES; entry++) {
+      const color = colors[entry];
+      const word = color ? encodeGenesisColor(color) : 0;
+      out[at++] = (word >> 8) & 0xff;
+      out[at++] = word & 0xff;
+    }
+  }
+  out.set(tail, ZONE_PALETTE_BYTES);
+  return out;
+}

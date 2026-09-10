@@ -479,12 +479,61 @@ export interface Act {
   stripPath: string | null;
 }
 
+/**
+ * WHERE A ZONE'S PALETTE CAME FROM, AND WHETHER THE SAVE MAY WRITE IT BACK.
+ *
+ * `Zone.palette` is four CRAM lines assembled from TWO files (see
+ * project/aeon/load.ts): the zone's own authored palette into lines 1 to 3,
+ * and the shared player palette into line 0. Only the first of those is this
+ * zone's to write, and only if the load actually understood it.
+ *
+ * This is the load's VERDICT travelling with the data, the same shape as
+ * `Section.unreadable`, `Act.sectionFiles` and `EffectsSceneLibrary.unreadable`
+ * and for the same reason: the write path's question is "what did the load
+ * understand", and a save that answers it by re-reading the disk is answering a
+ * different question. It is REQUIRED rather than optional so a producer cannot
+ * leave it unsaid, on the rule `Notice.severity` states.
+ */
+export interface ZonePaletteFile {
+  /**
+   * project.json's `zones[].palette`, verbatim and project-root-relative: the
+   * file the save writes lines 1 to 3 back to.
+   *
+   * IN PLACE, with no editor-owned redirect, unlike `tileset` / `bgLayout` /
+   * `bgTiles`. That is aeon's ruling, not a default: `games/<game>/data/editor/
+   * <zone>/<act>/palette.bin` is declared there as the ONLY authored copy of an
+   * act's palette, the build MIRRORS it into the generated tree, and its
+   * staleness gate re-bakes on a change under `data/editor/` specifically
+   * (aeon tools/ojz_common.py, "THE ACT PALETTE: EXACTLY ONE WRITER, AND IT IS
+   * THE EDITOR"). Aurora is that editor. Writing anywhere else, or retargeting
+   * the pointer, would leave the authored file untouched and the mirror step
+   * copying a palette nobody edited.
+   */
+  path: string;
+  /**
+   * True when the file supplied ALL of lines 1 to 3 (`ZONE_PALETTE_WORDS`
+   * words). False when it was shorter, which `buildPalette` pads with black:
+   * those blacks are this reader's invention, not the author's data, and
+   * writing them back would put them on disk. The save writes nothing when
+   * this is false.
+   */
+  complete: boolean;
+  /**
+   * The bytes the file held PAST lines 1 to 3, preserved verbatim so a save
+   * cannot truncate a file whose shape this reader was wrong about. Empty for
+   * every file of the documented 96-byte length.
+   */
+  tail: Uint8Array;
+}
+
 export interface Zone {
   id: string;
   name: string;
   acts: Act[];
   tileset: Tileset;
   palette: Palette;
+  /** See ZonePaletteFile: where lines 1 to 3 came from and whether they may go back. */
+  paletteFile: ZonePaletteFile;
 }
 
 /**
