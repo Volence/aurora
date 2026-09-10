@@ -269,6 +269,19 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
   // at the bottom of this component. A ref and not state for the reason above:
   // it is written and read inside the same gesture, and nothing draws it.
   const focusingClick = React.useRef(false);
+  // A RE-SELECT THE FOCUSING CLICK SCHEDULED FOR AFTER ITSELF, or null. The
+  // `onClick` block below is the whole derivation; this is the handle that lets
+  // a blur or an unmount cancel one that has not run yet.
+  const reselect = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelReselect = (): void => {
+    if (reselect.current === null) return;
+    clearTimeout(reselect.current);
+    reselect.current = null;
+  };
+  // A field unmounted between the click and the task it queued would otherwise
+  // leave a timer holding a detached input. Nothing draws this; it is hygiene
+  // with a real referent.
+  React.useEffect(() => cancelReselect, []);
 
   // Resync from the document — an undo, a drag on the canvas, a different
   // selection — but only when the author is not typing into this box.
@@ -304,12 +317,21 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
        * `numberfield-empty-harness.mjs` check 4a exists to hold it — so the
        * remedy moved rather than the constraint.
        *
-       * WHAT IS HERE INSTEAD SUPPRESSES NOTHING. `click` is dispatched AFTER
-       * mouseup's default action has run, so re-selecting there restores what
-       * the collapse took, and every default action on the way — the spin
-       * button's, the caret's, the primary-selection paste's — happens exactly
-       * as the browser intended. It is a smaller claim than a `preventDefault`:
-       * it does not stop the selection being collapsed, it puts it back.
+       * WHAT IS HERE INSTEAD SUPPRESSES NOTHING. It does not stop the selection
+       * being collapsed; it puts it back, from a task queued after the whole
+       * gesture. Every default action on the way — the spin button's, the
+       * caret's, the primary-selection paste's — happens exactly as the browser
+       * intended, and arm S measures the spinner stepping once and stopping.
+       *
+       * ⚠ AND IT IS QUEUED, NOT DONE IN THE `click` HANDLER, BECAUSE THAT WAS
+       * TRIED AND MEASURED. Re-selecting inside `onClick` reads as if it must
+       * work — click is dispatched after mouseup's default action — and it does
+       * NOT: arms H and K INSERTED with it in place (harness run, fixed build,
+       * load 35.7 -> 10.2). Blink's selection update for a mouse gesture lands
+       * after the click dispatch and inside the same task, so a handler cannot
+       * outrun it and a `setTimeout(0)` can. Anything that fires within that
+       * task is too early; that is the fact, and the `0` is not a race against a
+       * typist, it is a task boundary.
        *
        * ⚠ WHY IT IS ARMED ON `mousedown` AND NOT DONE ON EVERY CLICK. Selecting
        * on every click would take a deliberate caret placement and a
@@ -337,7 +359,13 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
       onClick={(e) => {
         if (!focusingClick.current) return;
         focusingClick.current = false;
-        e.currentTarget.select();
+        // ⚠ THE ELEMENT IS CAPTURED SYNCHRONOUSLY. React nulls a synthetic
+        // event's `currentTarget` once the handler returns, so reading it
+        // inside the queued task would find `null`. The local binding is the
+        // element itself and is unaffected.
+        const el = e.currentTarget;
+        cancelReselect();
+        reselect.current = setTimeout(() => { reselect.current = null; el.select(); }, 0);
       }}
       onFocus={(e) => {
         setEditing(true);
@@ -364,8 +392,11 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
         // otherwise stay set and the NEXT click to land here would re-select
         // inside an already-focused box — the exact regression the scoping
         // exists to avoid. Every later mousedown on this box recomputes the arm
-        // anyway; this closes the one window where none does.
+        // anyway; this closes the one window where none does. A queued
+        // re-select goes with it: a box that has lost focus must not grab a
+        // selection back a task later.
         focusingClick.current = false;
+        cancelReselect();
         // ⚠ THE COUNTER IS NOT CLEARED HERE, only on the next focus. The refusal
         // text stays painted after the box snaps back, and it is exactly then
         // that an author reads it — a clause deleted on blur would vanish at the

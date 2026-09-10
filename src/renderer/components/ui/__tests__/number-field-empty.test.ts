@@ -23,7 +23,7 @@
 // the same defect wearing a different number — so the rows assert the call
 // COUNT, not the value.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type React from 'react';
@@ -53,6 +53,8 @@ interface Box {
   mouseDown(button?: number): void;
   /** A completed click on the box, dispatched after mouseup's default action. */
   click(): void;
+  /** Run whatever the component queued for after the gesture. Needs fake timers. */
+  settle(): void;
 }
 
 /** Render the real `NumberField` and drive the real `<input>` it returns. */
@@ -115,6 +117,13 @@ function box(
         currentTarget: { select: () => { selects.count += 1; } },
       } as unknown as ChangeEvent);
     },
+    // ⚠ THE RE-SELECT IS QUEUED, NOT DONE IN THE HANDLER, and the component says
+    // why: inside `onClick` it is too early, because Blink's own selection
+    // update for the gesture lands after the click dispatch and in the same
+    // task. A row that called `click()` and read `selects` immediately would be
+    // asserting the wrong instant and would go green on a field that never
+    // selected at all.
+    settle: () => { vi.runAllTimers(); },
     shown: () => input().value,
     setValue: (v) => { h.setProps({ value: v }); },
     renders: () => h.renders(),
@@ -271,8 +280,11 @@ describe('NumberField: a clamp to a non-zero floor no longer rewrites the box mi
 // a caret).
 
 describe('NumberField re-selects on the FOCUSING click, and no other', () => {
-  /** The gesture a pointer really makes on an unfocused box. */
-  const focusingClick = (b: Box): void => { b.mouseDown(); b.focus(); b.click(); };
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  /** The gesture a pointer really makes on an unfocused box, start to finish. */
+  const focusingClick = (b: Box): void => { b.mouseDown(); b.focus(); b.click(); b.settle(); };
 
   it('selects again on the click that brings the box from unfocused to focused', () => {
     const b = box({ value: 156 });
@@ -291,6 +303,7 @@ describe('NumberField re-selects on the FOCUSING click, and no other', () => {
     const after = b.selects.count;
     b.mouseDown();
     b.click();
+    b.settle();
     expect(b.selects.count - after, 'a click inside an already focused box must select nothing')
       .toBe(0);
   });
@@ -303,6 +316,7 @@ describe('NumberField re-selects on the FOCUSING click, and no other', () => {
     expect(b.selects.count, 'first click, unfocused').toBe(2);
     b.mouseDown();
     b.click();
+    b.settle();
     expect(b.selects.count, 'second click, now focused').toBe(2);
     b.blur();
     focusingClick(b);
@@ -319,6 +333,7 @@ describe('NumberField re-selects on the FOCUSING click, and no other', () => {
       b.mouseDown(button);
       b.focus();
       b.click();
+      b.settle();
       expect(b.selects.count, `button ${button} must not re-select`).toBe(1);
     }
   });
@@ -328,6 +343,7 @@ describe('NumberField re-selects on the FOCUSING click, and no other', () => {
     focusingClick(b);
     expect(b.selects.count).toBe(2);
     b.click();
+    b.settle();
     expect(b.selects.count, 'the arm is spent, so a stray click selects nothing').toBe(2);
   });
 
@@ -341,7 +357,35 @@ describe('NumberField re-selects on the FOCUSING click, and no other', () => {
     b.blur();
     const after = b.selects.count;
     b.click();
+    b.settle();
     expect(b.selects.count - after, 'the arm must not survive a blur').toBe(0);
+  });
+
+  it('QUEUES the re-select instead of doing it in the handler', () => {
+    // The component's own reason: inside `onClick` the select is undone again,
+    // because Blink updates the gesture's selection after the click dispatch and
+    // in the same task. GREEN RULES OUT a field that went back to selecting
+    // inline, which reads as obviously correct and was measured INSERTING.
+    const b = box({ value: 156 });
+    b.mouseDown();
+    b.focus();
+    expect(b.selects.count, 'focus selects once, before the click').toBe(1);
+    b.click();
+    expect(b.selects.count, 'and the click must not select inside its own handler').toBe(1);
+    b.settle();
+    expect(b.selects.count, 'it selects on the task the click queued').toBe(2);
+  });
+
+  it('a blur before the queued task runs cancels it', () => {
+    // A box that lost focus in that window must not snatch a selection back.
+    const b = box({ value: 156 });
+    b.mouseDown();
+    b.focus();
+    b.click();
+    b.blur();
+    const after = b.selects.count;
+    b.settle();
+    expect(b.selects.count - after, 'a cancelled re-select must not fire').toBe(0);
   });
 
   it('and a Tab still selects, which has no click to land in', () => {
