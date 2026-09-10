@@ -2,8 +2,9 @@
 // classic. Owns the ONE EditorShell; the active facet module fills its slots.
 // The workspace header (EditorShell's appBar slot) carries the facet bar plus
 // the workspace controls that used to live on the legacy Toolbar: the FG/BG
-// plane toggle (on every facet whose canvas is plane-gated) and undo/redo for
-// the focused document.
+// plane toggle (on every facet whose canvas is plane-gated), undo/redo for the
+// focused document, and Save (owner card d-38 — shell/SaveChip.tsx carries why
+// a level had none until 2026-09-10 and why it sits last).
 //
 // WHICH SLOTS GET FILLED IS NOT DECIDED HERE. facet-chrome.ts owns it — both the
 // plane-gated facet list and the rule that a facet with no act loaded draws
@@ -25,6 +26,7 @@ import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { levelKeysEnabled } from './level-keys';
 import { isTypingTarget } from '../components/classic/composer-shared';
 import ViewMenu from '../shell/ViewMenu';
+import SaveChip from '../shell/SaveChip';
 import { Chip, T } from '../components/ui';
 import type { EditingLayer } from '../state/editorStore';
 import type { FacetCapability } from '../../core/project/adapter';
@@ -153,6 +155,15 @@ export default function LevelWorkspace() {
           rather than dead chrome. Dropping them would make the header jump. */}
       <Chip disabled={!history?.canUndo} onClick={() => history?.undo()}>Undo</Chip>
       <Chip disabled={!history?.canRedo} onClick={() => history?.redo()}>Redo</Chip>
+      {/* THE SAVE CONTROL A LEVEL DID NOT HAVE (owner card d-38; UX seat B's
+          F7). LAST, after Undo and Redo, because that is where the sprite
+          document's Save sits in the same tab strip and a control that moves
+          when you change tabs is one you have to find again. It survives the
+          no-act state for the same reason the two above it do: SaveChip renders
+          disabled with a tooltip saying there is nothing to save, which is a
+          true statement rather than dead chrome, and dropping it would make the
+          header jump. */}
+      <SaveChip />
     </div>
   );
 

@@ -221,6 +221,36 @@ describe('saveClassicProject orchestrator', () => {
     expect(useToastStore.getState().toasts.some((t) => t.type === 'success' && /Saved 1/.test(t.message))).toBe(true);
   });
 
+  // d-38, "a save says so briefly on screen": the success line NAMES what
+  // landed. UX seat A's F3 (docs/reviews/2026-09-07-lens-ux/uxa-walk.md) was 14
+  // pixels rewriting two .nem files unannounced, and the paths were in hand the
+  // whole time -- they are the guarded channel's own `written` report.
+  //
+  // THIS ROW IS THE WIRING, not the sentence. `savedFilesSentence` is exercised
+  // directly in shell/__tests__/save-surface-vocabulary.test.ts; what only this
+  // fixture can reach is whether the loop actually carries `outcome.written` out
+  // to it. The path asserted is the one the fake api reports as LANDED, not the
+  // one the doc offered, because those are different sets on a partial write.
+  it('and the success line names the files that landed', async () => {
+    const writeResult: WriteResult = {
+      written: [], skipped: [], errors: [],
+      files: [
+        { path: 'startpos/ghz1.bin', bytes: new Uint8Array([1]) },
+        { path: 'artnem/8x8 - GHZ1.nem', bytes: new Uint8Array([2]) },
+      ],
+      fileMtimes: {},
+    };
+    openStoreWithHandle(handleWith(async () => writeResult, vi.fn()));
+    const landed = ['startpos/ghz1.bin', 'artnem/8x8 - GHZ1.nem'];
+    const api = fakeApi(() => okResult(landed, {}));
+
+    await saveClassicProject(api, oneDirty);
+
+    const toast = useToastStore.getState().toasts.find((t) => t.type === 'success')!;
+    for (const p of landed) expect(toast.message, p).toContain(p);
+    expect(toast.message).toContain(`${landed.length} files`);
+  });
+
   it('on partial batch: refreshes the landed mtimes, toasts the failed path, returns partial', async () => {
     const writeResult: WriteResult = {
       written: [], skipped: [], errors: [],

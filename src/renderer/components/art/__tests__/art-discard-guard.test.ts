@@ -192,7 +192,7 @@ describe('§B planArtDocDiscard and the words it produces', () => {
 
   it('a dirty savable document asks, and offers Save', () => {
     expect(planArtDocDiscard(docOf({ dirty: true, name: 'N' }), { kind: 'savable' }))
-      .toEqual({ kind: 'confirm', name: 'N', offerSave: true, unsavable: null });
+      .toEqual({ kind: 'confirm', name: 'N', offerSave: true, unsavable: null, writesThrough: false });
   });
 
   it('a dirty document Save cannot write asks WITHOUT offering Save, and carries why', () => {
@@ -201,7 +201,9 @@ describe('§B planArtDocDiscard and the words it produces', () => {
     // inert primary button over work no saver touches.
     const plan = planArtDocDiscard(
       docOf({ dirty: true, name: 'N' }), { kind: 'blocked', why: 'BECAUSE X.' });
-    expect(plan).toEqual({ kind: 'confirm', name: 'N', offerSave: false, unsavable: 'BECAUSE X.' });
+    expect(plan).toEqual({
+      kind: 'confirm', name: 'N', offerSave: false, unsavable: 'BECAUSE X.', writesThrough: false,
+    });
   });
 
   it('the body states the stake, then the reason, then the way out', () => {
