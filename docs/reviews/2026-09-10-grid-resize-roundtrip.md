@@ -1,5 +1,14 @@
 # GRID-RESIZE-NOT-SAVED: REPRODUCED, and it is worse than the audit said
 
+> **CLOSED LATER THE SAME DAY.** The residual this packet left open (the
+> stranded `section_N` files, and the load-side ledger a sweep would need) is
+> done: `docs/reviews/2026-09-10-resize-orphan-sweep.md`. The row named below as
+> `KNOWN DEFECT, still open: a stranded section file resurrects a phantom
+> section` no longer exists under that title, so grepping for it finds nothing;
+> it was converted in place to `a stranded section file is swept, so no phantom
+> section comes back`, with both of its commented assertions restored. The rest
+> of this document stands as written.
+
 2026-09-09. Branch `grid-resize-roundtrip`. Node/vitest only: no Electron, no
 CDP, no ROM build, no emulator.
 

@@ -117,9 +117,12 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
     // file away while the sidecar that stopped pointing at it never landed.
     //
     // WHAT IT MAY TOUCH is not decided here. `core/project/aeon/save.ts`
-    // derives it from each library's `loadedPaths` ledger; a file this session
-    // never read as a document of that kind is in no such list and is
-    // unreachable from this loop.
+    // derives it from a ledger of what the LOAD read: each effects library's
+    // `loadedPaths`, and — since 2026-09-10 — `Act.sectionFiles` for the
+    // `section_N.*` files a grid resize strands. A file this session never read
+    // as a document of that kind is in no such list and is unreachable from
+    // this loop, and one the loader REFUSED is subtracted a second time. See
+    // `removalsFor` and the stranded-section block in core for both arguments.
     const removed: string[] = [];
     const failedRemovals = new Set<string>();
     for (const r of pendingRemovals.values()) {
