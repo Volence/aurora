@@ -198,7 +198,10 @@ import {
 } from '../../providers/effects-preset';
 import type { AnchorSeedState, AnchorMotionState } from '../../providers/effects-preset';
 import { AnchorSweepPreview } from './AnchorSweepPreview';
-import { sectionRasterAdvisory, rasterChooserName } from '../../../core/formats/effects/section-wiring';
+import {
+  sectionRasterAdvisory, rasterChooserName, sectionArmExclusivityRefusal,
+  sectionArmExclusivityUnknownNotice, sectionBindingControlDisabled,
+} from '../../../core/formats/effects/section-wiring';
 import { openGuide } from '../../state/guideStore';
 import { EFFECTS_GUIDE_SLUG, GUIDE_ANCHORS } from '../guide/guides';
 import { PresetLagDisclosure } from './PresetLagDisclosure';
@@ -304,6 +307,28 @@ export default function BandPresetPanel(): React.ReactElement | null {
     : deletePresetRefusal(act.sections, selected.id);
   const wiringAdvisory = act === null ? null : sectionRasterAdvisory(
     act.rasterWiring, activeSectionIndex, rasterChooserName(zoneId, act.id));
+  // ═══ THE ONE STRUCTURAL REFUSAL, AND THE ONLY THING ON THIS SURFACE THAT
+  //     DISABLES A CONTROL (SECTION0-SPECIAL-CASE, aeon `92d744fc`) ═══
+  //
+  // Everything else here ADVISES, on raster-binding.ts's standing refusal, and
+  // that refusal is unchanged for every fact that is INCIDENTAL: a section
+  // nothing threads is one aeon line away, a shared record is a split away, an
+  // occupied channel is the owner's content call. None of those is refused.
+  //
+  // This one is different in kind and aeon ruled it so: a record that binds
+  // `patched:` can never take a `raster:`, because `preset()`'s own ensure
+  // makes them one channel. It is not a missing line — there is no line to
+  // write. See section-wiring.ts's ARM EXCLUSIVITY banner for the derivation,
+  // for why it is derived from the mechanism rather than from `sec === 0`, and
+  // for the three-way shape that made a single verdict for "0-4" wrong either
+  // way round.
+  const armRefusal = act === null ? null : sectionArmExclusivityRefusal(
+    act.rasterWiring, activeSectionIndex, rasterChooserName(zoneId, act.id));
+  // ⚠ `unknown` IS NEITHER OF THE OTHER TWO. With the effects library unread,
+  // the control stays ENABLED and says what could not be checked — never
+  // silently enabled, and never disabled for a mechanism nobody measured.
+  const armUnknown = act === null ? null
+    : sectionArmExclusivityUnknownNotice(act.rasterWiring, activeSectionIndex);
   // ⚠ NO aeon FILE IN THIS ONE. The two sentences above degrade with
   // act_descriptor.emp and <zone>_effects.emp; this reads only the sidecars
   // Aurora itself writes, so it survives an unreadable aeon tree and it is the
@@ -484,6 +509,41 @@ export default function BandPresetPanel(): React.ReactElement | null {
             </Hint>
           ) : (
             <>
+              {/* ═══ THE STRUCTURAL REASON, ABOVE THE CONTROL IT DISABLES ═══
+
+                  ⚠ IT RENDERS BEFORE THE SELECT, not under it, and that is the
+                  whole point of putting it here rather than on `title`. A
+                  disabled control with no visible sentence is the same defect
+                  as a refusal that lives only in a hover tooltip — this repo
+                  has already fixed one of those (seat finding uxb F4) — and an
+                  author who meets the grey box first and the reason second has
+                  already formed the impression the sentence exists to prevent.
+
+                  `warning` and not `note`: this is the one place on the surface
+                  where aeon's build WOULD refuse what the author is reaching
+                  for, whether or not anything is bound. That is the same
+                  trigger `ConditionRow`'s `refused` tier uses, one mechanism
+                  further out — there the refusal needs a `rasterRef` to exist
+                  before it fires, and here it fires on the section itself. */}
+              {armRefusal !== null && (
+                <div data-effects-arm-refusal="" style={{ marginTop: T.s3 }}>
+                  <Hint tone="warning" style={{ marginBottom: 0 }}>{armRefusal}</Hint>
+                </div>
+              )}
+              {/* ═══ AND WHAT COULD NOT BE CHECKED, WHEN THAT IS THE ANSWER ═══
+
+                  The third verdict, never folded into either of the other two.
+                  The control below stays ENABLED under this sentence: a control
+                  greyed out because a file could not be read is
+                  indistinguishable, to the author, from one greyed out because
+                  the thing is impossible (raster-binding.ts's standing refusal,
+                  its hardest clause). `note` and not `warning`, because nothing
+                  is refused and nothing is wrong — Aurora simply cannot say. */}
+              {armUnknown !== null && (
+                <div data-effects-arm-unknown="" style={{ marginTop: T.s3 }}>
+                  <Hint style={{ marginBottom: 0 }}>{armUnknown}</Hint>
+                </div>
+              )}
               <Field label={`Section ${activeSectionIndex}`} title={RASTER_REF_ROW.title}
                 style={{ marginTop: T.s3, marginBottom: 0 }}>
                 {/* THROUGH `sectionPresetCommand`, NEVER `rasterRef = v`. That
@@ -494,7 +554,19 @@ export default function BandPresetPanel(): React.ReactElement | null {
                     `set-section-raster` command both arms of history know. A
                     control that assigned the field would let this panel and the
                     agent tool disagree about what an unbind even is. */}
-                <Select title={RASTER_REF_ROW.title}
+                {/* ⚠ DISABLED ONLY WHILE NOTHING IS BOUND, and the exception is
+                    not a softening — it is the one action a barred section can
+                    still need. If a `rasterRef` is already there (an older
+                    build, the agent tool, a hand-edited sidecar), aeon's seam
+                    gate is refusing that tree RIGHT NOW and this select is the
+                    only control in the app that can take it back out. A disable
+                    that traps the broken state and hides the fix is a worse
+                    defect than the one it prevents, so the refusal above stays
+                    on screen, in the warning tier, and the control stays live
+                    until the binding is gone. Then it greys. */}
+                <Select title={armRefusal ?? RASTER_REF_ROW.title}
+                  disabled={act !== null && sectionBindingControlDisabled(
+                    act.rasterWiring, activeSectionIndex, section.rasterRef)}
                   value={section.rasterRef ?? ''} style={{ flex: 1, minWidth: 0 }}
                   onChange={(v) => run(sectionPresetCommand(
                     activeSectionIndex, section.rasterRef, v))}>

@@ -7,13 +7,33 @@ const base: React.CSSProperties = {
   borderRadius: T.rMd, fontSize: T.tSm, padding: `${T.s2} ${T.s3}`,
 };
 
-export function Select({ value, onChange, children, title, style }: {
+/**
+ * ⚠ `disabled` IS NOT A STYLE — the real attribute goes on the `<select>`, so
+ * the platform stops the change event, keyboard activation and the tab stop
+ * together, and `focus-trap.ts`'s `select:not([disabled])` takes it out of the
+ * cycle for free. `opacity`/`cursor` follow `IconButton`'s and `Chip`'s
+ * spelling so a dead control looks the same everywhere in this app.
+ *
+ * ⚠⚠ AND IT OWES A REASON ON SCREEN. This repo has already fixed a control that
+ * refused silently once (seat finding uxb F4): a disabled control with no
+ * visible sentence is the same defect as a refusal that lives only in a hover
+ * tooltip. `title` is not that sentence — it is the same words a second time,
+ * for the reader who points at the control. The only caller today is the
+ * per-section raster binding in `BandPresetPanel`, which renders the reason as
+ * a `Hint` in the flow above the control before it ever draws it grey.
+ */
+export function Select({ value, onChange, children, title, style, disabled }: {
   value: string; onChange: (v: string) => void; children: React.ReactNode;
-  title?: string; style?: React.CSSProperties;
+  title?: string; style?: React.CSSProperties; disabled?: boolean;
 }) {
   return (
-    <select title={title} value={value} onChange={(e) => onChange(e.target.value)}
-            style={{ ...base, ...style }}>{children}</select>
+    <select title={title} value={value} disabled={disabled}
+            onChange={(e) => onChange(e.target.value)}
+            style={{
+              ...base,
+              ...(disabled ? { opacity: 0.5, cursor: 'default' } : null),
+              ...style,
+            }}>{children}</select>
   );
 }
 

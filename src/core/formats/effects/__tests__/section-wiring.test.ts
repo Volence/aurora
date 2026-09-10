@@ -31,6 +31,8 @@ import {
   wiredSections, eligibleSections, sectionWiringConditions, threadedSections,
   ownPresetSections, boundSections, sectionConditionsAgreeWithState, libraryChannelCalls,
   libraryChannelChooserCalls, channelChooserName, sectionExtraChannelsCondition,
+  libraryPatchedArmBindings, sectionArmExclusivity, sectionArmExclusivityRefusal,
+  sectionArmExclusivityUnknownNotice, armBarredSections, sectionBindingControlDisabled,
   extraChannelsAdvisory, EXTRA_SECTION_CHANNELS, type SectionRasterWiring,
 } from '../section-wiring';
 import { siblingPathOrUnresolved, siblingPathSource } from '../../../../../test/support/sibling-root.mjs';
@@ -115,6 +117,7 @@ function synthetic(): SectionRasterWiring {
     bindings: descriptorEffectsBindings(SYNTHETIC_DESC, 'zzz'),
     threadedBy: libraryRasterChooserCalls(SYNTHETIC_LIB, rasterChooserName('zzz', 'act1')),
     channelThreadedBy: libraryChannelCalls(SYNTHETIC_LIB, 'zzz', 'act1'),
+    patchedArm: libraryPatchedArmBindings(SYNTHETIC_LIB),
     descriptor: { path: '(synthetic)', parsed: true },
     library: { path: '(synthetic)', parsed: true },
   };
@@ -562,6 +565,7 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
       bindings: descriptorEffectsBindings(desc, 'ojz'),
       threadedBy: libraryRasterChooserCalls(lib, rasterChooserName('ojz', 'act1')),
       channelThreadedBy: libraryChannelCalls(lib, 'ojz', 'act1'),
+      patchedArm: libraryPatchedArmBindings(lib),
       descriptor: { path: DESC, parsed: true },
       library: { path: LIB, parsed: true },
     };
@@ -615,6 +619,7 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
       bindings: descriptorEffectsBindings(desc, 'ojz'),
       threadedBy: calls,
       channelThreadedBy: libraryChannelCalls(lib, 'ojz', 'act1'),
+      patchedArm: libraryPatchedArmBindings(lib),
       descriptor: { path: DESC, parsed: true },
       library: { path: LIB, parsed: true },
     };
@@ -639,6 +644,7 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
       bindings: descriptorEffectsBindings(desc, 'ojz'),
       threadedBy: libraryRasterChooserCalls(lib, chooser),
       channelThreadedBy: libraryChannelCalls(lib, 'ojz', 'act1'),
+      patchedArm: libraryPatchedArmBindings(lib),
       descriptor: { path: DESC, parsed: true },
       library: { path: LIB, parsed: true },
     };
@@ -870,5 +876,286 @@ pub data R_Out_Of_Order: EffectsPreset = preset(
     // not merely asserting that the parse found nothing.
     const right = wrong.replace('slot: 0', 'ch: 0');
     expect(libraryChannelChooserCalls(right, fn, 'ch')).toEqual({ R_Wrong: { 4: [0] } });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ARM EXCLUSIVITY — the one structural refusal (SECTION0-SPECIAL-CASE)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Aeon ruled at `92d744fc` that the question Aurora asked was the wrong shape:
+// section 0 is a STABLE PROPERTY, sections 1/2/4 are incidental-but-occupied
+// (content, the owner's call), section 3 is incidental AND FREE. These rows
+// hold the derivation that makes the first of those three a disabled control,
+// and — just as hard — hold it OFF the other two.
+
+/** A library whose one record binds a `patched:` arm, and one that does not. */
+const PATCHED_LIB = `
+pub data ZZZ_Preset_Sec0: EffectsPreset = preset(pal: P, patched: ZZZ_TwoChannel,
+    cycle: Pal_Cycle_None)
+pub data ZZZ_Preset_Shared: EffectsPreset = preset(pal: P, raster: Raster_Program_None)
+`;
+
+/** The four sections of SYNTHETIC_DESC, over a library that bars section 0. */
+function barred(): SectionRasterWiring {
+  return {
+    bindings: descriptorEffectsBindings(SYNTHETIC_DESC, 'zzz'),
+    threadedBy: libraryRasterChooserCalls(PATCHED_LIB, rasterChooserName('zzz', 'act1')),
+    channelThreadedBy: libraryChannelCalls(PATCHED_LIB, 'zzz', 'act1'),
+    patchedArm: libraryPatchedArmBindings(PATCHED_LIB),
+    descriptor: { path: '(synthetic)', parsed: true },
+    library: { path: '(synthetic)', parsed: true },
+  };
+}
+
+describe('the patched arm: parsing the one thing preset() will not share', () => {
+  it('a record binding `patched: <program>` is found, one binding none is absent', () => {
+    expect(libraryPatchedArmBindings(PATCHED_LIB))
+      .toEqual({ ZZZ_Preset_Sec0: 'ZZZ_TwoChannel' });
+  });
+
+  it('`patched: 0` is preset()\'s own OFF and binds no arm', () => {
+    // THE VALUE MATTERS, NOT THE KEY. `preset()`'s signature is
+    // `patched: Label = 0`, so an explicit 0 and an absent parameter are the
+    // same state; a predicate asking `'patched' in body` would refuse a section
+    // that binds nothing at all.
+    const off = 'pub data R_Off: EffectsPreset = preset(pal: P, patched: 0, raster: R)';
+    expect(libraryPatchedArmBindings(off)).toEqual({});
+    // The control: the same record with a real program IS found, so the row is
+    // not merely asserting that the parse found nothing.
+    expect(libraryPatchedArmBindings(off.replace('patched: 0', 'patched: R_Prog')))
+      .toEqual({ R_Off: 'R_Prog' });
+  });
+
+  it('A COMMENT IS NOT A BINDING, and the plant is aeon\'s own sentence', () => {
+    // ⚠ THIS IS NOT A SYNTHETIC HAZARD. `ojz_effects.emp` carries this line in
+    // prose at :1459 (aeon f93f9f6f), inside a docblock about why somebody did
+    // NOT unbind the arm — and the record split runs declaration-to-declaration,
+    // so that comment sits inside the body of `OJZ_DepthVSplit` (:1366), the
+    // nearest preceding declaration. Today that record is a raster PROGRAM no
+    // section binds as its preset, so the false positive lands somewhere
+    // harmless. One more declaration between the two and Aurora would grey out
+    // a control on the strength of a sentence explaining an absence.
+    const prose = '// UNBINDING `patched: OJZ_TwoChannel` would have done the same thing\n';
+    const lib = 'pub data R_Prog: [u16; 4] = raster_program(X)\n'
+      + prose
+      + 'pub data R_Preset: EffectsPreset = preset(pal: P, raster: Raster_Program_None)\n';
+    expect(libraryPatchedArmBindings(lib),
+      'a sentence about a binding is not a binding').toEqual({});
+    // THE CONTROL, so this row cannot pass by the parse being broken outright:
+    // the same text with the comment marker removed DOES bind an arm.
+    expect(libraryPatchedArmBindings(lib.replace(prose, 'x: patched: OJZ_TwoChannel\n')))
+      .toEqual({ R_Prog: 'OJZ_TwoChannel' });
+  });
+});
+
+describe('arm exclusivity: the three verdicts, and none of them is the others', () => {
+  it('a section whose record binds `patched:` is BARRED, and the sentence names both', () => {
+    const w = barred();
+    const arm = sectionArmExclusivity(w, 0);
+    expect(arm.verdict).toBe('barred');
+    expect(arm.record).toBe('ZZZ_Preset_Sec0');
+    expect(arm.patched).toBe('ZZZ_TwoChannel');
+    const say = sectionArmExclusivityRefusal(w, 0, 'zzz_act1_sec_raster');
+    // THE SENTENCE IS THE INSTRUMENT, so it is asserted like one: it must carry
+    // the record, the program, the chooser call the seam gate names, and the
+    // mechanism — not "you cannot bind this section".
+    expect(say).toContain('ZZZ_Preset_Sec0');
+    expect(say).toContain('patched: ZZZ_TwoChannel');
+    expect(say).toContain('zzz_act1_sec_raster(sec: 0)');
+    expect(say).toContain('mutually exclusive');
+    expect(say, 'a refusal must not be phrased as a prohibition by Aurora')
+      .not.toMatch(/you (can ?not|may not)/i);
+  });
+
+  it('a section whose record binds no arm is OPEN, and says nothing at all', () => {
+    // Sections 1 and 2 of the synthetic descriptor bind `ZZZ_Preset_Shared`,
+    // which hands `raster:` a literal. They fail condition 1 loudly — and this
+    // predicate is silent about them, which is the whole three-way point: an
+    // occupied or unthreaded section is not a barred one.
+    const w = barred();
+    expect(sectionArmExclusivity(w, 1).verdict).toBe('open');
+    expect(sectionArmExclusivityRefusal(w, 1, 'zzz_act1_sec_raster')).toBeNull();
+    expect(sectionWiringConditions(w, 1, 'zzz_act1_sec_raster').ownPreset.verdict,
+      'and the OTHER conditions still speak about it').toBe('no');
+  });
+
+  it('a section binding NO record is open, not barred: no record is no arm', () => {
+    // Section 3 of the synthetic descriptor binds nothing. `unknown` would be
+    // wrong (nothing was unreadable) and `barred` would be a refusal invented
+    // out of an absence.
+    expect(sectionArmExclusivity(barred(), 3).verdict).toBe('open');
+  });
+
+  it('AN UNREADABLE LIBRARY IS `unknown`, and it collapses in neither direction', () => {
+    // THE LOAD-BEARING ROW. `raster-binding.ts`'s standing refusal, hardest
+    // clause: a control greyed out because a file could not be read is
+    // indistinguishable, to the author, from one greyed out because the thing is
+    // impossible. And the other direction matters as much — enabled AND SILENT
+    // would let a structural impossibility present as an ordinary binding.
+    const noLib: SectionRasterWiring = {
+      ...barred(),
+      library: { path: 'ojz_effects.emp', parsed: false, reason: 'ENOENT' },
+    };
+    expect(sectionArmExclusivity(noLib, 0).verdict).toBe('unknown');
+    expect(sectionArmExclusivityRefusal(noLib, 0, 'zzz_act1_sec_raster'),
+      'never disabled for a mechanism nobody measured').toBeNull();
+    expect(sectionBindingControlDisabled(noLib, 0, null),
+      'the control stays ENABLED').toBe(false);
+    const notice = sectionArmExclusivityUnknownNotice(noLib, 0);
+    expect(notice, 'and never SILENTLY enabled').not.toBeNull();
+    expect(notice).toContain('ojz_effects.emp');
+    expect(notice).toContain('ENOENT');
+    expect(notice).toContain('ENABLED');
+  });
+
+  it('the unknown notice is SILENT when there is a real answer', () => {
+    // Otherwise it would print beside the refusal it is the alternative to.
+    expect(sectionArmExclusivityUnknownNotice(barred(), 0)).toBeNull();
+    expect(sectionArmExclusivityUnknownNotice(barred(), 1)).toBeNull();
+  });
+
+  it('`armBarredSections` names NOBODY when the library was not read', () => {
+    // `unknown` collapses to "refuse nothing" and never to "refuse everything":
+    // this set's only use is to grey controls out.
+    const noLib: SectionRasterWiring = {
+      ...barred(),
+      library: { path: 'ojz_effects.emp', parsed: false, reason: 'ENOENT' },
+    };
+    expect(armBarredSections(noLib, 4)).toEqual([]);
+    expect(armBarredSections(barred(), 4), 'the control: it names section 0 when it can')
+      .toEqual([0]);
+  });
+});
+
+describe('the disable rule, both clauses', () => {
+  it('barred AND nothing bound: the control is dead', () => {
+    expect(sectionBindingControlDisabled(barred(), 0, null)).toBe(true);
+  });
+
+  it('BARRED WITH SOMETHING ALREADY BOUND: THE CONTROL STAYS LIVE', () => {
+    // ⚠ THE CLAUSE A NEVER-RUN ASSERTION WOULD LET ROT. A barred section that
+    // already carries a `rasterRef` is a tree aeon's seam gate is refusing right
+    // now, and this select is the only control in the app that can take the
+    // binding back out. A disable that traps the broken state and hides its one
+    // fix is worse than the defect it prevents. The refusal sentence stays on
+    // screen either way — it is `sectionArmExclusivityRefusal`, which does not
+    // read `rasterRef` at all.
+    expect(sectionBindingControlDisabled(barred(), 0, 'some_doc')).toBe(false);
+    expect(sectionArmExclusivityRefusal(barred(), 0, 'zzz_act1_sec_raster'),
+      'and the reason is still said').not.toBeNull();
+  });
+
+  it('not barred: never disabled, bound or not', () => {
+    expect(sectionBindingControlDisabled(barred(), 1, null)).toBe(false);
+    expect(sectionBindingControlDisabled(barred(), 1, 'some_doc')).toBe(false);
+  });
+});
+
+describe('against aeon\'s real ojz/act1: which sections are structurally barred', () => {
+  const desc = haveTree ? readFileSync(DESC, 'utf8') : '';
+  const lib = haveTree ? readFileSync(LIB, 'utf8') : '';
+  const need = (ctx: { skip: (reason: string) => void }): boolean => {
+    if (haveTree) return true;
+    ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout at ${AEON}: these rows read their real `
+      + 'act_descriptor.emp and ojz_effects.emp and could not. The synthetic rows above still '
+      + 'ran and cover every verdict; what is unmeasured here is WHICH sections aeon\'s current '
+      + 'files bar.');
+    return false;
+  };
+  const real = (): SectionRasterWiring => ({
+    bindings: descriptorEffectsBindings(desc, 'ojz'),
+    threadedBy: libraryRasterChooserCalls(lib, rasterChooserName('ojz', 'act1')),
+    channelThreadedBy: libraryChannelCalls(lib, 'ojz', 'act1'),
+    patchedArm: libraryPatchedArmBindings(lib),
+    descriptor: { path: DESC, parsed: true },
+    library: { path: LIB, parsed: true },
+  });
+
+  it('THE RULING APPLIED: section 0 is barred, and the program is named', (ctx) => {
+    if (!need(ctx)) return;
+    const arm = sectionArmExclusivity(real(), 0);
+    expect(arm.verdict).toBe('barred');
+    expect(arm.record).toBe('OJZ_Preset_Sec0');
+    expect(arm.patched).toBe('OJZ_TwoChannel');
+  });
+
+  it('SECTIONS 1 TO 4 ARE NOT BARRED: the half of the ruling that refuses to refuse', (ctx) => {
+    if (!need(ctx)) return;
+    // ⚠ THIS IS THE ROW THAT STOPS THE THREE-WAY ANSWER COLLAPSING BACK INTO A
+    // BINARY. What bars 1, 2 and 4 is what already sits in their raster channels
+    // (`OJZ_TestRaster`, `OJZ_TestGradient`, the d-15 showcase `OJZ_DepthVSplit`)
+    // and that is CONTENT: reversible, and the owner's to reverse. Section 3 is
+    // free outright. Aeon: a single verdict for "0-4" "would either hide four
+    // reversible content calls behind a structural-sounding refusal, or promise
+    // section 0 a binding the gate will refuse."
+    const w = real();
+    for (const sec of [1, 2, 3, 4]) {
+      expect(sectionArmExclusivity(w, sec).verdict, `section ${sec} is not structural`)
+        .toBe('open');
+      expect(sectionArmExclusivityRefusal(w, sec, rasterChooserName('ojz', 'act1')),
+        `section ${sec} is refused nothing by Aurora`).toBeNull();
+      expect(sectionBindingControlDisabled(w, sec, null),
+        `section ${sec} keeps a live control`).toBe(false);
+    }
+  });
+
+  it('SECTION 7 IS BARRED TOO, AND THE RULING\'S PROSE SAYS IT IS NOT', (ctx) => {
+    if (!need(ctx)) return;
+    // ⚠ THE REASON THE PROPERTY IS DERIVED AND NOT WRITTEN DOWN. Aeon's ruling
+    // at 92d744fc says "Section 0 is the only section in the tree with live
+    // patch channels" — a sentence quoted from their own 2026-09-03
+    // OJZ_Preset_Sec5 block. Their ojz_effects.emp has contradicted it since
+    // 2026-09-05: "SECTION 7 IS THE ACT'S SECOND SECTION WITH LIVE PATCH
+    // CHANNELS", and OJZ_Preset_Sec7 binds `patched: OJZ_WorldWater`. A literal
+    // `sec === 0` would have shipped two days stale on the day it was written.
+    //
+    // IF THIS ROW GOES RED the correct response is to read the new fact off
+    // aeon's file, never to pin the old one here.
+    const arm = sectionArmExclusivity(real(), 7);
+    expect(arm.verdict).toBe('barred');
+    expect(arm.record).toBe('OJZ_Preset_Sec7');
+    expect(arm.patched).toBe('OJZ_WorldWater');
+  });
+
+  it('the barred set is DERIVED, and it is not "0 to 4"', (ctx) => {
+    if (!need(ctx)) return;
+    const set = armBarredSections(real(), 9);
+    expect(set).toEqual([0, 7]);
+    // Stated as its own claim so a future reader meets the contradiction rather
+    // than inferring it: the shape the ruling asked a verdict on is neither.
+    expect(set, 'the ruling asked about 0 to 4 and the tree answers 0 and 7')
+      .not.toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it('SECTION 3 IS FREE, and that is INFORMATION and not a default', (ctx) => {
+    if (!need(ctx)) return;
+    // Aeon: section 3 "already owns its own preset AND its raster channel is
+    // Raster_Program_None — the exact pair of conditions that made section 5 the
+    // first candidate. Nothing structural or content-shaped stops it; it has
+    // simply never been threaded." This row records that Aurora agrees, from its
+    // own parse. Nothing here threads it, selects it or defaults to it: that is
+    // the owner's call, and the row exists so the fact survives this session.
+    const w = real();
+    const chooser = rasterChooserName('ojz', 'act1');
+    const c = sectionWiringConditions(w, 3, chooser);
+    expect(c.ownPreset.verdict, 'its preset record is its own').toBe('yes');
+    expect(c.ownPreset.record).toBe('OJZ_Preset_Sec3');
+    expect(c.threaded.verdict, 'and nothing threads it: one aeon line, not a redesign')
+      .toBe('no');
+    expect(sectionArmExclusivity(w, 3).verdict, 'and nothing structural stops it')
+      .toBe('open');
+  });
+
+  it('the comment stripper is EXERCISED by aeon\'s real file, not only by the plant', (ctx) => {
+    if (!need(ctx)) return;
+    // The plant above proves the stripper refuses a sentence. This proves the
+    // sentence is really there: an unexercised guard and a guard with no hazard
+    // read alike.
+    expect(lib, 'aeon still carries the prose that would have parsed as a binding')
+      .toContain('UNBINDING `patched: OJZ_TwoChannel`');
+    expect(Object.keys(libraryPatchedArmBindings(lib)).sort(),
+      'and exactly two records bind an arm, both of them real')
+      .toEqual(['OJZ_Preset_Sec0', 'OJZ_Preset_Sec7']);
   });
 });

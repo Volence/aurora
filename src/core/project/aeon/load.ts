@@ -45,7 +45,8 @@ import { parseSectionMeta } from '../../formats/section-meta';
 import { loadEffectsSceneLibrary } from '../../formats/effects/scene';
 import {
   wiringPaths, unknownWiring, descriptorEffectsBindings, libraryRasterChooserCalls,
-  libraryChannelCalls, rasterChooserName, type SectionRasterWiring,
+  libraryChannelCalls, libraryPatchedArmBindings, rasterChooserName,
+  type SectionRasterWiring,
 } from '../../formats/effects/section-wiring';
 import { loadEffectsPresetLibrary } from '../../formats/effects/preset';
 import { loadBgOverride } from '../../formats/bg-override/bg-override-io';
@@ -792,6 +793,13 @@ async function loadFullProject(
           // required set is a function of the DOCUMENT and never a list.
           rasterWiring.channelThreadedBy =
             libraryChannelCalls(libText, zoneConfig.id, actConfig.id);
+          // THE OTHER ARM, from the SAME read — which records bind `patched:`.
+          // It is the one structural fact in the derivation: aeon's `preset()`
+          // ensures `raster:` and `patched:` are mutually exclusive, so a
+          // record that binds one can never take the other, and that is what
+          // disables the per-section select for those sections and only those.
+          // See section-wiring.ts's ARM EXCLUSIVITY banner.
+          rasterWiring.patchedArm = libraryPatchedArmBindings(libText);
           // ⚠ AN EMPTY CALL MAP IS A REAL ANSWER HERE, unlike an empty binding
           // map. "No preset threads the chooser" is the state every act starts
           // in and is exactly what the advisory needs to say; only a file that
