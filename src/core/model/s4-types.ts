@@ -241,8 +241,8 @@ export interface Section {
    * replaced it was retired the same day by aeon `9cdf32d8` — but only for
    * SECTION 5, whose `preset()` threads `ojz_act1_sec_raster(sec: 5, hand:
    * Raster_Program_None)`. Every other section's `raster:` is still a
-   * hand-authored label, so a `rasterRef` on section 6 is written, counted by
-   * aeon's witness, and consumed by nothing (aeon's own
+   * hand-authored label, so a `rasterRef` on an UNTHREADED section is written,
+   * counted by aeon's witness, and consumed by nothing (aeon's own
    * `tools/effects_seam_gate.py` refuses a full build for that, naming the
    * section — but that is aeon's build, not this field). And since aeon
    * `c9a462be` section 5's sidecar in THEIR tree carries
@@ -250,6 +250,17 @@ export interface Section {
    * in their generated module), so this field has been carried end to end from
    * this editor's writer to aeon's build for one section — and, per that
    * commit's own message, no further than the build.
+   *
+   * ⚠ EVERY NUMBER ABOVE IS A READING AT A REVISION AND TWO OF THEM MOVED ON
+   * 2026-09-03. aeon `6ae88363` threaded AND bound section 6
+   * (`ojz_sec6_baseswap`), so "only for SECTION 5" is a fact about `9cdf32d8`
+   * and `EditorRaster_OJZ_Act1_Bindings = 1` is a fact about `c9a462be`;
+   * neither describes today. The paragraph is kept as provenance, which does
+   * not go stale, and the LIVE answer is derived:
+   * `core/formats/effects/section-wiring.ts` per act on every load, checked
+   * against aeon's real file by
+   * `core/formats/__tests__/raster-binding-threaded-set.test.ts`. The half of
+   * this paragraph that has not moved is the one below.
    *
    * On THIS side nothing observes the key for ANY section: the viewport
    * composites no `rasterRef` and there is no preview. So a written `rasterRef`

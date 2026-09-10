@@ -292,7 +292,11 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     // above are about how far one binding travels; this one is about the TREE
     // the select leaves behind. At aeon `027ec162` three content tests in
     // their FAST=0 build accept exactly one bound set — section 5 →
-    // `ojz_sec5_showcase` — so the empty option on section 5 (the very
+    // `ojz_sec5_showcase` (⚠ A READING AT `027ec162`, and it moved: aeon
+    // `6ae88363`, 2026-09-03, added section 6 → `ojz_sec6_baseswap`, and
+    // renamed the test that pins the list. The limit sentence carries the
+    // current reading and `core/formats/__tests__/raster-binding-threaded-set.test.ts`
+    // holds it to aeon's real file; do not re-type a bound set here) — so the empty option on section 5 (the very
     // control this block renders above) produces a tree aeon's canonical
     // build refuses by name, and so does a pick on any other section. The
     // sentence says so, says FAST=1 builds it, and says nothing here prevents

@@ -408,9 +408,12 @@ export const EDITOR_METHODS: EditorMethod[] = [
   //     `SectionMeta` carries the preset binding — `rasterRef` (schema §3.1,
   //     adjudicated 2026-08-30, NOT `effectsRef`) — and `assign_section_preset`
   //     below writes it. aeon's generator READS it as of aeon `4aa2abc0`, and
-  //     as of aeon `6e2495a5` ONE section's `preset()` passes the emitted
-  //     chooser to its `raster:` channel — section 5's. Bind section 5 and the
-  //     ref resolves; bind any other section and the key is written and nothing
+  //     SOME sections' `preset()` passes the emitted chooser to its `raster:`
+  //     channel (at aeon `6e2495a5` that was section 5 alone; section 6 joined
+  //     it at `6ae88363` on 2026-09-03, and the set is DERIVED per act on every
+  //     load by `core/formats/effects/section-wiring.ts`, never written down
+  //     here). Bind a threaded section and the ref resolves; bind any other and
+  //     the key is written and nothing
   //     consumes it. The descriptions say that from the one constant that owns
   //     the sentence (core/formats/raster-binding.ts), never a second copy —
   //     which matters more here than anywhere, because a published description
@@ -476,7 +479,12 @@ export const EDITOR_METHODS: EditorMethod[] = [
   // FOR SECTION 5 ONLY, and section 5's sidecar landed in their tree at aeon
   // `c9a462be` — which is the case split the constant now carries along
   // with its dated expiry. An agent that read only "aeon threads the chooser"
-  // would bind section 6 and report a band it will never get.
+  // would bind an UNTHREADED section and report a band it will never get.
+  // ⚠ THAT LAST SENTENCE SAID "would bind section 6" UNTIL 2026-09-10, and by
+  // then section 6 was the WIRED example rather than the counter-example: aeon
+  // `6ae88363` threaded and bound it on 2026-09-03. An illustration built from a
+  // snapshot inverts when the snapshot moves, which is the small version of the
+  // defect recorded in `core/formats/raster-binding.ts`'s 2026-09-10 block.
   //
   // ⚠ AND SINCE O62 (2026-08-30) THE SAME CONSTANT SAYS WHAT `null` DOES TO
   // AEON'S BUILD: unbinding section 5, or binding any other section, leaves a
