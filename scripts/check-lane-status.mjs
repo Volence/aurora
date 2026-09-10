@@ -34,6 +34,30 @@ if (next.length !== 1) {
       : `Rows: ${next.map((q) => q.id).join(', ')}. A list where everything is next helps nobody choose.`));
 }
 
+// A `next` ROW THAT NAMES A BLOCKER IS NOT A STARTING POINT. `next` means "the
+// thing that starts when `doing` lands"; a row whose own text says it waits on
+// the owner or a peer cannot be that, and a successor reading the board at
+// 3am starts by discovering it cannot start. Nothing else compares these two
+// fields: `next` is a legal state and `blockedBy` is free text, so the console
+// says nothing and neither did this file until 2026-09-10.
+//
+// ⚠ ADDED BECAUSE THIS CHECK CAUSED THE DEFECT IT NOW CATCHES. The
+// exactly-one-`next` rule above is satisfiable by promoting a row that cannot
+// start, and that is exactly what happened here: a genuinely startable row
+// closed, the check went red for zero `next`, and the cheapest way to green it
+// was to promote a row blocked on the owner. **A validator that demands a
+// field be filled will get it filled.** The rule it needed was not "have a
+// next" but "have a next you can actually begin".
+const blockedNext = queue.filter((q) => q?.state === 'next' && q?.blockedBy);
+if (blockedNext.length) {
+  problems.push(
+    `row(s) in state "next" that NAME A BLOCKER: `
+    + blockedNext.map((q) => `${q.id} (blocked by: ${String(q.blockedBy).slice(0, 60)})`).join('; ')
+    + '. `next` is what starts when `doing` lands, so a row waiting on someone else is `blocked`. '
+    + 'If that leaves you with no startable row, the honest fix is to FIND one or write one. '
+    + 'Relabelling a blocked row is how this rule came to be needed.');
+}
+
 const bad = queue.filter((q) => q?.state && !STATES.has(q.state));
 if (bad.length) problems.push(`unknown state(s): ${bad.map((q) => `${q.id}=${q.state}`).join(', ')}`);
 
