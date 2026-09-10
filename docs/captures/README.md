@@ -47,13 +47,24 @@ checked at all.
 
 **A grep for `docs/captures/...` across this repo returns paths that are NOT this repo's.**
 The first pass here reported **7 dangling citations out of 76** and the true figure for aurora's
-own tree is **0 out of 54**. The seven were: three inside `scratchpad/fixtures/aeon-tile-door/`,
-a **vendored copy of aeon's tree** where those same paths resolve correctly and are aeon's; two
-from an illustrative example inside `scripts/check-doc-citations.mjs`'s own source; and one
-(`2026-09-05-floor-shear-verified.png`) that is not a citation at all but a packet *describing
-an untracked file in the aeon checkout*, in a sentence whose point is that the file **predates
-that session and is another lane's**. **Restrict the sweep to `docs/ scripts/ src/` and read
-what cites a path before counting it as broken.**
+own tree is **0 out of 54**. The seven were: **three inside a vendored copy of aeon's tree that
+lives under this repo's scratchpad fixtures**, where those same paths resolve correctly and are
+aeon's; two from an illustrative example inside `scripts/check-doc-citations.mjs`'s own source;
+and one that is not a citation at all but a packet *describing an untracked file in the aeon
+checkout*, in a sentence whose point is that the file **predates that session and is another
+lane's**. **Restrict the sweep to `docs/ scripts/ src/` and read what cites a path before
+counting it as broken.**
+
+⚠ **And the vendored tree is itself UNTRACKED, which is worse than the mis-attribution and was
+found by `check-doc-citations` refusing this very file.** It exists only on the machine that
+made it — so the naive sweep's `7` is **not even reproducible**: a reader on a fresh clone
+greps the same way and gets a different number, with no way to tell which of the two figures
+was the anomaly. A count taken across a machine-local tree is a fact about a machine.
+
+That gate's refusal is also why the paragraph above names no path for it. It has **no
+absence-marker exemption by design** — a disclosed dangling reference is still a pointer to
+nothing, and if `(not committed)` excused one, every author would learn the phrase. The rule it
+enforces is the one this file's rule 1 states from the other side.
 
 **There is deliberately NO GATE enforcing any of this**, and the reason is the measurement: the
 defect rate is **zero out of 54**. A gate added against a defect that is not occurring buys
