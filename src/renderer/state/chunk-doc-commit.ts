@@ -73,6 +73,32 @@ export function isChunkDocument(open: OpenDocument | null): boolean {
     && !open.bgOverride;
 }
 
+/**
+ * IS EVERY EDIT IN THIS DOCUMENT ALREADY RECORDED SOMEWHERE UNDO CAN REACH?
+ *
+ * The predicate the unsaved-work doors need after d-37, and the reason owner
+ * card `d-38-save-surface-vocabulary` says Discard on a chunk is "renamed or
+ * removed": once a chunk document writes through, closing it throws away the
+ * DOCUMENT and not the work. `Ctrl+Z`, one press per gesture, is the way back;
+ * the strokes themselves are in the library chunk this module wrote them to.
+ *
+ * ⚠ IT IS NOT `isChunkDocument`, AND THE DIFFERENCE IS THE WHOLE SAFETY OF IT.
+ * The write-through target is the LIBRARY ENTRY, so a chunk document whose entry
+ * has been undone or cleared away (`components/art/stale-document.ts`'s `chunk`
+ * arm, and the fourth early return in `composerSaveState`) has nowhere its edits
+ * can be living. For that document the old "Discard" wording is still the true
+ * one and this answers FALSE, which is what keeps the reassuring sentence off
+ * the one door where it would be a lie.
+ *
+ * PURE, taking the library rather than reading `projectStore`, so a door's copy
+ * can be walked over both answers without building a project to induce each.
+ */
+export function chunkDocEditsAreRecorded(
+  open: OpenDocument | null, chunkLibrary: readonly { id: string }[],
+): boolean {
+  return isChunkDocument(open) && chunkLibrary.some((c) => c.id === open!.chunkId);
+}
+
 function sameWords(a: Uint16Array, b: Uint16Array): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;

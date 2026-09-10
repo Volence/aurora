@@ -47,6 +47,17 @@
 // records for its own old code). `confirmStore` is a plain zustand store, so the
 // real door can be driven here with no DOM.
 //
+// (3) d-38, THE WORDS. On 2026-09-09 the chunk-undo routing (d-37) made a chunk
+// document write through: its strokes land in the library chunk as they are
+// made, as recorded, undoable steps. That turned this file's central noun
+// false for one document kind. "Discard & close" over a chunk now throws away
+// the DOCUMENT and not the work, and a control whose name states a destruction
+// that cannot happen is the same defect as the silent ones fixed the same day.
+// The owner's answer to `d-38-save-surface-vocabulary` is to rename or remove
+// it; it is RENAMED here, because the dialog still carries a real offer (Save
+// on a chunk is what APPLIES it to this act's placements, d-18c) and deleting
+// the door would delete that offer with it. See RECORDED_COPY below.
+//
 // ═══ THE SHAPE IS THE PERIMETER'S OWN ════════════════════════════════════
 //
 // `planArtDocDiscard` is the pure decision, `artDocDiscardBody` the pure copy,
@@ -58,10 +69,12 @@
 
 import { useArtStore } from '../../state/artStore';
 import type { OpenDocument } from '../../state/artStore';
+import { useProjectStore } from '../../state/projectStore';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
 import { composerSaveState, saveComposerDocument } from '../../state/art-composer-save';
 import type { ComposerSaveState } from '../../state/art-composer-save';
+import { chunkDocEditsAreRecorded } from '../../state/chunk-doc-commit';
 import { staleTargetSentence } from './stale-document';
 import type { StaleTarget } from './stale-document';
 
@@ -76,17 +89,39 @@ export type ArtDocDiscardPlan =
    * defect `state/art-composer-save.ts` was extracted to end, and repeating the
    * shape here rather than passing a bare boolean is deliberate.
    */
-  | { kind: 'confirm'; name: string; offerSave: boolean; unsavable: string | null };
+  | {
+      kind: 'confirm'; name: string; offerSave: boolean; unsavable: string | null;
+      /**
+       * TRUE when leaving this document behind throws NOTHING away, because
+       * every edit in it is already recorded on the zone-art undo stack and
+       * already in the library chunk it edits (`chunkDocEditsAreRecorded`).
+       *
+       * Owner card `d-38-save-surface-vocabulary`: after d-37's write-through
+       * routing landed on 2026-09-09, "Discard" on a chunk document names a
+       * thing that no longer happens. It is not merely a wrong word: the whole
+       * point of the surrounding dialog is to tell a person what they are about
+       * to lose, and the honest answer here is "nothing, and Ctrl+Z is how you
+       * abandon this work". So the copy, the labels and the danger tone all
+       * turn on this flag rather than the word being edited in place.
+       */
+      writesThrough: boolean;
+    };
 
 /**
  * Is there anything to lose, and can Save reach it?
  *
- * PURE, and takes the save state as an ARGUMENT rather than calling
- * `composerSaveState()` itself, so a test can walk every combination of
- * (document kind, save verdict) without building a project to induce each one.
+ * PURE, and takes the save state and the write-through verdict as ARGUMENTS
+ * rather than calling `composerSaveState()` / reading the project itself, so a
+ * test can walk every combination of (document kind, save verdict, recorded or
+ * not) without building a project to induce each one.
+ *
+ * `writesThrough` DEFAULTS TO FALSE, which is the pre-d-38 behaviour and the
+ * conservative one: a caller that has not been taught the question keeps
+ * warning that work will be lost, rather than reassuring a reader on a document
+ * where nobody checked.
  */
 export function planArtDocDiscard(
-  open: OpenDocument | null, save: ComposerSaveState,
+  open: OpenDocument | null, save: ComposerSaveState, writesThrough: boolean = false,
 ): ArtDocDiscardPlan {
   if (open === null || !open.dirty) return { kind: 'proceed' };
   return {
@@ -94,12 +129,15 @@ export function planArtDocDiscard(
     name: open.name,
     offerSave: save.kind === 'savable',
     unsavable: save.kind === 'blocked' ? save.why : null,
+    writesThrough,
   };
 }
 
-const DOOR_COPY: Record<ArtDocDoor, {
+interface DoorCopy {
   body: string; save: string; discard: string; cancel: string; cancelled: string;
-}> = {
+}
+
+const DOOR_COPY: Record<ArtDocDoor, DoorCopy> = {
   open: {
     body: 'Opening another art document discards the unsaved strokes in this one.',
     save: 'Save & open',
@@ -131,6 +169,97 @@ const DOOR_COPY: Record<ArtDocDoor, {
 };
 
 /**
+ * ═══ THE SAME THREE DOORS, WHEN NOTHING IS AT STAKE ═══════════════════════
+ *
+ * Owner card `d-38-save-surface-vocabulary`, answered `name_what_is_true`:
+ * "Discard on a chunk is renamed or removed, because there is no longer
+ * anything unrecorded for it to throw away. Undo is how you abandon chunk work
+ * now."
+ *
+ * RENAMED, NOT REMOVED, and the reason is that the dialog itself still has
+ * something true and useful to say. After d-37 a chunk document's strokes reach
+ * the library as they are made, so the DISCARD half of the old question is
+ * gone; but Save on a chunk document has meanwhile become the only gesture that
+ * APPLIES the chunk to its placements in this act (owner ruling d-18c, the
+ * propagation in `state/art-composer-save.ts`). Delete the dialog and that
+ * offer disappears with it, and the author walks away leaving placements
+ * showing the old art with nothing on screen having mentioned it. So the door
+ * stays and stops claiming a loss.
+ *
+ * WHAT EACH WORD IS DOING:
+ *   • The BODY leads with what is already safe, because the reader's question
+ *     at this door is "am I about to lose my work" and every second they spend
+ *     not knowing is the cost the dialog exists to remove. It names Ctrl+Z by
+ *     its chord, not as "undo", because the card's answer is that Undo is now
+ *     the abandon gesture and a reader who has to go looking for it has not
+ *     been told.
+ *   • The middle button is "Close without saving" / "Open without saving", the
+ *     plainest description of what it does. It is deliberately NOT "Discard":
+ *     `components/ui/safe-focus.ts` is explicit that the repo's guards key on
+ *     the `danger` TONE and never on labels, so renaming costs no coverage,
+ *     and a word that names a destruction which cannot happen is the exact
+ *     defect class this card is about.
+ *   • It also loses the `danger` tone (see the ask() call below), because
+ *     nothing about it is destructive any more. `safeFocusIndex` still lands on
+ *     the reserved `cancel` key, so the d-31 ruling is untouched.
+ *
+ * ⚠ THE `stale` ENTRY IS UNREACHABLE TODAY and is written honestly rather than
+ * left to throw. A chunk document is stale precisely when its library entry has
+ * GONE (`components/art/stale-document.ts`, the `chunk` arm), and
+ * `chunkDocEditsAreRecorded` answers false for exactly that document, so the
+ * stale door always takes `DOOR_COPY` above. It is filled in because
+ * `staleTarget` returns the FIRST stale target and a document can in principle
+ * carry two, and a `Record` with a hole is a crash waiting for that day.
+ */
+const RECORDED_COPY: Record<ArtDocDoor, DoorCopy> = {
+  open: {
+    body: 'Your edits to this chunk are already in the chunk library and Ctrl+Z takes '
+      + 'them back, so opening another document throws nothing away. Saving also applies '
+      + 'them to every placement of this chunk in this act, which nothing else does.',
+    save: 'Save & open',
+    discard: 'Open without saving',
+    cancel: 'Cancel',
+    cancelled: 'Open cancelled',
+  },
+  close: {
+    body: 'Your edits to this chunk are already in the chunk library and Ctrl+Z takes '
+      + 'them back, so closing throws nothing away. Saving also applies them to every '
+      + 'placement of this chunk in this act, which nothing else does.',
+    save: 'Save & close',
+    discard: 'Close without saving',
+    cancel: 'Cancel',
+    cancelled: 'Close cancelled',
+  },
+  stale: {
+    body: 'Your edits to this chunk are already in the chunk library and Ctrl+Z takes '
+      + 'them back, so closing throws nothing away.',
+    save: 'Save & close',
+    discard: 'Close without saving',
+    cancel: 'Keep it open',
+    cancelled: 'Document kept open',
+  },
+};
+
+/** The words this door speaks, which depend on whether anything is at stake. */
+function doorCopy(door: ArtDocDoor, writesThrough: boolean): DoorCopy {
+  return (writesThrough ? RECORDED_COPY : DOOR_COPY)[door];
+}
+
+/**
+ * The dialog's title.
+ *
+ * The old one, "Unsaved strokes in ...", is a true sentence about a buffered
+ * document and a misleading one about a chunk: the strokes are not unsaved,
+ * they are unAPPLIED. A title is the one line a reader is guaranteed to read,
+ * so it carries the distinction rather than leaving it to the body.
+ */
+export function artDocDiscardTitle(plan: { name: string; writesThrough: boolean }): string {
+  return plan.writesThrough
+    ? `Chunk "${plan.name}" is not applied to this act yet`
+    : `Unsaved strokes in "${plan.name}"`;
+}
+
+/**
  * The dialog body: what is at stake, then every sentence naming work Save cannot
  * write, then what to do about it, BEFORE the author presses anything.
  *
@@ -141,9 +270,11 @@ const DOOR_COPY: Record<ArtDocDoor, {
  * primary button reads as a bug.
  */
 export function artDocDiscardBody(
-  door: ArtDocDoor, plan: { offerSave: boolean; unsavable: string | null }, lead?: string,
+  door: ArtDocDoor,
+  plan: { offerSave: boolean; unsavable: string | null; writesThrough?: boolean },
+  lead?: string,
 ): string {
-  const copy = DOOR_COPY[door];
+  const copy = doorCopy(door, plan.writesThrough === true);
   const head = lead ? `${lead} ${copy.body}` : copy.body;
   if (plan.unsavable === null) return head;
   const tail = plan.offerSave
@@ -161,21 +292,42 @@ export function artDocDiscardBody(
  * not (cancel, dismissal, or a save that did not clear the flag).
  */
 async function askBeforeDiscard(door: ArtDocDoor, lead?: string): Promise<boolean> {
-  const plan = planArtDocDiscard(useArtStore.getState().open, composerSaveState());
+  const plan = planArtDocDiscard(
+    useArtStore.getState().open,
+    composerSaveState(),
+    // The d-38 question, asked at the door rather than assumed: is this a chunk
+    // document whose entry is STILL in the library, i.e. one whose edits are
+    // already recorded and undoable? `chunkDocEditsAreRecorded` is the single
+    // definition, so this door cannot disagree with the write-through routing
+    // about which documents lose nothing.
+    chunkDocEditsAreRecorded(
+      useArtStore.getState().open,
+      useProjectStore.getState().project?.chunkLibrary ?? [],
+    ),
+  );
   if (plan.kind === 'proceed') return true;
-  const copy = DOOR_COPY[door];
+  const copy = doorCopy(door, plan.writesThrough);
 
   // The array literal is inline, with the Save button behind a conditional
   // spread, because shell/__tests__/confirm-dialog-focus.test.ts walks every
   // ask() site in src/ in the AST and expands exactly this shape. A computed
   // button list would make this door invisible to it.
+  //
+  // The MIDDLE button is spread the same way for a reason that analyser also
+  // dictates: its `tone` differs between the two cases (danger when strokes are
+  // really at risk, none when the edits are already recorded), and a computed
+  // `tone:` would make the analyser REFUSE rather than expand. Two spreads means
+  // this door now presents four button sets to that guard, and `safeFocusIndex`
+  // must land on `cancel` in all four.
   const answer = await useConfirmStore.getState().ask({
-    title: `Unsaved strokes in "${plan.name}"`,
+    title: artDocDiscardTitle(plan),
     body: artDocDiscardBody(door, plan, lead),
     buttons: [
       ...(plan.offerSave
         ? [{ key: 'save', label: copy.save, tone: 'primary' as const }] : []),
-      { key: 'discard', label: copy.discard, tone: 'danger' as const },
+      ...(plan.writesThrough
+        ? [{ key: 'discard', label: copy.discard }]
+        : [{ key: 'discard', label: copy.discard, tone: 'danger' as const }]),
       { key: 'cancel', label: copy.cancel },
     ],
   });

@@ -67,6 +67,7 @@ import { useCanvasStore, saveableDirtyCanvasDocIds } from './canvasStore';
 import { collectSaveOutcomes, reportSaveOutcomes, type SaveReport } from './save-outcome-report';
 import { useArtStore } from './artStore';
 import { useToastStore } from './toastStore';
+import { useSaveReceipt } from './save-receipt';
 import { saveClassicProject } from './classic-save';
 import { saveAllSpriteArt, saveSpriteDocArt } from '../components/sprite/export-sprite';
 import { saveCanvasDocument } from './canvas-save';
@@ -246,6 +247,13 @@ export async function saveAllDirty(): Promise<SaveAllResult> {
   for (const f of result.failed) {
     useToastStore.getState().addToast(`Save failed (${f.id}): ${f.message}`, 'error');
   }
+  // The visible acknowledgement (d-38). `tabId: null` because a Save All is not
+  // about one tab. Same condition as saveActive's below, and for the same
+  // reason: a flash over a save where something failed would claim more than
+  // happened, and the failure toasts above are what that case gets.
+  if (result.saved.length > 0 && result.failed.length === 0) {
+    useSaveReceipt.getState().note(null);
+  }
   return result;
 }
 
@@ -281,6 +289,14 @@ export async function saveActive(tabId: string | null = activeTabId()): Promise<
   if (result.saved.length === 0 && result.failed.length === 0) {
     const message = unsavedElsewhereMessage(currentDirtySnapshot());
     if (message) useToastStore.getState().addToast(message, 'info');
+  }
+  // A SAVE THAT WROTE SOMETHING SAYS SO ON THE CONTROL, not only in a corner
+  // toast on a 2.2 s dwell (owner card d-38; state/save-receipt.ts carries the
+  // whole reasoning). Deliberately the SAME condition the branch above excludes:
+  // exactly one of the two fires, so Ctrl+S either flashes "Saved!" or explains
+  // why it wrote nothing, and never both and never neither.
+  if (result.saved.length > 0 && result.failed.length === 0) {
+    useSaveReceipt.getState().note(tabId);
   }
   return result;
 }

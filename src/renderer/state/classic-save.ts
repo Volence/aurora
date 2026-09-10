@@ -15,6 +15,34 @@ import type { WriteResult, ProjectHandle, ZoneActRef, DirtyDomains, LevelDoc } f
 import { useClassicProjectStore } from './classicProjectStore';
 import { useClassicLevelStore, type DomainGen } from './classicLevelStore';
 import { useToastStore } from './toastStore';
+import { nameSome } from '../../core/project/notice';
+
+/**
+ * WHAT A SUCCESSFUL CLASSIC SAVE SAYS — owner card `d-38-save-surface-vocabulary`,
+ * "a save says so briefly on screen".
+ *
+ * It said "Saved N level(s)" from 2026-08-09 until 2026-09-10, which is true and
+ * is not what the reader needed. UX seat A measured the gap twice on 2026-09-07
+ * (`docs/reviews/2026-09-07-lens-ux/uxa-walk.md`): F2, "a save reports nothing,
+ * so I never knew what I had written", cost them roughly a minute per job
+ * hashing the fixture from OUTSIDE the app; and F3, the sharper one, where 14
+ * pixels in a tile the panel itself called "in 0 blocks · 0 cells" rewrote
+ * `artnem/8x8 - GHZ1.nem` AND `artnem/8x8 - GHZ2.nem`, +329 bytes, with nothing
+ * on screen naming either file.
+ *
+ * The paths were already in hand: `SaveClassicResult.written` is the guarded
+ * channel's own report of what landed, relative to the project root, which is
+ * the form seat A quoted by hand. Naming them is what turns F3 from a discovery
+ * into a line the author reads as it happens.
+ *
+ * BOUNDED THROUGH `nameSome`, the idiom `aeon-save.ts` and the Save-All fold
+ * already use, so a large save is "+N more" and never a wall on a 2.2 s dwell.
+ */
+export function savedFilesSentence(levels: number, written: readonly string[]): string {
+  const head = `Saved ${levels} level(s)`;
+  if (written.length === 0) return head;
+  return `${head} · ${written.length} file${written.length === 1 ? '' : 's'}: ${nameSome(written)}`;
+}
 
 /** The narrow guarded-write capability the save pipe needs (window.api by default). */
 export interface GuardedWriteApi {
@@ -226,6 +254,9 @@ export async function saveClassicProject(
   if (dirtyLevels.length === 0) return { kind: 'nothing' };
 
   let saved = 0;
+  /** Every path the guarded channel reported as landed, across all acts, for the
+   *  success sentence. See `savedFilesSentence`. */
+  const writtenPaths: string[] = [];
   // BOUNDED BY ITS PRODUCER, NOT BY THIS LOOP. Every toast below is followed by
   // a `return`, so the switch's failure arms cost one toast however long
   // `dirtyLevels` is — but `notifyMidSaveEdits` in the 'saved' arm is NOT: that
@@ -257,6 +288,7 @@ export async function saveClassicProject(
           domainsToClear(dl.doc, dl.dirty, outcome.written),
           dl.gen,
         ));
+        writtenPaths.push(...outcome.written);
         saved++;
         break;
       case 'partial':
@@ -292,7 +324,9 @@ export async function saveClassicProject(
         break;
     }
   }
-  if (saved > 0) useToastStore.getState().addToast(`Saved ${saved} level(s)`, 'success');
+  if (saved > 0) {
+    useToastStore.getState().addToast(savedFilesSentence(saved, writtenPaths), 'success');
+  }
   return saved > 0 ? { kind: 'saved', count: saved } : { kind: 'nothing' };
 }
 
