@@ -189,6 +189,7 @@
     "harness:o56-loop-authoring-door": "node scratchpad/o56-loop-authoring-door-probe.mjs",
     "harness:object-label": "node scratchpad/object-label-harness.mjs",
     "harness:ozone-x11": "node scratchpad/ozone-x11-proof.mjs",
+    "harness:numberfield-selection-trace": "node scratchpad/numberfield-selection-trace-harness.mjs",
     "harness:pacing-readout": "node scratchpad/pacing-readout-harness.mjs",
     "harness:paint-regression": "node scratchpad/paint-regression-harness.mjs",
     "harness:paint-through": "node scratchpad/paint-through-harness.mjs",
