@@ -1,0 +1,83 @@
+root: /home/volence/sonic_hacks/aurora
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora
+=== cdp-sweep panels harness (P4 P5 P6 P7 + save-surface S1 S2 S3) ===
+    node        : v24.15.0
+    loadavg     : 7.65 9.74 9.24
+    AEON_DIR    : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/3c0520dc-6fcd-4e96-8730-98700fefd1b4/scratchpad/aeon-copy
+    CLASSIC_DIR : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/80d3be24-0dc3-4555-b525-b6250c8f1c50/scratchpad/s1disasm-copy
+    DISPLAY     : :99   PORT: 9473
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 202B [pid 395334 ALIVE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.sonic-level-editor/mcp.json 202B [pid 395334 ALIVE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178901793170
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-panels-harness-1359536-98657b93 — see HAZARD 6
+PASS  [0a] the COPIED aeon project is open (the subject for P4, P5, S1, S2)   [load 7.28/9.63/9.21]
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+──── P4: wheel gestures from the top of Colour to `Preset id` ────
+PASS  [0b] the Effects facet mounts   [load 7.02/9.54/9.18]
+PASS  [P4a] the Colour sub-tab is reachable and mounted   [load 6.85/9.46/9.16]
+        SUBTAB -> ok
+PASS  [P4b] `Preset id` is MOUNTED on arrival — the section arrives OPEN, so the count is about DEPTH   [load 6.85/9.46/9.16]
+        present in the DOM without any gesture
+PASS  [P4c] wheel gestures from the top of Colour to `Preset id` (seat's baseline: 4)   [load 6.85/9.46/9.16]
+        0 gesture(s) of the seat's own deltas [600] — arrived inView=true. Start {"there":true,"inView":true,"scrollTop":0,"scrollHeight":1806,"clientHeight":742,"y":768,"scrollerTop":106}; end {"there":true,"inView":true,"scrollTop":0,"scrollHeight":1806,"clientHeight":742,"y":768,"scrollerTop":106}. scrollTop is the unit-free half of this measurement and is printed on both.
+
+──── P5: the raster timeline below the preset panel ────
+PASS  [P5a] a raster-timeline canvas is MOUNTED, sized and painted below the preset panel   [load 6.85/9.46/9.16]
+        2 non-map canvas(es); live 2: [{"w":816,"h":742,"rect":{"x":284,"y":106,"width":816,"height":742,"top":106,"right":1100,"bottom":848,"left":284},"rects":1,"visible":true,"drawnAlphaPixels":0,"belowPreset":false},{"w":258,"h":280,"rect":{"x":1109,"y":1285.90625,"width":258,"height":279.828125,"top":1285.90625,"right":1367,"bottom":1565.734375,"left":1109},"rects":1,"visible":true,"drawnAlphaPixels":2048,"belowPreset":true}]
+PASS  [P5b] and it has actually been DRAWN INTO (not a blank element holding space)   [load 6.85/9.46/9.16]
+        816x742 drawn=0; 258x280 drawn=2048 — read off the canvas's OWN pixels, because source can prove the absence of `defaultCollapsed` and only a screen proves the canvas is there
+
+──── S1/S2: the Save chip and its flash ────
+PASS  [S1] the level header PAINTS a `Save` chip (uxb F7 — the control seat A never found)   [load 6.85/9.46/9.16]
+        {"found":true,"text":"Save","title":"Nothing to save in this document","rect":{"x":1349.625,"y":44,"width":42.375,"height":19,"top":44,"right":1392,"bottom":63,"left":1349.625},"rects":1,"visible":true,"hitInside":true,"inScrollerBox":null,"scrollerRect":null,"dpr":1}
+
+──── P6/P7: the palette affordance and Ctrl+Shift+P ────
+PASS  [P6a] the `Run a command` affordance is PAINTED and hit-testable with no hover   [load 6.85/9.46/9.16]
+        {"found":true,"text":"Run a command\nCtrl+K","title":"Run a command (Ctrl+K or Ctrl+Shift+P)","rect":{"x":8,"y":42,"width":223,"height":27,"top":42,"right":231,"bottom":69,"left":8},"rects":1,"visible":true,"hitInside":true,"inScrollerBox":null,"scrollerRect":null,"dpr":1}
+PASS  [P6b] it does NOT read as a second search box beside `Filter…` (a BUTTON, no placeholder, not on its row)   [load 6.85/9.46/9.16]
+        {"affordance":true,"filterFound":true,"affRect":{"x":8,"y":42,"width":223,"height":27,"top":42,"right":231,"bottom":69,"left":8},"filterRect":{"x":35,"y":82,"width":187,"height":17,"top":82,"right":222,"bottom":99,"left":35},"affTag":"BUTTON","affIsInput":false,"affHasPlaceholder":false,"sameRow":false,"verticalGap":-57,"explorerWidth":240} — the `Filter…` box is the POSITIVE CONTROL: found=true. Without it, "they are not side by side" could be a broken query returning a confident zero.
+PASS  [P7a] ANTI-VACUOUS: the palette is CLOSED before the chord   [load 6.85/9.46/9.16]
+PASS  [P7b] `Ctrl+Shift+P` opens the palette through the REAL window keydown path   [load 6.85/9.46/9.16]
+        the palette's own input appeared after a real Input.dispatchKeyEvent with Ctrl+Shift — never a synthetic dispatchEvent, which the app would be free to ignore
+PASS  [P7c] and it arrives PAINTED and focused (not opened underneath something)   [load 6.85/9.46/9.16]
+        {"focused":true,"rect":{"x":431,"y":105.625,"width":538,"height":45,"top":105.625,"right":969,"bottom":150.625,"left":431},"rects":1}
+
+──── S3: the classic save toast ────
+PASS  [S3a] the COPIED classic project is open   [load 6.85/9.46/9.16]
+        openDir -> "opened"; projStatus {"status":"open","zones":18}
+PASS  [S3b] an act is open on the classic side (the subject for the save)   [load 6.70/9.39/9.14]
+        levelState {"status":"ready","zone":"ghz","act":1}; zone click -> true; act click -> false; explorer rows seen: ["Run a command\nCtrl+K","LEVELS\n18","OBJECT LIBRARY\n109","CANVASES\n10","TOOLS\n1","Home\nGreen Hill Zone Act 1","Layout\nObjects\nCollision\nPalette\nArt","Layout","Objects","Collision","Palette","Art","FG","BG","View","Undo","Redo","Save","∞ Loop","Aether ◇ offline"]
+PASS  [S2a1] the debug door made a real LEVEL edit through the app's own commit path   [load 6.97/9.40/9.14]
+        stampLayoutCell -> {"plane":"fg","x":0,"y":0,"from":0,"to":1,"ok":true,"cellAfter":1,"docChanged":true,"dirtyBefore":[],"dirtyAfter":["fg"]}. This calls classicSetLayoutCells, the same function ClassicLevelViewport endStroke commits a stamp gesture with. It does NOT set a dirty flag; src/renderer/__tests__/debug-level-edit.test.ts reddens on that degradation (the undo row plus four source guards).
+PASS  [S2a2] ANTI-VACUOUS: a real BYTE changed in the document, read back out of it   [load 6.97/9.40/9.14]
+        fg cell (0,0) 0 -> 1 (asked for 1); dirty domains [] -> ["fg"]. A save with nothing changed would write the same bytes back and name a file for an edit that does not exist.
+PASS  [S2a3] and the APP agrees on screen: the chip's tooltip flips to the Ctrl+S one   [load 6.97/9.40/9.14]
+        chip title "Nothing to save in this document" -> "Save this document (Ctrl+S). Save All is Ctrl+Shift+S" on the CLASSIC level header (found true -> true). This is SaveChip reading canSaveActive, the same predicate its click uses, so it is the app's own verdict rather than the door's report about itself. Save-shaped buttons on screen: [{"text":"Save","title":"Save this document (Ctrl+S). Save All is Ctrl+Shift+S","rects":1,"disabled":false}]. aeon editorStore dirty = false, expected to stay false: it is the AEON flag, and this subject is a CLASSIC act.
+PASS  [S2b] Ctrl+S on a dirty level tab flashes `Saved!` ON THE CHIP (not only on a click)   [load 6.97/9.40/9.14]
+        the chip read "Saved!" inside its 1.5s window, raised by the CHORD — the gesture a local useState flash could never have answered, which is why state/save-receipt.ts is a store
+PASS  [S3c] a classic save's success toast NAMES the files it wrote   [load 6.97/9.40/9.14]
+        toast = "Saved 1 level(s) · 1 file: levels/ghz1.bin" — the row asks for a FILE PATH in the sentence, which is what seat A's F3 wanted and what `savedFilesSentence` adds
+
+    screenshots : /home/volence/sonic_hacks/aurora/scratchpad/shots-cdp-sweep/p4-p5-colour-tab.png, /home/volence/sonic_hacks/aurora/scratchpad/shots-cdp-sweep/p6-explorer.png, /home/volence/sonic_hacks/aurora/scratchpad/shots-cdp-sweep/panels-end.png
+cleanup: tree under pid 1359960 (11 process(es)):
+           1359960 /bin/sh /usr/bin/xvfb-run -n 99 -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora
+           1360004 Xvfb :99 -screen 0 1680x1050x24 -nolisten tcp
+           1387362 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           1387409 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           1387503 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1387508 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           1387587 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           1387771 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1387785 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1387790 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           1387808 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 49 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 1 ms; teardown 350 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ 20/20 rows PASS · 0 FAIL · 0 UNMEASURABLE · 25.2s ════
+     loadavg at start 7.65 9.74 9.24 · at end 6.97 9.40 9.14

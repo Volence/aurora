@@ -1,0 +1,73 @@
+root: /home/volence/sonic_hacks/aurora
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora
+=== cdp-sweep panels harness (P4 P5 P6 P7 + save-surface S1 S2 S3) ===
+    node        : v24.15.0
+    loadavg     : 11.84 10.73 9.51
+    AEON_DIR    : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/3c0520dc-6fcd-4e96-8730-98700fefd1b4/scratchpad/aeon-copy
+    CLASSIC_DIR : (unset — the classic save rows will say UNMEASURABLE)
+    DISPLAY     : :99   PORT: 9473
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 202B [pid 395334 ALIVE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.sonic-level-editor/mcp.json 202B [pid 395334 ALIVE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178901793170
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-panels-harness-956028-b57bc4d5 — see HAZARD 6
+PASS  [0a] the COPIED aeon project is open (the subject for P4, P5, S1, S2)   [load 11.18/10.63/9.48]
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+──── P4: wheel gestures from the top of Colour to `Preset id` ────
+PASS  [0b] the Effects facet mounts   [load 11.18/10.63/9.48]
+PASS  [P4a] the Colour sub-tab is reachable and mounted   [load 10.76/10.55/9.47]
+        SUBTAB -> ok
+PASS  [P4b] `Preset id` is MOUNTED on arrival — the section arrives OPEN, so the count is about DEPTH   [load 10.76/10.55/9.47]
+        present in the DOM without any gesture
+PASS  [P4c] wheel gestures from the top of Colour to `Preset id` (seat's baseline: 4)   [load 10.76/10.55/9.47]
+        0 gesture(s) of the seat's own deltas [600] — arrived inView=true. Start {"there":true,"inView":true,"scrollTop":0,"scrollHeight":1806,"clientHeight":742,"y":768,"scrollerTop":106}; end {"there":true,"inView":true,"scrollTop":0,"scrollHeight":1806,"clientHeight":742,"y":768,"scrollerTop":106}. scrollTop is the unit-free half of this measurement and is printed on both.
+
+──── P5: the raster timeline below the preset panel ────
+PASS  [P5a] a raster-timeline canvas is MOUNTED, sized and painted below the preset panel   [load 10.76/10.55/9.47]
+        2 non-map canvas(es); live 2: [{"w":816,"h":742,"rect":{"x":284,"y":106,"width":816,"height":742,"top":106,"right":1100,"bottom":848,"left":284},"rects":1,"visible":true,"drawnAlphaPixels":0,"belowPreset":false},{"w":258,"h":280,"rect":{"x":1109,"y":1285.90625,"width":258,"height":279.828125,"top":1285.90625,"right":1367,"bottom":1565.734375,"left":1109},"rects":1,"visible":true,"drawnAlphaPixels":2048,"belowPreset":true}]
+PASS  [P5b] and it has actually been DRAWN INTO (not a blank element holding space)   [load 10.76/10.55/9.47]
+        816x742 drawn=0; 258x280 drawn=2048 — read off the canvas's OWN pixels, because source can prove the absence of `defaultCollapsed` and only a screen proves the canvas is there
+
+──── S1/S2: the Save chip and its flash ────
+PASS  [S1] the level header PAINTS a `Save` chip (uxb F7 — the control seat A never found)   [load 10.76/10.55/9.47]
+        {"found":true,"text":"Save","title":"Nothing to save in this document","rect":{"x":1349.625,"y":44,"width":42.375,"height":19,"top":44,"right":1392,"bottom":63,"left":1349.625},"rects":1,"visible":true,"hitInside":true,"inScrollerBox":null,"scrollerRect":null,"dpr":1}
+
+──── P6/P7: the palette affordance and Ctrl+Shift+P ────
+PASS  [P6a] the `Run a command` affordance is PAINTED and hit-testable with no hover   [load 10.76/10.55/9.47]
+        {"found":true,"text":"Run a command\nCtrl+K","title":"Run a command (Ctrl+K or Ctrl+Shift+P)","rect":{"x":8,"y":42,"width":223,"height":27,"top":42,"right":231,"bottom":69,"left":8},"rects":1,"visible":true,"hitInside":true,"inScrollerBox":null,"scrollerRect":null,"dpr":1}
+PASS  [P6b] it does NOT read as a second search box beside `Filter…` (a BUTTON, no placeholder, not on its row)   [load 10.76/10.55/9.47]
+        {"affordance":true,"filterFound":true,"affRect":{"x":8,"y":42,"width":223,"height":27,"top":42,"right":231,"bottom":69,"left":8},"filterRect":{"x":35,"y":82,"width":187,"height":17,"top":82,"right":222,"bottom":99,"left":35},"affTag":"BUTTON","affIsInput":false,"affHasPlaceholder":false,"sameRow":false,"verticalGap":-57,"explorerWidth":240} — the `Filter…` box is the POSITIVE CONTROL: found=true. Without it, "they are not side by side" could be a broken query returning a confident zero.
+PASS  [P7a] ANTI-VACUOUS: the palette is CLOSED before the chord   [load 10.76/10.55/9.47]
+PASS  [P7b] `Ctrl+Shift+P` opens the palette through the REAL window keydown path   [load 10.76/10.55/9.47]
+        the palette's own input appeared after a real Input.dispatchKeyEvent with Ctrl+Shift — never a synthetic dispatchEvent, which the app would be free to ignore
+PASS  [P7c] and it arrives PAINTED and focused (not opened underneath something)   [load 10.76/10.55/9.47]
+        {"focused":true,"rect":{"x":431,"y":105.625,"width":538,"height":45,"top":105.625,"right":969,"bottom":150.625,"left":431},"rects":1}
+
+──── S3: the classic save toast ────
+UNMS  [S3] a classic save's success toast NAMES the files it wrote   [load 10.76/10.55/9.47]
+        CLASSIC_DIR is unset — the classic toast cannot be raised without a classic project, and a green from the aeon toast would be about a different sentence (`Project saved`, which deliberately names no files).
+
+    screenshots : /home/volence/sonic_hacks/aurora/scratchpad/shots-cdp-sweep/p4-p5-colour-tab.png, /home/volence/sonic_hacks/aurora/scratchpad/shots-cdp-sweep/p6-explorer.png, /home/volence/sonic_hacks/aurora/scratchpad/shots-cdp-sweep/panels-end.png
+cleanup: tree under pid 956601 (11 process(es)):
+           956601 /bin/sh /usr/bin/xvfb-run -n 99 -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora
+           956626 Xvfb :99 -screen 0 1680x1050x24 -nolisten tcp
+           980669 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           980961 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           981923 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           981932 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           982246 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           985003 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           985072 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           985264 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           985479 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 350 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ 13/14 rows PASS · 0 FAIL · 1 UNMEASURABLE · 15.1s ════
+     loadavg at start 11.84 10.73 9.51 · at end 10.76 10.55 9.47
+UNMEASURABLE:
+  [S3] a classic save's success toast NAMES the files it wrote (load 10.76/10.55/9.47)
