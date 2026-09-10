@@ -284,18 +284,29 @@ describe('a palette drag through this port can never be stranded', () => {
       .toBeTruthy();
     expect(body!, 'previewZone no longer consults zonePaletteLineRefusal')
       .toMatch(/zonePaletteLineRefusal\(line\)/);
-    // …and it must SHORT-CIRCUIT, not merely mention it. The write and the
-    // snapshot both have to be downstream of the return.
+    // …and it must SHORT-CIRCUIT, not merely mention it.
+    //
+    // ⚠ THE FIRST VERSION OF THIS ASSERTION WAS VACUOUS, and the poison run is
+    // how it was found: it took `body.indexOf('return')` as "the refusal's
+    // return", which actually lands on the `if (!z) return;` two lines further
+    // down. Deleting the short-circuit while keeping the call left every
+    // ordering comparison true and the row came back GREEN. So the span is
+    // anchored: between the refusal and the first thing that touches the zone
+    // there must be a `return`, and nothing else in the callback can supply it.
     const refusalAt = body!.indexOf('zonePaletteLineRefusal(line)');
-    const returnAt = body!.indexOf('return');
+    const zoneAt = body!.indexOf('getCurrentZone');
     const writeAt = body!.indexOf('z.palette.lines[line].colors[idx]');
     const beginAt = body!.indexOf('beginZoneDrag(line, idx)');
     expect(writeAt, 'previewZone stopped writing the palette: this scan is aimed at nothing')
       .toBeGreaterThan(-1);
-    expect(returnAt, 'the refusal does not return, so a refused line falls through and is written')
+    expect(zoneAt, 'previewZone stopped reading the zone: this scan is aimed at nothing')
       .toBeGreaterThan(refusalAt);
-    expect(writeAt, 'the palette write is not behind the refusal').toBeGreaterThan(returnAt);
-    expect(beginAt, 'the drag snapshot is taken before the refusal').toBeGreaterThan(returnAt);
+    expect(
+      body!.slice(refusalAt, zoneAt),
+      'the refusal does not return, so a refused line falls through and is written',
+    ).toMatch(/\breturn;/);
+    expect(writeAt, 'the palette write is not behind the refusal').toBeGreaterThan(refusalAt);
+    expect(beginAt, 'the drag snapshot is taken before the refusal').toBeGreaterThan(refusalAt);
   });
 
   it('commits AMBIENTLY, because the sprite pane has no aeon history focused', () => {
