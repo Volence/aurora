@@ -160,7 +160,7 @@ in the same breath as the outcome, not appended below it. And when a claimed own
 leaves no artifact, mark it unverifiable rather than laundering it into fact by repetition;
 the cheap fix is to ask, because the owner is usually one sentence away.
 
-### ⚠ CUT THE CEREMONY — OWNER, 2026-09-02T18:20:19Z. It OUTRANKS every process bar in this file while EFFECTS-W1 is open
+### ⚠ CUT THE CEREMONY — OWNER, 2026-09-02T18:20:19Z. ⚠ ITS CONDITION HAS LAPSED — TEST IT, DO NOT ASSUME IT
 
 **Read it at the artifact, not from this line** — it is the bullet beginning `2026-09-02T18:20:19Z — CUT THE CEREMONY` in empyrean's `docs/OVERSEER.md`, carried by empyrean `90554f2` (verified here an ancestor of `origin/main`, and read at that revision before this line was written):
 
@@ -169,7 +169,19 @@ git -C ../empyrean fetch -q origin && \
 git -C ../empyrean show origin/main:docs/OVERSEER.md | grep -n -A2 "18:20:19Z"
 ```
 
-Deliberately a pointer and not a summary: clause 2 of the ruling is a moratorium on boot-doc growth, so restating it here would be the first thing it forbids. The two clauses this lane trips over most are (2) no new process bars and no boot-doc growth, and (3) DoD items and the bug tier only — no instrument work, no cross-lane audits, no re-measuring a peer's numbers, **unless it blocks a DoD item or ships wrong output**. Banked 2026-09-03 at the hub's ask; four other lanes hold the same pointer.
+Deliberately a pointer and not a summary: clause 2 of the ruling is a moratorium on boot-doc growth, so restating it here would be the first thing it forbids.
+
+⚠ **CLAUSE 2 HAS LAPSED BY ITS OWN TERMS AND THIS LANE OBEYED IT ANYWAY, TONIGHT (2026-09-10).** Its text ends *"until EFFECTS-W1 ships"*, and `contract/projects.json` at empyrean `origin/main` has read `EFFECTS-W1 state = done` **since 2026-09-06**. Four days. The heading above used to state the condition and nothing tested it, which is the whole defect: **a rule whose END CONDITION lives inside its own prose keeps being obeyed long after it lapses, because the condition is a fact about ANOTHER repo's file that nothing re-reads.** Aeon hit the identical clause the same hour, independently, having quoted it as live at every boot since 09-03 (aeon `8caa9dd4`); two lanes, no contact, same dead clause. **Test the condition before citing it — one command, and it is the only honest way to read this section:**
+
+```sh
+git -C ../empyrean fetch -q origin && \
+  git -C ../empyrean show origin/main:contract/projects.json | \
+  python3 -c 'import json,sys; print(next(p["state"] for p in json.load(sys.stdin)["projects"] if p["id"]=="EFFECTS-W1"))'
+```
+
+**What actually survives, read clause by clause at the artifact rather than taken from this summary.** The header's *outranking* scope is `while EFFECTS-W1 is open`, so the ruling **no longer outranks** the other process bars in this file. **Clause 2** (no new process bars, no rulings about rules, no boot-doc growth) carried the end condition in its own sentence and is **spent**. **Clause 3** (DoD items and the bug tier only; no instrument, ledger or cross-lane work unless it blocks a DoD item or ships wrong output) carries **no end condition of its own** and stands as an owner-applied instruction — it simply stopped outranking. And beneath all five clauses the owner's own words are undated and were never scoped to a project: *"cut anything that's arbitrarily slowing us down without an actual good reason"*. **The preference outlives the application.**
+
+⚠ **DO NOT REBUILD THE BARS CLAUSE 2 SUSPENDED JUST BECAUSE IT LAPSED.** A moratorium ending is not an instruction to resume; it returns the question to ordinary judgement, and the reason each bar was cut is still on the record. **Worked example, this lane, the night the lapse was found:** a real defect (a fix reported as closed while the one instrument able to refute it had never run against it) invited a new gate. It was declined — on the ground that the checkable form needs a hand-filled *"when did this instrument last run"* field, and a gate that goes green on an author's belief is the shape this repo has paid for repeatedly. That reason is independent of the moratorium and is the better argument; the moratorium was cited beside it and was already dead. **Rest a refusal on the reason, not on the hold** — a hold can lapse without telling you, and a reason cannot. The two clauses this lane trips over most are (2) no new process bars and no boot-doc growth, and (3) DoD items and the bug tier only — no instrument work, no cross-lane audits, no re-measuring a peer's numbers, **unless it blocks a DoD item or ships wrong output**. Banked 2026-09-03 at the hub's ask; four other lanes hold the same pointer.
 
 ### Addressing the hub
 
@@ -478,8 +490,23 @@ What stays live:
   the client looks finished having done nothing. Anything init must consume is written
   at `reload_rom → run_to <init symbol> → write, flag last → continue`, where the
   machine is stopped at the init's entry and nothing is painted yet.
-- **`emulator/reset` is off-limits on the hosted build** until aeon's F-HOSTED-RESET-SRM
-  closes — it bypasses the player's `.srm` flush. `reload_rom` is unaffected.
+- **`emulator/reset` — THE PROHIBITION THIS ROW CARRIED IS SPENT, AND THE ROW WAS WRONG IN THREE WAYS.**
+  It read *"off-limits on the hosted build until **aeon's** F-HOSTED-RESET-SRM closes — it bypasses the
+  player's `.srm` flush"*. Re-derived 2026-09-10 at oracle `origin/main` `06dddb5`, `docs/OVERSEER.md`:
+  **(1) The finding is ORACLE'S, not aeon's** — a grep of aeon at `origin/master` returns nothing, and every
+  hit is in `crates/oracle-player/`. A hold pointed at the wrong repo cannot be tested by the lane holding it.
+  **(2) It CLOSED on 2026-09-06** (branch `fix/hosted-reset-srm`), four days before any session here stopped
+  citing it. **(3) The mitigation this row taught NEVER COVERED THE DEFECT**, in oracle's own words: *"the
+  defect is NOT hosted-only, the window's own F1/palette reset reaches it through the same door"*. So
+  "avoid it on the hosted build" was a rule that felt like protection and left the other door open — a
+  partial cover reads as a full one, which is worse than no rule at all.
+  **Do not read this as a clearance.** A LIFT is a present-tense claim exactly like a hold is, and this one
+  is second-hand. What is durable is the procedure, not either verdict:
+  ```sh
+  git -C ../oracle fetch -q origin && \
+    git -C ../oracle show origin/main:docs/OVERSEER.md | grep -n 'F-HOSTED-RESET-SRM'
+  ```
+  `reload_rom` was never implicated either way.
 - **The MCP SHIM and the Aether SERVER are independent, and only one of them is config**
   *(established firsthand 2026-08-22, during the Rust-core cutover)*. `mcp__oracle__*` in this
   workspace runs **oracle-old's Python shim** — a *client* — which dials the same socket chain
