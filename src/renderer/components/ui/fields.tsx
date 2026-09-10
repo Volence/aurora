@@ -264,6 +264,24 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
   // be a render per keystroke for a fact nothing draws.
   const focusState = React.useRef<{ held: number | null; commits: number }>(
     { held: null, commits: 0 });
+  // IS THE CLICK IN FLIGHT THE ONE THAT BROUGHT THIS BOX INTO FOCUS? Armed on
+  // `mousedown`, read on `mouseup`, and the whole reason is in the two handlers
+  // at the bottom of this component. A ref and not state for the reason above:
+  // it is written and read inside the same gesture, and nothing draws it.
+  const focusingClick = React.useRef(false);
+  // A RE-SELECT THE FOCUSING CLICK SCHEDULED FOR AFTER ITSELF, or null. The
+  // `onClick` block below is the whole derivation; this is the handle that lets
+  // a blur or an unmount cancel one that has not run yet.
+  const reselect = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelReselect = (): void => {
+    if (reselect.current === null) return;
+    clearTimeout(reselect.current);
+    reselect.current = null;
+  };
+  // A field unmounted between the click and the task it queued would otherwise
+  // leave a timer holding a detached input. Nothing draws this; it is hygiene
+  // with a real referent.
+  React.useEffect(() => cancelReselect, []);
 
   // Resync from the document — an undo, a drag on the canvas, a different
   // selection — but only when the author is not typing into this box.
@@ -273,6 +291,82 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
 
   return (
     <input type="number" title={title} value={text} min={min} max={max} step={step}
+      /**
+       * ═══ THE SELECT-ON-FOCUS THAT DID NOT STICK ═══
+       *
+       * `onFocus` below has called `select()` since EFFECTS-W1 defect 5, and it
+       * was RIGHT AND NOT ENOUGH. Measured, 9 arms, 2026-09-10
+       * (`docs/reviews/2026-09-10-numberfield-previous-visit.md`): click a box
+       * holding 156, type NOTHING, click away, click back, type `7` and the box
+       * reads `1567`. The `select()` runs in both arms of that pair. **What
+       * differs is that the click's own `mouseup` DEFAULT ACTION collapses the
+       * selection the `focus` handler just made** — the textbook cause of a
+       * select-on-focus that does not stick.
+       *
+       * ⚠ THE OBVIOUS REMEDY WAS TRIED FIRST, BUILT, AND MEASURED WRONG. The
+       * packet's arm M prevents that mouseup's default and arm H then replaces,
+       * so `preventDefault` on the focusing click's mouseup was written here
+       * and it DID fix the digits. It also broke the spinner. Chromium's number
+       * input carries a spin button in its UA shadow root; it STEPS on
+       * mousedown, which no mouseup guard can stop, and it STOPS ITS AUTO-REPEAT
+       * in a mouseup DEFAULT handler, which Blink skips once `preventDefault`
+       * has been called. Measured on this component with that remedy in place
+       * (harness arm S): one click on the down arrow of an unfocused box took
+       * 156 to 147 within 600ms and to 119 by 2s, still sliding. The spinner is
+       * a capability this repo has already refused to trade away once —
+       * `numberfield-empty-harness.mjs` check 4a exists to hold it — so the
+       * remedy moved rather than the constraint.
+       *
+       * WHAT IS HERE INSTEAD SUPPRESSES NOTHING. It does not stop the selection
+       * being collapsed; it puts it back, from a task queued after the whole
+       * gesture. Every default action on the way — the spin button's, the
+       * caret's, the primary-selection paste's — happens exactly as the browser
+       * intended, and arm S measures the spinner stepping once and stopping.
+       *
+       * ⚠ AND IT IS QUEUED, NOT DONE IN THE `click` HANDLER, BECAUSE THAT WAS
+       * TRIED AND MEASURED. Re-selecting inside `onClick` reads as if it must
+       * work — click is dispatched after mouseup's default action — and it does
+       * NOT: arms H and K INSERTED with it in place (harness run, fixed build,
+       * load 35.7 -> 10.2). Blink's selection update for a mouse gesture lands
+       * after the click dispatch and inside the same task, so a handler cannot
+       * outrun it and a `setTimeout(0)` can. Anything that fires within that
+       * task is too early; that is the fact, and the `0` is not a race against a
+       * typist, it is a task boundary.
+       *
+       * ⚠ WHY IT IS ARMED ON `mousedown` AND NOT DONE ON EVERY CLICK. Selecting
+       * on every click would take a deliberate caret placement and a
+       * drag-selection INSIDE A BOX THE AUTHOR IS ALREADY IN — a real
+       * capability, and one the defect never touched: the insert appears only
+       * on the click that brings the box from unfocused to focused. So the arm
+       * is set on `mousedown`, which fires BEFORE the focus default action, and
+       * `editing` there still answers exactly the right question: was this box
+       * unfocused when the pointer went down?
+       *
+       * WHY `editing` AND NOT `document.activeElement`. They agree — `editing`
+       * is set true on focus and false on blur and nowhere else — and the
+       * component then reaches for no global, which is what lets the SCOPE be
+       * unit-tested in a suite with no DOM
+       * (`__tests__/number-field-empty.test.ts`, the focusing-click rows). The
+       * behaviour it protects is a native default action and is NOT unit
+       * testable; the scope is, and the scope is the part a later edit can
+       * silently widen.
+       *
+       * ⚠ PRIMARY BUTTON ONLY. A middle-click on X11 pastes the primary
+       * selection, and a field that grabbed the selection out from under that
+       * paste would be inventing a second defect out of the fix for the first.
+       */
+      onMouseDown={(e) => { focusingClick.current = e.button === 0 && !editing; }}
+      onClick={(e) => {
+        if (!focusingClick.current) return;
+        focusingClick.current = false;
+        // ⚠ THE ELEMENT IS CAPTURED SYNCHRONOUSLY. React nulls a synthetic
+        // event's `currentTarget` once the handler returns, so reading it
+        // inside the queued task would find `null`. The local binding is the
+        // element itself and is unaffected.
+        const el = e.currentTarget;
+        cancelReselect();
+        reselect.current = setTimeout(() => { reselect.current = null; el.select(); }, 0);
+      }}
       onFocus={(e) => {
         setEditing(true);
         // SELECT ON FOCUS. Clicking a box holding `112` and typing `40` used to
@@ -281,6 +375,9 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
         // no warning anywhere). Selecting makes the first keystroke replace,
         // which is what every author expects of a small numeric field and what
         // makes the refusal below a backstop rather than a daily obstacle.
+        // ⚠ THIS LINE ALONE DOES NOT HOLD THE SELECTION AGAINST A CLICK, and it
+        // is still the only thing that selects for a Tab, which has no click to
+        // land in. The `onClick` above is the other half; see its block.
         e.currentTarget.select();
         // The baseline for the drift clause: what the author is about to type
         // OVER. Reset the counter with it — a second visit to the same box is a
@@ -290,6 +387,16 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
       }}
       onBlur={() => {
         setEditing(false);
+        // DISARM. A mousedown that arms the guard and then finishes somewhere
+        // else (a drag out of the box) fires no `click` here, so the arm would
+        // otherwise stay set and the NEXT click to land here would re-select
+        // inside an already-focused box — the exact regression the scoping
+        // exists to avoid. Every later mousedown on this box recomputes the arm
+        // anyway; this closes the one window where none does. A queued
+        // re-select goes with it: a box that has lost focus must not grab a
+        // selection back a task later.
+        focusingClick.current = false;
+        cancelReselect();
         // ⚠ THE COUNTER IS NOT CLEARED HERE, only on the next focus. The refusal
         // text stays painted after the box snaps back, and it is exactly then
         // that an author reads it — a clause deleted on blur would vanish at the

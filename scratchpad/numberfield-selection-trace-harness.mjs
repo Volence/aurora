@@ -29,6 +29,34 @@
 // `NumberField` commits per keystroke, so a two-key read has to be untangled
 // from the per-keystroke refusal arithmetic and a single key does not.
 //
+// ═══ 2026-09-10, LATER THE SAME DAY: THE FIX LANDED AND THIS FILE CHANGED ════
+//
+// `NumberField` now guards the FOCUSING click's `mouseup` (`fields.tsx`, the
+// block above `onMouseDown`), and arms H and K therefore REPLACE. **Three rows
+// went red on the fixed build and every one of them was correct to** — they
+// asserted the DEFECT, which is what a red is supposed to mean:
+//
+//   2a  H and I DISAGREE           the law itself; the fix erases the law
+//   2c  at least one arm INSERTED  the discrimination row; see below
+//   2d  K INSERTED                 the confound control, cleared before the fix
+//
+// They are rewritten rather than deleted, and each now states the pre-fix
+// measurement it used to make and where that measurement lives
+// (`docs/reviews/2026-09-10-numberfield-previous-visit.md`). ⚠ THE ONE THAT
+// MATTERS IS 2c. Its job was never "the bug is present" — its job was **can
+// this run still tell an INSERT from a REPLACE**, without which every REPLACED
+// above is indistinguishable from an instrument that reports REPLACED no matter
+// what. Deleting it would have removed the only thing standing between a fixed
+// build and a dead one. So it now asserts a gesture that MUST STILL INSERT on a
+// correctly fixed build, and there is exactly one: **a click inside a box that
+// is ALREADY FOCUSED**, which places a caret and is the capability the fix was
+// deliberately scoped not to take (arm N).
+//
+// Arm S is the other half of that scoping, on the axis nobody was watching: the
+// remedy suppresses a default action, and Chromium's number spinner stops its
+// auto-repeat in a mouseup default handler. A guard that reached the spin button
+// would leave it running. S measures it rather than arguing about it.
+//
 // ═══ WHAT THIS RUN ADDS, AND WHY IT IS NOT A SIXTH GESTURE ═══════════════════
 //
 // The census varied WHAT THE HANDS DID and found five inserting gestures and two
@@ -47,6 +75,10 @@
 //   J  visited, a REFUSED value typed and NOT committed
 //   K  visited, `.select()` called, nothing typed         the confound control
 //   L  visited, typed with NO explicit select()           the realistic typed case
+//   M  arm H's conditions, mouseup default prevented      the remedy probe
+//   N  a SECOND click inside the already-focused box      the scope, and 2c's
+//                                                         discriminator
+//   S  one click on the spin arrow of an unfocused box    the scope, other axis
 //
 // **H against I isolates whether a commit happened. J against both separates
 // TYPING from COMMITTING** — and that boundary is where `NumberField`'s code
@@ -96,6 +128,27 @@ const ONE_KEY = '7';
  *  refused, so the arm has ZERO commits rather than a legal prefix that landed.
  *  Verified per-run against the model rather than assumed (row `Jx`). */
 const REFUSED_KEY = '1';
+
+/**
+ * WHERE `key` WAS INSERTED INTO `before` TO PRODUCE `after`, or -1.
+ *
+ * ⚠ WIDENED WHEN THE FIX LANDED, and the widening is load-bearing rather than
+ * tidying. Until then this was `after.endsWith(key)`, which is true only for a
+ * caret at the END of the text — fine while every inserting arm clicked the
+ * CENTRE of a short left-aligned box, where the caret can land nowhere else.
+ * Arm N clicks the LEFT edge on purpose, so its insert lands at position 0 and
+ * `endsWith` would have called `"7156"` NEITHER — a verdict that reads as "the
+ * app did something inexplicable" for a caret doing exactly its job.
+ *
+ * Verdicts for every pre-existing arm are unchanged by this: `"156"` -> `"1567"`
+ * is index 3 here and passed `endsWith` before.
+ */
+function insertedAt(before, after, key) {
+  for (let i = 0; i <= before.length; i++) {
+    if (before.slice(0, i) + key + before.slice(i) === after) return i;
+  }
+  return -1;
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 2000) {
@@ -371,16 +424,17 @@ async function main() {
       const modelAfter = await band0();
 
       const replaced = afterKey.value === ONE_KEY;
-      const inserted = afterKey.value.length > 1 && afterKey.value.endsWith(ONE_KEY);
-      const verdict = replaced ? 'REPLACED' : inserted ? 'INSERTED' : 'NEITHER';
-      arms.push({ id, label, verdict, armedValue: armed.value, afterKey: afterKey.value, prepNote });
+      const at = insertedAt(armed.value, afterKey.value, ONE_KEY);
+      const verdict = replaced ? 'REPLACED' : at >= 0 ? 'INSERTED' : 'NEITHER';
+      arms.push({ id, label, verdict, armedValue: armed.value, afterKey: afterKey.value, at, prepNote });
 
       console.log(`\n──── ARM ${id}: ${label} ────`);
       if (prepNote) console.log(`        prep        : ${prepNote}`);
       console.log(`        model before: ${JSON.stringify(modelBefore)}`);
       console.log(`        box at click: ${JSON.stringify(armed)}`);
       console.log(`        after click : ${JSON.stringify(afterClick)}`);
-      console.log(`        after "${ONE_KEY}"   : ${JSON.stringify(afterKey)}   -> ${verdict}`);
+      console.log(`        after "${ONE_KEY}"   : ${JSON.stringify(afterKey)}   -> ${verdict}`
+        + `${at >= 0 ? `  (caret at ${at})` : ''}`);
       console.log(`        model after : ${JSON.stringify(modelAfter)}`);
       console.log(`        trace       : ${trace.map((r) => `${r.phase}(${r.isActive ? 'focused' : 'not'})`).join(' -> ')}`);
       return { verdict, armed, afterKey };
@@ -500,6 +554,145 @@ async function main() {
       return 'mouseup default prevented on the box; clicked once, typed nothing (= arm H)';
     });
 
+    // ── ARM N — THE SCOPE, AND THIS RUN'S ABILITY TO DISCRIMINATE ────────
+    //
+    // ⚠ THIS ARM EXISTS BECAUSE THE FIX RETIRED THE OLD ONE. Every arm above
+    // REPLACES on a fixed build, and a run in which nothing inserts cannot tell
+    // a fixed app from an instrument that has stopped seeing. Row 2c used to
+    // get that guarantee for free from the defect itself; it now has to be
+    // earned by a gesture that MUST STILL INSERT when the fix is correct.
+    //
+    // There is exactly one, and it is the constraint the fix was written to
+    // honour: **a click inside a box that is ALREADY FOCUSED places a caret.**
+    // Preventing every mouseup would have taken that away, which is why the
+    // guard is armed on mousedown and only for the click that brings the box
+    // from unfocused to focused. So one row now asserts BOTH halves — that this
+    // run can still see an insert, and that the fix left the deliberate caret
+    // alone.
+    //
+    // THE SECOND CLICK AIMS AT THE LEFT EDGE, not the centre, so the caret it
+    // asks for is position 0 and the resulting `"7156"` cannot be confused with
+    // a stray append. `insertedAt` reports the index, so the row can say where
+    // the caret went rather than only that it went somewhere.
+    const N = await (async () => {
+      const aim = await freshPanel();
+      const cold = await boxState(EDGE_BOX(BOT_TITLE));
+      if (cold.focused !== false) throw new Error('N: box already focused after a reload');
+      await c.evalExpr(RESET_TRACE);
+      await clickPoint(aim);            // the FOCUSING click — this one selects
+      await sleep(350);
+      const focused = await boxState(EDGE_BOX(BOT_TITLE));
+      const caret = await c.json(String.raw`(() => {
+        const el = ${EDGE_BOX(BOT_TITLE)};
+        if (!el) return null;
+        const b = el.getBoundingClientRect();
+        return { x: Math.round(b.left + 3), y: Math.round(b.top + b.height / 2) };
+      })()`);
+      if (!caret) throw new Error('N: box vanished between the click and the aim');
+      await clickPoint(caret);          // a SECOND click — already focused
+      await sleep(350);
+      const armed = await boxState(EDGE_BOX(BOT_TITLE));
+      await typeText(ONE_KEY);
+      await sleep(350);
+      const afterKey = await boxState(EDGE_BOX(BOT_TITLE));
+      const at = insertedAt(armed.value, afterKey.value, ONE_KEY);
+      const verdict = afterKey.value === ONE_KEY ? 'REPLACED' : at >= 0 ? 'INSERTED' : 'NEITHER';
+      arms.push({
+        id: 'N', label: 'a SECOND click inside the ALREADY-FOCUSED box', verdict,
+        armedValue: armed.value, afterKey: afterKey.value, at,
+        prepNote: 'focusing click, then a click at the box\'s LEFT edge',
+      });
+      console.log('\n──── ARM N: a SECOND click inside the ALREADY-FOCUSED box ────');
+      console.log(`        after click 1: ${JSON.stringify(focused)}`);
+      console.log(`        caret aim    : ${JSON.stringify(caret)}   (left edge, not the centre)`);
+      console.log(`        after click 2: ${JSON.stringify(armed)}`);
+      console.log(`        after "${ONE_KEY}"    : ${JSON.stringify(afterKey)}   -> ${verdict}`
+        + `${at >= 0 ? `  (caret at ${at})` : ''}`);
+      return { verdict, at, armed, afterKey };
+    })();
+
+    // ── ARM S — THE OTHER AXIS OF THE SCOPE: THE SPIN BUTTON ─────────────
+    //
+    // ⚠ A REMEDY THAT SUPPRESSES A DEFAULT ACTION HAS TO SAY WHOSE. Chromium's
+    // number input carries a spin button in its UA shadow root; events from it
+    // retarget to the input, so a `mouseup` listener on the field sees the
+    // arrow's mouseup too. The spin button STEPS on mousedown and STOPS ITS
+    // AUTO-REPEAT in a mouseup default handler — and Blink runs a default
+    // handler only when nothing called `preventDefault`. So the failure mode of
+    // this fix is NOT a spinner that does nothing; it is a spinner that never
+    // stops. That is what this arm watches, and it is why the second sample is
+    // taken a beat later rather than immediately.
+    //
+    // DOWN AND NOT UP, because arm I already proved `bot - 1` is a value the
+    // panel accepts, and a step the panel REFUSES would look exactly like a
+    // spinner that stopped working.
+    //
+    // ⚠ THIS ARM CAN COME BACK UNMEASURABLE, and says so rather than failing:
+    // if the value never moves at all, the pointer did not land on a spin
+    // button and this instrument measured nothing. That is a different fact
+    // from a runaway and the row separates them.
+    // ⚠ AND THE AIM IS SEARCHED, NOT ASSUMED, because the first version of this
+    // arm guessed `right - 4` and came back UNMEASURABLE on a build where the
+    // spinner was fine. Chromium's inner spin button sits inside the CONTENT
+    // box, so the field's own right PADDING is dead space between the border and
+    // the arrows — `right - 4` lands in it and hits nothing. The candidates
+    // below start from the computed padding and widen; the row reports which one
+    // landed, so a later reader can see the aim rather than trust it.
+    //
+    // ⚠ EVERY CANDIDATE IS TRIED FROM AN UNFOCUSED BOX. A failed attempt still
+    // FOCUSES the field, and the click this arm is about is the FOCUSING one —
+    // the only click the guard arms for. Without the blur between attempts the
+    // first successful candidate would be a click on an already-focused box, and
+    // the arm would measure the one gesture the guard deliberately does not
+    // touch while looking exactly like a pass.
+    const S = await (async () => {
+      const aim = await freshPanel();
+      if (!aim) throw new Error('S: no panel');
+      const spots = await c.json(String.raw`(() => {
+        const el = ${EDGE_BOX(BOT_TITLE)};
+        if (!el) return null;
+        const b = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        const padR = parseFloat(cs.paddingRight) || 0;
+        const bordR = parseFloat(cs.borderRightWidth) || 0;
+        const inner = b.right - padR - bordR;   // the content box's right edge
+        const y = Math.round(b.bottom - Math.max(3, b.height / 4));  // the DOWN half
+        return {
+          padR, bordR, w: Math.round(b.width), h: Math.round(b.height),
+          spots: [inner - 3, inner - 8, b.right - 5, b.right - 12, inner - 14]
+            .map((x) => ({ x: Math.round(x), y })),
+        };
+      })()`);
+      if (!spots) throw new Error('S: box vanished before the aim');
+      console.log('\n──── ARM S: one click on the spin arrow of an UNFOCUSED box ────');
+      console.log(`        box         : w=${spots.w} h=${spots.h} padRight=${spots.padR} `
+        + `borderRight=${spots.bordR}`);
+      let hit = null, v0 = null, v1 = null, v2 = null;
+      const tried = [];
+      for (const spot of spots.spots) {
+        await blur();
+        await sleep(250);
+        const pre = await boxState(EDGE_BOX(BOT_TITLE));
+        if (pre.focused !== false) throw new Error('S: the box would not give up focus');
+        await clickPoint(spot);
+        await sleep(600);
+        const post = (await boxState(EDGE_BOX(BOT_TITLE))).value;
+        tried.push(`${spot.x}:${pre.value}->${post}`);
+        if (post !== pre.value) {
+          hit = spot; v0 = pre.value; v1 = post;
+          await sleep(1400);
+          v2 = (await boxState(EDGE_BOX(BOT_TITLE))).value;
+          break;
+        }
+      }
+      console.log(`        candidates  : ${tried.join('  ')}`);
+      console.log(hit
+        ? `        HIT at x=${hit.x},y=${hit.y}: ${JSON.stringify(v0)} -> +600ms `
+          + `${JSON.stringify(v1)} -> +2000ms ${JSON.stringify(v2)}`
+        : '        no candidate moved the value: no spin button was reached');
+      return { v0, v1, v2, hit, tried, box: spots };
+    })();
+
     // ═══════════════════════════════════════════════════════════════════════
     console.log('\n──── the arms, one variable ────');
     console.log('        arm  what the PREVIOUS visit left behind                   verdict');
@@ -509,27 +702,46 @@ async function main() {
     }
 
     const v = Object.fromEntries(arms.map((a) => [a.id, a.verdict]));
-    check('2a', 'H and I DISAGREE — a commit during the previous visit is the variable',
-      v.H !== v.I,
+    check('2a', 'THE LAW IS GONE, WHICH IS THE FIX: H no longer disagrees with I',
+      v.H === 'REPLACED' && v.I === 'REPLACED',
       `H (nothing typed) ${v.H}, I (legal value committed) ${v.I}. `
-      + '⚠ If they AGREE the variable is not the commit, and the correlation this run was built '
-      + 'to test is refuted — say that and do not reach for the next candidate in the same breath.');
+      + 'BEFORE THE FIX this row asserted the opposite — H INSERTED and I REPLACED, which is the '
+      + 'law the packet states and the measurement is recorded there '
+      + '(docs/reviews/2026-09-10-numberfield-previous-visit.md, 9/9 rows, loads 2.7-4.0). '
+      + '⚠ It was CORRECT for this row to go red the moment the component was fixed: it asserted '
+      + 'the defect. It is inverted rather than deleted so the pair keeps being watched — a red '
+      + 'here now means H inserts again and the guard in `NumberField` has been lost or narrowed.');
     check('2b', 'J tells TYPING apart from COMMITTING',
       v.J !== undefined && (v.J === v.H || v.J === v.I),
       `J (typed, refused, zero commits) ${v.J}. Matching H (${v.H}) means COMMITTING is what `
       + `matters; matching I (${v.I}) means merely TYPING is. Both are informative; this row `
       + 'only asserts J landed on one of them.');
-    check('2c', 'the run reproduces the DEFECT at least once — an all-REPLACED run proves nothing',
-      arms.some((a) => a.verdict === 'INSERTED'),
-      `verdicts: ${arms.map((a) => `${a.id}=${a.verdict}`).join(' ')}. `
-      + '⚠ If no arm inserted, this run did not reproduce the bug at all and NONE of the rows '
-      + 'above may be read as being about it — not even the greens.');
+    check('2c', 'THIS RUN CAN STILL TELL AN INSERT FROM A REPLACE — arm N inserts, at the caret '
+      + 'the pointer asked for',
+      v.N === 'INSERTED' && N.at === 0,
+      `N (a second click at the LEFT edge of the already-focused box) ${v.N}`
+      + `${N.at >= 0 ? `, caret at ${N.at}` : ''}: `
+      + `${JSON.stringify(N.armed.value)} + "${ONE_KEY}" -> ${JSON.stringify(N.afterKey.value)}. `
+      + 'WHAT THIS ROW IS FOR, TWICE OVER. (1) Every other arm now REPLACES, and a run in which '
+      + 'nothing inserts cannot be told apart from an instrument that has stopped seeing — so the '
+      + 'discriminating population is this arm. Until the fix landed it was the DEFECT that '
+      + 'played this part (arms H and K, INSERTED, recorded in '
+      + 'docs/reviews/2026-09-10-numberfield-previous-visit.md); a fixed build cannot supply that '
+      + 'and must not be asked to. (2) A click inside a box the author is ALREADY IN is the '
+      + 'capability the fix was scoped not to take, so this is also the constraint\'s own row. '
+      + '⚠ A red here is ambiguous by construction and must be read before it is believed: either '
+      + 'the guard widened past the focusing click and ate the deliberate caret, or this run lost '
+      + 'the ability to observe an insert — in which case every REPLACED above says nothing.');
 
-    check('2d', 'THE CONFOUND IS CLEARED: `.select()` alone does NOT cause the replace',
-      v.K === 'INSERTED',
-      `K (select() called, nothing typed) ${v.K}. ⚠ A red here means the \`select()\` call in `
-      + 'arms I and J is a live alternative cause and NEITHER of them supports a claim about '
-      + 'typing. The finding would then be about select(), and this harness introduced it.');
+    check('2d', 'THE FIX REACHES THE `.select()`-ONLY GESTURE TOO: K replaces',
+      v.K === 'REPLACED',
+      `K (select() called, nothing typed) ${v.K}. BEFORE THE FIX this row asserted K INSERTED, `
+      + 'and that was the control clearing this run\'s own confound: `.select()` alone did not '
+      + 'cause the replace, so arms I and J were about TYPING '
+      + '(docs/reviews/2026-09-10-numberfield-previous-visit.md). That question is settled and '
+      + 'cannot be re-asked on a build where nothing inserts. What the row is worth now is '
+      + 'narrower and still worth having: K is the arm whose previous visit called `select()` and '
+      + 'typed nothing, and it is fixed too.');
     check('2e', 'AND THE REALISTIC TYPED GESTURE REPLACES with no select() anywhere',
       v.L === 'REPLACED',
       `L (typed one digit, no select() call) ${v.L}. This is the arm closest to what a person `
@@ -540,9 +752,28 @@ async function main() {
       v.M === 'REPLACED',
       `M (arm H's conditions + mouseup preventDefault) ${v.M}, against H's ${v.H}. `
       + '⚠ This is a REMEDY probe on a listener injected by the harness — it is NOT the shipped '
-      + 'component and must not be reported as one. Green means the click\'s own mouseup default '
-      + 'is what unmakes the selection and the fix has a named shape; red means it is something '
-      + 'else and the fix is NOT yet known, whatever the law above says.');
+      + 'component and must not be reported as one. ⚠ AND SINCE THE FIX LANDED IT DISCRIMINATES '
+      + 'NOTHING: the injected listener now duplicates a guard `NumberField` already has, so M '
+      + 'and H agree and this row would stay green with the probe deleted. It is kept because it '
+      + 'is the arm that NAMED the remedy, and it becomes informative again the moment the '
+      + 'component regresses — H red and M green would say the mechanism still holds and only the '
+      + 'component lost it. Read it beside 2a, never alone.');
+
+    check('4a', 'THE GUARD DID NOT COST THE SPIN BUTTON: one click on the arrow of an UNFOCUSED '
+      + 'box steps ONCE and then stops',
+      S.hit === null ? 'UNMEASURABLE'
+        : Math.abs(Number(S.v1) - Number(S.v0)) === 1 && S.v2 === S.v1,
+      `${JSON.stringify(S.v0)} -> +600ms ${JSON.stringify(S.v1)} -> +2000ms ${JSON.stringify(S.v2)} `
+      + `(hit ${JSON.stringify(S.hit)}; candidates tried ${S.tried.join(', ')}; box `
+      + `w=${S.box.w} padRight=${S.box.padR}). THE FAILURE MODE THIS WATCHES IS NOT AN INERT `
+      + 'SPINNER. '
+      + 'Chromium steps on mousedown, which no mouseup guard can stop; it STOPS THE AUTO-REPEAT '
+      + 'in a mouseup default handler, which a mouseup `preventDefault` would skip. So a '
+      + 'regression here looks like a value that keeps sliding — the +2000ms sample against the '
+      + '+600ms one — and not like a value that never moved. ⚠ UNMEASURABLE, NOT PASS, when the '
+      + 'value never moves at all: that means the pointer did not land on a spin button and this '
+      + 'arm observed nothing. Distinguish the two before reporting either; the reverted build '
+      + 'is the control, and an UNMEASURABLE on BOTH builds is this instrument, not the app.');
   } finally {
     try { c && c.close(); } catch { /* closing a dead socket is not a result */ }
     await killTree(child);
