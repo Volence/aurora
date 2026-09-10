@@ -257,6 +257,70 @@ export function Hint({ children, under = false, tone, style, testid }: {
 }
 
 /**
+ * ═══ THE MESSAGES FOR A GROUP OF FIELDS, RENDERED AFTER THE WHOLE GROUP ═══
+ *
+ * UX seat A, F4. A seat filling a raster band set `Top`, tabbed, clicked `Bot`
+ * at the position they had MEASURED, typed `72`, and got `12872`. Committing
+ * `Top` had rendered an explanatory block inside the field group and moved the
+ * panel below it by 120px: `S/H` went from y=704 to y=824, `addr` from 763 to
+ * 883. They had aimed at a control that had moved.
+ *
+ * ⚠ THAT SEAT RAN A CONTROL BEFORE BELIEVING THEIR OWN DIAGNOSIS, and it is why
+ * this component is about LAYOUT and nothing else. With the panel settled they
+ * repeated the identical click and typed `72` again, and got `72`. So
+ * click-selects-contents works and the bad value was not a difference between
+ * the two boxes. Nothing here changes what a refusal SAYS: that seat quoted this
+ * app's refusal approvingly at length (it named the value, the rule, the legal
+ * range, WHY the range is what it is, and what the field still held, and clamped
+ * nothing), and improving it was never the finding.
+ *
+ * WHAT THIS FIXES, EXACTLY. A message rendered between two boxes of a group can
+ * move the second box under a hand already aimed at it. Rendered after the last
+ * box of the group, it cannot move ANY of them: the group is rigid, and the
+ * shape is `home/OpenByPath.tsx`'s, which landed the same night for the same
+ * reason and put its refusal below the only control in its row.
+ *
+ * ⚠ AND THE RESIDUAL, NAMED RATHER THAN GLOSSED. Content BELOW the group still
+ * moves, so a message about the last box of a group displaces whatever follows
+ * it. Two alternatives close that and both are worse:
+ *
+ *   RESERVING the row's height costs 120px of blank column per field group in a
+ *   ~300px column that already has cards below the fold, and these messages are
+ *   long because they carry the rule and the committed-drift clause.
+ *
+ *   OVERLAYING it (absolute, out of flow) moves nothing and either eats the
+ *   clicks meant for the control it covers, or - with pointer events off -
+ *   paints an unclearable sentence over a `<select>` that has no focus handler
+ *   to dismiss it.
+ *
+ * What is NOT an option is moving the message far from its field: a refusal the
+ * author cannot see is a silent refusal, which is the defect the whole
+ * refuse-at-the-control parcel exists to end. So the rule this component
+ * encodes is "after the group, still beside it", and the residual is one
+ * `<select>` moving after a refused edge rather than a number field taking an
+ * appended value.
+ *
+ * `messages` takes nulls so the caller can hand over its whole slot in source
+ * order without an `.filter()` at every call site; a group with nothing to say
+ * renders nothing at all and occupies no height.
+ */
+export function GroupHints({ messages, tone, testid }: {
+  messages: readonly (string | null)[];
+  tone?: 'warning';
+  testid?: string;
+}): React.ReactElement | null {
+  const live = messages.filter((m): m is string => m !== null && m !== '');
+  if (live.length === 0) return null;
+  return (
+    <>
+      {live.map((m, i) => (
+        <Hint key={m} under tone={tone} testid={i === 0 ? testid : undefined}>{m}</Hint>
+      ))}
+    </>
+  );
+}
+
+/**
  * The label on the disclosure. One string, so the harness and the app cannot
  * drift, and so nobody re-words it per surface.
  */

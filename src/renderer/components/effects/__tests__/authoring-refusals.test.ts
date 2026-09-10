@@ -214,12 +214,24 @@ describe('the controls are wired to the refusals, not to min/max', () => {
   });
 
   it('every refusal is RENDERED, at the warning tone, in the field column', () => {
+    // ⚠ RE-SPELLED FOR THE EDGE PAIR, NOT WEAKENED (UX seat A's F4). The two
+    // edge messages used to be two `{edgeRefusal.x !== null && <Hint under
+    // tone="warning">}` blocks, one after EACH box, which is exactly what moved
+    // the panel 120px under the seat's hand. They are now one `GroupHints` slot
+    // after BOTH boxes, and `GroupHints` renders each live message as
+    // `<Hint under tone={tone}>` - the same element, the same tone, the same
+    // column. The property this row holds is unchanged: a refusal that is
+    // computed and never painted is a silent refusal. The row below it pins
+    // that nothing renders BETWEEN the two boxes, which is the new half.
     for (const re of [
-      /\{edgeRefusal\.top !== null && <Hint under tone="warning">/,
-      /\{edgeRefusal\.bot !== null && <Hint under tone="warning">/,
+      /<GroupHints tone="warning"[\s\S]{0,160}?messages=\{\[edgeRefusal\.top, edgeRefusal\.bot\]\}/,
       /\{lineRefusal !== null && <Hint under tone="warning">/,
       /\{fieldRefusal\[f\] != null && <Hint under tone="warning">/,
     ]) expect(code, `no render for ${re}`).toMatch(re);
+    // GroupHints is the element it claims to be, read from its own source.
+    const layout = readFileSync(join(__dirname, '..', 'column-layout.tsx'), 'utf8');
+    const fn = layout.slice(layout.indexOf('export function GroupHints'));
+    expect(fn.slice(0, 900)).toMatch(/<Hint key=\{m\} under tone=\{tone\}/);
   });
 });
 

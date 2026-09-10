@@ -51,7 +51,7 @@
 
 import React from 'react';
 import { T, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
-import { Field, Hint, Card, CONTROL_INSET } from './column-layout';
+import { Field, Hint, GroupHints, Card, CONTROL_INSET } from './column-layout';
 import { actAndDropFocus } from '../ui/act-and-drop-focus';
 import { deletePresetGuarded } from '../../shell/effects-delete-guard';
 // THE APP'S OWN SWATCH AND THE APP'S OWN PICKER. `GenesisColorSliders` is the
@@ -1355,20 +1355,41 @@ function BandCard({
           see `bandEdgeRefusal`'s docblock for why the line is drawn at rules 1
           and 2 and why the order rule's message ends "move the other edge
           first". */}
+      {/* ═══ TOP AND BOT ARE ONE GROUP, AND NOTHING RENDERS BETWEEN THEM ═══
+
+          UX seat A's F4. A message used to sit here, after `Top` and before
+          `Bot`, and after `Bot` before `S/H`. Committing `Top` therefore grew
+          the panel 120px under a hand already aimed at `Bot` (`S/H` measured
+          y=704 to y=824, `addr` 763 to 883), and the seat's `72` landed on the
+          end of the value they thought they were replacing: `12872`.
+
+          THE TWO EDGES ARE ONE GESTURE. They are the pair every author fills in
+          sequence, they refuse against EACH OTHER (rule 2, "move the other edge
+          first"), and a refusal about one is nearly always read while looking
+          at the other. So they are one group with one message slot after it,
+          and neither box can move because of anything either box says.
+          `GroupHints` carries the whole argument, including the residual it
+          does NOT fix and why the two alternatives are worse. */}
       <Field label="Top" title={BAND_FIELD_TITLES.top}>
         <NumberField title={BAND_FIELD_TITLES.top} width={72} value={band.top}
           refuse={(n) => bandEdgeRefusal(band, presetId, index, 'top', n)}
-          onRefusal={(r) => setEdgeRefusal({ ...edgeRefusal, top: r })}
+          // FUNCTIONAL, because the two boxes write one object. With the
+          // captured value, a refusal on one edge composed against a snapshot
+          // that could already be a render behind the other's - two writes in a
+          // tick and the first one vanishes. Nothing observed it; it is a
+          // latent second way for a sentence to go missing, fixed while the
+          // pair was being made one group.
+          onRefusal={(r) => setEdgeRefusal((s) => ({ ...s, top: r }))}
           onChange={(n) => run(setBandFieldCommand(library, presetId, index, 'top', n))} />
       </Field>
-      {edgeRefusal.top !== null && <Hint under tone="warning">{edgeRefusal.top}</Hint>}
       <Field label="Bot" title={BAND_FIELD_TITLES.bot}>
         <NumberField title={BAND_FIELD_TITLES.bot} width={72} value={band.bot}
           refuse={(n) => bandEdgeRefusal(band, presetId, index, 'bot', n)}
-          onRefusal={(r) => setEdgeRefusal({ ...edgeRefusal, bot: r })}
+          onRefusal={(r) => setEdgeRefusal((s) => ({ ...s, bot: r }))}
           onChange={(n) => run(setBandFieldCommand(library, presetId, index, 'bot', n))} />
       </Field>
-      {edgeRefusal.bot !== null && <Hint under tone="warning">{edgeRefusal.bot}</Hint>}
+      <GroupHints tone="warning" testid="band-edge-refusal"
+        messages={[edgeRefusal.top, edgeRefusal.bot]} />
 
       <Field label="S/H" title={BAND_FIELD_TITLES.sh}>
         <Select title={BAND_FIELD_TITLES.sh}
@@ -1717,13 +1738,19 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
         </Hint>
       )}
 
+      {/* TOP AND LINES ARE ONE GROUP (UX seat A's F4, applied where the seat did
+          not walk). They are the same shape as the band card's edge pair one
+          card up: two boxes filled in sequence, refused against each other by
+          one function (`rampSpanRefusal` reads both to decide either), and a
+          message between them moves the second under the author's hand. The
+          seat authored a band rather than a ramp; that is the only reason they
+          measured 120px here and not on this card. See `GroupHints`. */}
       <Field label="Top" title={RAMP_FIELD_TITLES.top}>
         <NumberField title={RAMP_FIELD_TITLES.top} width={72} value={ramp.top}
           refuse={(n) => rampSpanRefusal(ramp, presetId, 'top', n)}
           onRefusal={say('top')}
           onChange={(n) => run(setRampSpanCommand(library, presetId, 'top', n))} />
       </Field>
-      {said('top') !== null && <Hint under tone="warning">{said('top')}</Hint>}
 
       <Field label="Lines" title={RAMP_FIELD_TITLES.lines}>
         <NumberField title={RAMP_FIELD_TITLES.lines} width={72} value={ramp.lines}
@@ -1731,7 +1758,7 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
           onRefusal={say('lines')}
           onChange={(n) => run(setRampSpanCommand(library, presetId, 'lines', n))} />
       </Field>
-      {said('lines') !== null && <Hint under tone="warning">{said('lines')}</Hint>}
+      <GroupHints tone="warning" messages={[said('top'), said('lines')]} />
 
       {/* ═══ THE ONE PLACE THE DISPLAY LAG IS APPLIED ═══
 
@@ -1778,7 +1805,6 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
           {rampRateUnits('start')}
         </span>
       </Field>
-      {said('start') !== null && <Hint under tone="warning">{said('start')}</Hint>}
 
       <Field label="Step" title={RAMP_FIELD_TITLES.step}>
         <NumberField title={RAMP_FIELD_TITLES.step} width={88}
@@ -1790,7 +1816,10 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
           {rampRateUnits('step')}
         </span>
       </Field>
-      {said('step') !== null && <Hint under tone="warning">{said('step')}</Hint>}
+      {/* START AND STEP ARE THE OTHER PAIR ON THIS CARD, and one group for the
+          same reason: both are the fp16 rate, both are refused by one function,
+          and an author sets them together. */}
+      <GroupHints tone="warning" messages={[said('start'), said('step')]} />
 
       {/* WHAT THE RAMP DOES, in the author's own arithmetic — and the shape that
           makes a curve unthinkable: a first value, a last value and a total is
@@ -2026,7 +2055,6 @@ function BaseSwapBandCard({ library, presetId, index, band, bands, run, lastRefu
           onChange={(n) => run(setBaseSwapLineCommand(library, presetId, index, n))} />
         <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>ON fire</span>
       </Field>
-      {said('line') !== null && <Hint under tone="warning">{said('line')}</Hint>}
 
       {/* ═══ THE ADDRESS, SHOWN AS AN ADDRESS ═══
 
@@ -2044,7 +2072,12 @@ function BaseSwapBandCard({ library, presetId, index, band, bands, run, lastRefu
           {baseSwapTargetGloss(band.target)}
         </span>
       </Field>
-      {said('target') !== null && <Hint under tone="warning">{said('target')}</Hint>}
+      {/* LINE AND TARGET ARE ONE GROUP (UX seat A's F4): two number boxes in a
+          row, and a message between them moves the second under a hand already
+          aimed at it. `restore_line` below keeps its own slot because it is the
+          LAST field of the run - its message already renders after everything it
+          could displace. See `GroupHints`. */}
+      <GroupHints tone="warning" messages={[said('line'), said('target')]} />
 
       {/* ═══ THE OFF FIRE — PRESENT OR ABSENT, NOT SET-OR-ZERO ═══
 
@@ -2203,7 +2236,6 @@ function BoundaryCard({ library, preset, boundary, run }: {
           {BOUNDARY_FIELD_GLOSS.line}
         </span>
       </Field>
-      {said('line') !== null && <Hint under tone="warning">{said('line')}</Hint>}
 
       {/* ═══ THE CHANNEL, WHICH IS THE FIELD THAT DECIDES WHETHER THIS MOVES ═══
 
@@ -2221,7 +2253,14 @@ function BoundaryCard({ library, preset, boundary, run }: {
           {BOUNDARY_FIELD_GLOSS.channel}
         </span>
       </Field>
-      {said('channel') !== null && <Hint under tone="warning">{said('channel')}</Hint>}
+      {/* LINE AND CHANNEL ARE ONE GROUP, AND SO ARE LO AND HI (UX seat A's F4).
+          Four number boxes an author fills top to bottom: a message between any
+          two of them moves the next one under the hand aiming at it, which is
+          the 120px the seat measured on the band card. Paired rather than all
+          four in one slot, so no sentence ends up three fields away from the box
+          it is about - a refusal an author cannot see beside its control is the
+          silent refusal this panel exists to prevent. See `GroupHints`. */}
+      <GroupHints tone="warning" messages={[said('line'), said('channel')]} />
 
       <Field label="Lo" title={BOUNDARY_FIELD_TITLES.lo}>
         <NumberField title={BOUNDARY_FIELD_TITLES.lo} width={72} value={boundary.lo}
@@ -2232,7 +2271,6 @@ function BoundaryCard({ library, preset, boundary, run }: {
           {BOUNDARY_FIELD_GLOSS.lo}
         </span>
       </Field>
-      {said('lo') !== null && <Hint under tone="warning">{said('lo')}</Hint>}
 
       <Field label="Hi" title={BOUNDARY_FIELD_TITLES.hi}>
         <NumberField title={BOUNDARY_FIELD_TITLES.hi} width={72} value={boundary.hi}
@@ -2243,7 +2281,7 @@ function BoundaryCard({ library, preset, boundary, run }: {
           {BOUNDARY_FIELD_GLOSS.hi}
         </span>
       </Field>
-      {said('hi') !== null && <Hint under tone="warning">{said('hi')}</Hint>}
+      <GroupHints tone="warning" messages={[said('lo'), said('hi')]} />
 
       {/* WHAT THE BOUNDARY DOES, in the author's own numbers — including the
           band's LINE COUNT, which is `hi - lo + 1` and is the number nobody
