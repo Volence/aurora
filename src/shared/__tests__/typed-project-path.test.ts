@@ -149,8 +149,17 @@ describe('parseTypedProjectPath refuses with the rule and the fix, each in its o
   // every string above is shown verbatim under the field. check:src-dashes holds
   // the whole file; this row states the property at the point of output.
   it('no refusal carries an em or en dash', () => {
+    // Written as code points, not as a character class holding the two
+    // characters: `check:test-dashes` counts a dash anywhere in this tree,
+    // literals in the row that CHECKS for dashes included, and it is right to.
+    const EN_DASH = 0x2013;
+    const EM_DASH = 0x2014;
     for (const raw of ['', '~/p', 'rel', 'file://host/p', 'file:///%zz', '/']) {
-      expect(why(raw)).not.toMatch(/[–—]/);
+      const offenders = [...why(raw)].filter((c) => {
+        const cp = c.codePointAt(0);
+        return cp === EN_DASH || cp === EM_DASH;
+      });
+      expect(offenders, `in refusal for ${JSON.stringify(raw)}`).toEqual([]);
     }
   });
 });

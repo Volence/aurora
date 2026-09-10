@@ -269,7 +269,8 @@ export default function App() {
             {tabs.filter((t) => t.kind !== 'level' && t.kind !== 'sprite-doc' && t.kind !== 'art-doc').map((tab) => (
               <div key={tab.id} style={{ ...styles.tabPane, display: tab.id === activeId ? 'flex' : 'none' }}>
                 {tab.kind === 'home' ? (
-                  <HomeTab onOpenProject={openProject} onOpenRecent={openProjectByPath} />
+                  <HomeTab onOpenProject={openProject} onOpenRecent={openProjectByPath}
+                    onOpenPath={openProjectByPath} />
                 ) : tab.id === PROJECT_SETUP_TAB.id ? (
                   <ProjectSetupTab />
                 ) : parseGuideTabId(tab.id) ? (
