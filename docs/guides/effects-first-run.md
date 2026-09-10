@@ -38,11 +38,11 @@ act: own preset … · threaded … · bound …    ← the same, act-wide; boun
 
   Parallax                        Colour                            Tile anim
   ────────                        ──────                            ─────────
-  SCENES §2                       RASTER TIMELINE                   TILE ANIMATIONS (n/4) §8
-  LAYERS (n/16 per scene) §2      RASTER BAND PRESETS §3            NEW TILE ANIMATION §8
-  SCENE: <id>                     PRESET: <id> §3
-  SECTION ASSIGNMENT §6           PRESET: <id> · CYCLES, VARIANTS §4
-                                  PRESET: <id> · MOVING ANCHORS §5
+  SCENES §2                       RASTER BAND PRESETS §3            TILE ANIMATIONS (n/4) §8
+  LAYERS (n/16 per scene) §2      PRESET: <id> §3                   NEW TILE ANIMATION §8
+  SCENE: <id>                     PRESET: <id> · CYCLES, VARIANTS §4
+  SECTION ASSIGNMENT §6           PRESET: <id> · MOVING ANCHORS §5
+                                  RASTER TIMELINE
 ```
 
 `PROPERTIES` sits below all three. It is a readout of whatever is selected, not
