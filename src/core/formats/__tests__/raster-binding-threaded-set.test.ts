@@ -68,6 +68,30 @@
 // The precedent is on the same axis and thick: `bg-override-contract-currency`,
 // `aeon-ramp-sign-drift`, `aeon-vsram-mode-drift`, `fg-pool-ceiling-currency`
 // and a dozen more all steer by aeon `origin/master` through git objects.
+//
+// ⚠ WHY A GREEN RUN HERE PROVES NOTHING ABOUT THAT, AND WHAT WAS MEASURED
+// INSTEAD (2026-09-10). On the day of the change aeon's `ojz_effects.emp` was
+// byte-identical between its working tree and `origin/master`, so BOTH read
+// modes agreed and the local green discriminated nothing. The proof is a
+// constructed DIVERGENCE, in a scratch copy of an aeon-shaped checkout — never
+// in aeon itself — where the two disagree about the wired set. Both directions,
+// both gates, one fixture each:
+//
+//   published {5,6} / working tree {5}  ->  THIS FILE: 5 passed
+//                                           the pre-change worktree-reading
+//                                           version: 2 failed | 3 passed
+//   published {5}   / working tree {5,6} -> THIS FILE: 2 failed | 3 passed
+//                                           the pre-change version: 5 passed
+//
+// Perfectly anti-correlated: the colour follows the PUBLISHED bytes and ignores
+// the dirty ones. The mutation was `raster: ojz_act1_sec_raster(sec: 6, hand:
+// Raster_Program_None)` -> `raster: Raster_Program_None`, quoted off disk before
+// each run.
+//
+// The no-fallback property was measured separately, and it is the one a reader
+// should distrust most: against a scratch checkout that HAS the effects library
+// on disk but no resolvable `origin/master`, these rows skipped loudly and did
+// not read the file sitting right there.
 
 import { describe, it, expect } from 'vitest';
 import { existsSync } from 'node:fs';
