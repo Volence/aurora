@@ -247,12 +247,20 @@ describe('the door goes through the public action and nothing else', () => {
     expect(codeOnly(read('debug-level-edit.ts'))).not.toMatch(/\bcommitLayout\s*\(/);
   });
 
-  it('the probe delegates to the door module rather than committing inline', () => {
-    const src = codeOnly(read('debug-hooks.ts'));
-    expect(src).toContain("stampLayoutCell, type StampLayoutCellReport } from './debug-level-edit'");
-    expect(src).toMatch(/stampLayoutCell:\s*\(plane\)\s*=>\s*stampLayoutCell\(/);
-    expect(src, 'debug-hooks must not commit a layout edit of its own')
-      .not.toMatch(/classicSetLayoutCells\s*\(/);
+  // Split for the same reason as the four above: one row, three assertions,
+  // and the first failure hides the rest.
+  it('the probe imports the door from the door module', () => {
+    expect(codeOnly(read('debug-hooks.ts')))
+      .toContain("stampLayoutCell, type StampLayoutCellReport } from './debug-level-edit'");
+  });
+
+  it('the probe member is a delegation, not a second copy of the commit', () => {
+    expect(codeOnly(read('debug-hooks.ts')))
+      .toMatch(/stampLayoutCell:\s*\(plane\)\s*=>\s*stampLayoutCell\(/);
+  });
+
+  it('debug-hooks commits no layout edit of its own', () => {
+    expect(codeOnly(read('debug-hooks.ts'))).not.toMatch(/classicSetLayoutCells\s*\(/);
   });
 
   // ⚠ THIS ROW IS ABOUT THE PRODUCER, NOT THE DOOR. The door's justification is
