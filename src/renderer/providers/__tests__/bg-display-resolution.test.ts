@@ -50,6 +50,9 @@ function act(stripPath: string | null, sectionRef: string | null): Act {
   return {
     id: 'act1', gridWidth: 1, gridHeight: 1,
     sections: [section(sectionRef)],
+    // A hand-built act loaded nothing, so its ledger is empty — which is
+    // exactly zero deletions, never a licence. See ActSectionFileLedger.
+    sectionFiles: { loadedPaths: [], unreadablePaths: [] },
     startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
     bgLayout: new Uint16Array(BG_LAYOUT_WORDS).fill(0xAC7),
     bgTiles: modelTiles(8, 9),

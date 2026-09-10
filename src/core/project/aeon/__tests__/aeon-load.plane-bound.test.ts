@@ -64,7 +64,9 @@ function authoredFile(): Uint8Array {
 }
 
 const read = (fa: FileAccess, base: Uint8Array, unreadable: UnreadableItem[] = []) =>
-  readCollisionPlaneFile(fa, createSection(0, 'sec0'), 'data/z/a/section_0', 'collattr.bin', base, unreadable);
+  readCollisionPlaneFile(
+    fa, createSection(0, 'sec0'), 'data/z/a/section_0', 'collattr.bin', base,
+    { loaded: [], unreadable });
 
 afterEach(() => {
   resetPlaneLengthReports();

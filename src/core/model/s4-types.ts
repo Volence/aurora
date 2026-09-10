@@ -359,11 +359,68 @@ export interface Tileset {
   tiles: Tile[];
 }
 
+/**
+ * WHICH OF THIS ACT'S `section_N.*` FILES THIS LOAD ACTUALLY TOUCHED, and with
+ * what verdict. The record a SAVE-SIDE SWEEP is impossible without.
+ *
+ * ═══ WHY IT EXISTS ════════════════════════════════════════════════════════
+ *
+ * A grid resize re-indexes sections, so the save writes them to new
+ * `section_N` paths and the old ones are stranded. A stranded file at a flat
+ * index the resize left EMPTY is resurrected as a phantom section on the next
+ * open (docs/reviews/2026-09-10-grid-resize-roundtrip.md). Sweeping it needs
+ * the save to answer "is this slot empty because the author emptied it, or
+ * because Aurora could not read the file?" — and until this ledger existed it
+ * could not: `load.ts` pushes `null` for an ABSENT `tiles.bin` and for a
+ * REFUSED one through the same `if (!loaded)` branch, and the `Section` that
+ * carried the `unreadable` record is discarded with the slot. The two facts
+ * arrived at the save as one value, which is this repository's sharpest
+ * recorded defect class.
+ *
+ * ═══ HOW TO READ IT ═══════════════════════════════════════════════════════
+ *
+ * Both lists are POSITIVE claims about a read that was attempted and returned:
+ *
+ *   • `loadedPaths` — Aurora opened this file and understood it. Presence here
+ *     is proof the path IS a section document of this act, which is what makes
+ *     it eligible for removal once the model stops occupying it.
+ *   • `unreadablePaths` — the file is THERE (`FileAccess.exists` said so, or
+ *     could not tell — see `markUnreadable`, which guesses 'present') and the
+ *     read or the parse failed. Never written, never removed.
+ *
+ * A path in NEITHER list is a path nothing here knows anything about: absent,
+ * or never enumerated (a `section_N` beyond the grid project.json declared, so
+ * the load never looked). Those are left alone. The empty ledger therefore
+ * means "this act was not loaded by aeon/load.ts", and it yields ZERO
+ * deletions — the fail-safe direction, and the reason a hand-built `Act`
+ * fixture cannot make a save destructive.
+ *
+ * REQUIRED, on the same rule `S4Project.effectsScenes` states: an optional
+ * field reads downstream as "nothing was refused", which is a different claim
+ * from "nobody looked".
+ */
+export interface ActSectionFileLedger {
+  /** Section files this load READ and understood, project-relative, load order. */
+  loadedPaths: string[];
+  /** Section files that EXIST and would not read or parse. Never touched. */
+  unreadablePaths: string[];
+}
+
 export interface Act {
   id: string;
   gridWidth: number;
   gridHeight: number;
   sections: (Section | null)[];
+  /**
+   * The section-file ledger for THIS act — see `ActSectionFileLedger`. Read by
+   * `core/project/aeon/save.ts` to decide which stranded `section_N.*` files a
+   * save may unlink; written only by `core/project/aeon/load.ts`.
+   *
+   * ⚠ It describes the LOAD, not the current model, and it is deliberately not
+   * updated as the author edits: the question it answers is "what was on disk
+   * when this project was opened, and did Aurora understand it".
+   */
+  sectionFiles: ActSectionFileLedger;
   startPosition: { secX: number; secY: number; localX: number; localY: number };
   bgLayout: Uint16Array | null;
   bgTiles: Tile[] | null;
