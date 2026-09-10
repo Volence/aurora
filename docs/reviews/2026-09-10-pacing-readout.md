@@ -27,7 +27,7 @@ chain, printed by the harness rather than assumed). **10/10 rows.**
 |---|---|
 | fps | **60, 60, 61, 60** over a **1000 ms** window, `targetFps` **60** |
 | frame time | p50 **15.656 ms**, p99 **18.853 ms**, samples 599 |
-| audio | `unmeasured: false`, **underruns 86** (cumulative, since the window opened) |
+| audio | `unmeasured: false`, **underruns 86** — cumulative and **UNMOVED over 26,060 later frames**, see the correction below |
 | presented | 275927 → 276288, **+361 frames over 6.0 s** |
 | server | `implementation: oracle-rs`, build `275f0a42fa4b` (vcs), 62 methods |
 | box | load 7.90 → 7.91 at the reads (five other lanes working; 1-minute figure) |
@@ -74,14 +74,46 @@ Exactly the one method, across two unequal builds. That is the claim; the counts
 CR-S was filed because the owner reported his window **"lags super hard"** and the lane could
 measure his process from outside (97% of one core) but could not state his frame rate. **It can
 now, and the answer is that presentation is at target: 60 on a 60 target, p99 18.9 ms.** So
-whatever he was seeing is not a dropped-frame story on this evidence, and the one nonzero
-distress signal in the whole reply is **`audio.underruns: 86`** — which is the field §11.42's M3
-exists to keep expressible.
+whatever he was seeing is not a dropped-frame story on this evidence.
 
-⚠ **Stated as scope, not as an answer.** This is one 6-second sample on a box at load ~8 with
-five lanes working, and it is not a claim about what he saw at the moment he said it. §11.42's
-own S1 already says the method does not measure presented-under-vsync on the GPU. The useful
-next question is oracle's and not this lane's: whether 86 underruns is the whole complaint.
+### ⚠ CORRECTED WITHIN THE HOUR — THE AUDIO LEAD IS WEAK, AND THE FIRST VERSION OF THIS SECTION WAS WRONG
+
+This section first named **`audio.underruns: 86`** as *"the one nonzero distress signal"* and the
+lane-log entry told him it was **"where the lag you feel most likely lives."** Oracle asked the
+question that instrument did not: **did the counter MOVE?**
+
+```
+run 1  06:41Z  load 7.90   underruns 86 x4    presented 275927 -> 276288
+run 3  06:52Z  load 9.43   underruns 86 x6    presented 301086 -> 301987   (6 reads, 3 s apart)
+```
+
+**It did not.** And the strong form is not "flat over 15 s" — it is flat across the **gap between
+two independent invocations**: `presented` 275927 → 301987 is **26,060 frames put on the glass,
+~7.2 minutes of his window, at two loads, with zero new underruns.** The field carries no window
+of its own, so 86 could date from any moment in that process's 1h15m. **Historical, window
+unknown** — not a lead.
+
+**The defect in the first version, and it is the packet's own rule applied to one field and not
+the other.** Row 4a exists because *a counter read twice is a rate and a field read once is a
+claim* — that is why the frame rate was derived from `presented` instead of read off `fps`. Then
+`underruns: 86` was read off, once, and promoted to a lead. **Being careful about the quantity
+you are thinking about is not the same as being careful.**
+
+⚠ **And note what the caveat below did NOT do.** The scope statement was true and was published
+with the claim, and it protected the claim's *status* while its *content* was wrong. A caveat
+scopes confidence; it does not make a claim less wrong.
+
+⚠ **Stated as scope, not as an answer.** These are three samples on a loaded box, and they are
+not a claim about what he saw at the moment he said it. §11.42's own S1 already says the method
+does not measure presented-under-vsync on the GPU.
+
+**What the reading actually supports, and it is a better artifact than the lead it replaces: his
+window is healthy on BOTH quantities this method measures** — presentation at target, and audio
+quiet across a 7-minute window — **and his complaint is explained by neither.** That sharpens
+rather than blunts the hub's ruling that `F-VSYNC-NEVER-MEASURED` stays open on its subject
+rather than its name (empyrean `1427f53`): with both measured quantities clean, **presented-
+under-vsync on the real GPU is the only place left on this evidence for it to hide**, and it
+needs an instrument nobody has yet.
 
 ## Status
 
