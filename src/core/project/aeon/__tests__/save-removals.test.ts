@@ -241,6 +241,101 @@ describe('buildAeonSavePlan: removals', () => {
     });
 });
 
+/**
+ * ═══ THE GUARD ON THE GUARD, AT THE TWO EFFECTS CALL SITES ════════════════
+ *
+ * `buildAeonSavePlan` calls `removalsFor` three times and every call subtracts
+ * the refused paths a SECOND time — the loader has already kept them out of
+ * `loadedPaths`, so on any reachable load the third argument changes nothing.
+ * That is what makes it deletable: replacing `[...unreadableScenePaths]` and
+ * `[...unreadablePresetPaths]` with `[]` left the WHOLE suite green (measured
+ * by deletion, `SWEEP-SUBTRACTION-UNGUARDED-EFFECTS-SITES` in
+ * docs/lens-findings.jsonl), which is precedent **O20**: a gate resting on its
+ * neighbour is discovered the day the neighbour moves. The section-file site
+ * got its row first (grid-resize-roundtrip.test.ts); these are the other two.
+ *
+ * ⚠ THESE ROWS ARE PHRASED AGAINST THE SUBTRACTION, NOT THE FEATURE. The row
+ * "a document the parser refused is not deleted" already exists above and it
+ * stays GREEN with the subtraction gone, because it passes through the LOAD
+ * side. What discriminates is the FUTURE-LOADER state: a refused path
+ * deliberately present in `loadedPaths`, which no code path produces today and
+ * which each row injects in one statement. So these are evidence about the
+ * guard, and no evidence at all about a live data-loss bug.
+ *
+ * Each row carries the same three anti-vacuity assertions as the section-file
+ * row it is modelled on: the injection reached the plan builder, the refused
+ * path is NOT in `plan.files` (so the FIRST subtraction, `keep`, demonstrably
+ * is not what saves it), and a genuinely removable document IS removed in the
+ * same save (so the row cannot pass on an empty removable set).
+ *
+ * NO SEAM WAS NEEDED, unlike the section-file row's `afterLoad`. These two
+ * libraries hang off `project`, which `buildAeonSavePlan` takes as an argument
+ * and which the rows above already mutate between the real load and the real
+ * plan build. Nothing in `save.ts` changed for these rows.
+ */
+describe('the refused subtraction is load-bearing at the effects call sites', () => {
+  const enc = (s: string) => new TextEncoder().encode(s);
+  /** An interrupted write, not a stub: a real document cut off part-way. */
+  const truncated = (doc: string) => enc(doc.slice(0, Math.floor(doc.length * 0.6)));
+
+  it('SCENES: a loader that admitted a refused path to loadedPaths still does not get it '
+    + 'deleted', async () => {
+    const files = fixtureFiles();
+    const refusedPath = `${SCENE_DIR}broken.json`;
+    files.set(refusedPath, truncated(sceneDoc('broken')));
+
+    const r = await openFixture(files);
+    const lib = r.project.effectsScenes;
+    // The premise, asserted rather than assumed: TODAY the loader refuses it and
+    // keeps it out of the ledger, which is why the subtraction cannot fire.
+    expect(lib.unreadable.map((u) => u.path)).toContain(refusedPath);
+    expect(lib.loadedPaths).not.toContain(refusedPath);
+
+    // THE FUTURE LOADER, in one statement — the only state in which the second
+    // subtraction is the thing standing between this file and an unlink.
+    lib.loadedPaths = [...lib.loadedPaths, refusedPath];
+    // …and a genuinely removable document in the SAME save.
+    lib.scenes = lib.scenes.filter((s) => s.id !== 'victim');
+
+    const plan = await planFor(r, files);
+
+    // The injection reached the plan builder. Without this, a push that failed
+    // to land and a property that holds are the same artifact.
+    expect(r.project.effectsScenes.loadedPaths).toContain(refusedPath);
+    expect(r.project.effectsScenes.unreadable.map((u) => u.path)).toContain(refusedPath);
+    // ANTI-VACUITY: it is not WRITTEN either, so it is not in `keep`, so the
+    // first subtraction is demonstrably not what is saving it.
+    expect(plan.files.map((f) => f.path)).not.toContain(refusedPath);
+    // ANTI-VACUITY: the sweep really ran in this save.
+    expect(plan.removals.map((x) => x.path)).toContain(`${SCENE_DIR}victim.json`);
+    // THE PROPERTY.
+    expect(plan.removals.map((x) => x.path)).not.toContain(refusedPath);
+  });
+
+  it('RASTER PRESETS: a loader that admitted a refused path to loadedPaths still does not '
+    + 'get it deleted', async () => {
+    const files = fixtureFiles();
+    const refusedPath = `${PRESET_DIR}broken_p.json`;
+    files.set(refusedPath, truncated(presetDoc('broken_p')));
+
+    const r = await openFixture(files);
+    const lib = r.project.effectsPresets;
+    expect(lib.unreadable.map((u) => u.path)).toContain(refusedPath);
+    expect(lib.loadedPaths).not.toContain(refusedPath);
+
+    lib.loadedPaths = [...lib.loadedPaths, refusedPath];
+    lib.presets = lib.presets.filter((p) => p.id !== 'victim_p');
+
+    const plan = await planFor(r, files);
+
+    expect(r.project.effectsPresets.loadedPaths).toContain(refusedPath);
+    expect(r.project.effectsPresets.unreadable.map((u) => u.path)).toContain(refusedPath);
+    expect(plan.files.map((f) => f.path)).not.toContain(refusedPath);
+    expect(plan.removals.map((x) => x.path)).toContain(`${PRESET_DIR}victim_p.json`);
+    expect(plan.removals.map((x) => x.path)).not.toContain(refusedPath);
+  });
+});
+
 describe('removalsFor: the rule itself, with the loader out of the way', () => {
   const describePath = (p: string) => `thing ${p}`;
 
