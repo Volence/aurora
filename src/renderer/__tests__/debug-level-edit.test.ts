@@ -227,14 +227,24 @@ describe('stampLayoutCell', () => {
 // ---------------------------------------------------------------------------
 
 describe('the door goes through the public action and nothing else', () => {
-  it('the door module commits with classicSetLayoutCells and writes no flag itself', () => {
-    const src = codeOnly(read('debug-level-edit.ts'));
-    expect(src).toContain('classicSetLayoutCells(');
-    // The three ways past the boundary, each named so a failure says which.
-    expect(src, 'the door must not call setState').not.toMatch(/\.setState\s*\(/);
-    expect(src, 'the door must not assign a dirty flag').not.toMatch(/\bdirty\s*:/);
-    expect(src, 'the door must not reach past the public action to commitLayout')
-      .not.toMatch(/\bcommitLayout\s*\(/);
+  // ⚠ FOUR ROWS, NOT ONE, and the reason is a measured one. Written as a single
+  // row with four assertions, the first failure aborts the rest, so a mutation
+  // that trips three of them reddens one line and the other two are never
+  // evaluated. That is indistinguishable from three guards that do not exist.
+  it('the door module commits with classicSetLayoutCells', () => {
+    expect(codeOnly(read('debug-level-edit.ts'))).toContain('classicSetLayoutCells(');
+  });
+
+  it('the door module never calls setState', () => {
+    expect(codeOnly(read('debug-level-edit.ts'))).not.toMatch(/\.setState\s*\(/);
+  });
+
+  it('the door module never assigns a dirty flag', () => {
+    expect(codeOnly(read('debug-level-edit.ts'))).not.toMatch(/\bdirty\s*:/);
+  });
+
+  it('the door module never reaches past the public action to commitLayout', () => {
+    expect(codeOnly(read('debug-level-edit.ts'))).not.toMatch(/\bcommitLayout\s*\(/);
   });
 
   it('the probe delegates to the door module rather than committing inline', () => {
