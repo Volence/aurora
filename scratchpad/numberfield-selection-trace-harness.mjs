@@ -631,27 +631,66 @@ async function main() {
     // if the value never moves at all, the pointer did not land on a spin
     // button and this instrument measured nothing. That is a different fact
     // from a runaway and the row separates them.
+    // ⚠ AND THE AIM IS SEARCHED, NOT ASSUMED, because the first version of this
+    // arm guessed `right - 4` and came back UNMEASURABLE on a build where the
+    // spinner was fine. Chromium's inner spin button sits inside the CONTENT
+    // box, so the field's own right PADDING is dead space between the border and
+    // the arrows — `right - 4` lands in it and hits nothing. The candidates
+    // below start from the computed padding and widen; the row reports which one
+    // landed, so a later reader can see the aim rather than trust it.
+    //
+    // ⚠ EVERY CANDIDATE IS TRIED FROM AN UNFOCUSED BOX. A failed attempt still
+    // FOCUSES the field, and the click this arm is about is the FOCUSING one —
+    // the only click the guard arms for. Without the blur between attempts the
+    // first successful candidate would be a click on an already-focused box, and
+    // the arm would measure the one gesture the guard deliberately does not
+    // touch while looking exactly like a pass.
     const S = await (async () => {
       const aim = await freshPanel();
       if (!aim) throw new Error('S: no panel');
-      const spin = await c.json(String.raw`(() => {
+      const spots = await c.json(String.raw`(() => {
         const el = ${EDGE_BOX(BOT_TITLE)};
         if (!el) return null;
         const b = el.getBoundingClientRect();
-        return { x: Math.round(b.right - 4), y: Math.round(b.bottom - 4), w: Math.round(b.width) };
+        const cs = getComputedStyle(el);
+        const padR = parseFloat(cs.paddingRight) || 0;
+        const bordR = parseFloat(cs.borderRightWidth) || 0;
+        const inner = b.right - padR - bordR;   // the content box's right edge
+        const y = Math.round(b.bottom - Math.max(3, b.height / 4));  // the DOWN half
+        return {
+          padR, bordR, w: Math.round(b.width), h: Math.round(b.height),
+          spots: [inner - 3, inner - 8, b.right - 5, b.right - 12, inner - 14]
+            .map((x) => ({ x: Math.round(x), y })),
+        };
       })()`);
-      if (!spin) throw new Error('S: box vanished before the aim');
-      const v0 = (await boxState(EDGE_BOX(BOT_TITLE))).value;
-      await clickPoint(spin);
-      await sleep(600);
-      const v1 = (await boxState(EDGE_BOX(BOT_TITLE))).value;
-      await sleep(1400);
-      const v2 = (await boxState(EDGE_BOX(BOT_TITLE))).value;
+      if (!spots) throw new Error('S: box vanished before the aim');
       console.log('\n──── ARM S: one click on the spin arrow of an UNFOCUSED box ────');
-      console.log(`        aim         : ${JSON.stringify(spin)}   (right edge, lower half)`);
-      console.log(`        value       : ${JSON.stringify(v0)} -> +600ms ${JSON.stringify(v1)}`
-        + ` -> +2000ms ${JSON.stringify(v2)}`);
-      return { v0, v1, v2, spin };
+      console.log(`        box         : w=${spots.w} h=${spots.h} padRight=${spots.padR} `
+        + `borderRight=${spots.bordR}`);
+      let hit = null, v0 = null, v1 = null, v2 = null;
+      const tried = [];
+      for (const spot of spots.spots) {
+        await blur();
+        await sleep(250);
+        const pre = await boxState(EDGE_BOX(BOT_TITLE));
+        if (pre.focused !== false) throw new Error('S: the box would not give up focus');
+        await clickPoint(spot);
+        await sleep(600);
+        const post = (await boxState(EDGE_BOX(BOT_TITLE))).value;
+        tried.push(`${spot.x}:${pre.value}->${post}`);
+        if (post !== pre.value) {
+          hit = spot; v0 = pre.value; v1 = post;
+          await sleep(1400);
+          v2 = (await boxState(EDGE_BOX(BOT_TITLE))).value;
+          break;
+        }
+      }
+      console.log(`        candidates  : ${tried.join('  ')}`);
+      console.log(hit
+        ? `        HIT at x=${hit.x},y=${hit.y}: ${JSON.stringify(v0)} -> +600ms `
+          + `${JSON.stringify(v1)} -> +2000ms ${JSON.stringify(v2)}`
+        : '        no candidate moved the value: no spin button was reached');
+      return { v0, v1, v2, hit, tried, box: spots };
     })();
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -722,10 +761,12 @@ async function main() {
 
     check('4a', 'THE GUARD DID NOT COST THE SPIN BUTTON: one click on the arrow of an UNFOCUSED '
       + 'box steps ONCE and then stops',
-      S.v1 === S.v0 ? 'UNMEASURABLE'
+      S.hit === null ? 'UNMEASURABLE'
         : Math.abs(Number(S.v1) - Number(S.v0)) === 1 && S.v2 === S.v1,
       `${JSON.stringify(S.v0)} -> +600ms ${JSON.stringify(S.v1)} -> +2000ms ${JSON.stringify(S.v2)} `
-      + `(aim ${JSON.stringify(S.spin)}). THE FAILURE MODE THIS WATCHES IS NOT AN INERT SPINNER. `
+      + `(hit ${JSON.stringify(S.hit)}; candidates tried ${S.tried.join(', ')}; box `
+      + `w=${S.box.w} padRight=${S.box.padR}). THE FAILURE MODE THIS WATCHES IS NOT AN INERT `
+      + 'SPINNER. '
       + 'Chromium steps on mousedown, which no mouseup guard can stop; it STOPS THE AUTO-REPEAT '
       + 'in a mouseup default handler, which a mouseup `preventDefault` would skip. So a '
       + 'regression here looks like a value that keeps sliding — the +2000ms sample against the '
