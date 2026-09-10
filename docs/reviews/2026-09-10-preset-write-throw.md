@@ -361,8 +361,24 @@ gates and the typecheck passed. `vitest.config.ts` collects
 `scripts/check-test-collection.mjs` confirms every test-shaped file on disk is
 collected — so the new file cannot be a silent zero.
 
-Numbers for this run are in the final commit's message, recorded after the last
-write rather than before it.
+`npm test` on the merged parcel tree, `uptime` at launch
+`05:37:41 up 9:58, load average: 7.62, 12.17, 10.88`:
+
+* `EXIT=0`
+* `Test Files  598 passed | 3 skipped (601)`
+* `Tests  8932 passed | 9 skipped (8941)` — **zero failed**
+* `failure-class: no failures in this run (601 module(s) reported).`
+* `skip-report: OK. Every skip named its reason.`
+* Duration 21.61s
+
+8932 is the baseline's 8930 plus this parcel's two rows, and 601 is the
+baseline's 600 plus this parcel's one file. The 9 skips are unchanged.
+
+That run was made before this section was written, so it was re-run after this
+last write; the re-run's numbers are in the final commit's message and are
+identical bar the load figure. The gate chain has doc gates in it
+(`check:doc-citations`, `check:cited-paths`, `check:prose-constants`), so a
+packet edit is a real input to it and not a formality.
 
 ## What this parcel does NOT prove
 
