@@ -166,6 +166,17 @@ export async function buildAeonSavePlan(
 
   const dataPath = actConfig.dataPath;
 
+  // Every section path THIS PLAN WRITES, collected as the loop pushes them —
+  // the `keep` argument of the stranded-file sweep below. Derived from the
+  // pushes themselves rather than re-computed from the grid, so a write the loop
+  // makes on a condition this line did not anticipate (the meta and chunklinks
+  // sidecars each have three branches) can never end up in the removable set.
+  const sectionPathsWritten: string[] = [];
+  const writeSection = (file: AeonSaveFile): void => {
+    files.push(file);
+    sectionPathsWritten.push(file.path);
+  };
+
   // Write per-section data files
   for (let i = 0; i < act.sections.length; i++) {
     const section = act.sections[i];
@@ -183,7 +194,7 @@ export async function buildAeonSavePlan(
     // Write nametable (.tiles.bin)
     if (understood('tiles.bin')) {
       const ntData = serializeNametable(section.tileGrid.nametable);
-      files.push({ path: `${prefix}.tiles.bin`, bytes: ntData });
+      writeSection({ path: `${prefix}.tiles.bin`, bytes: ntData });
     }
 
     // Write editable collision attr plane (.collattr.bin) — the authored
@@ -196,11 +207,11 @@ export async function buildAeonSavePlan(
     // the baked baseline — every authored cell in the section, gone.
     if (understood('collattr.bin') && section.collisionEdit) {
       const caData = serializeCollAttr(section.collisionEdit);
-      files.push({ path: `${prefix}.collattr.bin`, bytes: caData });
+      writeSection({ path: `${prefix}.collattr.bin`, bytes: caData });
     }
     if (understood('collattrb.bin') && section.collisionEditB) {
       const cbData = serializeCollAttr(section.collisionEditB);
-      files.push({ path: `${prefix}.collattrb.bin`, bytes: cbData });
+      writeSection({ path: `${prefix}.collattrb.bin`, bytes: cbData });
     }
 
     // Write objects (.objects.json)
@@ -209,14 +220,14 @@ export async function buildAeonSavePlan(
       // see canonical-json.ts jsonFileText. Same for every JSON write below.
       const objectsJson = jsonFileText(JSON.stringify(section.objects, null, 2));
       const objectsBytes = new TextEncoder().encode(objectsJson);
-      files.push({ path: `${prefix}.objects.json`, bytes: objectsBytes, compare: 'json' });
+      writeSection({ path: `${prefix}.objects.json`, bytes: objectsBytes, compare: 'json' });
     }
 
     // Write rings (.rings.json)
     if (understood('rings.json')) {
       const ringsJson = jsonFileText(JSON.stringify(section.rings, null, 2));
       const ringsBytes = new TextEncoder().encode(ringsJson);
-      files.push({ path: `${prefix}.rings.json`, bytes: ringsBytes, compare: 'json' });
+      writeSection({ path: `${prefix}.rings.json`, bytes: ringsBytes, compare: 'json' });
     }
 
     // Write meta sidecar (.meta.json) — scalar refs (bgLayoutRef,
@@ -246,7 +257,7 @@ export async function buildAeonSavePlan(
       const metaPath = `${prefix}.meta.json`;
       if (metaJson !== null) {
         const metaBytes = new TextEncoder().encode(metaJson);
-        files.push({ path: metaPath, bytes: metaBytes, compare: 'section-meta' });
+        writeSection({ path: metaPath, bytes: metaBytes, compare: 'section-meta' });
       } else if (await fa.exists(metaPath)) {
         // Every ref the sidecar can hold must be named here, not just the ones
         // this branch happened to know about when it was written: a ref missing
@@ -254,7 +265,7 @@ export async function buildAeonSavePlan(
         const clearedBytes = new TextEncoder().encode(
           jsonFileText(JSON.stringify(
             { bgLayoutRef: null, paletteRef: null, rasterRef: null, sceneRef: null }, null, 2)));
-        files.push({ path: metaPath, bytes: clearedBytes, compare: 'section-meta' });
+        writeSection({ path: metaPath, bytes: clearedBytes, compare: 'section-meta' });
       }
     }
 
@@ -273,12 +284,64 @@ export async function buildAeonSavePlan(
       const linksText = serializeSectionChunkLinks(section.chunkLinks);
       const linksPath = `${prefix}.chunklinks.json`;
       if (linksText !== null) {
-        files.push({ path: linksPath, bytes: new TextEncoder().encode(jsonFileText(linksText)), compare: 'json' });
+        writeSection({ path: linksPath, bytes: new TextEncoder().encode(jsonFileText(linksText)), compare: 'json' });
       } else if (await fa.exists(linksPath)) {
-        files.push({ path: linksPath, bytes: new TextEncoder().encode(jsonFileText(clearedChunkLinksText())), compare: 'json' });
+        writeSection({ path: linksPath, bytes: new TextEncoder().encode(jsonFileText(clearedChunkLinksText())), compare: 'json' });
       }
     }
   }
+
+  // ═══ THE STRANDED SECTION FILES ═════════════════════════════════════════
+  //
+  // A grid resize re-indexes every section, so the loop above just wrote them
+  // to their NEW `section_N` paths and the old ones are still on disk. One
+  // sitting at a flat index the resize left EMPTY is not inert: the next open
+  // enumerates that slot, finds a `tiles.bin`, and resurrects a phantom
+  // duplicate — after which the save writes it back and the phantom is real.
+  // See docs/reviews/2026-09-10-grid-resize-roundtrip.md.
+  //
+  // THE HARD PART IS NOT THE SWEEP, IT IS THE PERMISSION. `act.sections[i]`
+  // being null is NOT evidence that flat i is free: load.ts pushes null both
+  // for a slot whose `tiles.bin` is ABSENT and for one whose `tiles.bin` it
+  // REFUSED to parse, and the Section carrying that refusal is discarded with
+  // the slot. Deleting on that ambiguity destroys the very file the refusal was
+  // protecting — the failure this file's own banner (`removalsFor`, and the
+  // `understood()` gate above) exists to prevent, and this repository's
+  // sharpest recorded defect class: a guard whose "I could not look" and "I
+  // looked and there is nothing" were the same value.
+  //
+  // So the permission comes from `Act.sectionFiles`, the load's own ledger, and
+  // it is POSITIVE on both ends:
+  //
+  //   removable = (paths this load READ and UNDERSTOOD as this act's section
+  //                documents)  MINUS  (paths this plan is writing)
+  //                            MINUS  (paths the load REFUSED)
+  //
+  // A path is deletable only because Aurora once opened it successfully. The
+  // absence of a reason to keep a file is never a reason to delete it, so:
+  //
+  //   • a `section_N` file that was ABSENT is in no list and is not removed
+  //     (nothing to remove — it is the ordinary empty slot);
+  //   • a `section_N` file that REFUSED is in `unreadablePaths`, subtracted a
+  //     second time exactly as `removalsFor`'s docblock describes, and left on
+  //     disk for a hand repair. It is not written either (`understood()`), so a
+  //     refused file survives a save untouched in both directions;
+  //   • a `section_N` beyond the grid project.json declared was never
+  //     enumerated, so it is in no list and is left alone. That is a real
+  //     limitation and a deliberate one: it would have to be deleted on a
+  //     directory listing, which is the "no reason to keep it" shape;
+  //   • an act built by hand rather than by aeon/load.ts has an EMPTY ledger,
+  //     which yields zero removals rather than a licence.
+  //
+  // The `keep` set is `sectionPathsWritten`, gathered from the pushes above
+  // rather than recomputed here, so a slot the loop wrote for a reason this
+  // block did not model cannot be swept out from under it.
+  removals.push(...removalsFor(
+    act.sectionFiles.loadedPaths,
+    sectionPathsWritten,
+    act.sectionFiles.unreadablePaths,
+    (path) => `stranded section file ${path.slice(path.lastIndexOf('/') + 1)}`,
+  ));
 
   // Save chunk library
   if (config.chunkLibraryPath && project.chunkLibrary.length > 0) {

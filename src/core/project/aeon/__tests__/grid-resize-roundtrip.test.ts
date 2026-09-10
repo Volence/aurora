@@ -25,7 +25,7 @@
 // files is computed from the resized grid's own occupancy, not from a listing
 // anyone printed once.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { FileAccess } from '../../adapter';
 import { loadAeonProject } from '../load';
 import { buildAeonSavePlan } from '../save';
@@ -206,44 +206,93 @@ describe('aeon grid resize round trip', () => {
   });
 
   /**
-   * ⚠ THIS TEST PINS A DEFECT THAT IS STILL OPEN. It asserts what Aurora does
-   * today, not what it should do. Delete it, and restore the two commented
-   * assertions at the bottom of it, when the orphaned-section-file row lands.
+   * WAS `KNOWN DEFECT, still open: a stranded section file resurrects a phantom
+   * section`, and is the same property with its two pinned assertions restored
+   * (2026-09-10, docs/reviews/2026-09-10-resize-orphan-sweep.md). The defect:
    *
    * The grid-dimension sync (core/project/aeon/save.ts) stops the widening
-   * resize from LOSING a section. It does not clean up the section files the
+   * resize from LOSING a section. It did not clean up the section files the
    * re-index stranded: widening 2x2 to 3x2 writes the bottom row to its new
    * flat indices 3 and 4 and leaves the pre-resize section_2 and section_3
    * files on disk. section_3 is overwritten, section_2 is not, and flat 2 is a
-   * slot the resize left EMPTY, so the reopen finds a file there and resurrects
-   * a phantom duplicate of the section that used to live at flat 2.
+   * slot the resize left EMPTY, so the reopen found a file there and
+   * resurrected a phantom duplicate of the section that used to live at flat 2.
    *
-   * The sweep is a SEPARATE row and not a one-line addition here, because the
-   * save cannot currently tell a slot the author emptied from a slot whose
-   * `tiles.bin` the LOADER refused to parse: load.ts pushes `null` for both and
-   * the `unreadable` record it made is dropped with the discarded section. This
-   * file's own banner forbids destroying data on a parse failure, so the sweep
-   * needs a load-side ledger of which absent slots were absent because Aurora
-   * could not read them. See docs/reviews/2026-09-10-grid-resize-roundtrip.md.
+   * What made the sweep a separate row was that the save could not tell a slot
+   * the author emptied from a slot whose `tiles.bin` the LOADER refused to
+   * parse: load.ts pushes `null` for both. `Act.sectionFiles` now carries that
+   * apart, and the sweep is gated on it. The REFUSED half is the next row down,
+   * and the load-side discrimination is __tests__/section-file-ledger.test.ts.
    */
-  it('KNOWN DEFECT, still open: a stranded section file resurrects a phantom section', async () => {
+  it('a stranded section file is swept, so no phantom section comes back', async () => {
     const files = fixtureFiles(2, 2);
     const { resized, after } = await resizeSaveReopen(files, 3, 2);
 
     // Derived, not observed: flat 2 is empty in the resized grid, and the
-    // stranded file at that path is the section the fixture put at flat 2
-    // BEFORE the resize, so it carries markerFor(2).
+    // stranded file at that path held the section the fixture put at flat 2
+    // BEFORE the resize, so it carried markerFor(2). Asserting the marker is
+    // gone by name, not merely that the slot is empty.
     expect(resized.sections[2]).toBeNull();
-    expect(sectionTileFileIndices(files)).toContain(2);
+    expect(markerFor(2)).toBe(0x0102);
 
+    // The file set on disk is exactly the resized grid's own occupancy.
+    expect(sectionTileFileIndices(files)).toEqual(
+      resized.sections.map((s, i) => (s == null ? -1 : i)).filter((i) => i >= 0));
     const reopened = after.project.zones[0].acts[0];
-    expect(reopened.sections[2]).not.toBeNull();
-    expect(reopened.sections[2]!.tileGrid.nametable[0]).toBe(markerFor(2));
+    expect(reopened.sections[2]).toBeNull();
+  });
 
-    // WHAT IT SHOULD SAY once the sweep lands:
-    //   expect(sectionTileFileIndices(files)).toEqual(
-    //     resized.sections.map((s, i) => (s == null ? -1 : i)).filter((i) => i >= 0));
-    //   expect(reopened.sections[2]).toBeNull();
+  /**
+   * THE DESTRUCTIVE HALF, ON THE SIDE THAT MATTERS.
+   *
+   * The sweep above deletes files. The one thing it must never delete is a
+   * section file Aurora could not read: `act.sections[i] === null` is the value
+   * the loader produces both for a slot with nothing in it and for a slot whose
+   * `tiles.bin` was truncated, and a sweep reading THAT would take the
+   * truncated file away on the next Ctrl+S. The author's repairable file would
+   * be gone, silently, exactly as the 2026-09-05 unreadable-table defect went.
+   *
+   * The fixture puts a truncated `tiles.bin` at flat 2 of a 2x2 act and then
+   * widens the grid, which is the same op the row above runs. Flat 2 is empty
+   * afterwards for BOTH reasons at once, and the two must come out different:
+   * the file the loader READ (flat 3, re-indexed to flat 4) is swept; the file
+   * the loader REFUSED (flat 2) is left byte for byte where it is.
+   */
+  it('a section file the loader REFUSED is neither swept nor overwritten', async () => {
+    const files = fixtureFiles(2, 2);
+    // Truncated by one row: a hand edit or an interrupted write, not a stub.
+    const whole = files.get(`${DATA_PATH}section_2.tiles.bin`)!;
+    const truncated = whole.slice(0, whole.length - SECTION_TILES_WIDE * 2);
+    files.set(`${DATA_PATH}section_2.tiles.bin`, truncated);
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let plan;
+    let before;
+    try {
+      ({ plan, before } = await resizeSaveReopen(files, 3, 2));
+    } finally {
+      warn.mockRestore();
+    }
+
+    // The fixture is doing what it claims: the loader refused this file, said
+    // so, and dropped the section. Without this the row could pass on a
+    // fixture whose file parsed fine.
+    const refusedPath = `${DATA_PATH}section_2.tiles.bin`;
+    const act = before.project.zones[0].acts[0];
+    expect(act.sectionFiles.unreadablePaths).toContain(refusedPath);
+    expect(act.sectionFiles.loadedPaths).not.toContain(refusedPath);
+
+    // NOT DELETED.
+    expect(plan.removals.map(r => r.path)).not.toContain(refusedPath);
+    // NOT OVERWRITTEN.
+    expect(plan.files.map(f => f.path)).not.toContain(refusedPath);
+    // And still on disk, byte for byte, after the plan was applied.
+    expect(files.get(refusedPath)).toEqual(truncated);
+
+    // Meanwhile the sweep DID run in this same save: the file the loader read
+    // at flat 3, whose section the resize moved to flat 4, is gone. A row that
+    // only proved the refusal would also pass with the sweep switched off.
+    expect(plan.removals.map(r => r.path)).toContain(`${DATA_PATH}section_3.tiles.bin`);
   });
 
   it('a shrunk grid keeps its new dimensions across save and reopen', async () => {
