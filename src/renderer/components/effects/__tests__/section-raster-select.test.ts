@@ -248,10 +248,15 @@ describe('the control adds no second wording of the limit', () => {
     // is a preset SPLIT plus a line, not one line). The anti-vacuous loop below
     // is what caught it: a phrase that leaves the constant stops being a sample
     // of it and would otherwise assert nothing about the panel forever.
+    // ⚠ AND IT WENT RED AGAIN ON 2026-09-10, THE SAME MECHANISM: the constant
+    // stopped saying "a preset split plus one call-site line" because "sections
+    // 6-8 share one record" was a snapshot that expired at aeon `6ae88363`. The
+    // replacement phrase states the RULE (split first only if the record is
+    // shared), so it does not carry a section list that can move.
     const phrases = [
       'does not install it', 'assign_section_preset writes it',
       'changes nothing on screen', 'costs ROM',
-      'a preset split plus one call-site line',
+      'a record SPLIT first if it shares one',
     ];
     // ANTI-VACUOUS: these really are the constant's phrases, so a green here is
     // about the panel and not about five strings nobody wrote.

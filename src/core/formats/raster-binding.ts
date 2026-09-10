@@ -195,6 +195,10 @@
  *     the lie it exists to prevent — pointed the other way, again. And if the
  *     seam gate stops refusing case 3, the "no longer silent" clause becomes the
  *     lie instead; do not keep it because a guard was once announced.
+ *     ⚠ THAT PREDICTION CAME TRUE ON 2026-09-03 AND NOTHING READ IT. Section 6
+ *     was threaded; both named consequences landed exactly as written; the
+ *     sentence went on shipping for seven days. See the 2026-09-10 block at the
+ *     foot of this header for why, and for the gate that now reads it.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * 2026-08-30, LATER THE SAME DAY: THE EXPIRY IS ARMED AND HAS NOT FIRED
@@ -532,6 +536,114 @@
  * aeon's lane, three files to re-read). It is narrower than the sentence's
  * main EXPIRES list on purpose: a second threaded section would fire both.
  *
+ * ⚠⚠ AND BOTH FIRED, ON 2026-09-03, AND NEITHER WAS READ FOR SEVEN DAYS. See the
+ * 2026-09-10 block at the foot of this header: a second section WAS threaded,
+ * this prediction was exactly right about what would happen, and being right
+ * changed nothing because no instrument read this sentence. The lesson is
+ * recorded there and the wording has been rebuilt so a snapshot cannot be the
+ * only thing holding a claim up.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 2026-09-10: THE EXPIRY FIRED ON 2026-09-03 AND NOTHING READ IT FOR SEVEN DAYS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * THIS IS THE FINDING, and it outranks the wording repair underneath it.
+ *
+ * Every block above ends the same way: a dated EXPIRES list naming the exact
+ * change that would falsify the sentence, with "EVALUATE, DO NOT OBEY" under
+ * it. The FIRST clause of every one of those lists is *a second section is
+ * threaded*. On 2026-09-03 aeon threaded one, and the sentence went on being
+ * published to authors and to agents until 2026-09-10.
+ *
+ * WHAT HAPPENED, WITH TIMES (aeon commit dates are `%ad`; the ARRIVAL time is
+ * from this machine's aeon reflog for `origin/master`, not a commit date):
+ *   • aeon `6ae88363` ("EFFECTS-W1 item 11a authorable — base_swap preset key +
+ *     real section 6 binding"), authored 2026-09-03 16:13:33 -0400. It threads
+ *     `raster: ojz_act1_sec_raster(sec: 6, hand: Raster_Program_None)` into a
+ *     new `OJZ_Preset_Sec6`, and commits
+ *     `games/sonic4/data/editor/ojz/act1/section_6.meta.json` with
+ *     `"rasterRef": "ojz_sec6_baseswap"`.
+ *   • It ARRIVED in this machine's aeon checkout at 2026-09-03 16:47:34 -0400
+ *     (first `origin/master` reflog entry containing it, `850d4c60`; the
+ *     entry before it, `69bb4dce` at 16:38:59, does not).
+ *   • Aurora's OWN derived-set rows in
+ *     `core/formats/effects/__tests__/section-wiring.test.ts` went red on it and
+ *     were re-pinned to `{OJZ_Preset_Sec5: 5, OJZ_Preset_Sec6: 6}` and
+ *     `wiredSections(...) === [5, 6]` at aurora `49dc5827`, 2026-09-03 17:22:20
+ *     -0400 — THIRTY-FIVE MINUTES after arrival. The alarm rang, on time, in
+ *     this repository.
+ *   • This file was not touched. Its last content edit before today is
+ *     `54e6da47` (2026-09-02); `07058678` (2026-09-05) is a whole-tree dash
+ *     sweep that changed no claim.
+ *
+ * SO THE ANSWER TO "WHY DIDN'T THE EXPIRY FIRE" IS NOT "THERE WAS NO GATE".
+ * There was one, it was correct, it read aeon's real file, it went red at the
+ * right moment and a person fixed it inside the hour. What did not exist was any
+ * link from that derivation to THIS SENTENCE. The repository held the same fact
+ * twice — once DERIVED and gated (`section-wiring.ts` + its real-tree rows),
+ * once as PROSE pinned by wording tests — and the two disagreed for a week with
+ * every check green.
+ *
+ * ⚠ AND THE WORDING TESTS MADE IT WORSE, WHICH IS THE PART WORTH KEEPING.
+ * `band-preset-wording.test.ts` and `agent-handler.assign-section-preset.test.ts`
+ * asserted `toMatch(/ONLY SECTION 5 IS WIRED/)` against this constant. Those
+ * rows are green exactly while the sentence is FALSE and would have gone red on
+ * a correct repair. A wording test pins a STRING, not a FACT; pointed at a claim
+ * about another repo it is an anti-expiry — it defends the snapshot from the
+ * correction. That is the shape to look for elsewhere: a peer-facing claim whose
+ * only automated reader checks that it has not changed.
+ *
+ * THE OTHER CLAUSE THAT HAD ALREADY EXPIRED, found in the same census and NOT
+ * caused by section 6: the sentence said the case-3 refusal is skippable,
+ * *"nothing here warns, and FAST=1 skips that gate"*. False since aeon's
+ * 2026-09-02 walkthrough finding b4 — `build.sh` now runs
+ * `tools/effects_seam_gate.py --source-only` as an unconditional pre-build check
+ * under `FAST == 1 && GAME == sonic4`, and their
+ * `TestSourceOnlyMode::test_it_REACHES_the_raster_binding_step` pins that the
+ * raster block is inside it. That clause was in the EXPIRES list too (*"or
+ * build.sh runs it under FAST=1"*) and had been false for EIGHT days. Two
+ * independent clauses of one list, both fired, both unread: the failure is the
+ * list's readership, not any one clause's drafting.
+ *
+ * WHAT WAS RETIRED, EXACTLY:
+ *   • `ONLY SECTION 5 IS WIRED` and *"exactly one preset() … passes the chooser
+ *     to its raster: channel"* — replaced by the RULE (a section is wired when
+ *     some `preset()` threads `ojz_act1_sec_raster(sec: N)`), the INSTRUMENT
+ *     (Aurora re-derives it per load; the panel strip renders the derivation),
+ *     the COMMAND that answers it at a terminal, and only then a dated,
+ *     refutable reading.
+ *   • `EditorRaster_OJZ_Act1_Bindings is 1` → 2 (`effects_scenes.emp:315` at
+ *     aeon `a6aaf581`; the chooser's arms are `:399` and `:400`).
+ *   • `exactly one sidecar carries the key (section 5's)` → two, section 5's and
+ *     section 6's.
+ *   • `test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document` →
+ *     `test_section_5_and_6_are_the_bound_ones_and_their_ids_are_the_shipped_documents`,
+ *     and its literal `sorted(bound) == [5]` → `[5, 6]`, message *"the bound
+ *     sections are …, not [5, 6]"*.
+ *   • `the ONLY state aeon's canonical build accepts` → the state it accepts.
+ *   • `FAST=1 skips that gate` → FAST=1 runs the source-only arm; what FAST
+ *     still skips is the pytest lane and the post-build listing step.
+ *
+ * WHAT WAS KEPT: the case split (it is what the whole sentence is for), the
+ * viewport clause word for word, the ROM-cost clause, both `assign_section_*`
+ * contrasts, the `4a4d3474` capture quotation, and the STANDING REFUSAL below
+ * with its 2026-09-02 narrowing.
+ *
+ * THE GATE THAT NOW READS THIS SENTENCE — and it is the deliverable, not the
+ * wording. `__tests__/raster-binding-threaded-set.test.ts` parses aeon's
+ * `ojz_effects.emp` with THIS REPO'S OWN `libraryRasterChooserCalls` (the same
+ * derivation the panel renders, so the expectation is derived rather than typed)
+ * and refuses to let the sentence's dated reading disagree with it. It is
+ * proved red-first, and it is LOUD ON UNMEASURABLE: with no aeon checkout it
+ * SKIPS with a reason and never passes, because "aeon says {5,6}" and "I could
+ * not open aeon" must not share a colour.
+ * ⚠ THE COST, STATED RATHER THAN HIDDEN: it reads a LIVE sibling working tree,
+ * so it goes red on a change nobody in this repo made. That is deliberate — it
+ * is the alarm this header spent four blocks asking for, and a FROZEN pin (a
+ * SHA committed here) would go stale in silence, which is the exact defect being
+ * repaired. The precedent is on the same axis: `section-wiring.test.ts` already
+ * reads that live tree for the same fact, and it is what worked on 2026-09-03.
+ *
  * ═══════════════════════════════════════════════════════════════════════════
  * IF AEON EVER PUBLISHES THE WIRED SET: WHAT THIS EDITOR MAY AND MAY NOT DO
  * ═══════════════════════════════════════════════════════════════════════════
@@ -572,12 +684,22 @@
  * cost him a red build he had to revert.
  * ⚠ THE FACT THAT MADE THIS WORTH THE DEVIATION, and it is why ONE derived set
  * would have been wrong: **being wired is TWO conditions, not one.**
- *   (1) NECESSARY — the section binds a preset no other section binds. Shared
- *       presets (6/7/8 -> OJZ_Preset_Plain) cannot take a per-section chooser,
- *       since every sharer would get the same band. Today: 0,1,2,3,4,5.
+ *   (1) NECESSARY — the section binds a preset record no other section binds.
+ *       A shared record cannot take a per-section chooser, since every sharer
+ *       would get the same band. `eligibleSections()` answers it.
  *   (2) SUFFICIENT — a `preset()` actually THREADS `ojz_act1_sec_raster(sec: N)`.
- *       Today: **5 alone** (`ojz_effects.emp:1114`).
- * Binding section 0 satisfies (1), fails (2), and dies in aeon's canonical build.
+ *       `wiredSections()` answers it.
+ * ⚠ NO COUNT AND NO PEER LINE NUMBER LIVES IN THIS PARAGRAPH ANY MORE, and that
+ * is the repair, not an omission. It used to end "(1) Today: 0,1,2,3,4,5" and
+ * "(2) Today: **5 alone** (`ojz_effects.emp:1114`)". By 2026-09-10 the count,
+ * the line AND the file offset in (2) were all wrong and (1) was wrong too, and
+ * a reader had no way to tell from the sentence. The rule is what this paragraph
+ * owns; the values are `section-wiring.ts`'s, re-derived per act on every load,
+ * and `section-wiring.test.ts`'s real-tree rows are what pin them against aeon.
+ * If you want today's numbers at a terminal rather than in the app:
+ * `grep -n sec_raster` over aeon's `games/sonic4/data/effects/ojz_effects.emp`
+ * at a committed revision.
+ * A section that satisfies (1) and fails (2) dies in aeon's canonical build.
  * Both were published as "the" answer on 2026-09-02 — aurora's own prose said
  * "only 5" (right about (2)), aeon said "1-5" and then "0-5" (right about (1)) —
  * and BOTH were half-right, including this overseer, who relayed (1) as the
@@ -601,53 +723,69 @@ export const RASTER_SECTION_BINDING_LIMIT =
   + 'that section\'s raster program together with the chooser that selects it, refusing an id that '
   + 'names no preset document BY NAME with the known ids listed, and refusing a numeric rasterRef, '
   + 'which matters because this editor\'s own sidecar parser nulls a non-string silently, so the '
-  + 'build is the last reader that can still see that mistake. WHICH SECTION YOU BIND NOW DECIDES '
-  + 'WHAT HAPPENS, AND ONLY SECTION 5 IS WIRED. At e6405428 exactly one preset() in aeon\'s '
-  + 'games/sonic4/data/effects/ojz_effects.emp passes the chooser to its raster: channel. That one is '
-  + 'OJZ_Preset_Sec5, as raster: ojz_act1_sec_raster(sec: 5, hand: Raster_Program_None). AND '
-  + 'SECTION 5 IS BOUND: aeon\'s c9a462be commits section_5.meta.json carrying rasterRef '
-  + 'ojz_sec5_showcase (authored here, through this writer), so EditorRaster_OJZ_Act1_Bindings is 1 '
-  + 'and the chooser resolves sec 5 to that program, the first choice made in this editor that '
-  + 'aeon\'s build carries to a raster channel. Leaving section 5 unbound resolves to that hand: '
-  + 'label and changes nothing. BINDING ANY OTHER SECTION STILL REACHES NOTHING: those presets hand '
-  + 'raster: a literal, so the key is written, aeon\'s witness counts it, and no program follows it. '
-  + 'That case is no longer SILENT: aeon\'s tools/effects_seam_gate.py refuses a full build for it '
-  + 'and names the section and the id, but the refusal is aeon\'s alone: nothing here warns, and '
-  + 'FAST=1 skips that gate. AND THE BOUND SET ITSELF IS PINNED BY AEON\'S FULL BUILD, WHICH THIS '
-  + 'EDITOR CAN MOVE: read at aeon 027ec162 (2026-08-30), section 5 bound to ojz_sec5_showcase is '
-  + 'the ONLY state aeon\'s canonical build accepts; three content tests in build.sh\'s pytest '
-  + 'lane refuse every other tree: tools/test_effects_seam_gate.py::TestRasterSeamAgainstTheRealTree'
+  + 'build is the last reader that can still see that mistake. WHICH SECTION YOU BIND DECIDES WHAT '
+  + 'HAPPENS, AND THE WIRED SET IS DERIVED, NEVER FIXED. THE RULE, which is the only durable '
+  + 'sentence here: a section is wired exactly when some preset() in aeon\'s '
+  + 'games/sonic4/data/effects/ojz_effects.emp passes ojz_act1_sec_raster(sec: N, hand: ...) to its '
+  + 'raster: channel. THE INSTRUMENT: this editor re-derives that set from aeon\'s own file on every '
+  + 'project load (core/formats/effects/section-wiring.ts) and the band-preset panel\'s per-section '
+  + 'strip renders whatever the derivation returned, so nothing in the app quotes the reading below. '
+  + 'THE COMMAND that answers it at a terminal: grep -n sec_raster over that file in an aeon '
+  + 'checkout, at a committed revision. THE READING, which is a reading and not a rule: at aeon '
+  + 'a6aaf581 (2026-09-10) the wired set is {5, 6} — OJZ_Preset_Sec5 with sec: 5 at :1665, and '
+  + 'OJZ_Preset_Sec6 with sec: 6 at :1723 — and that grep is what refutes it. BOTH ARE ALSO BOUND: '
+  + 'section_5.meta.json carries rasterRef ojz_sec5_showcase (aeon c9a462be, authored here through '
+  + 'this writer, the first choice made in this editor that aeon\'s build carried to a raster '
+  + 'channel) and section_6.meta.json carries ojz_sec6_baseswap, so EditorRaster_OJZ_Act1_Bindings '
+  + 'is 2 and the chooser resolves both. Leaving a wired section unbound resolves to that hand: '
+  + 'label and changes nothing. BINDING A SECTION OUTSIDE THE WIRED SET STILL REACHES NOTHING: '
+  + 'those presets hand raster: a literal, so the key is written, aeon\'s witness counts it, and no '
+  + 'program follows it. That case is not SILENT: aeon\'s tools/effects_seam_gate.py refuses the '
+  + 'build for it and names the section and the id. The refusal is aeon\'s alone — nothing here '
+  + 'warns — but it is no longer skippable by FAST: since their 2026-09-02 walkthrough finding b4, '
+  + 'build.sh runs tools/effects_seam_gate.py --source-only as an unconditional pre-build check '
+  + 'under FAST == 1 && GAME == sonic4, and that arm reaches the raster binding step. What FAST '
+  + 'still skips is the pytest lane and the post-build listing step. AND THE BOUND SET ITSELF IS '
+  + 'PINNED BY AEON\'S FULL BUILD, WHICH THIS EDITOR CAN MOVE: read at aeon a6aaf581 (2026-09-10), '
+  + 'three content tests in build.sh\'s pytest lane accept the bound set {5: ojz_sec5_showcase, 6: '
+  + 'ojz_sec6_baseswap} and refuse other trees: '
+  + 'tools/test_effects_seam_gate.py::TestRasterSeamAgainstTheRealTree'
   + '::test_the_bound_sections_are_exactly_the_threaded_ones, its sibling '
-  + 'test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document, and '
-  + 'tools/test_raster_cycle_table_lint.py::test_every_preset_document_is_REACHABLE. UNBINDING '
-  + 'SECTION 5 (null from this tool, or the select\'s Hand-authored raster option) leaves the '
-  + 'bound set empty and the document ojz_sec5_showcase.json orphaned, and all three refuse that by '
-  + 'name: "no sidecar carries a rasterRef — step 6\'s band is gone", "the bound sections are [], '
-  + 'not [5]", and "reachable by NOTHING: [\'ojz_sec5_showcase\']" (delete the document too and '
-  + 'the lint passes; the first two still refuse). BINDING ANY OTHER SECTION, beside 5 or instead '
-  + 'of it, fails the exact-[5] assertion (sorted(bound) must equal [5]) and the threaded-set one, '
-  + 'on top of the seam gate above; re-pointing section 5 at any other document orphans '
-  + 'ojz_sec5_showcase. That refusal runs only in the canonical FAST=0 build: FAST=1 sets '
-  + 'NO_LINT=1, the pytest lane sits under NO_LINT, and FAST=1 builds the tree, which is how aeon '
-  + 'built its own control ROM (docs/research/reference_captures/2026-08-30-sec5-band/README.md, '
+  + 'test_section_5_and_6_are_the_bound_ones_and_their_ids_are_the_shipped_documents, and '
+  + 'tools/test_raster_cycle_table_lint.py::test_every_preset_document_is_REACHABLE. UNBINDING A '
+  + 'BOUND SECTION (null from this tool, or the select\'s Hand-authored raster option) shrinks the '
+  + 'bound set and orphans that section\'s document, and those tests refuse it by name: "the bound '
+  + 'sections are ..., not [5, 6]" and "reachable by NOTHING: [...]" (unbinding BOTH also trips "no '
+  + 'sidecar carries a rasterRef — step 6\'s band is gone"; delete the orphaned document too and '
+  + 'the lint passes while the content test still refuses). BINDING A SECTION OUTSIDE THE BOUND SET '
+  + 'fails the same exact-set assertion (sorted(bound) must equal the pinned list) and, if it is '
+  + 'also outside the WIRED set, the threaded-set one and the seam gate above; re-pointing a bound '
+  + 'section at another document orphans the one it left. That pytest refusal runs only in the '
+  + 'canonical FAST=0 build: FAST=1 sets NO_LINT=1, the pytest lane sits under NO_LINT, and FAST=1 '
+  + 'builds the tree, which is how aeon built its own control ROM '
+  + '(docs/research/reference_captures/2026-08-30-sec5-band/README.md, '
   + '"The canonical build REFUSES the control tree, by design"). NOTHING HERE PREVENTS THE WRITE: '
   + 'the sidecar takes whichever state you choose, and you meet the refusal at aeon\'s next FAST=0 '
-  + 'build or not at all. THAT CLAUSE EXPIRES when the [5] literal in '
-  + 'test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document changes, when those tests '
-  + 'are renamed or the pytest lane leaves the NO_LINT block that FAST=1 switches off, when '
-  + 'test_every_preset_document_is_REACHABLE drops its sidecar arm, or when a second binding ships '
-  + '(owner: aeon\'s lane); before quoting it, re-read tools/test_effects_seam_gate.py, '
-  + 'tools/test_raster_cycle_table_lint.py and build.sh. '
-  + 'Wiring a second section is a preset split plus one call-site line in '
-  + 'aeon, not authoring the effect: sections 6-8 share one record, and a section-keyed chooser '
-  + 'threaded into a shared record is itself a seam-gate refusal. Nor is there anything to look at '
+  + 'build or not at all. THAT CLAUSE IS A SNAPSHOT OF ANOTHER REPO\'S TESTS and it expires when '
+  + 'their pinned list changes, when those tests are renamed or the pytest lane leaves the NO_LINT '
+  + 'block that FAST=1 switches off, or when test_every_preset_document_is_REACHABLE drops its '
+  + 'sidecar arm (owner: aeon\'s lane); before quoting it, re-read tools/test_effects_seam_gate.py, '
+  + 'tools/test_raster_cycle_table_lint.py and build.sh at a committed revision. '
+  + 'Wiring a further section is hand work in aeon, not authoring the effect: at most one '
+  + 'call-site line if that section already owns its preset record, and a record SPLIT first if it '
+  + 'shares one, because a section-keyed chooser threaded into a record two sections point at is '
+  + 'itself a seam-gate refusal. Which sections share a record is derived here too '
+  + '(eligibleSections in core/formats/effects/section-wiring.ts) and the panel strip shows it; at '
+  + 'aeon a6aaf581 every section 0-8 owns its own record, so no split is outstanding. Nor is there '
+  + 'anything to look at '
   + 'here, for section 5 as much as for any other: the band-preset panel now carries a per-section '
   + 'raster select, but binding one draws nothing: the viewport does not composite a rasterRef, so '
   + 'unlike assign_section_bg (whose ref the viewport does composite) this assignment changes '
   + 'nothing on screen. A preset document costs ROM whether or not any section binds it, since aeon '
-  + 'emits one program per document. Unlike assign_section_scene, which is baked. At e6405428 '
-  + 'exactly one sidecar carries the key (section 5\'s), so the seam gate\'s section arm is no '
-  + 'longer vacuous: it counts 1 sidecar rasterRef and checks it against the threaded set. Section '
+  + 'emits one program per document. Unlike assign_section_scene, which is baked. At a6aaf581 two '
+  + 'sidecars carry the key (sections 5 and 6), so the seam gate\'s section arm is not vacuous: it '
+  + 'counts the sidecar rasterRefs and checks them against the threaded set. To count them '
+  + 'yourself, grep rasterRef over games/sonic4/data/editor/ojz/act1/ in an aeon checkout. Section '
   + '5 has been exercised from this editor\'s writer to aeon\'s generator and build, and once past '
   + 'them in aeon\'s tree: aeon\'s 4a4d3474 (2026-08-30, docs/research/reference_captures/'
   + '2026-08-30-sec5-band/) records the section-5 band MEASURED on screen in aeon\'s emulator '
@@ -656,10 +794,16 @@ export const RASTER_SECTION_BINDING_LIMIT =
   + 'byte, and as $0000 on every one of those lines on the control ROM built with the sidecar\'s '
   + 'rasterRef null; taken on their headless oracle-aether instance, not hardware. That is aeon\'s '
   + 'measurement of aeon\'s build: no CRAM was sampled here, and nothing of that frame is visible '
-  + 'in this editor. EXPIRES when a second section is threaded, when sec: 5 becomes another '
-  + 'index, when section 5\'s sidecar stops naming ojz_sec5_showcase, when '
-  + 'tools/effects_seam_gate.py stops refusing the unthreaded case or build.sh runs it under '
-  + 'FAST=1, when docs/research/reference_captures/2026-08-30-sec5-band/ leaves aeon\'s tree or its '
+  + 'in this editor. EXPIRES — and note that the wired-set clause above no longer relies on this '
+  + 'list, because the reading it carries is checked on every test run against aeon\'s real file by '
+  + 'core/formats/__tests__/raster-binding-threaded-set.test.ts, which is why "a second section is '
+  + 'threaded" is no longer a clause here: from 2026-09-03 to 2026-09-10 that clause was true, '
+  + 'named the right file, and was read by nothing. What is left in this list still has no reader, '
+  + 'so treat it as a re-read instruction and not as an alarm. EXPIRES when section 5\'s sidecar '
+  + 'stops naming ojz_sec5_showcase, when '
+  + 'tools/effects_seam_gate.py stops refusing the unthreaded case or build.sh stops running its '
+  + 'source-only arm under FAST=1, when docs/research/reference_captures/2026-08-30-sec5-band/ '
+  + 'leaves aeon\'s tree or its '
   + 'README stops saying what is quoted here, when a later aeon measurement of section 5 records '
   + 'something else, or when this viewport learns to composite a rasterRef (owner: aeon\'s lane '
   + 'for all but the last, which is Aurora\'s). Before quoting this, re-read '
