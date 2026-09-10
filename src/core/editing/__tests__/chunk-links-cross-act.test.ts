@@ -93,6 +93,10 @@ function zone(id: string, name: string, acts: Act[]): Zone {
     id, name, acts,
     tileset: { tiles: Array.from({ length: 16 }, tile) },
     palette: { lines: [line(), line(), line(), line()] },
+    // Hand-built, like `sectionFiles` above: nothing was read, so nothing is
+    // writable either. `complete: false` is the honest value for a palette that
+    // came from no file at all, and it is the value that writes nothing.
+    paletteFile: { path: '(fixture)', complete: false, tail: new Uint8Array(0) },
   };
 }
 

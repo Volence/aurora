@@ -6,14 +6,17 @@
 // and the preview/commit path — and none of them is a difference the grid itself
 // should know about:
 //
-//   1. Art / Palette facet   — the zone's 4 lines; line 0 is sprite-reserved
-//                              (the PLAYER palette), so the policy locks it.
-//   2. Sprite pane, zone     — the same 4 lines, but line 0 UNLOCKED: editing
-//                              the player palette is what that pane is for.
-//                              A swatch pick binds the sprite's zoneLine rather
-//                              than artStore's paint line.
+//   1. Art / Palette facet   — the zone's 4 lines; line 0 is the shared PLAYER
+//                              palette, so the policy locks it.
+//   2. Sprite pane, zone     — the same 4 lines and the SAME lock since
+//                              2026-09-10 (see AEON_ZONE_PALETTE_POLICY: line 0
+//                              is one file for the whole game and this pane's
+//                              edits to it reached neither disk nor the running
+//                              game). A swatch pick binds the sprite's zoneLine
+//                              rather than artStore's paint line.
 //   3. Sprite pane, standalone — one row of the sprite doc's 16 private colours;
-//                              writes go to the sprite's own undo stack.
+//                              writes go to the sprite's own undo stack. NOT a
+//                              CRAM line, so it is not locked.
 //
 // THE PREVIEW MUTATES THE OPEN DOCUMENT. That is deliberate — it is what makes
 // the composer canvas repaint per slider tick without spending a history step —
@@ -41,7 +44,9 @@ import { useArtStore } from '../state/artStore';
 import { useAetherStore } from '../state/aetherStore';
 import { PAL_BASE_FIRST_LINE as PUSHABLE_FIRST_LINE, PAL_BASE_LAST_LINE as PUSHABLE_LAST_LINE } from '../../core/aether/palette-push';
 import { useSpriteStore, patchSpriteDoc } from '../state/spriteStore';
-import { encodeGenesisColor, decodeGenesisColor, fmtGenesisWord } from '../../core/formats/palette';
+import {
+  encodeGenesisColor, decodeGenesisColor, fmtGenesisWord, ZONE_PALETTE_FIRST_LINE,
+} from '../../core/formats/palette';
 import { resolvePaletteDragEnd } from '../../core/art/palette-drag';
 import {
   TRANSPARENT_INDEX,
@@ -54,22 +59,99 @@ import {
 import type { Color, Zone } from '../../core/model/s4-types';
 
 /**
- * Line 0 is the PLAYER palette — shared across the zone and baked into every
- * Sonic frame — so the Art facet locks it: a recolour meant for the terrain must
- * not restain the character. This is the one substantive rule classic has no
- * counterpart for, and it is why the policy is data rather than an engine name.
+ * The CRAM lines of a zone palette that are NOT the zone's to write: every line
+ * below the first one the authored palette file owns.
+ *
+ * DERIVED from `ZONE_PALETTE_FIRST_LINE`, not typed as `[0]`, because that
+ * constant is the single statement of which line the file's first word lands
+ * on. If the format ever changed, a hand-typed `[0]` here would go on locking
+ * the wrong line and the lock would silently protect nothing.
  */
-export const AEON_ART_PALETTE_POLICY: PalettePolicy = {
-  lockedLines: [0],
+export const ZONE_UNSAVABLE_LINES: readonly number[]
+  = Array.from({ length: ZONE_PALETTE_FIRST_LINE }, (_, line) => line);
+
+/**
+ * THE ZONE PALETTE'S LINE 0 IS LOCKED EVERYWHERE, AND THIS IS WHY.
+ *
+ * `Zone.palette` is assembled from TWO files (core/project/aeon/load.ts): the
+ * zone's own authored palette into CRAM lines 1 to 3, and
+ * `art/palettes/SonicAndTails.bin` into line 0 — ONE file for the entire game,
+ * which every zone carries in-game. So a line 0 edit is not a zone edit at all:
+ * it recolours Sonic and Tails in every zone there is.
+ *
+ * ═══ WHAT CHANGED, 2026-09-10 ═════════════════════════════════════════════
+ *
+ * The Art facet always locked it. The SPRITE pane deliberately unlocked it,
+ * with the reasoning "editing the player palette is precisely the job there" —
+ * and until this date that control was inert in every direction anyone could
+ * check:
+ *
+ *   • it did not reach DISK. The aeon save plan had no palette file in it at
+ *     all, so the edit lived in the model until the reopen and then vanished.
+ *     That is the defect this parcel closes for lines 1 to 3;
+ *   • it did not reach a RUNNING GAME either. `Pal_Base` is 96 bytes covering
+ *     lines 1 to 3 only, and `palBaseOffset` THROWS on line 0 because the
+ *     engine never writes it (core/aether/palette-push.ts);
+ *   • and the agent tool had refused the same write since long before, in
+ *     those words: "palette line 0 is reserved for player/sprite art"
+ *     (core/agent/validation.ts).
+ *
+ * Three independent refusals and one unlocked slider. Now that lines 1 to 3
+ * genuinely save, leaving line 0 editable would make it the ONE control in the
+ * palette whose edits still silently evaporate — which is precisely the shape
+ * of defect the rest of this parcel exists to remove. So it is refused, with
+ * the reason in `ZONE_LINE0_REFUSAL` where a person can read it.
+ *
+ * ⚠ THIS IS A BUILD OF ONE OPTION, NOT A SETTLED FACT. Owner card
+ * PALETTE-LINE0-BLAST-RADIUS is unanswered; `refuse_line0` is the recommended
+ * option and this is it. If the ruling comes back the other way, the REFUSAL is
+ * what gets replaced — by a write to the shared file, made deliberately and
+ * with the blast radius named on screen. Nothing in this parcel writes
+ * `art/palettes/SonicAndTails.bin`, and `serializeZonePalette` cannot emit
+ * line 0 at all.
+ */
+export const AEON_ZONE_PALETTE_POLICY: PalettePolicy = {
+  lockedLines: ZONE_UNSAVABLE_LINES,
   transparent: 'paint',
 };
 
-/** The sprite pane unlocks line 0, in both of its palette modes: editing the
- *  player palette is precisely the job there. */
-export const AEON_SPRITE_PALETTE_POLICY: PalettePolicy = {
+/**
+ * The sprite document's own 16 private colours, which the grid draws as a
+ * single row and therefore indexes as "line 0".
+ *
+ * ⚠ THAT ZERO IS NOT A CRAM LINE, and the two must not be conflated: these
+ * colours are a working palette belonging to one sprite document, they are
+ * committed to that document's own undo stack, and nothing about
+ * SonicAndTails.bin or `Pal_Base` applies to them. Locking line 0 here would
+ * make the standalone sprite palette uneditable, which is the whole feature.
+ */
+export const AEON_SPRITE_STANDALONE_PALETTE_POLICY: PalettePolicy = {
   lockedLines: [],
   transparent: 'paint',
 };
+
+/**
+ * What Aurora says when a gesture aims at zone palette line 0.
+ *
+ * ONE SENTENCE IN ONE PLACE, read by the swatch tooltip, the line-grip tooltip
+ * and the port's own guard, because a refusal whose reason is spelled three
+ * times is a refusal that comes to mean three things.
+ */
+export const ZONE_LINE0_REFUSAL
+  = 'Palette line 0 is the Sonic and Tails palette, one file shared by every zone in '
+  + 'the game, so Aurora does not change it from here. Lines 1 to 3 are this zone\'s '
+  + 'own palette and they do save.';
+
+/**
+ * The refusal a zone palette gesture earns, or null when there is none.
+ *
+ * Exported and pure so the decision is executable in the node suite: the hook
+ * around it needs a DOM and the grid needs a screen, and a rule that can only
+ * be checked by looking is a rule nobody checks.
+ */
+export function zonePaletteLineRefusal(line: number): string | null {
+  return ZONE_UNSAVABLE_LINES.includes(line) ? ZONE_LINE0_REFUSAL : null;
+}
 
 /**
  * The repaint key. THREE parts, and each covers something the others cannot:
@@ -224,6 +306,19 @@ export function useAeonPaletteGridPort(opts?: { context?: 'sprite' }): PaletteGr
    * sound because `drain` is guaranteed to run.
    */
   const previewZone = React.useCallback((line: number, idx: number, word: number): void => {
+    // THE REFUSAL, at the one place a zone colour is actually written.
+    //
+    // The policy above already stops the grid from OFFERING line 0, and this
+    // is deliberately a second lock rather than a redundant one: `preview` is a
+    // public port method, the policy is data a future mount could pass
+    // differently, and this preview writes straight into the open document
+    // outside the command system. A refusal that only lives in the data the UI
+    // consults is a refusal the next caller does not get.
+    //
+    // It is LOUD rather than a bare return: a control that does nothing and
+    // says nothing is the defect this whole parcel is about.
+    const refusal = zonePaletteLineRefusal(line);
+    if (refusal) { console.warn(refusal); return; }
     const z = getCurrentZone(useProjectStore.getState());
     if (!z) return;
     beginZoneDrag(line, idx);
@@ -314,7 +409,10 @@ export function useAeonPaletteGridPort(opts?: { context?: 'sprite' }): PaletteGr
   }, [standaloneMode, inSprite]);
 
   const zone = getCurrentZone(useProjectStore.getState());
-  const policy = standaloneMode || inSprite ? AEON_SPRITE_PALETTE_POLICY : AEON_ART_PALETTE_POLICY;
+  // The zone policy now covers the sprite pane's zone mode too: its line 0 is
+  // the same shared player palette the Art facet has always locked. Only the
+  // STANDALONE row, which is not a CRAM line at all, stays unlocked.
+  const policy = standaloneMode ? AEON_SPRITE_STANDALONE_PALETTE_POLICY : AEON_ZONE_PALETTE_POLICY;
 
   /* eslint-disable-next-line react-hooks/exhaustive-deps -- the palette object is
      MUTATED in place by the preview and by the command layer, so its identity is
@@ -409,7 +507,10 @@ export function useAeonPaletteGridPort(opts?: { context?: 'sprite' }): PaletteGr
     commit,
     drain,
     title: (line, idx) => {
-      if (isLineLocked(line, policy)) return 'sprite-reserved (line 0)';
+      // The locked line's tooltip IS the refusal: it is the only place a person
+      // reading the palette is told why the swatch will not open, so it carries
+      // the reason rather than the label `sprite-reserved (line 0)` it used to.
+      if (isLineLocked(line, policy)) return ZONE_LINE0_REFUSAL;
       if (idx === TRANSPARENT_INDEX) return 'transparent (index 0)';
       const word = fmtGenesisWord(lines[line]?.[idx] ?? 0);
       return standaloneMode

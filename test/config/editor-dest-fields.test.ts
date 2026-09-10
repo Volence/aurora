@@ -144,6 +144,25 @@ const BASELINE_PLAN: [string, number][] = [
   ['games/sonic4/data/editor/ojz/act1/section_0.objects.json', 81],
   ['games/sonic4/data/editor/ojz/act1/section_0.rings.json', 3],
   ['games/sonic4/data/editor/ojz_tiles.bin', 64],
+  // NEW 2026-09-10, and it is the one entry here that is not from the capture:
+  // the zone palette, which until that date the save did not write AT ALL. See
+  // docs/reviews/2026-09-10-palette-write-target.md. 96 bytes = CRAM lines 1 to
+  // 3 (`ZONE_PALETTE_BYTES`); line 0 is the shared Sonic and Tails palette and
+  // is never written from here.
+  //
+  // ⚠ IT GOES TO `data/generated/`, WHICH IS THIS FIXTURE'S POINT AND ALSO A
+  // HAZARD WORTH READING. The palette is the one art blob with no
+  // editor-destination escape hatch and no retarget: aeon declares
+  // `data/editor/<zone>/<act>/palette.bin` the ONLY authored copy and mirrors it
+  // INTO the generated tree on every build (tools/ojz_common.py, "EXACTLY ONE
+  // WRITER, AND IT IS THE EDITOR"), so Aurora writes whatever `zones[].palette`
+  // names and must not move it. This fixture is a deliberately PRE-CHANGE
+  // project.json whose pointer still names the generated mirror, and a checkout
+  // shaped like that would have its palette edits overwritten by the next build
+  // — not by Aurora, but by the mirror step. aeon's live project.json was
+  // measured on 2026-09-10 and names the authored editor path, so the shipping
+  // configuration is not this one.
+  ['games/sonic4/data/generated/ojz/act1/ojz_palette.bin', 96],
   ['games/sonic4/data/editor/ojz_act1_bg.bin', 256],
   ['games/sonic4/data/editor/ojz_act1_bg_tiles.bin', 66],
   ['project.json', 994],

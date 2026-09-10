@@ -8,7 +8,9 @@ import { paletteLineUsageCounts } from '../../../core/art/usage';
 import type { Color } from '../../../core/model/s4-types';
 import { T } from '../ui';
 import PaletteGrid, { type PaletteGridShell, type PaletteSwatchProps } from '../art-shared/PaletteGrid';
-import { useAeonPaletteGridPort } from '../../providers/palette-aeon';
+import {
+  useAeonPaletteGridPort, zonePaletteLineRefusal, ZONE_LINE0_REFUSAL,
+} from '../../providers/palette-aeon';
 import PaletteCopyMenu, { type CopyMenuItem } from './PaletteCopyMenu';
 
 /** Source carried by an in-progress swatch/line drag (HTML5 DnD; payload in a
@@ -133,11 +135,18 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }): Reac
     return act ? paletteLineUsageCounts(act) : new Map<number, number>();
   }
 
-  /** A zone line is off-limits as a copy participant when it is the Art-mode
-   *  sprite-reserved line 0 — the same rule the port's policy states per swatch,
-   *  so the copy bridge cannot overwrite the player palette outside sprite mode. */
+  /** A zone line is off-limits as a copy participant when the port's own policy
+   *  refuses it — the SAME rule, read from the same place, so the copy bridge and
+   *  the swatch grid cannot come apart.
+   *
+   *  ⚠ THE `&& !inSprite` THAT USED TO BE HERE IS GONE (2026-09-10). It let the
+   *  copy menu and the swatch drop paint over zone line 0 whenever the palette
+   *  was open in the sprite pane, which is a second door onto exactly the write
+   *  AEON_ZONE_PALETTE_POLICY refuses — and a quieter one, because a copy lands
+   *  in one gesture with no slider to notice. Line 0 is Sonic and Tails across
+   *  the whole game; see ZONE_LINE0_REFUSAL. */
   function zoneLineLocked(line: number): boolean {
-    return line === 0 && !inSprite;
+    return !standaloneSprite && zonePaletteLineRefusal(line) !== null;
   }
 
   /** Build "Copy to ▸" targets for a single swatch (index-preserving). `srcLine`
@@ -231,7 +240,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }): Reac
         key="grip"
         style={{ ...styles.grip, ...(locked ? styles.locked : {}), ...(dropKey === `${keyPrefix}-line:${li}` ? styles.dropTarget : {}) }}
         title={locked
-          ? 'sprite-reserved (line 0)'
+          ? ZONE_LINE0_REFUSAL
           : standaloneSprite
             ? 'Drag to copy this palette · right-click to copy to a zone line'
             : `Drag to copy line ${li} · right-click to copy elsewhere`}

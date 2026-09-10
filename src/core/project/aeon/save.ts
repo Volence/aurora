@@ -33,6 +33,7 @@ import {
   bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, mergeBgLibraryIndex, serializeBgLibraryIndex,
 } from '../../formats/bg-library';
 import { serializeSectionMeta } from '../../formats/section-meta';
+import { serializeZonePalette } from '../../formats/palette';
 import { clearedChunkLinksText, serializeSectionChunkLinks } from '../../formats/section-chunk-links';
 import { effectsScenePath, serializeEffectsScene } from '../../formats/effects/scene';
 import { effectsPresetPath, serializeEffectsPreset } from '../../formats/effects/preset';
@@ -419,6 +420,46 @@ export async function buildAeonSavePlan(
     if (rawZone && !rawZone.editorTilesetPath && rawZone.tileset !== tilesetDest) {
       rawZone.tileset = tilesetDest;
       configChanged = true;
+    }
+
+    // ═══ THE ZONE PALETTE ═══════════════════════════════════════════════════
+    //
+    // Until 2026-09-10 this plan had NO palette file in it and core/formats/
+    // palette.ts had no serializer, so every colour the author picked was
+    // discarded at the next reopen. Not a missing step: a missing DESTINATION.
+    // See docs/reviews/2026-09-10-palette-write-target.md.
+    //
+    // THREE THINGS ABOUT THIS WRITE ARE DELIBERATE AND EACH HAS A ROW:
+    //
+    //   1. IT WRITES `paletteFile.path` IN PLACE and adds no `editorPalettePath`
+    //      escape hatch, which makes it the one art blob that does NOT follow
+    //      the editor-destination rule above. That is aeon's ruling, not an
+    //      omission: `games/<game>/data/editor/<zone>/<act>/palette.bin` is
+    //      declared there as the ONLY authored copy, the build mirrors it into
+    //      the generated tree, and the staleness gate watches `data/editor/`
+    //      specifically so an editor palette save re-bakes. See the docblock on
+    //      ZonePaletteFile.path.
+    //
+    //   2. IT WRITES LINES 1 TO 3 AND CANNOT WRITE LINE 0. `serializeZonePalette`
+    //      starts its loop at ZONE_PALETTE_FIRST_LINE, so there is no argument
+    //      that makes this emit the player palette, and this plan never names
+    //      `art/palettes/SonicAndTails.bin` at all. Line 0 is Sonic and Tails,
+    //      one file for the whole game; an edit to it is refused at the gesture
+    //      (providers/palette-aeon.ts), which is the `refuse_line0` build of
+    //      owner card PALETTE-LINE0-BLAST-RADIUS. If that ruling changes, the
+    //      refusal is the thing that gets replaced, not this.
+    //
+    //   3. IT DECLINES ON `complete: false`, on the same rule the section loop's
+    //      `understood()` gate states: a file the load did not fully read is
+    //      held in memory as PLACEHOLDER BLACK, and writing that back is how a
+    //      truncated palette becomes a permanently black one. The load says so
+    //      out loud when it happens (a 'warning' notice), so this skip is not
+    //      the only thing standing between the author and a surprise.
+    if (projZone.paletteFile.complete) {
+      files.push({
+        path: projZone.paletteFile.path,
+        bytes: serializeZonePalette(projZone.palette, projZone.paletteFile.tail),
+      });
     }
   }
 
