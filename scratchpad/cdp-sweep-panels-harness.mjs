@@ -384,17 +384,25 @@ async function main() {
     //
     // Two attempts to dirty the AEON level document from this facet failed for
     // reasons that are about THIS HARNESS'S REACH and not about the app:
-    //   - an effects-preset edit writes a DIFFERENT document (`aeon.state()
-    //     .dirty` is the editor store's LEVEL flag, and the preset boxes do not
-    //     touch it), and
+    //   - an effects-preset edit writes a DIFFERENT document, and
     //   - `setFacet("layout")` returned null, so the armed tool never left
     //     `view` and the drag on #map-canvas painted nothing.
     // Reporting either of those as "the Save chip does not flash" would be
     // reporting a harness limit as a verdict on the app.
     //
+    // ⚠ AND ONE CLAIM IN THAT PARAGRAPH WAS WRONG, corrected here rather than
+    // deleted. It said `aeon.state().dirty` "is the editor store's LEVEL flag",
+    // which reads as "the flag any level dirties". It is `useEditorStore.dirty`,
+    // keyed on the AEON project's zone/act, and a CLASSIC act's dirtiness is a
+    // different field entirely (`useClassicLevelStore.dirty`; see
+    // `shell/dirty-snapshot.ts`, which carries both as `aeonDirty` and
+    // `classicDirty`). The block below says so again where it matters.
+    //
     // So the flash is measured on a CLASSIC level below — which is the engine
     // seat A's own jobs were on, and the engine S3's toast is about. ONE dirty
     // document, ONE Ctrl+S, and both S2b and S3c are read off it, in one run.
+    // The dirty document now comes from `__dbg.classic.stampLayoutCell`, which
+    // commits through the app's own action and sets no flag — see that block.
     // ═══════════════════════════════════════════════════════════════════════
     console.log('\n──── P6/P7: the palette affordance and Ctrl+Shift+P ────');
     const AFFORD = String.raw`
@@ -520,90 +528,132 @@ async function main() {
           + `act click -> ${JSON.stringify(clickedAct)}; explorer rows seen: `
           + `${JSON.stringify(rows.map((r) => r.t).slice(0, 24))}`);
         if (openedAct !== 'ok') {
-          check('S2a', 'ANTI-VACUOUS: a level document is DIRTY before Ctrl+S', 'UNMEASURABLE',
-            'no classic act reached the screen, so nothing could be dirtied');
+          check('S2a1', 'the debug door made a real LEVEL edit through the app\'s own commit path',
+            'UNMEASURABLE', 'no classic act reached the screen, so there was no document to edit');
+          check('S2a2', 'ANTI-VACUOUS: a real BYTE changed in the document, read back out of it',
+            'UNMEASURABLE', 'no classic act reached the screen, so nothing could be dirtied');
+          check('S2a3', 'and the APP agrees on screen: the chip\'s tooltip flips to the Ctrl+S one',
+            'UNMEASURABLE', 'no classic act reached the screen, so no level header was on it');
           check('S2b', 'Ctrl+S on a dirty level tab flashes `Saved!` ON THE CHIP', 'UNMEASURABLE',
             'no dirty level document to save');
           check('S3c', 'a classic save\'s success toast NAMES the files it wrote', 'UNMEASURABLE',
             'no classic act could be opened, so no classic save was raised. '
             + 'This is a limit of the harness\'s reach, NOT evidence about the toast.');
         } else {
-          // ── DIRTY IT WITH A REAL STROKE ─────────────────────────────────
-          // Layout facet, paint-tile armed by its own TOOL_KEYS letter, then a
-          // real press-move-release on the level canvas. Setup is only the
-          // layer/tile arming the probe itself declares to be setup.
-          // ⚠ THE FACET PILL IS FOUND ACROSS TAGS, NOT AS A `div`. A previous
-          // run searched `div` only and got `false` -- which reads as "there is
-          // no Layout facet" when it means "the pill is a button". Both the
-          // app's own click and the probe's `setFacet` are tried, and BOTH
-          // results are printed, so a reader can see which door answered.
-          const facetClick = await c.evalExpr(String.raw`
-            (() => {
-              const el = [...document.querySelectorAll('button,div,li,span,a')]
-                .filter((e) => e.getClientRects().length > 0)
-                .find((e) => (e.textContent || '').trim() === 'Layout'
-                          && ![...e.children].some((k) => (k.textContent || '').trim() === 'Layout'));
-              if (!el) return 'not-found';
-              el.click();
-              return el.tagName;
-            })()`).catch(() => 'threw');
-          await sleep(1200);
-          const facetSet = await c.json('window.__dbg.setFacet("layout")').catch(() => null);
+          // ── DIRTY IT THROUGH THE DEBUG DOOR ─────────────────────────────
+          //
+          // ⚠ WHAT CHANGED SINCE THE 2026-09-10 SWEEP, AND WHAT DID NOT.
+          //
+          // The sweep parked S2 and S3 UNMEASURABLE because four routes to a
+          // dirty LEVEL document all failed, and every failure was about THIS
+          // HARNESS'S REACH: an Effects-preset edit writes a different
+          // document; `__dbg.setFacet("layout")` returns null; the `Layout`
+          // pill clicks (it is a BUTTON, not a `div`) but the `t` tool letter
+          // leaves `tool` at `view`, so the drag on the canvas painted nothing.
+          // `ClassicLevelViewport`'s key handling is not `MapViewport`'s and
+          // arming its paint tool from outside is still a door this instrument
+          // does not have. THAT IS UNCHANGED.
+          //
+          // What is new is `__dbg.classic.stampLayoutCell(plane)`
+          // (src/renderer/debug-level-edit.ts). It calls
+          // `classicSetLayoutCells`, which is EXACTLY the function
+          // `ClassicLevelViewport`'s `endStroke` ends a real stamp gesture in --
+          // same argument shape, one undo entry, the real dirty domain, the
+          // real file on the next save. IT DOES NOT SET A DIRTY FLAG, and that
+          // is the whole point: a door that flipped `dirty` would make S2b
+          // vacuous, proving only that the chip reacts to a flag.
+          //
+          // ⚠ SO S2b AND S3c ARE NOW ABOUT EVERYTHING DOWNSTREAM OF THE MOUSE,
+          // AND NOTHING UPSTREAM OF IT. The pointer gesture into that call is
+          // still unexercised by this harness. A defect between the mouse and
+          // `classicSetLayoutCells` would still be invisible here, and no row
+          // below claims otherwise.
+          //
+          // ⚠ AND ONE CORRECTION TO THE ROW THAT USED TO STAND HERE. It read
+          // `__dbg.aeon.state().dirty` and called that "the editor store's
+          // LEVEL flag". It is `useEditorStore.dirty`, which is keyed on the
+          // AEON project's zone/act (editorStore.ts markDirty reads
+          // `p.currentZoneId`/`p.currentActId` off `useProjectStore`). A
+          // CLASSIC act's dirtiness lives in `useClassicLevelStore.dirty` --
+          // `shell/dirty-snapshot.ts` reads the two as separate fields,
+          // `classicDirty` and `aeonDirty`. So on the classic subject that
+          // predicate could not have gone true even with a working stroke. It
+          // is still READ below, and printed, because a reader deserves to see
+          // it stay false rather than to take that sentence on trust.
+          const NOTHING = 'Nothing to save in this document';
+          const CANSAVE = 'Save this document (Ctrl+S). Save All is Ctrl+Shift+S';
+          // READ BEFORE THE EDIT, on THIS subject. S1's tooltip was read on the
+          // aeon tab and is about a different document; a transition asserted
+          // across two documents is not a transition.
+          const chipBefore = await c.json(PAINTED(CHIP));
+          const stamp = await c.json(
+            '(() => { try { return window.__dbg.classic.stampLayoutCell("fg"); } '
+            + 'catch (e) { return { ok: false, error: "threw: " + e.message }; } })()',
+          ).catch((e) => ({ ok: false, error: `eval threw: ${e.message}` }));
           await sleep(900);
-          await key('t', 0, 'KeyT');
-          await sleep(600);
-          // ⚠ `__dbg.state()` IS NOT A HOOK and threw; the shared level editor
-          // store is behind `__dbg.aeon.state()`. The name says aeon, the store
-          // is `useEditorStore` -- the SAME `dirty`/`tool` a classic level
-          // writes (debug-hooks.ts:1185 reads `e.dirty`, `e.tool` off it). A
-          // probe named for one engine reading the store both share is exactly
-          // the kind of thing that makes a correct row look like a dead app.
-          const toolNow = await c.evalExpr('window.__dbg.aeon.state().tool').catch(() => null);
-          const cv = await c.json(String.raw`(() => {
-            const el = document.getElementById('map-canvas')
-              || [...document.querySelectorAll('canvas')].sort(
-                   (a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width)[0];
-            if (!el) return null;
-            const b = el.getBoundingClientRect();
-            return { id: el.id || '(unnamed canvas)',
-                     x: Math.round(b.left + b.width * 0.4),
-                     y: Math.round(b.top + b.height * 0.4), rect: b.toJSON() };
-          })()`);
-          if (cv) {
-            await c.send('Input.dispatchMouseEvent',
-              { type: 'mousePressed', x: cv.x, y: cv.y, button: 'left', clickCount: 1 });
-            await c.send('Input.dispatchMouseEvent',
-              { type: 'mouseMoved', x: cv.x + 10, y: cv.y + 10, button: 'left', buttons: 1 });
-            await c.send('Input.dispatchMouseEvent',
-              { type: 'mouseReleased', x: cv.x + 10, y: cv.y + 10, button: 'left', clickCount: 1 });
-            await sleep(1200);
-          }
-          const dirtyNow = await c.evalExpr(
+          const aeonDirty = await c.evalExpr(
             '(() => { try { return window.__dbg.aeon.state().dirty; } '
             + 'catch (e) { return "threw: " + e.message; } })()').catch(() => 'threw');
-          // ⚠ NOT A `FAIL`. This is the harness failing to REACH the gesture,
-          // not the app failing a property, and the two must not be reported
-          // with the same word. Four routes were tried across four runs: an
-          // effects-preset edit (wrong document), aeon `setFacet` (returns
-          // null), the Layout pill by `div` (wrong tag), and the Layout pill
-          // found across tags (CLICKS, tag BUTTON) followed by the `t` tool
-          // letter -- which leaves `tool` at `view`, so the drag paints
-          // nothing. The classic viewport is `ClassicLevelViewport`, whose key
-          // handling is not `MapViewport`'s, and arming its paint tool from
-          // outside is a route this instrument does not have. Saying UNMEASURABLE
-          // is the honest verdict; saying FAIL would put a defect on the app
-          // that this run has no evidence for.
-          check('S2a', 'ANTI-VACUOUS: the level document is DIRTY before Ctrl+S — else a save writes nothing',
-            dirtyNow === true ? true : 'UNMEASURABLE',
-            `dirty = ${JSON.stringify(dirtyNow)} after a real paint-tile drag (Layout click = `
-            + `${JSON.stringify(facetClick)}, setFacet -> ${JSON.stringify(facetSet)}, tool armed = `
-            + `${JSON.stringify(toolNow)}, canvas ${JSON.stringify(cv && cv.id)} `
-            + `${JSON.stringify(cv && cv.rect)})`);
 
+          // THE INDEPENDENT, SCREEN-SIDE WITNESS. `stamp` is the door's own
+          // report; believing it alone would make the door the only evidence
+          // for the door. The chip's tooltip is the app's OWN verdict --
+          // `SaveChip` picks it from `canSaveActive(activeId)`, the same
+          // predicate its click uses -- so a flip from "nothing to save" to the
+          // Ctrl+S tooltip is the app saying, on screen, that this document now
+          // has something to write.
+          //
+          // The census is PRINTED, never predicated on: if a second Save-shaped
+          // button is on screen on the classic side (a sprite header's, say),
+          // that must be visible to the reader rather than silently deciding
+          // which button these rows are about.
+          const CHIP_CENSUS = String.raw`
+(() => [...document.querySelectorAll('button')]
+  .filter((b) => /^(Save|Saved!)$/.test((b.textContent || '').trim()))
+  .map((b) => ({ text: (b.textContent || '').trim(), title: (b.title || '').slice(0, 90),
+                 rects: b.getClientRects().length, disabled: !!b.disabled })))()`;
+          const chipAfter = await c.json(PAINTED(CHIP));
+          const census = await c.json(CHIP_CENSUS).catch(() => []);
+
+          // ⚠ NOT ONE ROW WITH THREE CLAUSES. The door's report, the document
+          // bytes and the app's own tooltip are three separate witnesses, and a
+          // single row would hide two of them behind whichever failed first.
+          const stampOk = stamp && stamp.ok === true;
+          check('S2a1', 'the debug door made a real LEVEL edit through the app\'s own commit path',
+            stampOk === true,
+            `stampLayoutCell -> ${JSON.stringify(stamp)}. This calls classicSetLayoutCells, `
+            + 'the same function ClassicLevelViewport endStroke commits a stamp gesture with. '
+            + 'It does NOT set a dirty flag; src/renderer/__tests__/debug-level-edit.test.ts '
+            + 'reddens on that degradation (the undo row plus four source guards).');
+          check('S2a2', 'ANTI-VACUOUS: a real BYTE changed in the document, read back out of it',
+            stampOk === true && stamp.docChanged === true && stamp.from !== stamp.to,
+            stampOk
+              ? `${stamp.plane} cell (${stamp.x},${stamp.y}) ${stamp.from} -> ${stamp.cellAfter} `
+                + `(asked for ${stamp.to}); dirty domains ${JSON.stringify(stamp.dirtyBefore)} -> `
+                + `${JSON.stringify(stamp.dirtyAfter)}. A save with nothing changed would write the `
+                + 'same bytes back and name a file for an edit that does not exist.'
+              : `no stamp was made: ${JSON.stringify(stamp)}`);
+          // ⚠ UNMEASURABLE, NOT FAIL, IF THE PRECONDITION IS ALREADY GONE. A
+          // classic act that arrives with something to save is not a defect in
+          // the chip, and a red here would say it was.
+          check('S2a3', 'and the APP agrees on screen: the chip\'s tooltip flips to the Ctrl+S one',
+            chipBefore.found !== true || chipBefore.title !== NOTHING
+              ? 'UNMEASURABLE'
+              : chipAfter.found === true && chipAfter.rects > 0 && chipAfter.title === CANSAVE,
+            `chip title ${JSON.stringify(chipBefore.title)} -> ${JSON.stringify(chipAfter.title)} `
+            + `on the CLASSIC level header (found ${chipBefore.found} -> ${chipAfter.found}). `
+            + 'This is SaveChip reading canSaveActive, the same predicate its click uses, so it is '
+            + 'the app\'s own verdict rather than the door\'s report about itself. '
+            + `Save-shaped buttons on screen: ${JSON.stringify(census)}. `
+            + `aeon editorStore dirty = ${JSON.stringify(aeonDirty)}, expected to stay false: it is `
+            + 'the AEON flag, and this subject is a CLASSIC act.');
+
+          const dirtyNow = stampOk && stamp.docChanged === true;
           if (dirtyNow !== true) {
             check('S2b', 'Ctrl+S on a dirty level tab flashes `Saved!` ON THE CHIP', 'UNMEASURABLE',
-              'the stroke did not dirty the document, so a save would correctly write nothing '
-              + 'and correctly not flash — a green here would have been vacuous');
+              'the door did not change a byte in the document, so a save would correctly write '
+              + 'nothing and correctly not flash — a green here would have been vacuous. '
+              + 'S2a1/S2a2 above say WHICH half failed, and neither is a verdict on the chip.');
             check('S3c', 'a classic save\'s success toast NAMES the files it wrote', 'UNMEASURABLE',
               'nothing was dirty, so no `Saved N level(s)` toast is due');
           } else {
