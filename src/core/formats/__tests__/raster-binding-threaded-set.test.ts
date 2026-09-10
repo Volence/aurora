@@ -243,7 +243,7 @@ function sidecarListing(): Listing {
   if (!lines[0]?.startsWith('tree ')) {
     return {
       ok: false,
-      why: `${at(SIDECARS_REL)} is not a directory at that revision — git described it as `
+      why: `${at(SIDECARS_REL)} is not a directory at that revision: git described it as `
         + `${JSON.stringify(lines[0] ?? '')}. Nothing was listed, and an unlistable directory `
         + 'must not be counted as an empty one',
     };
