@@ -641,9 +641,10 @@ export function sectionArmExclusivityRefusal(
     + `threaded through ${chooserFn}(sec: ${sectionIndex}). So binding one here would have to take `
     + `${arm.patched} out of section ${sectionIndex} first. That is a property of the `
     + 'mechanism and not a choice about this section (aeon, 2026-09-10: "THAT IS A STRUCTURAL GAP '
-    + 'AND NOT A CHOICE"), which is why this control is disabled here and nowhere else. A '
-    + 'programmer unbinds the patched arm in that record if this section is really the one you '
-    + 'want.';
+    + 'AND NOT A CHOICE"), and it is the only kind of thing that greys this control out: a section '
+    + 'nothing threads yet, or one whose raster channel is already occupied, is refused nothing '
+    + 'here. A programmer unbinds the patched arm in that record if this section is really the '
+    + 'one you want.';
 }
 
 /**

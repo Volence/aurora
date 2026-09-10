@@ -591,6 +591,36 @@
  * greyed out because the thing is impossible; the second is a claim we would not
  * have earned. Fail toward the honest sentence, not toward the confident-looking
  * lock.
+ *
+ * ⚠ NARROWED A SECOND TIME 2026-09-10 (SECTION0-SPECIAL-CASE). One thing now
+ * disables the per-section select, and every clause above stands unchanged for
+ * everything else. Read this before citing "no gate" against it.
+ *
+ *   WHAT DISABLES IT: `section-wiring.ts`'s `sectionBindingControlDisabled`,
+ *   from `sectionArmExclusivity` — a section whose preset record passes a
+ *   non-zero `patched:`. `engine/effects/preset.emp`'s `preset()` ensures
+ *   `ep_raster` and `ep_patched` are mutually exclusive, so such a record can
+ *   never take a `raster:` beside the arm it already holds.
+ *
+ *   WHY IT IS NOT THE SNAPSHOT THIS REFUSAL FORBIDS: it is not a section list
+ *   and not a cached set. It is the ensure, re-read from aeon's own library on
+ *   every load — and it already disagrees with aeon's ruling PROSE, which says
+ *   section 0 is the only section with live patch channels while their own
+ *   `ojz_effects.emp` has carried a second (`OJZ_Preset_Sec7`, `patched:
+ *   OJZ_WorldWater`) since 2026-09-05. A literal would have been born stale.
+ *
+ *   WHY IT IS A REFUSAL AND NOT AN ADVISORY: aeon ruled it (`92d744fc`,
+ *   `docs/DEFERRED_WORK.md`) a STABLE PROPERTY under this lane's own
+ *   pre-committed rule — "a permanent property earns a disabled control with a
+ *   reason; an incidental gap earns the enabled control with a disclosure". The
+ *   other four sections aurora asked about are INCIDENTAL and are refused
+ *   NOTHING here: what occupies their raster channels is content, reversible,
+ *   and the owner's call.
+ *
+ *   AND THE CLAUSE DIRECTLY ABOVE IS UNTOUCHED: with the effects library
+ *   unreadable the verdict is `unknown`, the control stays ENABLED, and a
+ *   sentence says what could not be checked. It is not disabled-for-that-reason
+ *   either, which would be a mechanism nobody measured.
  */
 
 export const RASTER_SECTION_BINDING_LIMIT =
