@@ -208,6 +208,14 @@ function readSchematic(): Schematic {
   }
   if (header < 0) return { columns, found: false };
   const starts = labels.map((l) => lines[header].indexOf(l));
+  // ⚠ `found` HAS TO BE MORE THAN "the labels are all in there". Every offset
+  // is >= 0 by construction at this point, so asserting that proves nothing;
+  // and `includes` matches a SUPERSTRING, so renaming the middle heading to
+  // `Colours` left this whole reader working and every row green when it was
+  // tried as a mutation. What actually has to hold for the slicing below to
+  // mean anything is that the three headings sit at three DISTINCT, INCREASING
+  // offsets, in the order the bar paints them.
+  const ordered = starts.every((s, k) => s >= 0 && (k === 0 || s > starts[k - 1]));
   for (let k = 0; k < labels.length; k += 1) {
     const cells: string[] = [];
     for (let i = header + 1; i < lines.length && !lines[i].startsWith('```'); i += 1) {
@@ -217,7 +225,7 @@ function readSchematic(): Schematic {
     }
     columns.set(EFFECTS_SUB_TABS[k].id, cells);
   }
-  return { columns, found: starts.every((s) => s >= 0) };
+  return { columns, found: ordered };
 }
 
 const schematic = readSchematic();
@@ -227,9 +235,9 @@ describe('the guide is readable as an instrument at all', () => {
     // Every order row below rests on this. Without it a renamed heading turns
     // the whole schematic into an empty map, and an empty map is in every
     // order there is.
-    expect(schematic.found, 'the §1 panel schematic no longer has a fenced header line '
-      + 'naming all three sub-tab labels; every column row below is measuring nothing')
-      .toBe(true);
+    expect(schematic.found, 'the §1 panel schematic no longer has a fenced header line naming '
+      + 'all three sub-tab labels at three distinct rising offsets; every column row below is '
+      + 'measuring nothing').toBe(true);
     for (const tab of EFFECTS_SUB_TABS) {
       expect(schematic.columns.get(tab.id)?.length ?? 0,
         `the schematic's ${tab.label} column came back empty`).toBeGreaterThan(0);
