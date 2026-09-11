@@ -48,10 +48,13 @@ Sprite documents do mappings + DPLC round-trip across four game formats — Soni
 2, 3&K and S4 (`src/core/formats/games/`) — with a whole-frame bitmap editor and an
 animation timeline.
 
-Every edit — level, art, sprite, or agent-driven — is a single undo step
+Every edit (level, art, sprite, or agent-driven) is a single undo step
 (Ctrl+Z; redo Ctrl+Y or Ctrl+Shift+Z) on the focused document's history, which
-human and agent edits share. Edits stay in memory until you save; the classic save
-is mtime-guarded and refuses rather than clobbering a file changed underneath it.
+human and agent edits share. Edits stay in memory until you save. **Ctrl+S** saves
+the document in the active tab (a level's Save button, beside Undo and Redo, does
+the same), and **Ctrl+Shift+S** saves every unsaved document that has a file to go
+to. The classic save is mtime-guarded and refuses rather than clobbering a file
+changed underneath it.
 
 ## Playtest loop
 
