@@ -157,7 +157,9 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onI
   const filtered = useMemo(() => filterExplorer(groups, query), [groups, query]);
   // ONE rule, in core/shell/explorer.ts, for what an empty tree shows — see its
   // header for seat B's F5, the filter that deleted this panel's only control.
-  const emptyState = explorerEmptyState(filtered.length, query, noProject);
+  // The fourth argument is the UNFILTERED count: it is how the rule tells "the
+  // filter matched nothing" from "there was nothing to filter" (census B-F5).
+  const emptyState = explorerEmptyState(filtered.length, query, noProject, groups.length);
 
   const activate = (item: ExplorerItemModel) => {
     if (item.disabled) return;
@@ -291,7 +293,7 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onI
       </div>
       <div style={styles.treeScroll}>
         {emptyState.noMatches && (
-          <div style={styles.empty}>No matches</div>
+          <div style={styles.empty}>{emptyState.message}</div>
         )}
         {emptyState.openProject && (
           <div style={styles.empty}>
