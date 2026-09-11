@@ -57,6 +57,7 @@ import { useSessionStore } from '../../state/sessionStore';
 import { useViewStore } from '../../state/viewStore';
 import { useToastStore } from '../../state/toastStore';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
+import { switchFacet } from '../../workspace/facet-tools';
 import { documentHistoryHub } from '../../state/history-hub';
 import type { ObjectPlacement, Section } from '../../../core/model/s4-types';
 import { unpackNametableWord, SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../core/model/s4-types';
@@ -1962,14 +1963,27 @@ describe('a marquee drag snaps from its start tile, follows the modifier live, a
   it('a move after an act switch does not extend the marquee into the act that opened', async () => {
     // React held back: the marquee's arm of `abandonStaleGestures` alone. Its
     // start carries a SECTION INDEX, and index 0 resolves in both acts.
+    //
+    // The row asks ONE thing: did the move extend the drag into act2. Whether the
+    // committed rect survives the switch is not this arm's job. editorStore's
+    // scope subscription clears it at the switch itself (a store listener, which
+    // holding React back does not hold back), and its rows are at the end of the
+    // paste block. So the rect after the move is compared with the rect the move
+    // WOULD write, not with the rect before it, which the subscription has
+    // already taken away. (It was `toEqual(before)` while the clear was an effect
+    // that a React-held-back row never let run.)
     const s = await mountMap();
     s.on().onMouseDown(tileAt(START.col, START.row));
     s.on().onMouseMove(tileAt(START.col + 1, START.row));
     const before = marquee();
+    const cursor = { col: END.col + 10, row: END.row + 6 };
+    const extended = rect(START, cursor, false);
+    expect(before, 'the premise: a drag in flight with a rect on screen').not.toBeNull();
+    expect(extended, 'ANTI-VACUOUS: the move would not have changed the rect').not.toEqual(before);
     const held = { ...s.on() };
     focusAct('act2');
-    held.onMouseMove(tileAt(END.col + 10, END.row + 6));
-    expect(marquee(), 'the drag kept extending after the act changed under it').toEqual(before);
+    held.onMouseMove(tileAt(cursor.col, cursor.row));
+    expect(marquee(), 'the drag kept extending after the act changed under it').not.toEqual(extended);
   });
 
   it('an act switch drops the committed marquee AND paste mode', async () => {
@@ -2081,14 +2095,16 @@ describe('paste mode commits at the hovered, snapped origin, and a middle drag s
   });
 
   /**
-   * Mount the map, THEN arm paste mode.
+   * Mount the map, THEN arm paste mode, which is the order an author does it in.
    *
    * ⚠ THE FIRST DRAFT ARMED IT IN `beforeEach`, BEFORE THE MOUNT, AND EVERY ROW
-   * IN THIS BLOCK WENT RED FOR A REASON THAT WAS NOT THE COMPONENT'S. The effect
-   * that clears the marquee and paste mode on an act switch is keyed on the open
-   * zone and act, and like every effect it also runs on the FIRST render. So
-   * paste mode armed before the map existed was dropped by the mount. In the
-   * app the author arms it with the map on screen, which is what this does.
+   * IN THIS BLOCK WENT RED FOR A REASON THAT WAS NOT THE COMPONENT'S. The clear
+   * of the marquee and paste mode on an act switch was then a `useEffect` keyed
+   * on the open zone and act, and like every effect it also ran on the FIRST
+   * render, so paste mode armed before the map existed was dropped by the mount.
+   * That clear is now a store subscription that never fires on a mount
+   * (MAP-REMOUNT-DROPS-PASTE; the nested block at the end of this one), so the
+   * order no longer decides the outcome. It is kept because it is the app's.
    */
   async function mountPasting(): Promise<Surface> {
     const s = await mountMap();
@@ -2166,6 +2182,164 @@ describe('paste mode commits at the hovered, snapped origin, and a middle drag s
     expect(fgPainted('act1'), 'the pan pasted').toHaveLength(0);
     expect(focusedHistory()?.canUndo ?? false).toBe(false);
     expect(useEditorStore.getState().pasting, 'and the mode is still armed').toBe(true);
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // THE MARQUEE AND AN ARMED PASTE BELONG TO THE ACT, NOT TO THE MOUNT
+  // (MAP-REMOUNT-DROPS-PASTE; docs/reviews/2026-09-11-map-remount-clear.md)
+  //
+  // The act-identity clear was a `useEffect` keyed on the open zone and act,
+  // whose comment said it fired "only on an actual act/zone switch". Like every
+  // effect it also ran on the FIRST render, so every remount cleared both, and a
+  // facet round trip through Art IS a remount: LevelWorkspace renders the facet
+  // module's `<Canvas />`, and Art's Canvas is `ArtCanvas`, not the MapViewport
+  // that every other aeon facet shares through `mapFacet`.
+  //
+  // Nested in the paste block for its `document` stub and its armed clipboard:
+  // with paste mode on at a mount, the preview pass reaches `regionPreviewCanvas`.
+  //
+  // THE REMOUNT, AS THIS HARNESS CAN SPELL IT: `takeDown` runs every cleanup and
+  // `mountMap` builds a fresh instance whose effects all run as a first render.
+  // LevelWorkspace itself is not rendered here; the rows that go through the
+  // facet bar call `switchFacet`, the store half of what the bar does.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  describe('the marquee and an armed paste belong to the act they were made in, not to the mount', () => {
+    const DRAG = { from: { col: 3, row: 3 }, to: { col: 6, row: 4 } };
+    const armedRect = () => ({
+      sectionIndex: 0,
+      ...snapMarquee(DRAG.from.col, DRAG.from.row, DRAG.to.col, DRAG.to.row, effectiveGranularity('block', false)),
+    });
+    const ed = () => useEditorStore.getState();
+    /** A config for the project that is open before a switch, so a switch is one
+     *  config for another as it is in the app, not null for one. */
+    const giveTheOpenProjectAConfig = () =>
+      useProjectStore.setState({ config: { basePath: '/map-remount/first-checkout', zones: [] } as never });
+
+    /**
+     * A committed marquee from a real drag, then paste armed by a real Ctrl+V,
+     * both with the map on screen as an author does it. Both premises are
+     * asserted: a row that expects a clear is vacuous over state never armed.
+     */
+    async function armBoth(): Promise<Surface> {
+      ed().setTool('marquee');            // FIRST: setTool clears `pasting`
+      ed().setMarqueeGranularity('block');
+      ed().setMarqueeSnapInvert(false);
+      ed().setMarquee(null);
+      const s = await mountMap();
+      s.on().onMouseDown(tileAt(DRAG.from.col, DRAG.from.row));
+      s.on().onMouseMove(tileAt(DRAG.to.col, DRAG.to.row));
+      win!.dispatch('mouseup', {});
+      expect(ed().marquee, 'the drag committed no marquee, so no row below can see a clear')
+        .toEqual(armedRect());
+      expect(win!.dispatch('keydown', keydown('v', { ctrlKey: true })), 'nothing heard Ctrl+V')
+        .toBeGreaterThan(0);
+      expect(ed().pasting, 'Ctrl+V did not arm paste mode, so no row below can see a clear').toBe(true);
+      return s;
+    }
+
+    /** Take the map down the way React does, and its window stub with it. */
+    function takeDown(s: Surface): void {
+      s.h.unmount();
+      mounted = null;
+      win!.restore();
+      win = null;
+    }
+
+    /**
+     * A different project opened over this one, in aeon-open.ts's order
+     * (`openLoaded`, then the first-act pick), whose first act has the SAME ids
+     * as the one open. Only the project changed, so a clear keyed on zone and act
+     * alone cannot see it. Two checkouts of one tree are exactly this.
+     */
+    function openSameIdsProject(): void {
+      useProjectStore.getState().openLoaded({
+        config: { basePath: '/map-remount/another-checkout', zones: [] },
+        project: twoActProject(),
+        collisionProfiles: null, capabilities: null, legacyAtlasMerged: false,
+      } as never);
+      useProjectStore.getState().setCurrentAct('ojz', 'act1');
+    }
+
+    it('a facet round trip through Art keeps the committed marquee', async () => {
+      const s = await armBoth();
+      const tab = useSessionStore.getState().activeId;
+      switchFacet(tab, 'art');            // the facet bar: Art's Canvas replaces the map…
+      takeDown(s);                        // …which unmounts it
+      switchFacet(tab, 'layout');
+      await mountMap();                   // and coming back mounts a fresh one
+      expect(ed().tool, 'the premise: the marquee tool came back with the facet').toBe('marquee');
+      expect(ed().marquee, 'the remount threw away a marquee made in the act that is still open')
+        .toEqual(armedRect());
+    });
+
+    it('CONTROL: the facet switch ITSELF disarms paste, before any remount', async () => {
+      // So the facet bar never brings a paste back, whatever the mount does:
+      // `switchFacet` re-scopes the tool through `setTool`, whose rule is that
+      // picking a tool means the author is done pasting. The marquee is not in
+      // that rule, which is why it is the half an author could see come back.
+      await armBoth();
+      switchFacet(useSessionStore.getState().activeId, 'art');
+      expect(ed().pasting, 'the facet switch left paste mode armed').toBe(false);
+      expect(ed().marquee, 'and the switch is not what drops the marquee').toEqual(armedRect());
+    });
+
+    it('a remount with no tool change keeps the marquee AND the armed paste', async () => {
+      // No shipped path remounts the map without a tool re-scope or a change of
+      // act or project (the packet's table), so this is the component's own
+      // property rather than an author's path: a mount destroys nothing.
+      const s = await armBoth();
+      takeDown(s);
+      await mountMap();
+      expect(ed().marquee, 'the mount cleared the marquee').toEqual(armedRect());
+      expect(ed().pasting, 'the mount disarmed paste mode').toBe(true);
+    });
+
+    it('an act switch while the map is unmounted still drops both', async () => {
+      // The case the mount-time clear was carrying without saying so.
+      const s = await armBoth();
+      takeDown(s);
+      focusAct('act2');
+      await mountMap();
+      expect(ed().marquee, 'a marquee from act1 is on act2\'s map').toBeNull();
+      expect(ed().pasting, 'paste mode from act1 is armed over act2').toBe(false);
+    });
+
+    it('a round trip to another act and back while unmounted still drops both', async () => {
+      // The act it comes back to IS the act the state was made in. A mounted map
+      // clears both at the first switch, so an unmounted one must too. Comparing
+      // the act at the next mount with the act the state was armed in cannot see
+      // this; that is what this row is for.
+      const s = await armBoth();
+      takeDown(s);
+      focusAct('act2');
+      focusAct('act1');
+      await mountMap();
+      expect(ed().marquee, 'a marquee survived an act switch because the map was not on screen').toBeNull();
+      expect(ed().pasting, 'paste mode survived an act switch because the map was not on screen').toBe(false);
+    });
+
+    it('a project opened while unmounted, with the SAME zone and act ids, still drops both', async () => {
+      giveTheOpenProjectAConfig();
+      const s = await armBoth();
+      takeDown(s);
+      openSameIdsProject();
+      await mountMap();
+      expect(ed().marquee, 'a marquee from the other project is on this one').toBeNull();
+      expect(ed().pasting, 'the other project\'s paste is armed over this one').toBe(false);
+    });
+
+    it('a project opened with the map MOUNTED, same zone and act ids, drops both', async () => {
+      // The mounted half of the same path. `resetProjectRuntime`
+      // (state/project-runtime.ts) clears histories and documents, not these.
+      giveTheOpenProjectAConfig();
+      const s = await armBoth();
+      const before = s.h.renders();
+      openSameIdsProject();
+      expect(s.h.renders(), 'the map did not re-render on the project change').toBeGreaterThan(before);
+      expect(ed().marquee, 'a marquee from the other project survived the open').toBeNull();
+      expect(ed().pasting, 'the other project\'s paste stayed armed').toBe(false);
+    });
   });
 });
 
