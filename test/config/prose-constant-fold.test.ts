@@ -21,7 +21,7 @@
  * same value. A row that typed `12` would go stale on the day aeon resizes its
  * art pool, which is the precise failure the constant exists to prevent.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -171,8 +171,62 @@ describe('the blindness announces itself, in the tier that fits it', () => {
 });
 
 describe('the real gate, over the real repo', () => {
-  const run = (...args: string[]) =>
-    execFileSync('node', [resolve(REPO, GATE), ...args], { cwd: REPO, encoding: 'utf8' });
+  /*
+   * THE GATE RUNS ONCE PER INVOCATION, IN A HOOK, AND BOTH LIMITS ARE DERIVED.
+   * docs/reviews/2026-09-11-suite-timeout-rows.md has the measurements.
+   *
+   * WHAT THE TIME IS. Every row here used to spawn the real gate itself, four
+   * spawns for three rows (the coverage row spawns twice), each on vitest's 5s
+   * default. The gate is a synchronous parse of every tracked source file: no
+   * timer, no poll, no watcher, no await anywhere in it or in the fold it
+   * imports. Measured, its child uses MORE CPU than wall time on a quiet box
+   * (user+sys ~1.2s against ~0.6s wall, V8's helper threads), so nothing in it
+   * waits, and under load wall grows while CPU stays flat. That is starvation of
+   * real work, not a window: these rows timed out at 5246ms and 6498ms (the
+   * ledger row, load 14.80) and 5902ms (a landing on 2026-09-11) and pass in
+   * ~0.6s alone, with one tight mode at every load measured.
+   *
+   * WHY A HOOK. The plain run is shared by the exit row and the coverage row, so
+   * three spawns do the work four did. The row bodies are UNCHANGED: `run()`
+   * returns exactly what `execFileSync` returned, or re-throws exactly what it
+   * threw, so "exits 0" still means a spawn that did not throw.
+   *
+   * THE NUMBERS. One spawn's idle median is 553ms (nine spawns inside vitest,
+   * load 7.9 to 8.3). The worst stretch MEASURED here is 5.8x (3143ms, load 44
+   * to 50 under 16 busy loops). The worst REPORTED is at least 7.8x: the
+   * facet-modules import row, 645ms idle, timed out at 5000ms in the
+   * 2026-09-11 landings at load 33 to 36, a lower bound because the timeout cut
+   * it off. Headroom x20 is about 2.5 times that: 553ms x 20 = 11.1s, rounded
+   * up to 15s per spawn. The spawn
+   * carries its OWN kill bound so a hung gate fails as ETIMEDOUT naming the
+   * spawn, which the failure-class reporter files as would-block. Without it a
+   * hang blocks this worker for good, because vitest cannot interrupt a
+   * synchronous call. The hook's bound is the sum of its three spawns' bounds,
+   * so the per-spawn kill always fires first.
+   *
+   * IF A SPAWN EVER HITS 15s, DO NOT RAISE IT. The gate has grown or something
+   * in it has become slow, and the answer is to measure what changed.
+   */
+  const SPAWN_MS = 15_000;
+  type Captured = { out: string } | { err: unknown };
+  const captured = new Map<string, Captured>();
+  /** What the old per-row call returned, or the error it threw, re-thrown. */
+  const run = (...args: string[]): string => {
+    const got = captured.get(args.join(' '));
+    if (!got) throw new Error(`no captured gate run for [${args.join(' ')}]: the hook never ran it`);
+    if ('err' in got) throw got.err;
+    return got.out;
+  };
+  beforeAll(() => {
+    for (const args of [[], ['--table'], ['--blind']]) {
+      try {
+        captured.set(args.join(' '), { out: execFileSync('node', [resolve(REPO, GATE), ...args],
+          { cwd: REPO, encoding: 'utf8', timeout: SPAWN_MS }) });
+      } catch (err) {
+        captured.set(args.join(' '), { err });
+      }
+    }
+  }, 3 * SPAWN_MS);
 
   it('exits 0 today, so the rows below read a passing run', () => {
     expect(() => run()).not.toThrow();
