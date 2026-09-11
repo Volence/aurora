@@ -2485,10 +2485,11 @@ describe('paste mode commits at the hovered, snapped origin, and a middle drag s
       return s;
     }
 
-    /** Hover then press at PASTE_AT, then release: a whole click. */
-    function clickAtPaste(s: Surface) {
+    /** Hover then press at PASTE_AT, then release: a whole click. `over` carries
+     *  the press's modifiers (Shift is "collision only", Alt "art only"). */
+    function clickAtPaste(s: Surface, over: Record<string, unknown> = {}) {
       s.on().onMouseMove(tileAt(PASTE_AT.col, PASTE_AT.row));
-      const e = tileAt(PASTE_AT.col, PASTE_AT.row);
+      const e = tileAt(PASTE_AT.col, PASTE_AT.row, over);
       s.on().onMouseDown(e);
       win!.dispatch('mouseup', {});
       return e;
@@ -2671,6 +2672,105 @@ describe('paste mode commits at the hovered, snapped origin, and a middle drag s
           .not.toEqual([...clip!.tileset.tiles[t].pixels]);
       }
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // A COLLISION WORD DOES NOT INDEX THE TILE SET
+    // (COLLISION-PASTE-ACROSS-TILESETS;
+    //  docs/reviews/2026-09-11-collision-paste-across-tilesets.md)
+    //
+    // Its shape number indexes the project's ONE collision base bank: aeon bakes
+    // every section of every zone against the same bank into one shared attr
+    // set. So a collision-only paste into another zone of the SAME project puts
+    // down exactly the shapes that were copied, and refusing it (with a message
+    // about tiles, which it does not write) was wrong. Across PROJECTS the bank
+    // can differ, so there it stays refused, and the message is about collision.
+    // ════════════════════════════════════════════════════════════════════════
+
+    /** The four tile-indexed plane words the 16px cell at PASTE_BASE covers
+     *  (every sub-tile of a cell holds the cell's one word). */
+    const PASTE_CELL = cellSubTiles(PASTE_BASE.col >> 1, PASTE_BASE.row >> 1);
+
+    /** What a collision-only paste of the copy at PASTE_AT must change in
+     *  `zoneId`/act1, derived from the clipboard and the planes before it, and
+     *  nothing else: both planes, at the cell's four sub-tiles. Sorted, like
+     *  `changesSince(...).sort()`. Asserts the paste would be VISIBLE first. */
+    function collisionOnlyLanding(zoneId: string, before: Planes): string[] {
+      const clip = ed().mapClipboard!;
+      expect([clip.collisionA.length, clip.collisionB.length],
+        'the premise: the copy is exactly one 16px cell per plane').toEqual([1, 1]);
+      const out: string[] = [];
+      for (const [plane, w] of [['collA', clip.collisionA[0]], ['collB', clip.collisionB[0]]] as const) {
+        const was = before.find((p) => p.where === `${zoneId}/act1/s0/${plane}`);
+        if (!was) throw new Error(`map-viewport-mounted: ${zoneId}/act1 has no ${plane}; the fixture moved`);
+        for (const i of PASTE_CELL) {
+          expect(was.words[i], `ANTI-VACUOUS: ${zoneId} ${plane}[${i}] already holds the copied word`).not.toBe(w);
+          out.push(`${zoneId}/act1/s0/${plane}[${i}] ${hex(was.words[i])} became ${hex(w)}`);
+        }
+      }
+      return out.sort();
+    }
+
+    it('a COLLISION-ONLY (Shift) paste into another zone of the same project lands the copied collision and no tile word', async () => {
+      const s = await copyInSource();
+      focusZoneAct(OTHER, 'act1');
+      const before = planes();
+      const expected = collisionOnlyLanding(OTHER, before);
+      useToastStore.setState({ toasts: [] });
+      win!.dispatch('keydown', keydown('v', { ctrlKey: true }));
+      expect(ed().pasting, 'Ctrl+V refused a paste whose collision means the same shapes in every zone').toBe(true);
+      clickAtPaste(s, { shiftKey: true });
+      expect(changesSince(before).sort(),
+        'the collision-only paste wrote something other than the copied collision').toEqual(expected);
+      expect(toastsMatching('Not pasted'), 'a paste that landed was also refused').toHaveLength(0);
+      expect(undoDepth(), 'the collision paste is not ONE undo step').toBe(1);
+    });
+
+    it('the same paste through the sticky Paste setting (Collision), with no modifier, lands the same way', async () => {
+      const s = await copyInSource();
+      focusZoneAct(OTHER, 'act1');
+      ed().setPasteLayers('collision');
+      const before = planes();
+      const expected = collisionOnlyLanding(OTHER, before);
+      useToastStore.setState({ toasts: [] });
+      win!.dispatch('keydown', keydown('v', { ctrlKey: true }));
+      expect(ed().pasting, 'Ctrl+V refused a collision-only paste into another zone').toBe(true);
+      clickAtPaste(s);
+      expect(changesSince(before).sort(),
+        'the collision-only paste wrote something other than the copied collision').toEqual(expected);
+      expect(toastsMatching('Not pasted'), 'a paste that landed was also refused').toHaveLength(0);
+    });
+
+    it('a collision-only paste into ANOTHER PROJECT is refused at the click, in terms of COLLISION, and nothing is written', async () => {
+      // The store's own arm, around Ctrl+V, so this row measures the click's
+      // check: the write must not trust whoever armed it.
+      const s = await copyInSource();
+      const next = twoActProject() as unknown as { zones: Array<Record<string, unknown>> };
+      next.zones[0].tileset = tilesOf((i) => 15 - i);
+      useProjectStore.getState().openLoaded({
+        config: { basePath: '/collision-paste/another-checkout', zones: [] },
+        project: next,
+        collisionProfiles: null, capabilities: null, legacyAtlasMerged: false,
+      } as never);
+      focusZoneAct('ojz', 'act1');
+      const target = sectionIn('ojz', 'act1');
+      target.collisionEdit = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(7));
+      target.collisionEditB = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(8));
+      const before = planes();
+      collisionOnlyLanding('ojz', before);   // ANTI-VACUOUS: a paste here would show
+      ed().setPasting(true);
+      expect(ed().pasting, 'the premise: paste mode is armed over the other project').toBe(true);
+      useToastStore.setState({ toasts: [] });
+      const e = clickAtPaste(s, { shiftKey: true });
+      expect(changesSince(before), 'another project\'s shape numbers were pasted into this one').toEqual([]);
+      const said = toastsMatching('Not pasted');
+      expect(said, 'the refused click was silent').toHaveLength(1);
+      expect(said[0], 'the refusal did not name what it refused').toContain('collision');
+      expect(said[0], 'the refusal did not say where the copy came from').toContain('another project');
+      expect(said[0], 'a paste that writes no tile word was refused in terms of tiles').not.toContain('tiles');
+      expect(ed().pasting, 'a refused paste stayed armed').toBe(false);
+      expect(e.wasPrevented(), 'the refused click fell through to the tool').toBe(true);
+      expect(focusedHistory()?.canUndo ?? false, 'a refusal put an entry on the undo stack').toBe(false);
+    });
   });
 });
 
