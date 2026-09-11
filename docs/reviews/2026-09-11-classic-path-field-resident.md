@@ -227,7 +227,29 @@ Restored with `git checkout ca909185 -- src/renderer/components/home/OpenByPath.
 
 ## 5. Suite
 
-TBD
+Full `npm test` at `fc24e0a6` (fix plus this packet), run in the foreground,
+exit 0:
+
+| | Test Files | Tests |
+|---|---|---|
+| tip `fc24e0a6` | 607 passed \| 3 skipped (610) | 9149 passed \| 9 skipped (9158) |
+
+- The failure-class reporter says "no failures in this run (610 module(s)
+  reported)".
+- The skip reporter says "9 SKIPPED test(s) in 7 file(s)" and "OK. Every skip
+  named its reason".
+- The new file is collected by `npm test`:
+  `✓ src/renderer/components/home/__tests__/typed-path-field-classic-resident.test.ts (6 tests)`.
+- In the same run: `typed-path-field-after-open.test.ts` 14/14,
+  `typed-path-open.test.ts` 8/8 and `project-open-door-census.test.ts` 6/6.
+- Every gate in the `npm test` chain printed OK. That includes
+  `check-doc-citations`, `check-tsx-dashes`, `check-src-dashes` and
+  `check-test-dashes`.
+- `npx tsc --noEmit` exits 0 with no output, at `ca909185` and at `fc24e0a6`.
+
+**Base was not run as a full suite.** Nothing failed at the tip, so no failure
+needed a base comparison. The only rows this branch adds are the 6 in the one
+new file.
 
 ## 6. Where the tree contradicted or extended the brief
 
