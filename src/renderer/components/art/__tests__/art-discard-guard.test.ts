@@ -40,7 +40,7 @@
 // `scratchpad/confirm-focus-harness.mjs` is what measures focus in the running
 // app under CDP. A green here with neither of those run is not a proof.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
@@ -498,9 +498,54 @@ function codeOf(path: string): string {
   }).outputText;
 }
 
+/*
+ * ONE TRANSPILE OF THE TREE, SHARED BY §E AND §F, INSIDE A BOUNDED HOOK.
+ * docs/reviews/2026-09-11-suite-timeout-rows.md has the measurements.
+ *
+ * Until 2026-09-11 every file under src/ went through `codeOf` THREE times per
+ * run: once in the §E row below, once while §F's describe body COLLECTED its
+ * callers (collection has no time bound at all), and once more in §F's
+ * replace-door row. The two in-row passes each ran on vitest's 5s default and
+ * the §E one timed out at 5273ms on a loaded box (ledger
+ * SUITE-SUBPROCESS-ROWS-TIME-OUT-UNDER-LOAD). The work is `ts.transpileModule`
+ * in a synchronous loop: no await, no timer, nothing to race, so the time is
+ * CPU and it stretches smoothly with load.
+ *
+ * Now the pass happens once, in whichever of the two describes' hooks runs
+ * first, and every row reads its result. Nothing a row asserts changed: the
+ * same files, through the same `codeOf`, read from disk in the same run.
+ *
+ * THE LIMIT. The §E row is exactly one full pass plus a regex per file; its idle
+ * median is 966ms (916, 966 and 1032ms, load 7.9 to 8.3). Headroom x20, the
+ * factor test/config/prose-constant-fold.test.ts derives for the same box:
+ * 19.3s, rounded up to 20s. Each hook carries the full bound because `-t` can
+ * run either describe alone, and then that one pays the pass.
+ *
+ * IF A HOOK EVER HITS 20s, DO NOT RAISE IT. The tree has grown or the parse has
+ * become slow, and the answer is to measure what changed.
+ */
+const TREE_TRANSPILE_MS = 20_000;
+const treeCode = new Map<string, string>();
+
+/** Transpile every file not already transpiled this run. */
+function transpileTree(files: readonly string[]): void {
+  for (const f of files) if (!treeCode.has(f)) treeCode.set(f, codeOf(f));
+}
+
+/** `codeOf(f)` from the shared pass, and LOUD if the pass never covered `f`. */
+function transpiled(f: string): string {
+  const code = treeCode.get(f);
+  if (code === undefined) {
+    throw new Error(`${f} was never transpiled: the shared pass did not run over it, so `
+      + 'a row reading it would be measuring nothing');
+  }
+  return code;
+}
+
 describe('§E no door in src/ asks through a native browser dialog', () => {
   const SRC = join(__dirname, '..', '..', '..', '..');            // → src/
   const files = sourceFiles(SRC);
+  beforeAll(() => transpileTree(files), TREE_TRANSPILE_MS);
 
   it('[canary] the scanner reads code, not prose, and found the tree', () => {
     // A scan that found no files, or that could not strip comments, would green
@@ -523,7 +568,7 @@ describe('§E no door in src/ asks through a native browser dialog', () => {
     // "discard the drawing" — which is the d-31 defect by another route, at the one
     // door whose destructive answer is an artist's unsaved pixels.
     const offenders = files
-      .filter((f) => /window\.(confirm|alert|prompt)\s*\(/.test(codeOf(f)))
+      .filter((f) => /window\.(confirm|alert|prompt)\s*\(/.test(transpiled(f)))
       .map((f) => relative(SRC, f));
     expect(offenders).toEqual([]);
   });
@@ -584,12 +629,21 @@ describe('§F the doors are the only way to destroy the document', () => {
   const SRC = join(__dirname, '..', '..', '..', '..');
   const files = sourceFiles(SRC);
 
-  /** Files whose code calls the store's openDocument/closeDocument. */
-  const callers = files
-    .map((f) => ({ file: relative(SRC, f), code: codeOf(f) }))
-    .filter(({ code }) => /(^|[^A-Za-z0-9_$.])(open|close)Document\s*\(/m.test(code)
-      || /\.(open|close)Document\s*\(/.test(code))
-    .map(({ file }) => file);
+  /**
+   * Files whose code calls the store's openDocument/closeDocument. Filled in the
+   * hook, not at collection: collection runs BEFORE any hook, so computing this
+   * there would read an empty shared pass and every row below would be measuring
+   * nothing (the dead-rows row would catch that, but it should never have to).
+   */
+  let callers: string[] = [];
+  beforeAll(() => {
+    transpileTree(files);
+    callers = files
+      .map((f) => ({ file: relative(SRC, f), code: transpiled(f) }))
+      .filter(({ code }) => /(^|[^A-Za-z0-9_$.])(open|close)Document\s*\(/m.test(code)
+        || /\.(open|close)Document\s*\(/.test(code))
+      .map(({ file }) => file);
+  }, TREE_TRANSPILE_MS);
 
   it('nothing outside the sanctioned list reaches the store directly', () => {
     // The row that would have caught ART-DOC-CLOSED-UNGUARDED at the time it
@@ -629,7 +683,7 @@ describe('§F the doors are the only way to destroy the document', () => {
     // row above, and this catches the whole set being renamed away.
     const per = new Map<string, number>();
     for (const f of files) {
-      const n = (codeOf(f).match(/confirmArtDocumentOpen\s*\(/g) ?? []).length;
+      const n = (transpiled(f).match(/confirmArtDocumentOpen\s*\(/g) ?? []).length;
       if (n > 0) per.set(relative(SRC, f), n);
     }
     for (const f of [
