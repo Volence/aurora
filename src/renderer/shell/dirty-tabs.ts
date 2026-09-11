@@ -16,6 +16,14 @@
 // tab it lives inside while Ctrl+S there saves the PROJECT and not the composer.
 // state/project-runtime.ts registers the two level savers against the second
 // one; the tab strip reads the first.
+//
+// AND THE SAME SNAPSHOT NOW REACHES TWO SURFACES THAT OUTLIVE A TAB (census
+// B-F3). Closing a dirty level tab keeps the edit, and the close takes the tab
+// and its dot away. `explorerRowDirty` puts the dot on the level's Explorer row
+// (delegating to `tabHasDirtyDot`, so the row and the tab cannot disagree), and
+// `hasUnsavedWork` puts a marker in the window title while anything at all is
+// unsaved (derived from `unsavedKinds`, the same list the Ctrl+S toast names,
+// so the title and the toast cannot disagree either).
 
 import type { TabKind } from '../../core/shell/session';
 import { parseLevelTabId } from './tabs';
@@ -131,6 +139,23 @@ export function tabHasDirtyDot(tabId: string, kind: TabKind, s: DirtySnapshot): 
  * than one that says a canvas document is unsaved.
  */
 export function unsavedElsewhereMessage(s: DirtySnapshot): string | null {
+  const kinds = unsavedKinds(s);
+  if (kinds.length === 0) return null;
+  // NOT "the unsaved work is elsewhere". A canvas or sprite document can be
+  // dirty on THIS tab and still have no file to write to, in which case Ctrl+S
+  // honestly wrote nothing and the work is right here. The sentence is true in
+  // both cases.
+  return `Ctrl+S wrote nothing. Unsaved work is open in: ${kinds.join(', ')}. `
+    + 'Ctrl+Shift+S saves everything that has somewhere to go.';
+}
+
+/**
+ * EVERY KIND OF OPEN DOCUMENT THAT HOLDS UNSAVED WORK, as the words a person
+ * reads. One list for two readers: `unsavedElsewhereMessage` names them, and
+ * `hasUnsavedWork` (the window title's marker) asks whether there are any. Split
+ * out so the two can never disagree about whether anything is unsaved.
+ */
+export function unsavedKinds(s: DirtySnapshot): string[] {
   const kinds: string[] = [];
   if (s.classicOpen && s.classicDirty) kinds.push('a level');
   if (s.aeonOpen && !s.classicOpen && s.aeonDirty) kinds.push('a level');
@@ -141,11 +166,40 @@ export function unsavedElsewhereMessage(s: DirtySnapshot): string | null {
   if (s.dirtyCanvasDocIds.length > 0) {
     kinds.push(s.dirtyCanvasDocIds.length === 1 ? 'a canvas document' : `${s.dirtyCanvasDocIds.length} canvas documents`);
   }
-  if (kinds.length === 0) return null;
-  // NOT "the unsaved work is elsewhere". A canvas or sprite document can be
-  // dirty on THIS tab and still have no file to write to, in which case Ctrl+S
-  // honestly wrote nothing and the work is right here. The sentence is true in
-  // both cases.
-  return `Ctrl+S wrote nothing. Unsaved work is open in: ${kinds.join(', ')}. `
-    + 'Ctrl+Shift+S saves everything that has somewhere to go.';
+  return kinds;
+}
+
+/**
+ * IS ANY OPEN DOCUMENT UNSAVED, whatever tab is showing and whether or not the
+ * document still has a tab. The window title's marker (window-title.ts).
+ *
+ * Census B-F3: a dirty level tab closes without a prompt and KEEPS its edit (the
+ * act stays resident; tab-activation/dispatch.ts), so after the close the only
+ * thing on screen that said "unsaved", the tab's dot, is gone. This is the
+ * question that still has an answer once it is.
+ */
+export function hasUnsavedWork(s: DirtySnapshot): boolean {
+  return unsavedKinds(s).length > 0;
+}
+
+/**
+ * DOES THIS EXPLORER ROW SHOW THE UNSAVED DOT. True only for a LEVEL row
+ * (`level:<zone>:<act>`, which is also that level's tab id; tabs.ts
+ * `levelDocId`) whose tab would dot. Delegates to `tabHasDirtyDot` rather than
+ * restating it, so the row and the tab give the same answer about the same
+ * level, including the aeon aggregate (every aeon level dots while the project
+ * is dirty, spec §10).
+ *
+ * Only level rows, deliberately. A sprite or canvas document's close is
+ * CONFIRMED and discards (dispatch.ts `requestCloseTab`), so a dirty one always
+ * has its tab open and its dot showing. A level is the one document that stays
+ * unsaved with no tab, which is census B-F3.
+ */
+export function explorerRowDirty(itemId: string, s: DirtySnapshot): boolean {
+  return parseLevelTabId(itemId) !== null && tabHasDirtyDot(itemId, 'level', s);
+}
+
+/** Does any row of this Explorer group show the dot. The group header repeats it. */
+export function explorerGroupDirty(items: readonly { id: string }[], s: DirtySnapshot): boolean {
+  return items.some((i) => explorerRowDirty(i.id, s));
 }

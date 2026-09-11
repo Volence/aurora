@@ -36,6 +36,9 @@ import {
 import type { RecentProject } from '../../shared/ipc-types';
 import { loadRecents } from '../state/recents';
 import type { ObjectDef } from '../../core/model/s4-types';
+import { useDirtySnapshot } from './dirty-snapshot';
+import { explorerRowDirty, explorerGroupDirty } from './dirty-tabs';
+import { DirtyDot, EXPLORER_DIRTY_DOT_TITLE } from './DirtyDot';
 
 // Referentially-stable fallback: a fresh `[]` per render would defeat the
 // zustand selector's equality check and rebuild the whole groups memo on
@@ -62,7 +65,12 @@ export interface ExplorerProps {
 }
 
 /** One explorer tree row. Local hover state (the way `Tab` does) — never a CSS file. */
-function ExplorerItem({ item, onActivate }: { item: ExplorerItemModel; onActivate: (item: ExplorerItemModel) => void }) {
+function ExplorerItem({ item, dirty, onActivate }: {
+  item: ExplorerItemModel;
+  /** `explorerRowDirty` for this row: its level holds unsaved edits (census B-F3). */
+  dirty: boolean;
+  onActivate: (item: ExplorerItemModel) => void;
+}) {
   const [hover, setHover] = useState(false);
   if (item.heading) {
     // A divider labelling the rows after it (ExplorerItemModel.heading) — a
@@ -83,6 +91,7 @@ function ExplorerItem({ item, onActivate }: { item: ExplorerItemModel; onActivat
       }}
     >
       <span style={styles.itemLabel}>{item.label}</span>
+      {dirty && <DirtyDot title={EXPLORER_DIRTY_DOT_TITLE} />}
       {item.hint && <span style={styles.itemHint}>{item.hint}</span>}
     </button>
   );
@@ -102,6 +111,12 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onI
   const config = useProjectStore((s) => s.config);
   const objectLibrary = useProjectStore((s) => s.project?.objectLibrary ?? EMPTY_LIBRARY);
   const objectBindings = useProjectStore((s) => s.objectBindings);
+  // UNSAVED WORK WITH NO TAB (census B-F3). Closing a dirty level tab keeps the
+  // edit, and the close takes the tab's dot with it, so the level's row here
+  // carries the same dot while the level is dirty. Read off the SAME snapshot
+  // and rule as the tab strip (explorerRowDirty delegates to tabHasDirtyDot),
+  // so the two surfaces cannot disagree about which level is unsaved.
+  const dirtySnap = useDirtySnapshot();
 
   const [recents, setRecents] = useState<RecentProject[]>([]);
   const noProject = !classicOpen && !config;
@@ -307,11 +322,19 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onI
             title={g.label}
             defaultCollapsed
             collapsedOverride={query.trim() !== '' ? false : undefined}
-            right={<span style={styles.count}>{countableItems(g)}</span>}
+            // The group header repeats the dot when a row under it is dirty:
+            // groups start COLLAPSED, and a dot inside a folded group is a dot
+            // nobody sees.
+            right={
+              <span style={styles.groupRight}>
+                {explorerGroupDirty(g.items, dirtySnap) && <DirtyDot title={EXPLORER_DIRTY_DOT_TITLE} />}
+                <span style={styles.count}>{countableItems(g)}</span>
+              </span>
+            }
           >
             <div style={styles.items}>
               {g.items.map((item) => (
-                <ExplorerItem key={item.id} item={item} onActivate={activate} />
+                <ExplorerItem key={item.id} item={item} dirty={explorerRowDirty(item.id, dirtySnap)} onActivate={activate} />
               ))}
             </div>
           </CollapsibleSection>
@@ -371,6 +394,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   treeScroll: { flex: 1, overflowY: 'auto' },
   count: { fontSize: T.t2xs, color: T.textFaint, fontFamily: T.fontMono },
+  groupRight: { display: 'flex', alignItems: 'center', gap: 6 },
   items: { display: 'flex', flexDirection: 'column', padding: '2px 4px 6px' },
   item: {
     display: 'flex', alignItems: 'center', gap: 8, padding: '3px 8px', width: '100%',

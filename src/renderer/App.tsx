@@ -5,6 +5,7 @@ import { useToastStore } from './state/toastStore';
 import { useAetherStore, installAetherStatusListener } from './state/aetherStore';
 import CommandPalette from './components/CommandPalette';
 import TabStrip from './shell/TabStrip';
+import WindowTitle from './shell/WindowTitle';
 import Explorer from './shell/Explorer';
 import ConfirmDialog from './shell/ConfirmDialog';
 import LevelWorkspace from './workspace/LevelWorkspace';
@@ -179,12 +180,10 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [toggleExplorer, startBuild]);
 
-  // -- window title: Aurora - <project> - <tab> ----------------------------
-  useEffect(() => {
-    const projectName = classicOpen ? classicLabel : config?.name;
-    const parts = ['Aurora', projectName, activeTab && activeTab.kind !== 'home' ? activeTab.title : null];
-    document.title = parts.filter(Boolean).join(' - ');
-  }, [classicOpen, classicLabel, config, activeTab]);
+  // -- window title: <WindowTitle /> below, not an effect here -------------
+  // It also carries the unsaved marker (census B-F3), which needs the dirty
+  // snapshot, which re-renders its host on every edit. Hosting that here would
+  // re-render the whole window per edit; shell/WindowTitle.tsx renders null.
 
   // -- ⌘K ------------------------------------------------------------------
   // ONE shared derivation (state/open-project.ts) — App used to key aeon off
@@ -364,6 +363,7 @@ export default function App() {
 
       <BuildPanel />
       <ToastContainer />
+      <WindowTitle />
       <CommandPalette commands={commands} />
       <ConfirmDialog />
       <NewCanvasDialog open={newCanvasOpen} onClose={() => setNewCanvasOpen(false)} />
