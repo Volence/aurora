@@ -35,9 +35,10 @@ export function paintDocCollision(
  *  true if anything changed.
  *
  *  Takes a `MapRegion`, not the clipboard, because it writes no nametable word:
- *  a collision word's shape number indexes the collision shape set, not the
- *  tile set, so the clipboard's tile-set identity (PASTE-ACROSS-TILESETS) is
- *  not a question this writer has to answer. */
+ *  a collision word's shape number indexes the project's collision base bank,
+ *  not the tile set. Which PROJECT the words came from is the caller's question
+ *  (ComposerCanvas refuses another project's collision through `pasteRefusal`,
+ *  COLLISION-PASTE-ACROSS-TILESETS); this writer only copies words. */
 export function applyClipboardCollisionToDoc(doc: ComposerDoc, clip: MapRegion): boolean {
   const docCellsW = doc.widthTiles >> 1, docCellsH = doc.heightTiles >> 1;
   const clipCellsW = clip.widthTiles >> 1, clipCellsH = clip.heightTiles >> 1;

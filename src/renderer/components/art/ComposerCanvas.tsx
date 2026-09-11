@@ -21,7 +21,7 @@ import {
 } from '../../state/chunk-doc-commit';
 import type { ComposerSnapshot } from '../../../core/editing/composer-history';
 import { paintDocCollision, applyClipboardCollisionToDoc } from '../../../core/art/composer-collision';
-import { copyChunkToClipboard } from '../../../core/editing/map-clipboard';
+import { copyChunkToClipboard, pasteFit, pasteRefusal } from '../../../core/editing/map-clipboard';
 import { selectedCollisionWord } from '../../../core/collision/collision-cell-word';
 import {
   createBuffer, flipH, flipV, rotate90, wrapShift,
@@ -849,6 +849,21 @@ export default function ComposerCanvas() {
         // "art" or "both" mode for a composer paste.
         const mapClip = useEditorStore.getState().mapClipboard;
         if (doc && mapClip) {
+          // ANOTHER PROJECT'S COLLISION IS REFUSED (COLLISION-PASTE-ACROSS-
+          // TILESETS). This paste writes collision words and nothing else, and a
+          // shape number indexes the project's ONE collision bank: every zone
+          // reads it the same, so a copy from another zone pastes, and a copy
+          // from another project (whose bank can differ) does not. The same
+          // decision as the map's click (`pasteRefusal`), out loud, with the key
+          // claimed and nothing written.
+          const pstate = useProjectStore.getState();
+          const refusal = pasteRefusal(
+            pasteFit(mapClip, getCurrentZone(pstate)?.tileset, pstate.project), 'collision');
+          if (refusal) {
+            useToastStore.getState().addToast(refusal, 'warning');
+            e.preventDefault();
+            return;
+          }
           // Snapshot first, bank only if the paste landed — the same pattern the
           // tile-space tools use, for the same reason: `applyClipboardCollisionToDoc`
           // writes the planes in place and only then says whether it wrote.

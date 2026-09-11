@@ -81,6 +81,105 @@ export function clipboardFitsTileset(clip: MapClipboard, target: Tileset | null 
   return target != null && clip.tileset === target;
 }
 
+/**
+ * Was `clip` copied in the project that is OPEN NOW? The question a COLLISION
+ * word asks (COLLISION-PASTE-ACROSS-TILESETS,
+ * docs/reviews/2026-09-11-collision-paste-across-tilesets.md).
+ *
+ * A collision word's shape number (bits 0-9, collision/collision-cell-word.ts)
+ * indexes the project's collision BASE BANK, and there is one bank per project:
+ * Aurora loads one `CollisionProfileSet` per open (project/aeon/load.ts,
+ * `loadAeonProject`), and aeon's bake resolves every section of every zone
+ * against the same bank into ONE shared attr set (tools/ojz_strip_gen.py). So a
+ * collision word means the same shape in every zone of a project. It does not
+ * necessarily mean it in another project, whose bank can differ.
+ *
+ * ANSWERED BY REFERENCE, through the tile set the clipboard already carries. A
+ * `Tileset` is made once per zone per load (load.ts builds it, and nothing else
+ * does), so the copy came from THIS load exactly when its tile set is one of the
+ * open project's zones'. That is the same load identity the editor store keys a
+ * project change on (the `config` reference, both written by `openLoaded`),
+ * reached without a second field every producer would have to state. A reopen
+ * of the same directory is a new load, so it is another project here, exactly
+ * as it is another tile set.
+ */
+export function clipboardFromProject(
+  clip: MapClipboard,
+  project: { zones: ReadonlyArray<{ tileset: Tileset }> } | null | undefined,
+): boolean {
+  return project != null && project.zones.some((z) => z.tileset === clip.tileset);
+}
+
+/** The refusal when the words a paste would write are COLLISION words from
+ *  another project. It says nothing about tiles: such a paste writes none. */
+export const OTHER_PROJECT_COLLISION_REFUSAL =
+  'Not pasted: the copied collision belongs to another project, whose collision shapes can differ '
+  + 'from this one\'s, so pasting it here could put different shapes down. Copy again from this project.';
+
+/** The refusal when a paste would write tile words AND collision words, and both
+ *  kinds belong to another project. */
+export const OTHER_PROJECT_REFUSAL =
+  'Not pasted: this was copied in another project, whose tiles and collision shapes can differ '
+  + 'from this one\'s, so pasting here could put different ones down. Copy again from this project.';
+
+/** Said when Ctrl+V arms over another zone's tile set, where only the clipboard's
+ *  collision can land. */
+export const COLLISION_ONLY_HERE =
+  'Only the collision can be pasted here: the copied tiles belong to another tile set. '
+  + 'Shift+click pastes collision only.';
+
+/**
+ * Which of a clipboard's two kinds of word may be written where the author is
+ * now. `art`: tile words, only into the very tile set they were copied from
+ * (`clipboardFitsTileset`). `collision`: collision words, anywhere in the
+ * project they were copied in (`clipboardFromProject`).
+ */
+export interface PasteFit { art: boolean; collision: boolean }
+
+export function pasteFit(
+  clip: MapClipboard,
+  openTileset: Tileset | null | undefined,
+  openProject: { zones: ReadonlyArray<{ tileset: Tileset }> } | null | undefined,
+): PasteFit {
+  return { art: clipboardFitsTileset(clip, openTileset), collision: clipboardFromProject(clip, openProject) };
+}
+
+/**
+ * The refusal for a paste that would write `layers` (already collapsed by
+ * `effectivePasteLayers`), or null when every word it would write fits. The one
+ * decision behind the map's commit click, the map's Ctrl+V and the composer's
+ * Ctrl+V, so the three cannot disagree.
+ *
+ * The message is chosen by WHICH words would be wrong, so it never names a kind
+ * of word the paste does not write: both kinds foreign is OTHER_PROJECT_REFUSAL,
+ * tile words only is OTHER_TILESET_REFUSAL, collision words only is
+ * OTHER_PROJECT_COLLISION_REFUSAL. `null` layers (nothing to write) is not
+ * refused here: the caller has its own sentence for that.
+ */
+export function pasteRefusal(fit: PasteFit, layers: PasteLayers | null): string | null {
+  if (layers === null) return null;
+  const artBad = layers !== 'collision' && !fit.art;
+  const collisionBad = layers !== 'art' && !fit.collision;
+  if (artBad && collisionBad) return OTHER_PROJECT_REFUSAL;
+  if (artBad) return OTHER_TILESET_REFUSAL;
+  if (collisionBad) return OTHER_PROJECT_COLLISION_REFUSAL;
+  return null;
+}
+
+/**
+ * The refusal for ARMING a paste (the map's Ctrl+V), or null to arm.
+ *
+ * Refused only when no click could land anything. The layers are decided AT THE
+ * CLICK (Shift is collision only, Alt art only), so a clipboard whose collision
+ * fits here arms even when its tiles do not, and the click refuses whatever does
+ * not fit. When nothing can land, the message is the one the sticky Paste
+ * setting would get at the click (art, for a clipboard with no collision).
+ */
+export function armRefusal(clip: MapClipboard, fit: PasteFit, sticky: PasteLayers): string | null {
+  if (fit.art || (fit.collision && !clip.artOnly)) return null;
+  return pasteRefusal(fit, effectivePasteLayers(clip, sticky) ?? 'art');
+}
+
 export type PasteLayers = 'both' | 'art' | 'collision';
 
 /**
