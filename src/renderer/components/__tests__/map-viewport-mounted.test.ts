@@ -52,16 +52,21 @@ import { renderHooked, type Hooked } from '../../../test/render-hooked';
 import { installWindowStub, type WindowStub } from '../../../test/window-stub';
 import { attachRefs, type HostStub } from '../../../test/element-stub';
 import { useProjectStore } from '../../state/projectStore';
-import { useEditorStore, focusedHistory } from '../../state/editorStore';
+import { useEditorStore, focusedHistory, RING_PATTERNS } from '../../state/editorStore';
 import { useSessionStore } from '../../state/sessionStore';
 import { useViewStore } from '../../state/viewStore';
 import { useToastStore } from '../../state/toastStore';
+import { useArtStore } from '../../state/artStore';
+import { useConfirmStore } from '../../state/confirmStore';
+import { docFromTile } from '../../../core/art/composer-buffer';
+import { useAetherStore } from '../../state/aetherStore';
+import { warpTargetFor } from '../../../core/aether/warp-math';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { switchFacet } from '../../workspace/facet-tools';
 import { documentHistoryHub } from '../../state/history-hub';
 import type { ObjectPlacement, Section } from '../../../core/model/s4-types';
 import {
-  unpackNametableWord, packNametableWord, SECTION_TILES_WIDE, SECTION_TILES_HIGH,
+  unpackNametableWord, packNametableWord, SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE,
 } from '../../../core/model/s4-types';
 import { BG_WIDTH } from '../../../core/formats/bg-tiles';
 import {
@@ -70,6 +75,7 @@ import {
 import { documentBands, bandSlotBases } from '../../../core/formats/bg-override/bg-anim-band';
 import { packCollisionCell, unpackCollisionCell } from '../../../core/collision/collision-cell-word';
 import { SECTION_PLANE_WORDS } from '../../../core/collision/collision-cell-resolve';
+import { readCrossover, handOffFrom } from '../../../core/collision/layer-transition';
 import { snapMarquee, effectiveGranularity, type MapClipboard } from '../../../core/editing/map-clipboard';
 import { selectionToChunk } from '../../../core/editing/selection-to-chunk';
 import { SCREEN_WIDTH } from '../../../core/model/screen';
@@ -2200,6 +2206,106 @@ describe('paste mode commits at the hovered, snapped origin, and a middle drag s
   });
 
   // ══════════════════════════════════════════════════════════════════════════
+  // THE COORDINATE READOUT IN PASTE MODE (PASTE-READOUT-HIDDEN, map-coverage-4)
+  //
+  // The screen sweep's report: in paste mode the readout (the hover bar) stays
+  // hidden once the cursor leaves the map and comes back. `onMouseLeave` hides
+  // the bar, and the one line that shows it again sits at the bottom of
+  // `handleMouseMove`, below the paste branch's `return`. The same shape as the
+  // middle-drag pan the owner reported in this mode (the row above): a rule at
+  // the bottom of the handler is off for every mode whose branch returns first.
+  //
+  // Nested here for the block's `document` stub: paste mode rasterises a ghost.
+  // The bar is a host stub (element-stub.ts), so `style.display` and
+  // `innerHTML` are what the component wrote, and nothing is laid out: whether
+  // the bar is legible on screen is a foreground question.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  describe('the coordinate readout follows the cursor in paste mode as it does outside it', () => {
+    const A = { col: 3, row: 3 };
+    const B = { col: 9, row: 5 };
+    const C = { col: 12, row: 7 };
+
+    // ⚠ THE LAYER IS SET, and the first run of these rows is why. The top-level
+    // beforeEach resets the tool and the selection but NOT the editing layer, so
+    // this block inherited 'bg' from the BG blocks earlier in the file and the
+    // CONTROL went red reading "BG | Pos 28, 28": a red that was the fixture's,
+    // not the component's. (Every paste row above runs on that inherited layer
+    // too; the paste branch never reads it, so none of them noticed.)
+    beforeEach(() => { useEditorStore.getState().setEditingLayer('fg'); });
+
+    /** The hover bar's host stub: the one div rendered hidden with no pointer
+     *  events and a ref, found in the tree rather than by attach order. */
+    function readout(s: Surface): { style: Record<string, unknown>; innerHTML: string } {
+      const found: Array<{ current: unknown }> = [];
+      const walk = (node: unknown): void => {
+        if (Array.isArray(node)) { for (const c of node) walk(c); return; }
+        if (!node || typeof node !== 'object') return;
+        const el = node as { type?: unknown; props?: Record<string, unknown> };
+        const style = el.props?.style as Record<string, unknown> | undefined;
+        const ref = el.props?.ref as { current: unknown } | undefined;
+        if (el.type === 'div' && ref && style?.display === 'none' && style?.pointerEvents === 'none') found.push(ref);
+        walk(el.props?.children);
+      };
+      walk(s.h.el());
+      expect(found, 'HARNESS: exactly one hover bar in the rendered tree').toHaveLength(1);
+      const bar = found[0].current as { style: Record<string, unknown>; innerHTML: string } | null;
+      if (!bar) throw new Error('map-viewport-mounted: the hover bar ref was never filled');
+      return bar;
+    }
+
+    /** The readout must NAME the tile under the cursor and its world point.
+     *  Under VIEWPORT at zoom 1 and camera 0, tileAt(c, r) is world (8c+4, 8r+4). */
+    function expectNames(bar: { innerHTML: string }, t: { col: number; row: number }, why: string): void {
+      for (const frag of [`Tile (${t.col}, ${t.row})`, `Pos ${t.col * 8 + 4}, ${t.row * 8 + 4}`]) {
+        expect(bar.innerHTML, why).toContain(frag);
+      }
+    }
+
+    /** Hover A with the map in its ordinary mode, then arm paste with Ctrl+V. */
+    async function hoverThenArm(): Promise<{ s: Surface; bar: { style: Record<string, unknown>; innerHTML: string } }> {
+      const s = await mountMap();
+      s.on().onMouseMove(tileAt(A.col, A.row));
+      const bar = readout(s);
+      expect(bar.style.display, 'the premise: the readout shows before paste mode').toBe('flex');
+      expect(win!.dispatch('keydown', keydown('v', { ctrlKey: true })), 'nothing heard Ctrl+V').toBeGreaterThan(0);
+      expect(useEditorStore.getState().pasting, 'the premise: Ctrl+V armed paste mode').toBe(true);
+      return { s, bar };
+    }
+
+    it('CONTROL: outside paste mode the readout hides when the cursor leaves, and comes back naming the new tile', async () => {
+      const s = await mountMap();
+      expect(useEditorStore.getState().pasting, 'the premise: not in paste mode').toBe(false);
+      s.on().onMouseMove(tileAt(A.col, A.row));
+      const bar = readout(s);
+      expect(bar.style.display, 'the readout never showed').toBe('flex');
+      expectNames(bar, A, 'the readout does not name the tile under the cursor');
+      s.on().onMouseLeave(mouse(700, 700));
+      expect(bar.style.display, 'leaving the map did not hide the readout').toBe('none');
+      s.on().onMouseMove(tileAt(B.col, B.row));
+      expect(bar.style.display, 'coming back did not show the readout').toBe('flex');
+      expectNames(bar, B, 'the readout came back naming somewhere other than the tile under the cursor');
+    });
+
+    it('in paste mode the readout comes back when the cursor leaves the map and returns, naming the tile it returned to', async () => {
+      const { s, bar } = await hoverThenArm();
+      s.on().onMouseLeave(mouse(700, 700));
+      expect(bar.style.display, 'leaving the map did not hide the readout').toBe('none');
+      s.on().onMouseMove(tileAt(B.col, B.row));
+      expect(bar.style.display, 'the readout stayed hidden after the cursor came back in paste mode').toBe('flex');
+      expectNames(bar, B, 'the readout came back naming somewhere other than the tile under the cursor');
+    });
+
+    it('in paste mode the readout follows the cursor from tile to tile', async () => {
+      const { s, bar } = await hoverThenArm();
+      s.on().onMouseMove(tileAt(B.col, B.row));
+      expectNames(bar, B, 'in paste mode the readout froze on the tile it showed before the mode');
+      s.on().onMouseMove(tileAt(C.col, C.row));
+      expectNames(bar, C, 'in paste mode the readout did not follow the cursor');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
   // THE MARQUEE AND AN ARMED PASTE BELONG TO THE ACT, NOT TO THE MOUNT
   // (MAP-REMOUNT-DROPS-PASTE; docs/reviews/2026-09-11-map-remount-clear.md)
   //
@@ -3167,5 +3273,895 @@ describe('the context menu opens where it was asked for, and closes on click-awa
     focusAct('act1');
     win!.dispatch('keydown', keydown('Escape'));
     expect(menuOf(s), 'Escape on the level tab did not close the menu').toBeNull();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// map-coverage-4 STARTS HERE.
+//
+// Same harness and the same rules as the rounds above: the component's real
+// handlers over the real stores, every row shown red with a mutation on disk
+// before it was trusted, and expected values derived from a rule a module
+// states or from the engine constants. The packet
+// (docs/reviews/2026-09-11-map-coverage-4.md) carries the plant for each row.
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Ascending numeric order, for index lists gathered from several cells. */
+const asc = (xs: number[]): number[] => [...xs].sort((a, b) => a - b);
+
+/** Put four FOREGROUND words on the 16px block (cc, cr) of act1's section 0, in
+ *  the order `cellSubTiles` lists that block: top-left, top-right, bottom-left,
+ *  bottom-right (rows are SECTION_TILES_WIDE apart, so ascending IS that order). */
+function plantBlock(cc: number, cr: number, words: readonly number[]): void {
+  const nt = sectionOf('act1').tileGrid.nametable;
+  cellSubTiles(cc, cr).forEach((i, k) => { nt[i] = words[k]; });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COLLISION PAINT, THE THREE MODES map-coverage-3 LEFT: Alt's propagate, a
+// brush wider than one block, and the crossover brush with its half-cell span.
+//
+// COVERAGE. `collisionPaintTargets`, `cellCrossoverIndices` and
+// `crossoverSpanForCursor` are pinned as pure functions. What nothing drove is
+// the handler that LATCHES each mode at the press and hands it to them: the
+// Alt bit off the pointer event, the brush size off the store, the crossover
+// brush and its span mode, and the drag cache that decides whether a move is
+// "the same cell".
+//
+// Expected cells are derived from the rule each module STATES (the docblock
+// sentence is quoted beside each derivation), never from the handler.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('collision paint: Alt propagates, a wide brush covers an area, and the crossover brush marks the half it is aimed at', () => {
+  const PICK = 9;
+  /** Two four-tile patterns no fixture block carries: the FG fill is FG_FILL.act1
+   *  on every tile, so a block made of these matches only where it is planted. */
+  const P = [0x0041, 0x0042, 0x0043, 0x0044] as const;
+  const Q = [0x0051, 0x0052, 0x0053, 0x0054] as const;
+  const W = SECTION_TILES_WIDE;
+  const painted = () => collPainted('act1', 'a').map(([i]) => i);
+
+  beforeEach(() => {
+    seedCollision();
+    useToastStore.setState({ toasts: [] });
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-collision');
+    ed.setSelectedCollisionProfile(PICK);
+    ed.setSelectedCollisionSolidity('all');
+    ed.setCollisionPaintPlane('a');
+    ed.setCollisionPaintBothPlanes(false);
+    ed.setCollisionBrushSize(1);
+    ed.setCollisionCrossoverBrush('keep');
+    ed.setCollisionCrossoverSpanMode('cell');
+  });
+
+  afterEach(() => {
+    const ed = useEditorStore.getState();
+    ed.setCollisionBrushSize(1);
+    ed.setCollisionCrossoverBrush('keep');
+    ed.setCollisionCrossoverSpanMode('cell');
+    // Arming an authoring crossover brush turns the crossover lens on as a side
+    // effect (editorStore's setter). It is view state and outlives this block.
+    useViewStore.getState().setOverlay('showCrossover', false);
+  });
+
+  /** Every block of act1's section 0 whose four words are `words`, scanned
+   *  directly, so the fixture guard does not borrow the function under test. */
+  function blocksCarrying(words: readonly number[]): Array<[number, number]> {
+    const nt = sectionOf('act1').tileGrid.nametable;
+    const out: Array<[number, number]> = [];
+    for (let cr = 0; cr < SECTION_TILES_HIGH / 2; cr++) {
+      for (let cc = 0; cc < W / 2; cc++) {
+        if (cellSubTiles(cc, cr).every((i, k) => nt[i] === words[k])) out.push([cc, cr]);
+      }
+    }
+    return out;
+  }
+
+  it('ANTI-VACUOUS: a planted pattern is on the blocks it was planted on and on no other', () => {
+    plantBlock(1, 1, P);
+    plantBlock(5, 3, P);
+    expect(blocksCarrying(P), 'Alt would have more (or fewer) blocks to reach than the rows below expect')
+      .toEqual([[1, 1], [5, 3]]);
+  });
+
+  it('CONTROL: without Alt a press paints the clicked block alone, though another block is made of the same tiles', async () => {
+    plantBlock(1, 1, P);
+    plantBlock(5, 3, P);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1));
+    expect(painted(), 'a plain press reached a block it was not aimed at').toEqual(cellSubTiles(1, 1));
+  });
+
+  it('ALT paints every block made of the same four tiles, and no other, as ONE undo step', async () => {
+    // collision-paint.ts: "brush 1 + propagate (Alt) -> every block in the
+    // section with the same tiles (reuse), explicit opt-in."
+    plantBlock(1, 1, P);
+    plantBlock(5, 3, P);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1, { altKey: true }));
+    expect(painted(), 'Alt did not reach the other block made of the same tiles, or reached one that is not')
+      .toEqual(asc([...cellSubTiles(1, 1), ...cellSubTiles(5, 3)]));
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'a propagated press must be ONE undo step').toBe(1);
+    expect(painted(), 'and that one undo must take every matching block back').toHaveLength(0);
+  });
+
+  it('ALT is LATCHED at the press: a drag keeps propagating after the key comes up', async () => {
+    // MapViewport.tsx, at `paintPropagate`: "latched at mousedown ... so
+    // toggling Alt mid-drag can't switch a single stroke between local and reuse."
+    plantBlock(1, 1, P);
+    plantBlock(7, 1, Q);
+    plantBlock(9, 4, Q);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1, { altKey: true }));
+    s.on().onMouseMove(collCell(7, 1));   // Alt no longer held on this event
+    expect(painted(), 'the stroke stopped propagating when the key came up mid-drag')
+      .toEqual(asc([...cellSubTiles(1, 1), ...cellSubTiles(7, 1), ...cellSubTiles(9, 4)]));
+  });
+
+  it('a brush of N paints the N by N block area CENTRED on the cell, as ONE undo step', async () => {
+    // collision-paint.ts: "brush > 1 -> the N×N block area centred on the cell
+    // (clamped to the section)". An odd N centred on a cell reaches (N-1)/2 each way.
+    const N = 3;
+    const at = { cc: 4, cr: 4 };
+    const reach = (N - 1) / 2;
+    const cells: number[] = [];
+    for (let cr = at.cr - reach; cr <= at.cr + reach; cr++) {
+      for (let cc = at.cc - reach; cc <= at.cc + reach; cc++) cells.push(...cellSubTiles(cc, cr));
+    }
+    expect(cells, 'ANTI-VACUOUS: the area is N by N blocks of four sub-tiles').toHaveLength(N * N * 4);
+    useEditorStore.getState().setCollisionBrushSize(N);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(at.cc, at.cr));
+    expect(painted(), 'the brush did not paint the area around the cell').toEqual(asc(cells));
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'a brush press must be ONE undo step').toBe(1);
+    expect(painted()).toHaveLength(0);
+  });
+
+  it('the brush area stops at the section edge: nothing left of column 0 wraps onto the row above', async () => {
+    // ⚠ WHY AN EDGE ROW CAN FAIL HERE, when the typed-array hazard says it
+    // might not. A block column of -1 is sub-tile column -2, and a store at a
+    // NEGATIVE index is dropped silently, which would hide an unclamped brush.
+    // But one block row down, (2 * cr) * W - 2 is a real index: the last two
+    // columns of the row above. So an unclamped brush at (0, 1) WRITES
+    // somewhere visible, and this row is placed where that happens.
+    const N = 3;
+    useEditorStore.getState().setCollisionBrushSize(N);
+    const cells: number[] = [];
+    for (let cr = 0; cr <= 2; cr++) for (let cc = 0; cc <= 1; cc++) cells.push(...cellSubTiles(cc, cr));
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(0, 1));
+    expect(painted(), 'the brush wrapped past the section edge, or stopped short of it').toEqual(asc(cells));
+  });
+
+  it('HAND-OFF marks every sub-tile of the cell to leave the plane it is painted on: A hands to B, B to A', async () => {
+    // layer-transition.ts: "`hand-off` ... the SAME armed brush does the right
+    // thing on either plane" (handOffFrom).
+    expect(handOffFrom('a'), 'ANTI-VACUOUS: the two planes hand off in different directions')
+      .not.toBe(handOffFrom('b'));
+    expect(readCrossover(collWord(COLL_SHAPE.act1.a)), 'ANTI-VACUOUS: the fixture carries no mark').toBe('none');
+    useEditorStore.getState().setCollisionCrossoverBrush('hand-off');
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(2, 1));
+    win!.dispatch('mouseup', {});
+    const a = collPlane('act1', 'a');
+    expect(cellSubTiles(2, 1).map((i) => readCrossover(a[i])), 'plane A did not take the hand-off')
+      .toEqual(cellSubTiles(2, 1).map(() => handOffFrom('a')));
+    expect(cellSubTiles(2, 1).map((i) => unpackCollisionCell(a[i]).shape), 'the geometry did not land with the mark')
+      .toEqual(cellSubTiles(2, 1).map(() => PICK));
+
+    useEditorStore.getState().setCollisionPaintPlane('b');
+    s.on().onMouseDown(collCell(4, 1));
+    win!.dispatch('mouseup', {});
+    const b = collPlane('act1', 'b');
+    expect(cellSubTiles(4, 1).map((i) => readCrossover(b[i])),
+      'plane B took the mark that hands to itself, which the bake refuses')
+      .toEqual(cellSubTiles(4, 1).map(() => handOffFrom('b')));
+  });
+
+  it('HALF width marks only the 8px column under the cursor, both of its rows, and the geometry stays cell-wide', async () => {
+    // layer-transition.ts: "`'left'` / `'right'` name one sub-tile column",
+    // and collision-cell.ts: "(both of its rows ...)". The column is the 8px
+    // tile column the cursor is over: tile 5 is the RIGHT half of cell 2, tile 8
+    // the LEFT half of cell 4.
+    const ed = useEditorStore.getState();
+    ed.setCollisionCrossoverBrush('hand-off');
+    ed.setCollisionCrossoverSpanMode('half');
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(5, 2));
+    win!.dispatch('mouseup', {});
+    s.on().onMouseDown(tileAt(8, 2));
+    win!.dispatch('mouseup', {});
+    const a = collPlane('act1', 'a');
+    const touched = asc([...cellSubTiles(2, 1), ...cellSubTiles(4, 1)]);
+    expect(touched.filter((i) => readCrossover(a[i]) !== 'none'), 'the mark is not the column under the cursor')
+      .toEqual(asc([2 * W + 5, 3 * W + 5, 2 * W + 8, 3 * W + 8]));
+    expect(touched.map((i) => unpackCollisionCell(a[i]).shape), 'a half-width MARK narrowed the GEOMETRY as well')
+      .toEqual(touched.map(() => PICK));
+  });
+
+  it('a drag from one half of a cell to the other marks BOTH halves', async () => {
+    // MapViewport.tsx, at `cellKey`: "THE DRAG CACHE IS KEYED ON THE SPAN TOO.
+    // Without it, dragging from one half of a cell to the other inside a
+    // single stroke would be 'the same cursor cell, skip'".
+    const ed = useEditorStore.getState();
+    ed.setCollisionCrossoverBrush('hand-off');
+    ed.setCollisionCrossoverSpanMode('half');
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(4, 2));   // the left half of cell (2, 1)
+    s.on().onMouseMove(tileAt(5, 2));   // the right half of the SAME cell
+    win!.dispatch('mouseup', {});
+    const a = collPlane('act1', 'a');
+    expect(cellSubTiles(2, 1).filter((i) => readCrossover(a[i]) !== 'none'),
+      'the second half of the cell was skipped as the same cursor cell')
+      .toEqual(cellSubTiles(2, 1));
+  });
+
+  it('the crossover brush is LATCHED at the press: changing it mid-drag does not split the stroke', async () => {
+    useEditorStore.getState().setCollisionCrossoverBrush('hand-off');
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1));
+    useEditorStore.getState().setCollisionCrossoverBrush('keep');
+    s.on().onMouseMove(collCell(2, 1));
+    win!.dispatch('mouseup', {});
+    const a = collPlane('act1', 'a');
+    expect(cellSubTiles(2, 1).map((i) => readCrossover(a[i])),
+      'a brush change mid-drag switched one gesture between marking and not')
+      .toEqual(cellSubTiles(2, 1).map(() => handOffFrom('a')));
+  });
+});
+
+// ── a TWO-SECTION act, for the rows that cross a section boundary ─────────────
+//
+// ⚠ SIZED FROM THE ENGINE CONSTANTS, for the reason the nametable is. The
+// boundary is SECTION_PIXEL_SIZE world pixels in (SectionRenderer lays section
+// i at (i % gridWidth) * SECTION_PIXEL_SIZE), and a fixture that typed the
+// number would drift from it silently. Section 1 has its own FG fill, so a write
+// into the wrong section is a wrong VALUE and not only a wrong array.
+
+const FG_S1 = 0x0111;
+
+/** Make act1 a 2 by 1 grid: section 0 as the fixture has it, section 1 to its right. */
+function makeAct1TwoSections(): void {
+  const project = useProjectStore.getState().project as unknown as {
+    zones: Array<{ acts: Array<Record<string, unknown>> }>;
+  };
+  const act = project.zones[0].acts[0];
+  act.gridWidth = 2;
+  act.gridHeight = 1;
+  act.sections = [
+    section([OBJ(64, 64)], FG_FILL.act1),
+    { ...section([], FG_S1), index: 1, name: 's1' },
+  ];
+}
+
+/** The centre of tile (col, row) of act1's section `sec`, in WORLD pixels. */
+const tileCentre = (sec: 0 | 1, col: number, row: number) =>
+  ({ x: sec * SECTION_PIXEL_SIZE + col * 8 + 4, y: row * 8 + 4 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE MARQUEE CROSSING INTO ANOTHER SECTION.
+//
+// COVERAGE. map-coverage-3's marquee rows ran on a one-section act, where "the
+// section the drag started in" and "the section the cursor is over" cannot
+// differ. MapViewport.tsx states the rule at the move branch: "always resolved
+// against the drag-START section's local tile space (not whatever section the
+// cursor currently sits over), so dragging out of the section still
+// extends/clamps the same marquee."
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('a marquee resolves against the section it STARTED in, whichever section the cursor is over', () => {
+  /** The camera parked so the section boundary sits mid-VIEWPORT, at client x 320. */
+  const VIEW = { vpX: SECTION_PIXEL_SIZE - 320, vpY: 0, zoom: 1 };
+  /** The client point over world (x, y), through VIEWPORT and VIEW. */
+  const worldAt = (p: { x: number; y: number }) => mouse(p.x - VIEW.vpX, p.y - VIEW.vpY);
+  const marquee = () => useEditorStore.getState().marquee;
+  const block = effectiveGranularity('block', false);
+
+  beforeEach(() => {
+    makeAct1TwoSections();
+    useViewStore.setState(VIEW);
+    const ed = useEditorStore.getState();
+    ed.setTool('marquee');
+    ed.setMarqueeGranularity('block');
+    ed.setMarqueeSnapInvert(false);
+    ed.setMarquee(null);
+  });
+
+  it('HARNESS: the renderer lays section 1 at the engine\'s section width, beside section 0', async () => {
+    expect(SECTION_PIXEL_SIZE, 'a section is SECTION_TILES_WIDE tiles of 8px').toBe(SECTION_TILES_WIDE * 8);
+    await mountMap();
+    const { sectionRenderer } = await import('../MapViewport');
+    expect([sectionRenderer.sectionAtWorld(SECTION_PIXEL_SIZE - 1, 0), sectionRenderer.sectionAtWorld(SECTION_PIXEL_SIZE, 0)],
+      'the two-section act did not reach the renderer, so no row here crosses a boundary')
+      .toEqual([0, 1]);
+  });
+
+  it('a drag from section 0 into section 1 stays in section 0, and stops at its last column', async () => {
+    const start = { col: 250, row: 3 };
+    const over = { col: 5, row: 4 };            // in section 1's own tile space
+    const cursor = tileCentre(1, over.col, over.row);
+    // The cursor in the START section's tile space. Section 0's offset is 0, so
+    // that is the world pixel over 8, which lands past the section's last column.
+    const inStart = { col: Math.floor(cursor.x / 8), row: Math.floor(cursor.y / 8) };
+    const expected = { sectionIndex: 0, ...snapMarquee(start.col, start.row, inStart.col, inStart.row, block) };
+    expect(expected, 'ANTI-VACUOUS: resolving against the cursor\'s own section would give another rect')
+      .not.toEqual({ sectionIndex: 0, ...snapMarquee(start.col, start.row, over.col, over.row, block) });
+    expect(expected.col + expected.w, 'ANTI-VACUOUS: the cursor is past the edge, so the rect must end AT the edge')
+      .toBe(SECTION_TILES_WIDE);
+    const s = await mountMap();
+    s.on().onMouseDown(worldAt(tileCentre(0, start.col, start.row)));
+    s.on().onMouseMove(worldAt(cursor));
+    expect(marquee(), 'the marquee followed the cursor into section 1, or lost the section it started in')
+      .toEqual(expected);
+  });
+
+  it('CONTROL: a drag that starts in section 1 resolves in section 1\'s own tile space', async () => {
+    // Every other marquee row starts in section 0, whose offset is (0, 0), so a
+    // resolution that forgot the offset, or took section 0 always, passes them.
+    const s = await mountMap();
+    s.on().onMouseDown(worldAt(tileCentre(1, 5, 4)));
+    s.on().onMouseMove(worldAt(tileCentre(1, 9, 6)));
+    expect(marquee(), 'a marquee drawn in section 1 was placed in section 0\'s tile space')
+      .toEqual({ sectionIndex: 1, ...snapMarquee(5, 4, 9, 6, block) });
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE CONTEXT MENU'S TWO ACTIONS (`handleEditTile`, `handleEditBlock`).
+//
+// COVERAGE. map-coverage-3 drove where the menu opens and how it closes, and
+// left the actions out as "a shell flow with its own tests". The shell half IS
+// tested (open-document's doors). What nothing ran is the map's half: which
+// cell the menu remembered, which word and which region it hands the Art
+// document, the collision it carries, the menu closing, and the facet switch
+// gated on the door's answer.
+//
+// The rect is OFFSET, for the reason map-coverage-3's menu block gives: the
+// menu stores container-local coordinates AND a map cell, and a row at the
+// client origin could not tell the two apart.
+//
+// ⚠ THE DOOR IS ASYNC. `confirmArtDocumentOpen` is awaited even when nothing is
+// at stake, so the document and the facet switch land a task later. Every row
+// settles before reading either.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('the context menu\'s two actions open the clicked cell in Art, and switch the tab only when the door opens', () => {
+  const W = SECTION_TILES_WIDE;
+  const rightClickTile = (col: number, row: number) =>
+    mouse(OFFSET.left + col * 8 + 4, OFFSET.top + row * 8 + 4, { button: 2, buttons: 2 });
+  const settle = () => new Promise<void>((r) => { setTimeout(r, 0); });
+  const facet = () => useWorkspaceStore.getState().facetFor(useSessionStore.getState().activeId);
+  const art = () => useArtStore.getState().open;
+
+  /** Every element of `type` in a subtree, as data. */
+  function elementsOf(
+    node: unknown, type: string, out: Array<React.ReactElement<Record<string, unknown>>> = [],
+  ): Array<React.ReactElement<Record<string, unknown>>> {
+    if (Array.isArray(node)) { for (const c of node) elementsOf(c, type, out); return out; }
+    if (!node || typeof node !== 'object') return out;
+    const el = node as React.ReactElement<Record<string, unknown>>;
+    if (el.type === type) out.push(el);
+    const children = (el.props as { children?: unknown } | undefined)?.children;
+    if (children !== undefined) elementsOf(children, type, out);
+    return out;
+  }
+  const menuButtons = (s: Surface) =>
+    elementsOf((s.h.el().props as { children?: unknown }).children, 'button');
+  /** The one menu button whose label contains `label`, as the click it runs. */
+  function menuButton(s: Surface, label: string): () => void {
+    const hit = menuButtons(s).filter((b) => String(b.props.children).includes(label));
+    expect(hit, `no single menu button labelled "${label}"`).toHaveLength(1);
+    return hit[0].props.onClick as () => void;
+  }
+
+  beforeEach(() => {
+    useArtStore.getState().closeDocument();
+    useConfirmStore.setState({ request: null, resolver: null });
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-tile');
+    ed.setEditingLayer('fg');
+    ed.setSelectedTileIndex(5);
+  });
+
+  afterEach(() => {
+    useArtStore.getState().closeDocument();
+    useConfirmStore.setState({ request: null, resolver: null });
+  });
+
+  it('Edit tile opens the tile the clicked cell names, as a live tile, closes the menu, and switches the tab to Art', async () => {
+    const AT = { col: 9, row: 3 };
+    const TILE = 6;
+    sectionOf('act1').tileGrid.nametable[AT.row * W + AT.col] = packNametableWord(TILE, 0, false, false, true);
+    expect(unpackNametableWord(sectionOf('act1').tileGrid.nametable[AT.col * W + AT.row]).tileIndex,
+      'ANTI-VACUOUS: the cell with row and column swapped names another tile').not.toBe(TILE);
+    expect(facet(), 'the premise: the tab starts on the Layout facet').toBe('layout');
+    const s = await mountMap(OFFSET);
+    s.on().onContextMenu(rightClickTile(AT.col, AT.row));
+    menuButton(s, 'Edit tile')();
+    expect(menuButtons(s), 'the menu stayed open over the document it opened').toHaveLength(0);
+    await settle();
+    const open = art();
+    expect(open, 'no Art document was opened').not.toBeNull();
+    expect({ live: open!.liveTileIndex, cell: open!.doc.cells[0].atlasTile, chunk: open!.chunkId, dirty: open!.dirty },
+      'the document is not the tile the clicked cell names, opened as that live tile')
+      .toEqual({ live: TILE, cell: TILE, chunk: null, dirty: false });
+    expect(facet(), 'the tab did not switch to Art').toBe('art');
+  });
+
+  it('Edit chunk region opens the 16 by 16 tile region on the block grid around the click, with its collision, as a new unsaved document', async () => {
+    // MapViewport.tsx, `handleEditBlock`: "the block-aligned 128×128
+    // (16×16-tile) region under the cursor as a NEW unsaved chunk document",
+    // carrying "the map's real collision into the doc".
+    const REGION = 16;
+    const AT = { col: 20, row: 35 };
+    const base = { col: Math.floor(AT.col / REGION) * REGION, row: Math.floor(AT.row / REGION) * REGION };
+    expect([AT.col % REGION, AT.row % REGION], 'ANTI-VACUOUS: the click is off the region grid, so the snap does work')
+      .not.toEqual([0, 0]);
+    seedCollision();
+    const nt = sectionOf('act1').tileGrid.nametable;
+    const corners = [[0, 0, 1], [REGION - 1, 0, 2], [0, REGION - 1, 3], [REGION - 1, REGION - 1, 4]] as const;
+    for (const [c, r, t] of corners) nt[(base.row + r) * W + base.col + c] = packNametableWord(t, 0, false, false, false);
+    // One collision cell per plane inside the region: its top-left cell on A,
+    // its bottom-right cell on B.
+    const A_WORD = collWord(13);
+    const B_WORD = collWord(14);
+    for (const i of cellSubTiles(base.col >> 1, base.row >> 1)) collPlane('act1', 'a')[i] = A_WORD;
+    for (const i of cellSubTiles((base.col + REGION - 2) >> 1, (base.row + REGION - 2) >> 1)) {
+      collPlane('act1', 'b')[i] = B_WORD;
+    }
+    const s = await mountMap(OFFSET);
+    s.on().onContextMenu(rightClickTile(AT.col, AT.row));
+    menuButton(s, 'Edit 128')();
+    await settle();
+    const open = art();
+    expect(open, 'no Art document was opened').not.toBeNull();
+    const doc = open!.doc;
+    expect([doc.widthTiles, doc.heightTiles], 'the document is not a 16 by 16 tile region').toEqual([REGION, REGION]);
+    expect(corners.map(([c, r]) => doc.cells[r * REGION + c].atlasTile),
+      'the document is not the region on the block grid around the click').toEqual(corners.map(([, , t]) => t));
+    const cells = (REGION / 2) * (REGION / 2);
+    expect([doc.collisionA.length, doc.collisionB.length], 'the premise: one collision word per 16px cell')
+      .toEqual([cells, cells]);
+    expect([doc.collisionA[0], doc.collisionB[cells - 1]], 'the map\'s collision did not come with the region')
+      .toEqual([A_WORD, B_WORD]);
+    expect({ live: open!.liveTileIndex, chunk: open!.chunkId, dirty: open!.dirty },
+      'a region copied off the map is a NEW document with unsaved work').toEqual({ live: null, chunk: null, dirty: true });
+    expect(facet(), 'the tab did not switch to Art').toBe('art');
+  });
+
+  it('a cancelled open replaces nothing and leaves the tab where it was; the same click answered Discard opens and switches', async () => {
+    // The door asks when the Art document already open has unsaved strokes.
+    // The map's half is the `if (opened)` on its answer.
+    useArtStore.getState().openDocument({
+      doc: docFromTile(0), liveTileIndex: null, chunkId: null, name: 'drawing in progress', dirty: true,
+    });
+    const s = await mountMap(OFFSET);
+    s.on().onContextMenu(rightClickTile(9, 3));
+    menuButton(s, 'Edit tile')();
+    await settle();
+    expect(useConfirmStore.getState().request, 'the door did not ask about the unsaved drawing').not.toBeNull();
+    useConfirmStore.getState().answer('cancel');
+    await settle();
+    expect(art()?.name, 'a cancelled open replaced the drawing').toBe('drawing in progress');
+    expect(facet(), 'a cancelled open still switched the tab to Art').toBe('layout');
+
+    s.on().onContextMenu(rightClickTile(9, 3));
+    menuButton(s, 'Edit tile')();
+    await settle();
+    expect(useConfirmStore.getState().request, 'the second click did not ask either').not.toBeNull();
+    useConfirmStore.getState().answer('discard');
+    await settle();
+    expect(art()?.name, 'the open the author agreed to did not happen').not.toBe('drawing in progress');
+    expect(facet(), 'the open the author agreed to did not switch the tab').toBe('art');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE ONE-PRESS TOOLS: paint-block, place-object, place-ring.
+//
+// COVERAGE. Each is a single command per press, and nothing ran any of them.
+// The object and ring rows use the TWO-SECTION act, through OFFSET and a zoomed,
+// parked view: a placement is stored in its SECTION's local space, and on the
+// fixture's one section at the origin "local" and "world" are one number.
+// Every world point is a whole pixel, so no row asks what `Math.round` does.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('paint-block, place-object and place-ring: one press, one command, at the point under the cursor', () => {
+  const W = SECTION_TILES_WIDE;
+  /** Section 1 sits SECTION_PIXEL_SIZE in; the camera shows its first columns. */
+  const VIEW = { vpX: SECTION_PIXEL_SIZE - 64, vpY: 32, zoom: 2 };
+  /** The client point over act1 section 1's LOCAL point (x, y), through OFFSET and VIEW. */
+  const atLocal1 = (x: number, y: number) => mouse(
+    OFFSET.left + (SECTION_PIXEL_SIZE + x - VIEW.vpX) * VIEW.zoom,
+    OFFSET.top + (y - VIEW.vpY) * VIEW.zoom,
+  );
+  function act1Sec(i: 0 | 1): Section {
+    const sec = useProjectStore.getState().project?.zones[0]?.acts.find((a) => a.id === 'act1')?.sections[i];
+    if (!sec) throw new Error(`map-viewport-mounted: no section ${i} in act1; the fixture moved`);
+    return sec;
+  }
+
+  afterEach(() => {
+    useEditorStore.getState().setSelectedRingPattern(0);
+    useEditorStore.getState().setSelectedObjectTypeId(null);
+  });
+
+  it('paint-block paints the 2x2 block on the 16px grid under the cursor, the pick at its top-left and the next three after it, as ONE undo entry', async () => {
+    // tool-meta.ts: "Click to place a 16×16 px block (2×2 tiles)".
+    const PICK = 20;
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-block');
+    ed.setSelectedTileIndex(PICK);
+    ed.setActiveSectionIndex(7);                // off the default, so a claim is visible
+    const at = { col: 5, row: 3 };              // odd both ways, so the snap does work
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(at.col, at.row));
+    const got = fgPainted('act1');
+    expect(got.map(([i]) => i), 'the block did not land on the 16px block under the cursor')
+      .toEqual(cellSubTiles(at.col >> 1, at.row >> 1));
+    const tiles = got.map(([, w]) => unpackNametableWord(w).tileIndex);
+    expect(tiles[0], 'the top-left tile is not the pick').toBe(PICK);
+    expect(asc(tiles), 'the block is not the pick and the three tiles after it').toEqual([PICK, PICK + 1, PICK + 2, PICK + 3]);
+    // PINNED AS FOUND: the order of the other three. No module states it; the
+    // only statement is MapViewport's own `tileOffset = dr * 2 + dc`, row-major.
+    expect(tiles, 'PINNED AS FOUND: the block reads row-major. If that changed on purpose, re-pin it')
+      .toEqual([PICK, PICK + 1, PICK + 2, PICK + 3]);
+    expect(useEditorStore.getState().activeSectionIndex, 'the press did not claim its section').toBe(0);
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'a block press must be ONE undo entry').toBe(1);
+    expect(fgPainted('act1'), 'and its undo must take all four tiles back').toHaveLength(0);
+  });
+
+  it('CONTROL: a paint-block press on a block already carrying those four tiles costs no undo entry', async () => {
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-block');
+    ed.setSelectedTileIndex(20);
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(5, 3));
+    win!.dispatch('mouseup', {});
+    expect(fgPainted('act1'), 'the first press did not paint, so this row measures nothing').toHaveLength(4);
+    s.on().onMouseDown(tileAt(4, 2));           // the same block, the same pick
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'a press that changed nothing put a second, empty entry on the stack').toBe(1);
+  });
+
+  it('place-object adds the picked type and subtype at the point under the cursor, in THAT section\'s local space, as ONE undo entry', async () => {
+    makeAct1TwoSections();
+    useViewStore.setState(VIEW);
+    const ed = useEditorStore.getState();
+    ed.setTool('place-object');
+    ed.setSelectedObjectTypeId('spring', 3);
+    ed.setActiveSectionIndex(7);
+    const local = { x: 300, y: 200 };
+    const s = await mountMap(OFFSET);
+    s.on().onMouseDown(atLocal1(local.x, local.y));
+    expect(act1Sec(1).objects, 'the object is not the pick, or not at section 1\'s local point under the cursor')
+      .toEqual([{ x: local.x, y: local.y, typeId: 'spring', subtype: 3 }]);
+    expect(act1Sec(0).objects, 'section 0 was written as well').toEqual([OBJ(64, 64)]);
+    expect(useEditorStore.getState().activeSectionIndex, 'the press did not claim section 1').toBe(1);
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'a placement must be ONE undo entry').toBe(1);
+    expect(act1Sec(1).objects, 'and its undo must remove the object').toHaveLength(0);
+  });
+
+  it('place-ring puts one ring at the local point, and a pattern puts every ring of it in ONE press', async () => {
+    makeAct1TwoSections();
+    useViewStore.setState(VIEW);
+    const ed = useEditorStore.getState();
+    ed.setTool('place-ring');
+    ed.setSelectedRingPattern(0);
+    expect(RING_PATTERNS[0].offsets, 'the premise: pattern 0 is one ring at the point').toEqual([{ dx: 0, dy: 0 }]);
+    const DIAMOND = RING_PATTERNS.findIndex((p) => p.name === 'Diamond');
+    expect(DIAMOND, 'the premise: a multi-ring pattern to pick').toBeGreaterThan(0);
+    const s = await mountMap(OFFSET);
+    s.on().onMouseDown(atLocal1(300, 200));
+    win!.dispatch('mouseup', {});
+    ed.setSelectedRingPattern(DIAMOND);
+    s.on().onMouseDown(atLocal1(400, 120));
+    win!.dispatch('mouseup', {});
+    expect(act1Sec(1).rings, 'the rings are not the patterns, at section 1\'s local points under the cursor')
+      .toEqual([{ x: 300, y: 200 }, ...RING_PATTERNS[DIAMOND].offsets.map((o) => ({ x: 400 + o.dx, y: 120 + o.dy }))]);
+    expect(act1Sec(0).rings, 'section 0 was written as well').toHaveLength(0);
+    expect(undoDepth(), 'each press must be ONE undo entry, the whole pattern included').toBe(2);
+    expect(act1Sec(1).rings).toHaveLength(0);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE FLIP KEYS, X AND Y, on a committed marquee.
+//
+// COVERAGE. `flipAxisForKey`, `resolveFlip` and region-flip's transforms are
+// pinned as pure functions, and the paste block pins the CLIPBOARD half (a flip
+// in paste mode keeps the tile set). What nothing drove is the in-place half
+// from the keyboard: the key reaching `performMapFlip`, the map rewritten as one
+// undo step, the key claimed, the hoisted chord guard in front of it, and the
+// marquee-tool scoping map-flip.ts argues for ("a flip REWRITES THE MAP").
+//
+// The region is 4 by 4 tiles, two by two 16px cells, every tile and every cell
+// distinct, so a mirror on either axis moves every word and a wrong axis shows.
+// Expected words come from region-flip's rule: the mirrored source cell, with
+// that axis's flip bit toggled.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('the flip keys mirror a committed marquee in place, only under the marquee tool, and never as a chord', () => {
+  const W = SECTION_TILES_WIDE;
+  const R = { col: 2, row: 2, w: 4, h: 4 };
+  const artTile = (r: number, c: number) => 1 + r * R.w + c;
+  const collShape = (cy: number, cx: number) => 20 + cy * 2 + cx;
+  const CELLS = { w: R.w / 2, h: R.h / 2 };
+
+  /** A keydown whose `preventDefault` a row can read back. */
+  function pressKey(k: string, mods: Parameters<typeof keydown>[1] = {}) {
+    let prevented = false;
+    return { ...keydown(k, mods), preventDefault: () => { prevented = true; }, wasPrevented: () => prevented };
+  }
+  const art = (r: number, c: number) =>
+    unpackNametableWord(sectionOf('act1').tileGrid.nametable[(R.row + r) * W + R.col + c]);
+  const coll = (cy: number, cx: number) =>
+    unpackCollisionCell(collPlane('act1', 'a')[cellSubTiles((R.col >> 1) + cx, (R.row >> 1) + cy)[0]]);
+  /** The region's art as [tile, hFlip, vFlip] and its plane-A cells as [shape, xFlip, yFlip]. */
+  function region() {
+    const a: Array<[number, boolean, boolean]> = [];
+    for (let r = 0; r < R.h; r++) for (let c = 0; c < R.w; c++) { const w = art(r, c); a.push([w.tileIndex, w.hFlip, w.vFlip]); }
+    const k: Array<[number, boolean, boolean]> = [];
+    for (let cy = 0; cy < CELLS.h; cy++) for (let cx = 0; cx < CELLS.w; cx++) { const w = coll(cy, cx); k.push([w.shape, w.xFlip, w.yFlip]); }
+    return { art: a, coll: k };
+  }
+  function expected(axis: 'h' | 'v') {
+    const a: Array<[number, boolean, boolean]> = [];
+    for (let r = 0; r < R.h; r++) {
+      for (let c = 0; c < R.w; c++) {
+        a.push(axis === 'h' ? [artTile(r, R.w - 1 - c), true, false] : [artTile(R.h - 1 - r, c), false, true]);
+      }
+    }
+    const k: Array<[number, boolean, boolean]> = [];
+    for (let cy = 0; cy < CELLS.h; cy++) {
+      for (let cx = 0; cx < CELLS.w; cx++) {
+        k.push(axis === 'h' ? [collShape(cy, CELLS.w - 1 - cx), true, false] : [collShape(CELLS.h - 1 - cy, cx), false, true]);
+      }
+    }
+    return { art: a, coll: k };
+  }
+  let original: ReturnType<typeof region>;
+
+  beforeEach(() => {
+    seedCollision();
+    useToastStore.setState({ toasts: [] });
+    const nt = sectionOf('act1').tileGrid.nametable;
+    for (let r = 0; r < R.h; r++) {
+      for (let c = 0; c < R.w; c++) nt[(R.row + r) * W + R.col + c] = packNametableWord(artTile(r, c), 0, false, false, false);
+    }
+    for (let cy = 0; cy < CELLS.h; cy++) {
+      for (let cx = 0; cx < CELLS.w; cx++) {
+        for (const i of cellSubTiles((R.col >> 1) + cx, (R.row >> 1) + cy)) collPlane('act1', 'a')[i] = collWord(collShape(cy, cx));
+      }
+    }
+    const ed = useEditorStore.getState();
+    ed.setTool('marquee');
+    ed.setMarquee({
+      sectionIndex: 0,
+      ...snapMarquee(R.col, R.row, R.col + R.w - 1, R.row + R.h - 1, effectiveGranularity('block', false)),
+    });
+    expect(ed.marquee ?? useEditorStore.getState().marquee, 'the premise: the marquee is the planted region')
+      .toEqual({ sectionIndex: 0, ...R });
+    original = region();
+  });
+
+  afterEach(() => { useEditorStore.getState().setMarquee(null); });
+
+  for (const [key, axis, words] of [['x', 'h', 'left to right'], ['y', 'v', 'top to bottom']] as const) {
+    it(`${key.toUpperCase()} mirrors the selection ${words}, art AND collision, as ONE undo step, and claims the key`, async () => {
+      expect(expected(axis), 'ANTI-VACUOUS: the mirror moves every word').not.toEqual(original);
+      await mountMap();
+      const e = pressKey(key);
+      expect(win!.dispatch('keydown', e), 'nothing was listening').toBeGreaterThan(0);
+      expect(region(), `${key.toUpperCase()} did not mirror the region ${words}`).toEqual(expected(axis));
+      expect(e.wasPrevented(), 'the flip key was left to the browser as well').toBe(true);
+      expect(undoDepth(), 'a flip must be ONE undo step').toBe(1);
+      expect(region(), 'and its undo must put the region back').toEqual(original);
+    });
+  }
+
+  it('GUARD: X or Y with Ctrl, Alt or Meta is somebody else\'s chord and flips nothing', async () => {
+    await mountMap();
+    for (const mod of ['ctrlKey', 'altKey', 'metaKey'] as const) {
+      for (const key of ['x', 'y']) win!.dispatch('keydown', pressKey(key, { [mod]: true }));
+    }
+    expect(region(), 'a modified flip key rewrote the map').toEqual(original);
+    expect(focusedHistory()?.canUndo ?? false, 'and put it on the undo stack').toBe(false);
+  });
+
+  it('CONTROL: under another tool X leaves the selection alone and does not claim the key', async () => {
+    // map-flip.ts: "An author who has switched to paint-tile and types `x` is
+    // typing at his paint tool, not at a rectangle he selected minutes ago."
+    useEditorStore.getState().setTool('paint-tile');
+    expect(useEditorStore.getState().marquee, 'the premise: the marquee outlives the tool switch').not.toBeNull();
+    await mountMap();
+    const e = pressKey('x');
+    win!.dispatch('keydown', e);
+    expect(region(), 'X under the paint tool rewrote a selection made with another tool').toEqual(original);
+    expect(focusedHistory()?.canUndo ?? false).toBe(false);
+    expect(e.wasPrevented(), 'a key that did nothing was swallowed').toBe(false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// F7, PLAY FROM CURSOR.
+//
+// COVERAGE. `warpTargetFor` is pinned as arithmetic and `resolveMapChord` as a
+// verdict. What nothing drove is the branch between them: which ref it aims
+// at. MapViewport's `cursorClient` docblock records the defect it replaced
+// (F7 read `lastMouse`, the PAN ANCHOR, so it aimed at the last press, and at
+// the canvas corner before any). The game is not here: `warp` is replaced by a
+// recorder for the length of this block, so a row reads what F7 ASKED FOR.
+// Through OFFSET and a zoom-2 parked view, so a warp that forgot either is a
+// wrong point.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('F7 plays from the CURSOR: with none it says so, a hover aims it, and a pan anchor never does', () => {
+  const VIEW = { vpX: 256, vpY: 256, zoom: 2 };
+  /** The client point over world (x, y), through OFFSET and the camera NOW. */
+  const clientAt = (x: number, y: number) => {
+    const v = useViewStore.getState();
+    return mouse(OFFSET.left + (x - v.vpX) * v.zoom, OFFSET.top + (y - v.vpY) * v.zoom);
+  };
+  /** What F7 would ask for at world (x, y) on the fixture's one-section act. */
+  const target = (x: number, y: number) => {
+    const t = warpTargetFor(x, y, { gridWidth: 1, gridHeight: 1 });
+    return { x: t.x, y: t.y };
+  };
+  let calls: Array<{ x: number; y: number }> = [];
+  let realWarp: ReturnType<typeof useAetherStore.getState>['warp'];
+
+  beforeEach(() => {
+    useViewStore.setState(VIEW);
+    useToastStore.setState({ toasts: [] });
+    realWarp = useAetherStore.getState().warp;
+    calls = [];
+    useAetherStore.setState({
+      warp: (x: number, y: number) => { calls.push({ x, y }); return Promise.resolve(null); },
+    });
+  });
+
+  afterEach(() => { useAetherStore.setState({ warp: realWarp }); });
+
+  it('cold F7, before the pointer has been over the map, warps nowhere and says why', async () => {
+    await mountMap(OFFSET);
+    expect(win!.dispatch('keydown', keydown('F7')), 'nothing was listening').toBeGreaterThan(0);
+    expect(calls, 'a cold F7 warped the game to wherever the canvas corner is').toEqual([]);
+    expect(toastsMatching('needs a cursor'), 'a cold F7 said nothing').toHaveLength(1);
+  });
+
+  it('after a plain hover, with no press ever, F7 warps to the world point under the cursor', async () => {
+    const P = { x: 300, y: 400 };
+    expect(target(P.x, P.y), 'ANTI-VACUOUS: the point is inside the act, so no clamp moves it').toEqual(P);
+    const s = await mountMap(OFFSET);
+    s.on().onMouseMove(clientAt(P.x, P.y));
+    win!.dispatch('keydown', keydown('F7'));
+    expect(calls, 'F7 did not warp to the point under the cursor').toEqual([P]);
+  });
+
+  it('the aim is the cursor, not the last press: after a pan, a hover elsewhere is where F7 warps', async () => {
+    useEditorStore.getState().setTool('view');
+    const s = await mountMap(OFFSET);
+    const press = clientAt(300, 400);
+    s.on().onMouseDown(press);
+    s.on().onMouseMove(mouse(press.clientX + 40, press.clientY + 20));   // a pan: the camera moves
+    win!.dispatch('mouseup', {});
+    expect(useViewStore.getState().vpX, 'the premise: the drag panned the camera').not.toBe(VIEW.vpX);
+    const Q = { x: 500, y: 300 };
+    s.on().onMouseMove(clientAt(Q.x, Q.y));                             // a hover, no button
+    win!.dispatch('keydown', keydown('F7'));
+    expect(calls, 'F7 aimed at the pan anchor, not at the cursor').toEqual([target(Q.x, Q.y)]);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE HOVER BAR'S TEXT (`writeHoverReadout`), outside paste mode.
+//
+// COVERAGE. The paste block's readout rows pin that the bar shows and follows
+// the cursor. These pin WHAT IT SAYS on each of its arms: a section and its
+// LOCAL tile with the world position, the BG plane's tile, off the grid, and
+// the collision word of the hovered 16px cell. Fragments name the facts the
+// readout carries; nothing here reads a pixel.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('the hover bar says where the cursor is: section, local tile and world point, the BG tile, off the grid, and the collision under it', () => {
+  const W = SECTION_TILES_WIDE;
+  /** The hover bar's host stub, found in the tree as the paste block's rows find it. */
+  function bar(s: Surface): { style: Record<string, unknown>; innerHTML: string } {
+    const found: Array<{ current: unknown }> = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) { for (const c of node) walk(c); return; }
+      if (!node || typeof node !== 'object') return;
+      const el = node as { type?: unknown; props?: Record<string, unknown> };
+      const style = el.props?.style as Record<string, unknown> | undefined;
+      const ref = el.props?.ref as { current: unknown } | undefined;
+      if (el.type === 'div' && ref && style?.display === 'none' && style?.pointerEvents === 'none') found.push(ref);
+      walk(el.props?.children);
+    };
+    walk(s.h.el());
+    expect(found, 'HARNESS: exactly one hover bar in the rendered tree').toHaveLength(1);
+    const el = found[0].current as { style: Record<string, unknown>; innerHTML: string } | null;
+    if (!el) throw new Error('map-viewport-mounted: the hover bar ref was never filled');
+    return el;
+  }
+  const says = (b: { innerHTML: string }, frags: string[], why: string) => {
+    for (const f of frags) expect(b.innerHTML, why).toContain(f);
+  };
+
+  beforeEach(() => {
+    const ed = useEditorStore.getState();
+    ed.setTool('select');
+    ed.setEditingLayer('fg');
+  });
+
+  afterEach(() => {
+    useViewStore.getState().setOverlay('showCollision', false);
+    useViewStore.getState().setOverlay('showCollisionPathB', false);
+    useEditorStore.getState().setEditingLayer('fg');
+  });
+
+  it('over section 1, it names section 1, the tile in section 1\'s OWN space, and the world point', async () => {
+    makeAct1TwoSections();
+    const VIEW = { vpX: SECTION_PIXEL_SIZE - 64, vpY: 32, zoom: 2 };
+    useViewStore.setState(VIEW);
+    const local = { col: 5, row: 9 };
+    const world = tileCentre(1, local.col, local.row);
+    const s = await mountMap(OFFSET);
+    s.on().onMouseMove(mouse(OFFSET.left + (world.x - VIEW.vpX) * VIEW.zoom, OFFSET.top + (world.y - VIEW.vpY) * VIEW.zoom));
+    says(bar(s), ['Sec 1', `Tile (${local.col}, ${local.row})`, `Pos ${world.x}, ${world.y}`],
+      'the readout does not name section 1, its local tile and the world point under the cursor');
+  });
+
+  it('on the BG layer it names the BG tile over the plane, and only the position off it', async () => {
+    // The fixture's plane is BG_COLS by BG_ROWS tiles (bgLayout above), so world
+    // y 12 is on its row 1 and y 30 is below its last row.
+    useEditorStore.getState().setEditingLayer('bg');
+    const s = await mountMap();
+    s.on().onMouseMove(mouse(20, 12));
+    says(bar(s), ['BG', 'Tile (2, 1)', 'Pos 20, 12'], 'the readout does not name the BG tile under the cursor');
+    expect(Math.floor(30 / 8), 'ANTI-VACUOUS: y 30 is below the plane').toBeGreaterThanOrEqual(BG_ROWS);
+    s.on().onMouseMove(mouse(20, 30));
+    says(bar(s), ['BG', 'Pos 20, 30'], 'the readout off the BG plane does not give the position');
+    expect(bar(s).innerHTML, 'the readout names a BG tile that is not there').not.toContain('Tile');
+  });
+
+  it('off the section grid it gives only the position, and does not keep the last tile it named', async () => {
+    useViewStore.setState({ vpX: SECTION_PIXEL_SIZE - 100, vpY: 0, zoom: 1 });
+    const s = await mountMap();
+    s.on().onMouseMove(mouse(50, 20));                      // world x SECTION_PIXEL_SIZE - 50: on the grid
+    says(bar(s), ['Sec 0', `Pos ${SECTION_PIXEL_SIZE - 50}, 20`], 'the premise: on the grid the readout names the section');
+    s.on().onMouseMove(mouse(150, 20));                     // world x SECTION_PIXEL_SIZE + 50: past the act's one section
+    says(bar(s), [`Pos ${SECTION_PIXEL_SIZE + 50}, 20`], 'off the grid the readout does not give the position');
+    expect(bar(s).innerHTML, 'off the grid the readout still names a section').not.toContain('Sec');
+  });
+
+  it('with a collision overlay on, it reads the hovered 16px cell\'s word, plane A, or B when B alone is shown', async () => {
+    // MapViewport: "Snap to the 16px cell's top-left tile" and "In the A/B
+    // diff (both overlays on) the base shown is A, so report A." Only the
+    // cell's TOP-LEFT sub-tile is planted, so a read of the hovered sub-tile
+    // itself gives the fixture's shape instead.
+    seedCollision();
+    expect(useProjectStore.getState().collisionProfiles, 'the premise: no collision tables are loaded').toBeNull();
+    const hover = { col: 5, row: 3 };
+    const topLeft = (hover.row >> 1) * 2 * W + (hover.col >> 1) * 2;
+    collPlane('act1', 'a')[topLeft] = packCollisionCell({ shape: 13, xFlip: true, yFlip: false, solidity: 'all' });
+    collPlane('act1', 'b')[topLeft] = collWord(14);
+    expect(unpackCollisionCell(collPlane('act1', 'a')[hover.row * W + hover.col]).shape,
+      'ANTI-VACUOUS: the hovered sub-tile itself carries another shape').not.toBe(13);
+    useViewStore.getState().setOverlay('showCollision', true);
+    const s = await mountMap();
+    s.on().onMouseMove(tileAt(hover.col, hover.row));
+    says(bar(s), ['Coll A #13 ⇄', '(tables not loaded)'], 'the readout does not give plane A\'s word for the hovered cell');
+    useViewStore.getState().setOverlay('showCollisionPathB', true);  // both on: the diff's base is A
+    s.on().onMouseMove(tileAt(hover.col, hover.row));
+    says(bar(s), ['Coll A #13'], 'with both overlays on the readout left plane A');
+    useViewStore.getState().setOverlay('showCollision', false);      // B alone
+    s.on().onMouseMove(tileAt(hover.col, hover.row));
+    says(bar(s), ['Coll B #14'], 'with plane B alone shown the readout did not read plane B');
   });
 });
