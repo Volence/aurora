@@ -61,7 +61,7 @@ import { switchFacet } from '../../workspace/facet-tools';
 import { documentHistoryHub } from '../../state/history-hub';
 import type { ObjectPlacement, Section } from '../../../core/model/s4-types';
 import {
-  unpackNametableWord, packNametableWord, SECTION_TILES_WIDE, SECTION_TILES_HIGH,
+  unpackNametableWord, packNametableWord, SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE,
 } from '../../../core/model/s4-types';
 import { BG_WIDTH } from '../../../core/formats/bg-tiles';
 import {
@@ -3405,5 +3405,101 @@ describe('collision paint: Alt propagates, a wide brush covers an area, and the 
     expect(cellSubTiles(2, 1).map((i) => readCrossover(a[i])),
       'a brush change mid-drag switched one gesture between marking and not')
       .toEqual(cellSubTiles(2, 1).map(() => handOffFrom('a')));
+  });
+});
+
+// ── a TWO-SECTION act, for the rows that cross a section boundary ─────────────
+//
+// ⚠ SIZED FROM THE ENGINE CONSTANTS, for the reason the nametable is. The
+// boundary is SECTION_PIXEL_SIZE world pixels in (SectionRenderer lays section
+// i at (i % gridWidth) * SECTION_PIXEL_SIZE), and a fixture that typed the
+// number would drift from it silently. Section 1 has its own FG fill, so a write
+// into the wrong section is a wrong VALUE and not only a wrong array.
+
+const FG_S1 = 0x0111;
+
+/** Make act1 a 2 by 1 grid: section 0 as the fixture has it, section 1 to its right. */
+function makeAct1TwoSections(): void {
+  const project = useProjectStore.getState().project as unknown as {
+    zones: Array<{ acts: Array<Record<string, unknown>> }>;
+  };
+  const act = project.zones[0].acts[0];
+  act.gridWidth = 2;
+  act.gridHeight = 1;
+  act.sections = [
+    section([OBJ(64, 64)], FG_FILL.act1),
+    { ...section([], FG_S1), index: 1, name: 's1' },
+  ];
+}
+
+/** The centre of tile (col, row) of act1's section `sec`, in WORLD pixels. */
+const tileCentre = (sec: 0 | 1, col: number, row: number) =>
+  ({ x: sec * SECTION_PIXEL_SIZE + col * 8 + 4, y: row * 8 + 4 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE MARQUEE CROSSING INTO ANOTHER SECTION.
+//
+// COVERAGE. map-coverage-3's marquee rows ran on a one-section act, where "the
+// section the drag started in" and "the section the cursor is over" cannot
+// differ. MapViewport.tsx states the rule at the move branch: "always resolved
+// against the drag-START section's local tile space (not whatever section the
+// cursor currently sits over), so dragging out of the section still
+// extends/clamps the same marquee."
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('a marquee resolves against the section it STARTED in, whichever section the cursor is over', () => {
+  /** The camera parked so the section boundary sits mid-VIEWPORT, at client x 320. */
+  const VIEW = { vpX: SECTION_PIXEL_SIZE - 320, vpY: 0, zoom: 1 };
+  /** The client point over world (x, y), through VIEWPORT and VIEW. */
+  const worldAt = (p: { x: number; y: number }) => mouse(p.x - VIEW.vpX, p.y - VIEW.vpY);
+  const marquee = () => useEditorStore.getState().marquee;
+  const block = effectiveGranularity('block', false);
+
+  beforeEach(() => {
+    makeAct1TwoSections();
+    useViewStore.setState(VIEW);
+    const ed = useEditorStore.getState();
+    ed.setTool('marquee');
+    ed.setMarqueeGranularity('block');
+    ed.setMarqueeSnapInvert(false);
+    ed.setMarquee(null);
+  });
+
+  it('HARNESS: the renderer lays section 1 at the engine\'s section width, beside section 0', async () => {
+    expect(SECTION_PIXEL_SIZE, 'a section is SECTION_TILES_WIDE tiles of 8px').toBe(SECTION_TILES_WIDE * 8);
+    await mountMap();
+    const { sectionRenderer } = await import('../MapViewport');
+    expect([sectionRenderer.sectionAtWorld(SECTION_PIXEL_SIZE - 1, 0), sectionRenderer.sectionAtWorld(SECTION_PIXEL_SIZE, 0)],
+      'the two-section act did not reach the renderer, so no row here crosses a boundary')
+      .toEqual([0, 1]);
+  });
+
+  it('a drag from section 0 into section 1 stays in section 0, and stops at its last column', async () => {
+    const start = { col: 250, row: 3 };
+    const over = { col: 5, row: 4 };            // in section 1's own tile space
+    const cursor = tileCentre(1, over.col, over.row);
+    // The cursor in the START section's tile space. Section 0's offset is 0, so
+    // that is the world pixel over 8, which lands past the section's last column.
+    const inStart = { col: Math.floor(cursor.x / 8), row: Math.floor(cursor.y / 8) };
+    const expected = { sectionIndex: 0, ...snapMarquee(start.col, start.row, inStart.col, inStart.row, block) };
+    expect(expected, 'ANTI-VACUOUS: resolving against the cursor\'s own section would give another rect')
+      .not.toEqual({ sectionIndex: 0, ...snapMarquee(start.col, start.row, over.col, over.row, block) });
+    expect(expected.col + expected.w, 'ANTI-VACUOUS: the cursor is past the edge, so the rect must end AT the edge')
+      .toBe(SECTION_TILES_WIDE);
+    const s = await mountMap();
+    s.on().onMouseDown(worldAt(tileCentre(0, start.col, start.row)));
+    s.on().onMouseMove(worldAt(cursor));
+    expect(marquee(), 'the marquee followed the cursor into section 1, or lost the section it started in')
+      .toEqual(expected);
+  });
+
+  it('CONTROL: a drag that starts in section 1 resolves in section 1\'s own tile space', async () => {
+    // Every other marquee row starts in section 0, whose offset is (0, 0), so a
+    // resolution that forgot the offset, or took section 0 always, passes them.
+    const s = await mountMap();
+    s.on().onMouseDown(worldAt(tileCentre(1, 5, 4)));
+    s.on().onMouseMove(worldAt(tileCentre(1, 9, 6)));
+    expect(marquee(), 'a marquee drawn in section 1 was placed in section 0\'s tile space')
+      .toEqual({ sectionIndex: 1, ...snapMarquee(5, 4, 9, 6, block) });
   });
 });
