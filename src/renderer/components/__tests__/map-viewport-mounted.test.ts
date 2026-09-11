@@ -70,6 +70,7 @@ import {
 import { documentBands, bandSlotBases } from '../../../core/formats/bg-override/bg-anim-band';
 import { packCollisionCell, unpackCollisionCell } from '../../../core/collision/collision-cell-word';
 import { SECTION_PLANE_WORDS } from '../../../core/collision/collision-cell-resolve';
+import { readCrossover, handOffFrom } from '../../../core/collision/layer-transition';
 import { snapMarquee, effectiveGranularity, type MapClipboard } from '../../../core/editing/map-clipboard';
 import { selectionToChunk } from '../../../core/editing/selection-to-chunk';
 import { SCREEN_WIDTH } from '../../../core/model/screen';
@@ -3167,5 +3168,242 @@ describe('the context menu opens where it was asked for, and closes on click-awa
     focusAct('act1');
     win!.dispatch('keydown', keydown('Escape'));
     expect(menuOf(s), 'Escape on the level tab did not close the menu').toBeNull();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// map-coverage-4 STARTS HERE.
+//
+// Same harness and the same rules as the rounds above: the component's real
+// handlers over the real stores, every row shown red with a mutation on disk
+// before it was trusted, and expected values derived from a rule a module
+// states or from the engine constants. The packet
+// (docs/reviews/2026-09-11-map-coverage-4.md) carries the plant for each row.
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Ascending numeric order, for index lists gathered from several cells. */
+const asc = (xs: number[]): number[] => [...xs].sort((a, b) => a - b);
+
+/** Put four FOREGROUND words on the 16px block (cc, cr) of act1's section 0, in
+ *  the order `cellSubTiles` lists that block: top-left, top-right, bottom-left,
+ *  bottom-right (rows are SECTION_TILES_WIDE apart, so ascending IS that order). */
+function plantBlock(cc: number, cr: number, words: readonly number[]): void {
+  const nt = sectionOf('act1').tileGrid.nametable;
+  cellSubTiles(cc, cr).forEach((i, k) => { nt[i] = words[k]; });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COLLISION PAINT, THE THREE MODES map-coverage-3 LEFT: Alt's propagate, a
+// brush wider than one block, and the crossover brush with its half-cell span.
+//
+// COVERAGE. `collisionPaintTargets`, `cellCrossoverIndices` and
+// `crossoverSpanForCursor` are pinned as pure functions. What nothing drove is
+// the handler that LATCHES each mode at the press and hands it to them: the
+// Alt bit off the pointer event, the brush size off the store, the crossover
+// brush and its span mode, and the drag cache that decides whether a move is
+// "the same cell".
+//
+// Expected cells are derived from the rule each module STATES (the docblock
+// sentence is quoted beside each derivation), never from the handler.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('collision paint: Alt propagates, a wide brush covers an area, and the crossover brush marks the half it is aimed at', () => {
+  const PICK = 9;
+  /** Two four-tile patterns no fixture block carries: the FG fill is FG_FILL.act1
+   *  on every tile, so a block made of these matches only where it is planted. */
+  const P = [0x0041, 0x0042, 0x0043, 0x0044] as const;
+  const Q = [0x0051, 0x0052, 0x0053, 0x0054] as const;
+  const W = SECTION_TILES_WIDE;
+  const painted = () => collPainted('act1', 'a').map(([i]) => i);
+
+  beforeEach(() => {
+    seedCollision();
+    useToastStore.setState({ toasts: [] });
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-collision');
+    ed.setSelectedCollisionProfile(PICK);
+    ed.setSelectedCollisionSolidity('all');
+    ed.setCollisionPaintPlane('a');
+    ed.setCollisionPaintBothPlanes(false);
+    ed.setCollisionBrushSize(1);
+    ed.setCollisionCrossoverBrush('keep');
+    ed.setCollisionCrossoverSpanMode('cell');
+  });
+
+  afterEach(() => {
+    const ed = useEditorStore.getState();
+    ed.setCollisionBrushSize(1);
+    ed.setCollisionCrossoverBrush('keep');
+    ed.setCollisionCrossoverSpanMode('cell');
+    // Arming an authoring crossover brush turns the crossover lens on as a side
+    // effect (editorStore's setter). It is view state and outlives this block.
+    useViewStore.getState().setOverlay('showCrossover', false);
+  });
+
+  /** Every block of act1's section 0 whose four words are `words`, scanned
+   *  directly, so the fixture guard does not borrow the function under test. */
+  function blocksCarrying(words: readonly number[]): Array<[number, number]> {
+    const nt = sectionOf('act1').tileGrid.nametable;
+    const out: Array<[number, number]> = [];
+    for (let cr = 0; cr < SECTION_TILES_HIGH / 2; cr++) {
+      for (let cc = 0; cc < W / 2; cc++) {
+        if (cellSubTiles(cc, cr).every((i, k) => nt[i] === words[k])) out.push([cc, cr]);
+      }
+    }
+    return out;
+  }
+
+  it('ANTI-VACUOUS: a planted pattern is on the blocks it was planted on and on no other', () => {
+    plantBlock(1, 1, P);
+    plantBlock(5, 3, P);
+    expect(blocksCarrying(P), 'Alt would have more (or fewer) blocks to reach than the rows below expect')
+      .toEqual([[1, 1], [5, 3]]);
+  });
+
+  it('CONTROL: without Alt a press paints the clicked block alone, though another block is made of the same tiles', async () => {
+    plantBlock(1, 1, P);
+    plantBlock(5, 3, P);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1));
+    expect(painted(), 'a plain press reached a block it was not aimed at').toEqual(cellSubTiles(1, 1));
+  });
+
+  it('ALT paints every block made of the same four tiles, and no other, as ONE undo step', async () => {
+    // collision-paint.ts: "brush 1 + propagate (Alt) -> every block in the
+    // section with the same tiles (reuse), explicit opt-in."
+    plantBlock(1, 1, P);
+    plantBlock(5, 3, P);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1, { altKey: true }));
+    expect(painted(), 'Alt did not reach the other block made of the same tiles, or reached one that is not')
+      .toEqual(asc([...cellSubTiles(1, 1), ...cellSubTiles(5, 3)]));
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'a propagated press must be ONE undo step').toBe(1);
+    expect(painted(), 'and that one undo must take every matching block back').toHaveLength(0);
+  });
+
+  it('ALT is LATCHED at the press: a drag keeps propagating after the key comes up', async () => {
+    // MapViewport.tsx, at `paintPropagate`: "latched at mousedown ... so
+    // toggling Alt mid-drag can't switch a single stroke between local and reuse."
+    plantBlock(1, 1, P);
+    plantBlock(7, 1, Q);
+    plantBlock(9, 4, Q);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1, { altKey: true }));
+    s.on().onMouseMove(collCell(7, 1));   // Alt no longer held on this event
+    expect(painted(), 'the stroke stopped propagating when the key came up mid-drag')
+      .toEqual(asc([...cellSubTiles(1, 1), ...cellSubTiles(7, 1), ...cellSubTiles(9, 4)]));
+  });
+
+  it('a brush of N paints the N by N block area CENTRED on the cell, as ONE undo step', async () => {
+    // collision-paint.ts: "brush > 1 -> the N×N block area centred on the cell
+    // (clamped to the section)". An odd N centred on a cell reaches (N-1)/2 each way.
+    const N = 3;
+    const at = { cc: 4, cr: 4 };
+    const reach = (N - 1) / 2;
+    const cells: number[] = [];
+    for (let cr = at.cr - reach; cr <= at.cr + reach; cr++) {
+      for (let cc = at.cc - reach; cc <= at.cc + reach; cc++) cells.push(...cellSubTiles(cc, cr));
+    }
+    expect(cells, 'ANTI-VACUOUS: the area is N by N blocks of four sub-tiles').toHaveLength(N * N * 4);
+    useEditorStore.getState().setCollisionBrushSize(N);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(at.cc, at.cr));
+    expect(painted(), 'the brush did not paint the area around the cell').toEqual(asc(cells));
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'a brush press must be ONE undo step').toBe(1);
+    expect(painted()).toHaveLength(0);
+  });
+
+  it('the brush area stops at the section edge: nothing left of column 0 wraps onto the row above', async () => {
+    // ⚠ WHY AN EDGE ROW CAN FAIL HERE, when the typed-array hazard says it
+    // might not. A block column of -1 is sub-tile column -2, and a store at a
+    // NEGATIVE index is dropped silently, which would hide an unclamped brush.
+    // But one block row down, (2 * cr) * W - 2 is a real index: the last two
+    // columns of the row above. So an unclamped brush at (0, 1) WRITES
+    // somewhere visible, and this row is placed where that happens.
+    const N = 3;
+    useEditorStore.getState().setCollisionBrushSize(N);
+    const cells: number[] = [];
+    for (let cr = 0; cr <= 2; cr++) for (let cc = 0; cc <= 1; cc++) cells.push(...cellSubTiles(cc, cr));
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(0, 1));
+    expect(painted(), 'the brush wrapped past the section edge, or stopped short of it').toEqual(asc(cells));
+  });
+
+  it('HAND-OFF marks every sub-tile of the cell to leave the plane it is painted on: A hands to B, B to A', async () => {
+    // layer-transition.ts: "`hand-off` ... the SAME armed brush does the right
+    // thing on either plane" (handOffFrom).
+    expect(handOffFrom('a'), 'ANTI-VACUOUS: the two planes hand off in different directions')
+      .not.toBe(handOffFrom('b'));
+    expect(readCrossover(collWord(COLL_SHAPE.act1.a)), 'ANTI-VACUOUS: the fixture carries no mark').toBe('none');
+    useEditorStore.getState().setCollisionCrossoverBrush('hand-off');
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(2, 1));
+    win!.dispatch('mouseup', {});
+    const a = collPlane('act1', 'a');
+    expect(cellSubTiles(2, 1).map((i) => readCrossover(a[i])), 'plane A did not take the hand-off')
+      .toEqual(cellSubTiles(2, 1).map(() => handOffFrom('a')));
+    expect(cellSubTiles(2, 1).map((i) => unpackCollisionCell(a[i]).shape), 'the geometry did not land with the mark')
+      .toEqual(cellSubTiles(2, 1).map(() => PICK));
+
+    useEditorStore.getState().setCollisionPaintPlane('b');
+    s.on().onMouseDown(collCell(4, 1));
+    win!.dispatch('mouseup', {});
+    const b = collPlane('act1', 'b');
+    expect(cellSubTiles(4, 1).map((i) => readCrossover(b[i])),
+      'plane B took the mark that hands to itself, which the bake refuses')
+      .toEqual(cellSubTiles(4, 1).map(() => handOffFrom('b')));
+  });
+
+  it('HALF width marks only the 8px column under the cursor, both of its rows, and the geometry stays cell-wide', async () => {
+    // layer-transition.ts: "`'left'` / `'right'` name one sub-tile column",
+    // and collision-cell.ts: "(both of its rows ...)". The column is the 8px
+    // tile column the cursor is over: tile 5 is the RIGHT half of cell 2, tile 8
+    // the LEFT half of cell 4.
+    const ed = useEditorStore.getState();
+    ed.setCollisionCrossoverBrush('hand-off');
+    ed.setCollisionCrossoverSpanMode('half');
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(5, 2));
+    win!.dispatch('mouseup', {});
+    s.on().onMouseDown(tileAt(8, 2));
+    win!.dispatch('mouseup', {});
+    const a = collPlane('act1', 'a');
+    const touched = asc([...cellSubTiles(2, 1), ...cellSubTiles(4, 1)]);
+    expect(touched.filter((i) => readCrossover(a[i]) !== 'none'), 'the mark is not the column under the cursor')
+      .toEqual(asc([2 * W + 5, 3 * W + 5, 2 * W + 8, 3 * W + 8]));
+    expect(touched.map((i) => unpackCollisionCell(a[i]).shape), 'a half-width MARK narrowed the GEOMETRY as well')
+      .toEqual(touched.map(() => PICK));
+  });
+
+  it('a drag from one half of a cell to the other marks BOTH halves', async () => {
+    // MapViewport.tsx, at `cellKey`: "THE DRAG CACHE IS KEYED ON THE SPAN TOO.
+    // Without it, dragging from one half of a cell to the other inside a
+    // single stroke would be 'the same cursor cell, skip'".
+    const ed = useEditorStore.getState();
+    ed.setCollisionCrossoverBrush('hand-off');
+    ed.setCollisionCrossoverSpanMode('half');
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(4, 2));   // the left half of cell (2, 1)
+    s.on().onMouseMove(tileAt(5, 2));   // the right half of the SAME cell
+    win!.dispatch('mouseup', {});
+    const a = collPlane('act1', 'a');
+    expect(cellSubTiles(2, 1).filter((i) => readCrossover(a[i]) !== 'none'),
+      'the second half of the cell was skipped as the same cursor cell')
+      .toEqual(cellSubTiles(2, 1));
+  });
+
+  it('the crossover brush is LATCHED at the press: changing it mid-drag does not split the stroke', async () => {
+    useEditorStore.getState().setCollisionCrossoverBrush('hand-off');
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1));
+    useEditorStore.getState().setCollisionCrossoverBrush('keep');
+    s.on().onMouseMove(collCell(2, 1));
+    win!.dispatch('mouseup', {});
+    const a = collPlane('act1', 'a');
+    expect(cellSubTiles(2, 1).map((i) => readCrossover(a[i])),
+      'a brush change mid-drag switched one gesture between marking and not')
+      .toEqual(cellSubTiles(2, 1).map(() => handOffFrom('a')));
   });
 });
