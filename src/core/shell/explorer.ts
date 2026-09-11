@@ -83,24 +83,48 @@ export function filterExplorer(groups: ExplorerGroupModel[], query: string): Exp
  * The two are independent, so both can be true at once — and on the cold Home
  * screen with a filter typed, both ARE.
  *
- * NOT DECIDED HERE, and left alone on purpose: seat B also reads `No matches` as
- * misdescribing the no-project state ("with no project open there is nothing to
- * match"). That is a wording call, so this changes behaviour and not one word of
- * copy.
+ * THE SENTENCE, decided later (the census's B-F5 wording half, 2026-09-11).
+ * Seat B also read `No matches` as misdescribing the no-project state: "with no
+ * project open there is nothing to match". True whenever the no-project tree is
+ * empty before the filter runs, which is the cold Home of a first launch. With
+ * no project open the tree lists only Recent Projects, so the true report
+ * depends on whether there was anything to narrow:
+ *
+ *   project open, filter matched nothing   `No matches` (unchanged, and true)
+ *   no project, recents listed, none match  `No recent project matches`
+ *   no project, nothing listed at all       `No project is open, so there is nothing to filter`
+ *
+ * That third case is why the rule takes the UNFILTERED group count: from the
+ * filtered count alone, "matched nothing" and "there was nothing" look the
+ * same. The text lives here, beside the condition that selects it, so the
+ * component cannot pick a sentence the rule did not choose.
  */
+export const EXPLORER_NO_MATCHES = 'No matches';
+export const EXPLORER_NO_RECENT_MATCHES = 'No recent project matches';
+export const EXPLORER_NOTHING_TO_FILTER = 'No project is open, so there is nothing to filter';
+
 export interface ExplorerEmptyState {
   /** The active filter matched nothing. Only ever true while a filter is set. */
   noMatches: boolean;
+  /** What to say when `noMatches`: one of the three constants above. Null otherwise. */
+  message: string | null;
   /** Offer the way out of the no-project state. NEVER suppressed by a filter. */
   openProject: boolean;
 }
 
 export function explorerEmptyState(
-  filteredGroupCount: number, query: string, noProject: boolean,
+  filteredGroupCount: number, query: string, noProject: boolean, unfilteredGroupCount: number,
 ): ExplorerEmptyState {
   const treeIsEmpty = filteredGroupCount === 0;
+  const noMatches = treeIsEmpty && query.trim() !== '';
+  let message: string | null = null;
+  if (noMatches) {
+    if (!noProject) message = EXPLORER_NO_MATCHES;
+    else message = unfilteredGroupCount > 0 ? EXPLORER_NO_RECENT_MATCHES : EXPLORER_NOTHING_TO_FILTER;
+  }
   return {
-    noMatches: treeIsEmpty && query.trim() !== '',
+    noMatches,
+    message,
     openProject: treeIsEmpty && noProject,
   };
 }

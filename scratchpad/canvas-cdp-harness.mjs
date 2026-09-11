@@ -467,9 +467,13 @@ const INSTALL = String.raw`
     const e = H.tabEl(title); if (!e) return null;
     return centre(e.querySelector('span[title="Close tab"]'));
   };
-  H.dirtyDots = () => [...document.querySelectorAll('span[title^="Unsaved changes"]')].length;
+  // SCOPED TO THE TAB STRIP (2026-09-11). These two used to scan the whole
+  // document, which was the same thing while the tab was the only place the dot
+  // appeared. Since census B-F3 the Explorer's level rows and group headers carry
+  // it too, and an unscoped count would add those to a number named for tabs.
+  H.dirtyDots = () => [...document.querySelectorAll('[role="tablist"] span[title^="Unsaved changes"]')].length;
   /** Tab titles that currently carry the unsaved dot. */
-  H.dirtyTabLabels = () => [...document.querySelectorAll('span[title^="Unsaved changes"]')]
+  H.dirtyTabLabels = () => [...document.querySelectorAll('[role="tablist"] span[title^="Unsaved changes"]')]
     .map((d) => (d.parentElement ? (d.parentElement.title || d.parentElement.textContent.trim()) : '?'));
 
   // --- second pass: dialog focus + field readouts -------------------------

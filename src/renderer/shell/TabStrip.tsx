@@ -11,18 +11,12 @@ import { useSessionStore } from '../state/sessionStore';
 import { tabHasDirtyDot } from './dirty-tabs';
 import { useDirtySnapshot } from './dirty-snapshot';
 import { requestFocusTabId, requestCloseTab } from './tab-activation';
+import { DirtyDot, DIRTY_DOT_TITLE } from './DirtyDot';
 import type { TabDescriptor } from '../../core/shell/session';
 
-/**
- * The dirty dot's two texts, exported so a test can assert the RENDERED name
- * against the one definition rather than against a copy of the string.
- * `DIRTY_DOT_TITLE` is what a pointer user hovers; `DIRTY_DOT_LABEL` is the
- * accessible name, and it is deliberately the state alone - a screen reader
- * announces a label, and "Ctrl+S to save" read out as part of an element's
- * NAME is instruction where a name belongs.
- */
-export const DIRTY_DOT_LABEL = 'Unsaved changes';
-export const DIRTY_DOT_TITLE = 'Unsaved changes. Ctrl+S to save';
+// The dot's texts and look now live in DirtyDot.tsx, shared with the Explorer.
+// Re-exported so anything that imported them from here keeps working.
+export { DIRTY_DOT_LABEL, DIRTY_DOT_TITLE } from './DirtyDot';
 
 function Tab({ tab, active, dirty }: { tab: TabDescriptor; active: boolean; dirty: boolean }) {
   const [hover, setHover] = React.useState(false);
@@ -42,25 +36,27 @@ function Tab({ tab, active, dirty }: { tab: TabDescriptor; active: boolean; dirt
       {tab.kind === 'home' && <Icons.IconHome size={13} />}
       <span style={styles.tabTitle}>{tab.title}</span>
       {dirty && (
-        // THE DOT IS THE ONLY PLACE THE APP SAYS "UNSAVED", so it has to be
-        // readable by something other than a hovering mouse. It was a bare
-        // 6x6 `<span>` carrying a `title` and nothing else: no text, no role,
-        // no accessible name. A screen reader walks past it, and a full-DOM
-        // scan for the state finds a decorative element. Two independent UX
-        // seats reached the same conclusion from opposite ends (packet
-        // docs/reviews/2026-09-09-save-contract.md, receipt R3).
+        // THE TAB DOT IS NOT THE ONLY PLACE THE APP SAYS "UNSAVED" ANY MORE,
+        // and this comment used to say it was. It was true, and it was the
+        // defect: closing a dirty level tab keeps the edit (no prompt, owner
+        // card d-38; the act stays resident, see tab-activation/dispatch.ts),
+        // and the close takes this dot with it, so seat B's full-screen scan
+        // after the close found nothing while the store still held the work
+        // (census B-F3). Three places say it now, all read off the same dirty
+        // snapshot:
         //
-        // `role="img"` + `aria-label` is the minimum that gives it a name in
-        // the accessibility tree; the `title` stays because it is what a
-        // pointer user gets and it names the remedy. NOTHING VISUAL CHANGES -
-        // what a save control should LOOK like is the owner's call and is
-        // parked in that packet, not decided here.
-        <span
-          style={styles.dot}
-          role="img"
-          aria-label={DIRTY_DOT_LABEL}
-          title={DIRTY_DOT_TITLE}
-        />
+        //   - this dot, on the tab;
+        //   - the same dot on the level's row in the Explorer, and on the
+        //     Levels group header so a folded group still shows it
+        //     (dirty-tabs.ts `explorerRowDirty`, the same rule as this one);
+        //   - a leading `● ` in the window title while ANY open document is
+        //     unsaved (window-title.ts, dirty-tabs.ts `hasUnsavedWork`).
+        //
+        // The dot has a role and an accessible name, not just a `title`, so a
+        // screen reader and a DOM scan can both find the state (packet
+        // docs/reviews/2026-09-09-save-contract.md, receipt R3). It is drawn by
+        // DirtyDot.tsx, one definition for every place it appears.
+        <DirtyDot title={DIRTY_DOT_TITLE} />
       )}
       {closeable && (
         <span
@@ -111,9 +107,6 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: `inset 0 2px 0 ${T.accent}`,
   },
   tabTitle: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
-  dot: {
-    width: 6, height: 6, borderRadius: '50%', background: T.accent, flexShrink: 0,
-  },
   close: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: 16, height: 16, borderRadius: T.rSm, color: T.textLo, flexShrink: 0,
