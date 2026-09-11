@@ -56,6 +56,9 @@ import { useEditorStore, focusedHistory } from '../../state/editorStore';
 import { useSessionStore } from '../../state/sessionStore';
 import { useViewStore } from '../../state/viewStore';
 import { useToastStore } from '../../state/toastStore';
+import { useArtStore } from '../../state/artStore';
+import { useConfirmStore } from '../../state/confirmStore';
+import { docFromTile } from '../../../core/art/composer-buffer';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { switchFacet } from '../../workspace/facet-tools';
 import { documentHistoryHub } from '../../state/history-hub';
@@ -3501,5 +3504,155 @@ describe('a marquee resolves against the section it STARTED in, whichever sectio
     s.on().onMouseMove(worldAt(tileCentre(1, 9, 6)));
     expect(marquee(), 'a marquee drawn in section 1 was placed in section 0\'s tile space')
       .toEqual({ sectionIndex: 1, ...snapMarquee(5, 4, 9, 6, block) });
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE CONTEXT MENU'S TWO ACTIONS (`handleEditTile`, `handleEditBlock`).
+//
+// COVERAGE. map-coverage-3 drove where the menu opens and how it closes, and
+// left the actions out as "a shell flow with its own tests". The shell half IS
+// tested (open-document's doors). What nothing ran is the map's half: which
+// cell the menu remembered, which word and which region it hands the Art
+// document, the collision it carries, the menu closing, and the facet switch
+// gated on the door's answer.
+//
+// The rect is OFFSET, for the reason map-coverage-3's menu block gives: the
+// menu stores container-local coordinates AND a map cell, and a row at the
+// client origin could not tell the two apart.
+//
+// ⚠ THE DOOR IS ASYNC. `confirmArtDocumentOpen` is awaited even when nothing is
+// at stake, so the document and the facet switch land a task later. Every row
+// settles before reading either.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('the context menu\'s two actions open the clicked cell in Art, and switch the tab only when the door opens', () => {
+  const W = SECTION_TILES_WIDE;
+  const rightClickTile = (col: number, row: number) =>
+    mouse(OFFSET.left + col * 8 + 4, OFFSET.top + row * 8 + 4, { button: 2, buttons: 2 });
+  const settle = () => new Promise<void>((r) => { setTimeout(r, 0); });
+  const facet = () => useWorkspaceStore.getState().facetFor(useSessionStore.getState().activeId);
+  const art = () => useArtStore.getState().open;
+
+  /** Every element of `type` in a subtree, as data. */
+  function elementsOf(
+    node: unknown, type: string, out: Array<React.ReactElement<Record<string, unknown>>> = [],
+  ): Array<React.ReactElement<Record<string, unknown>>> {
+    if (Array.isArray(node)) { for (const c of node) elementsOf(c, type, out); return out; }
+    if (!node || typeof node !== 'object') return out;
+    const el = node as React.ReactElement<Record<string, unknown>>;
+    if (el.type === type) out.push(el);
+    const children = (el.props as { children?: unknown } | undefined)?.children;
+    if (children !== undefined) elementsOf(children, type, out);
+    return out;
+  }
+  const menuButtons = (s: Surface) =>
+    elementsOf((s.h.el().props as { children?: unknown }).children, 'button');
+  /** The one menu button whose label contains `label`, as the click it runs. */
+  function menuButton(s: Surface, label: string): () => void {
+    const hit = menuButtons(s).filter((b) => String(b.props.children).includes(label));
+    expect(hit, `no single menu button labelled "${label}"`).toHaveLength(1);
+    return hit[0].props.onClick as () => void;
+  }
+
+  beforeEach(() => {
+    useArtStore.getState().closeDocument();
+    useConfirmStore.setState({ request: null, resolver: null });
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-tile');
+    ed.setEditingLayer('fg');
+    ed.setSelectedTileIndex(5);
+  });
+
+  afterEach(() => {
+    useArtStore.getState().closeDocument();
+    useConfirmStore.setState({ request: null, resolver: null });
+  });
+
+  it('Edit tile opens the tile the clicked cell names, as a live tile, closes the menu, and switches the tab to Art', async () => {
+    const AT = { col: 9, row: 3 };
+    const TILE = 6;
+    sectionOf('act1').tileGrid.nametable[AT.row * W + AT.col] = packNametableWord(TILE, 0, false, false, true);
+    expect(unpackNametableWord(sectionOf('act1').tileGrid.nametable[AT.col * W + AT.row]).tileIndex,
+      'ANTI-VACUOUS: the cell with row and column swapped names another tile').not.toBe(TILE);
+    expect(facet(), 'the premise: the tab starts on the Layout facet').toBe('layout');
+    const s = await mountMap(OFFSET);
+    s.on().onContextMenu(rightClickTile(AT.col, AT.row));
+    menuButton(s, 'Edit tile')();
+    expect(menuButtons(s), 'the menu stayed open over the document it opened').toHaveLength(0);
+    await settle();
+    const open = art();
+    expect(open, 'no Art document was opened').not.toBeNull();
+    expect({ live: open!.liveTileIndex, cell: open!.doc.cells[0].atlasTile, chunk: open!.chunkId, dirty: open!.dirty },
+      'the document is not the tile the clicked cell names, opened as that live tile')
+      .toEqual({ live: TILE, cell: TILE, chunk: null, dirty: false });
+    expect(facet(), 'the tab did not switch to Art').toBe('art');
+  });
+
+  it('Edit chunk region opens the 16 by 16 tile region on the block grid around the click, with its collision, as a new unsaved document', async () => {
+    // MapViewport.tsx, `handleEditBlock`: "the block-aligned 128×128
+    // (16×16-tile) region under the cursor as a NEW unsaved chunk document",
+    // carrying "the map's real collision into the doc".
+    const REGION = 16;
+    const AT = { col: 20, row: 35 };
+    const base = { col: Math.floor(AT.col / REGION) * REGION, row: Math.floor(AT.row / REGION) * REGION };
+    expect([AT.col % REGION, AT.row % REGION], 'ANTI-VACUOUS: the click is off the region grid, so the snap does work')
+      .not.toEqual([0, 0]);
+    seedCollision();
+    const nt = sectionOf('act1').tileGrid.nametable;
+    const corners = [[0, 0, 1], [REGION - 1, 0, 2], [0, REGION - 1, 3], [REGION - 1, REGION - 1, 4]] as const;
+    for (const [c, r, t] of corners) nt[(base.row + r) * W + base.col + c] = packNametableWord(t, 0, false, false, false);
+    // One collision cell per plane inside the region: its top-left cell on A,
+    // its bottom-right cell on B.
+    const A_WORD = collWord(13);
+    const B_WORD = collWord(14);
+    for (const i of cellSubTiles(base.col >> 1, base.row >> 1)) collPlane('act1', 'a')[i] = A_WORD;
+    for (const i of cellSubTiles((base.col + REGION - 2) >> 1, (base.row + REGION - 2) >> 1)) {
+      collPlane('act1', 'b')[i] = B_WORD;
+    }
+    const s = await mountMap(OFFSET);
+    s.on().onContextMenu(rightClickTile(AT.col, AT.row));
+    menuButton(s, 'Edit 128')();
+    await settle();
+    const open = art();
+    expect(open, 'no Art document was opened').not.toBeNull();
+    const doc = open!.doc;
+    expect([doc.widthTiles, doc.heightTiles], 'the document is not a 16 by 16 tile region').toEqual([REGION, REGION]);
+    expect(corners.map(([c, r]) => doc.cells[r * REGION + c].atlasTile),
+      'the document is not the region on the block grid around the click').toEqual(corners.map(([, , t]) => t));
+    const cells = (REGION / 2) * (REGION / 2);
+    expect([doc.collisionA.length, doc.collisionB.length], 'the premise: one collision word per 16px cell')
+      .toEqual([cells, cells]);
+    expect([doc.collisionA[0], doc.collisionB[cells - 1]], 'the map\'s collision did not come with the region')
+      .toEqual([A_WORD, B_WORD]);
+    expect({ live: open!.liveTileIndex, chunk: open!.chunkId, dirty: open!.dirty },
+      'a region copied off the map is a NEW document with unsaved work').toEqual({ live: null, chunk: null, dirty: true });
+    expect(facet(), 'the tab did not switch to Art').toBe('art');
+  });
+
+  it('a cancelled open replaces nothing and leaves the tab where it was; the same click answered Discard opens and switches', async () => {
+    // The door asks when the Art document already open has unsaved strokes.
+    // The map's half is the `if (opened)` on its answer.
+    useArtStore.getState().openDocument({
+      doc: docFromTile(0), liveTileIndex: null, chunkId: null, name: 'drawing in progress', dirty: true,
+    });
+    const s = await mountMap(OFFSET);
+    s.on().onContextMenu(rightClickTile(9, 3));
+    menuButton(s, 'Edit tile')();
+    await settle();
+    expect(useConfirmStore.getState().request, 'the door did not ask about the unsaved drawing').not.toBeNull();
+    useConfirmStore.getState().answer('cancel');
+    await settle();
+    expect(art()?.name, 'a cancelled open replaced the drawing').toBe('drawing in progress');
+    expect(facet(), 'a cancelled open still switched the tab to Art').toBe('layout');
+
+    s.on().onContextMenu(rightClickTile(9, 3));
+    menuButton(s, 'Edit tile')();
+    await settle();
+    expect(useConfirmStore.getState().request, 'the second click did not ask either').not.toBeNull();
+    useConfirmStore.getState().answer('discard');
+    await settle();
+    expect(art()?.name, 'the open the author agreed to did not happen').not.toBe('drawing in progress');
+    expect(facet(), 'the open the author agreed to did not switch the tab').toBe('art');
   });
 });
