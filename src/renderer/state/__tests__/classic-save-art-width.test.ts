@@ -139,7 +139,11 @@ async function openSession(): Promise<Session> {
         writes.push(out);
         return out;
       },
-      updateMtimes: (_ref, m) => { for (const p of Object.keys(m)) state.read.writtenSinceRead.add(p); },
+      // `?.` only so the §2 rows can run UNMODIFIED against the pre-2026-09-11
+      // code, whose read state has no such Set (the packet records that run; a
+      // bare `.add` crashed it after the write landed, before any assertion). At
+      // this tree the field is required and always present, so `?.` is a no-op.
+      updateMtimes: (_ref, m) => { for (const p of Object.keys(m)) state.read.writtenSinceRead?.add(p); },
       editableTileRange: () => ({ baseTileCount, animRanges: [] }),
     },
   };
@@ -265,7 +269,10 @@ describe('§2 the zero-diff save is unchanged by the unchanged-art rule', () => 
     expect(await saveClassicProject(api)).toEqual({ kind: 'saved', count: 1 });
     expect(api.calls).toHaveLength(1);
     expect(api.calls[0].map((f) => f.relPath).sort()).toEqual([NEM_A, NEM_B].sort());
-    expect(writes[0].unchanged).toEqual([]);
+    // `?? []` because `unchanged` is optional and absent means none. That is also
+    // what lets this row run unmodified against the pre-2026-09-11 code, which is
+    // how the packet shows this behaviour did not move.
+    expect(writes[0].unchanged ?? []).toEqual([]);
     expect(dirty().tiles).toBeUndefined();
   });
 });
