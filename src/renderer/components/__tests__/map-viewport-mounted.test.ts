@@ -59,6 +59,8 @@ import { useToastStore } from '../../state/toastStore';
 import { useArtStore } from '../../state/artStore';
 import { useConfirmStore } from '../../state/confirmStore';
 import { docFromTile } from '../../../core/art/composer-buffer';
+import { useAetherStore } from '../../state/aetherStore';
+import { warpTargetFor } from '../../../core/aether/warp-math';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { switchFacet } from '../../workspace/facet-tools';
 import { documentHistoryHub } from '../../state/history-hub';
@@ -3983,5 +3985,183 @@ describe('the flip keys mirror a committed marquee in place, only under the marq
     expect(region(), 'X under the paint tool rewrote a selection made with another tool').toEqual(original);
     expect(focusedHistory()?.canUndo ?? false).toBe(false);
     expect(e.wasPrevented(), 'a key that did nothing was swallowed').toBe(false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// F7, PLAY FROM CURSOR.
+//
+// COVERAGE. `warpTargetFor` is pinned as arithmetic and `resolveMapChord` as a
+// verdict. What nothing drove is the branch between them: which ref it aims
+// at. MapViewport's `cursorClient` docblock records the defect it replaced
+// (F7 read `lastMouse`, the PAN ANCHOR, so it aimed at the last press, and at
+// the canvas corner before any). The game is not here: `warp` is replaced by a
+// recorder for the length of this block, so a row reads what F7 ASKED FOR.
+// Through OFFSET and a zoom-2 parked view, so a warp that forgot either is a
+// wrong point.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('F7 plays from the CURSOR: with none it says so, a hover aims it, and a pan anchor never does', () => {
+  const VIEW = { vpX: 256, vpY: 256, zoom: 2 };
+  /** The client point over world (x, y), through OFFSET and the camera NOW. */
+  const clientAt = (x: number, y: number) => {
+    const v = useViewStore.getState();
+    return mouse(OFFSET.left + (x - v.vpX) * v.zoom, OFFSET.top + (y - v.vpY) * v.zoom);
+  };
+  /** What F7 would ask for at world (x, y) on the fixture's one-section act. */
+  const target = (x: number, y: number) => {
+    const t = warpTargetFor(x, y, { gridWidth: 1, gridHeight: 1 });
+    return { x: t.x, y: t.y };
+  };
+  let calls: Array<{ x: number; y: number }> = [];
+  let realWarp: ReturnType<typeof useAetherStore.getState>['warp'];
+
+  beforeEach(() => {
+    useViewStore.setState(VIEW);
+    useToastStore.setState({ toasts: [] });
+    realWarp = useAetherStore.getState().warp;
+    calls = [];
+    useAetherStore.setState({
+      warp: (x: number, y: number) => { calls.push({ x, y }); return Promise.resolve(null); },
+    });
+  });
+
+  afterEach(() => { useAetherStore.setState({ warp: realWarp }); });
+
+  it('cold F7, before the pointer has been over the map, warps nowhere and says why', async () => {
+    await mountMap(OFFSET);
+    expect(win!.dispatch('keydown', keydown('F7')), 'nothing was listening').toBeGreaterThan(0);
+    expect(calls, 'a cold F7 warped the game to wherever the canvas corner is').toEqual([]);
+    expect(toastsMatching('needs a cursor'), 'a cold F7 said nothing').toHaveLength(1);
+  });
+
+  it('after a plain hover, with no press ever, F7 warps to the world point under the cursor', async () => {
+    const P = { x: 300, y: 400 };
+    expect(target(P.x, P.y), 'ANTI-VACUOUS: the point is inside the act, so no clamp moves it').toEqual(P);
+    const s = await mountMap(OFFSET);
+    s.on().onMouseMove(clientAt(P.x, P.y));
+    win!.dispatch('keydown', keydown('F7'));
+    expect(calls, 'F7 did not warp to the point under the cursor').toEqual([P]);
+  });
+
+  it('the aim is the cursor, not the last press: after a pan, a hover elsewhere is where F7 warps', async () => {
+    useEditorStore.getState().setTool('view');
+    const s = await mountMap(OFFSET);
+    const press = clientAt(300, 400);
+    s.on().onMouseDown(press);
+    s.on().onMouseMove(mouse(press.clientX + 40, press.clientY + 20));   // a pan: the camera moves
+    win!.dispatch('mouseup', {});
+    expect(useViewStore.getState().vpX, 'the premise: the drag panned the camera').not.toBe(VIEW.vpX);
+    const Q = { x: 500, y: 300 };
+    s.on().onMouseMove(clientAt(Q.x, Q.y));                             // a hover, no button
+    win!.dispatch('keydown', keydown('F7'));
+    expect(calls, 'F7 aimed at the pan anchor, not at the cursor').toEqual([target(Q.x, Q.y)]);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE HOVER BAR'S TEXT (`writeHoverReadout`), outside paste mode.
+//
+// COVERAGE. The paste block's readout rows pin that the bar shows and follows
+// the cursor. These pin WHAT IT SAYS on each of its arms: a section and its
+// LOCAL tile with the world position, the BG plane's tile, off the grid, and
+// the collision word of the hovered 16px cell. Fragments name the facts the
+// readout carries; nothing here reads a pixel.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('the hover bar says where the cursor is: section, local tile and world point, the BG tile, off the grid, and the collision under it', () => {
+  const W = SECTION_TILES_WIDE;
+  /** The hover bar's host stub, found in the tree as the paste block's rows find it. */
+  function bar(s: Surface): { style: Record<string, unknown>; innerHTML: string } {
+    const found: Array<{ current: unknown }> = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) { for (const c of node) walk(c); return; }
+      if (!node || typeof node !== 'object') return;
+      const el = node as { type?: unknown; props?: Record<string, unknown> };
+      const style = el.props?.style as Record<string, unknown> | undefined;
+      const ref = el.props?.ref as { current: unknown } | undefined;
+      if (el.type === 'div' && ref && style?.display === 'none' && style?.pointerEvents === 'none') found.push(ref);
+      walk(el.props?.children);
+    };
+    walk(s.h.el());
+    expect(found, 'HARNESS: exactly one hover bar in the rendered tree').toHaveLength(1);
+    const el = found[0].current as { style: Record<string, unknown>; innerHTML: string } | null;
+    if (!el) throw new Error('map-viewport-mounted: the hover bar ref was never filled');
+    return el;
+  }
+  const says = (b: { innerHTML: string }, frags: string[], why: string) => {
+    for (const f of frags) expect(b.innerHTML, why).toContain(f);
+  };
+
+  beforeEach(() => {
+    const ed = useEditorStore.getState();
+    ed.setTool('select');
+    ed.setEditingLayer('fg');
+  });
+
+  afterEach(() => {
+    useViewStore.getState().setOverlay('showCollision', false);
+    useViewStore.getState().setOverlay('showCollisionPathB', false);
+    useEditorStore.getState().setEditingLayer('fg');
+  });
+
+  it('over section 1, it names section 1, the tile in section 1\'s OWN space, and the world point', async () => {
+    makeAct1TwoSections();
+    const VIEW = { vpX: SECTION_PIXEL_SIZE - 64, vpY: 32, zoom: 2 };
+    useViewStore.setState(VIEW);
+    const local = { col: 5, row: 9 };
+    const world = tileCentre(1, local.col, local.row);
+    const s = await mountMap(OFFSET);
+    s.on().onMouseMove(mouse(OFFSET.left + (world.x - VIEW.vpX) * VIEW.zoom, OFFSET.top + (world.y - VIEW.vpY) * VIEW.zoom));
+    says(bar(s), ['Sec 1', `Tile (${local.col}, ${local.row})`, `Pos ${world.x}, ${world.y}`],
+      'the readout does not name section 1, its local tile and the world point under the cursor');
+  });
+
+  it('on the BG layer it names the BG tile over the plane, and only the position off it', async () => {
+    // The fixture's plane is BG_COLS by BG_ROWS tiles (bgLayout above), so world
+    // y 12 is on its row 1 and y 30 is below its last row.
+    useEditorStore.getState().setEditingLayer('bg');
+    const s = await mountMap();
+    s.on().onMouseMove(mouse(20, 12));
+    says(bar(s), ['BG', 'Tile (2, 1)', 'Pos 20, 12'], 'the readout does not name the BG tile under the cursor');
+    expect(Math.floor(30 / 8), 'ANTI-VACUOUS: y 30 is below the plane').toBeGreaterThanOrEqual(BG_ROWS);
+    s.on().onMouseMove(mouse(20, 30));
+    says(bar(s), ['BG', 'Pos 20, 30'], 'the readout off the BG plane does not give the position');
+    expect(bar(s).innerHTML, 'the readout names a BG tile that is not there').not.toContain('Tile');
+  });
+
+  it('off the section grid it gives only the position, and does not keep the last tile it named', async () => {
+    useViewStore.setState({ vpX: SECTION_PIXEL_SIZE - 100, vpY: 0, zoom: 1 });
+    const s = await mountMap();
+    s.on().onMouseMove(mouse(50, 20));                      // world x SECTION_PIXEL_SIZE - 50: on the grid
+    says(bar(s), ['Sec 0', `Pos ${SECTION_PIXEL_SIZE - 50}, 20`], 'the premise: on the grid the readout names the section');
+    s.on().onMouseMove(mouse(150, 20));                     // world x SECTION_PIXEL_SIZE + 50: past the act's one section
+    says(bar(s), [`Pos ${SECTION_PIXEL_SIZE + 50}, 20`], 'off the grid the readout does not give the position');
+    expect(bar(s).innerHTML, 'off the grid the readout still names a section').not.toContain('Sec');
+  });
+
+  it('with a collision overlay on, it reads the hovered 16px cell\'s word, plane A, or B when B alone is shown', async () => {
+    // MapViewport: "Snap to the 16px cell's top-left tile" and "In the A/B
+    // diff (both overlays on) the base shown is A, so report A." Only the
+    // cell's TOP-LEFT sub-tile is planted, so a read of the hovered sub-tile
+    // itself gives the fixture's shape instead.
+    seedCollision();
+    expect(useProjectStore.getState().collisionProfiles, 'the premise: no collision tables are loaded').toBeNull();
+    const hover = { col: 5, row: 3 };
+    const topLeft = (hover.row >> 1) * 2 * W + (hover.col >> 1) * 2;
+    collPlane('act1', 'a')[topLeft] = packCollisionCell({ shape: 13, xFlip: true, yFlip: false, solidity: 'all' });
+    collPlane('act1', 'b')[topLeft] = collWord(14);
+    expect(unpackCollisionCell(collPlane('act1', 'a')[hover.row * W + hover.col]).shape,
+      'ANTI-VACUOUS: the hovered sub-tile itself carries another shape').not.toBe(13);
+    useViewStore.getState().setOverlay('showCollision', true);
+    const s = await mountMap();
+    s.on().onMouseMove(tileAt(hover.col, hover.row));
+    says(bar(s), ['Coll A #13 ⇄', '(tables not loaded)'], 'the readout does not give plane A\'s word for the hovered cell');
+    useViewStore.getState().setOverlay('showCollisionPathB', true);  // both on: the diff's base is A
+    s.on().onMouseMove(tileAt(hover.col, hover.row));
+    says(bar(s), ['Coll A #13'], 'with both overlays on the readout left plane A');
+    useViewStore.getState().setOverlay('showCollision', false);      // B alone
+    s.on().onMouseMove(tileAt(hover.col, hover.row));
+    says(bar(s), ['Coll B #14'], 'with plane B alone shown the readout did not read plane B');
   });
 });
