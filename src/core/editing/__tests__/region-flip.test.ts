@@ -5,7 +5,7 @@ import {
 } from '../region-flip';
 import type { FlipAxis } from '../region-flip';
 import { copyFromSection, isBlockAligned } from '../map-clipboard';
-import type { MapClipboard } from '../map-clipboard';
+import type { MapRegion } from '../map-clipboard';
 import {
   createSection, packNametableWord, unpackNametableWord, SECTION_TILES_WIDE,
 } from '../../model/s4-types';
@@ -72,7 +72,7 @@ function coll(shape: number, opts: {
  * collision cells carry DIFFERENT shapes so a reverse that did nothing is
  * visible on the collision plane as well as the art one.
  */
-function fixture(): MapClipboard {
+function fixture(): MapRegion {
   return {
     widthTiles: 4, heightTiles: 2,
     nametable: new Uint16Array([
@@ -86,7 +86,7 @@ function fixture(): MapClipboard {
 }
 
 /** THE FIRST HALF ONLY: words move, bits do not. */
-function plantReverseOnly(clip: MapClipboard, axis: FlipAxis): Uint16Array {
+function plantReverseOnly(clip: MapRegion, axis: FlipAxis): Uint16Array {
   const { widthTiles: w, heightTiles: h } = clip;
   const out = new Uint16Array(w * h);
   for (let r = 0; r < h; r++) {
@@ -98,12 +98,12 @@ function plantReverseOnly(clip: MapClipboard, axis: FlipAxis): Uint16Array {
 }
 
 /** THE SECOND HALF ONLY: bits toggle, words stay put. */
-function plantToggleOnly(clip: MapClipboard, axis: FlipAxis): Uint16Array {
+function plantToggleOnly(clip: MapRegion, axis: FlipAxis): Uint16Array {
   return Uint16Array.from(clip.nametable, (word) => flipArtWord(word, axis));
 }
 
 /** A section with an asymmetric art + collision region written at (col,row). */
-function sectionWith(col: number, row: number, clip: MapClipboard): Section {
+function sectionWith(col: number, row: number, clip: MapRegion): Section {
   const s = createSection(0, 'flip');
   s.collisionEdit = new Uint16Array(SECTION_TILES_WIDE * SECTION_TILES_WIDE);
   s.collisionEditB = new Uint16Array(SECTION_TILES_WIDE * SECTION_TILES_WIDE);
@@ -381,7 +381,7 @@ describe('region-flip · round trip', () => {
 // ─── 4. ODD RUNS, AND THE CENTRE COLUMN ────────────────────────────────────
 
 describe('region-flip · odd runs', () => {
-  const odd = (): MapClipboard => ({
+  const odd = (): MapRegion => ({
     widthTiles: 3, heightTiles: 1,
     nametable: new Uint16Array([art(9), art(10, { h: true }), art(11)]),
     collisionA: new Uint16Array(0), collisionB: new Uint16Array(0),
@@ -422,7 +422,7 @@ describe('region-flip · odd runs', () => {
 
   it('4e: a 1x1 selection has nothing to reverse, so a flip is PURELY the bit toggle '
     + ': the case reverse-only cannot be told from doing nothing', () => {
-    const one: MapClipboard = {
+    const one: MapRegion = {
       widthTiles: 1, heightTiles: 1, nametable: new Uint16Array([art(7)]),
       collisionA: new Uint16Array(0), collisionB: new Uint16Array(0), artOnly: true,
     };

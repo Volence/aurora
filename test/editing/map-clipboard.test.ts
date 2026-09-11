@@ -82,7 +82,7 @@ describe('copyChunkToClipboard', () => {
     chunk.collisionA[0] = packCollisionCell({ shape: 5, xFlip: false, yFlip: false, solidity: 'all' });
     chunk.collisionB[0] = packCollisionCell({ shape: 9, xFlip: true, yFlip: false, solidity: 'top' });
 
-    const clip = copyChunkToClipboard(chunk);
+    const clip = copyChunkToClipboard(chunk, { tiles: [] });
 
     expect(clip.widthTiles).toBe(4);
     expect(clip.heightTiles).toBe(4);

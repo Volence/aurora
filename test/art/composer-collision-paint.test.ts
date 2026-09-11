@@ -3,7 +3,7 @@ import { createDoc } from '../../src/core/art/composer-buffer';
 import {
   paintDocCollision, applyClipboardCollisionToDoc, seedDocCollisionFromSection,
 } from '../../src/core/art/composer-collision';
-import type { MapClipboard } from '../../src/core/editing/map-clipboard';
+import type { MapRegion } from '../../src/core/editing/map-clipboard';
 import { createSection, SECTION_TILES_WIDE } from '../../src/core/model/s4-types';
 import { packCollisionCell } from '../../src/core/collision/collision-cell-word';
 
@@ -43,7 +43,7 @@ describe('paintDocCollision', () => {
 });
 
 describe('applyClipboardCollisionToDoc', () => {
-  function clip2x2(): MapClipboard {
+  function clip2x2(): MapRegion {
     // 2x2-cell clipboard (4x4 tiles): distinct nonzero words per cell.
     return {
       widthTiles: 4, heightTiles: 4,
@@ -72,7 +72,7 @@ describe('applyClipboardCollisionToDoc', () => {
 
   it('clamps an oversized clipboard to the doc bounds', () => {
     const doc = createDoc(4, 4); // 2x2 cells
-    const clip: MapClipboard = {
+    const clip: MapRegion = {
       widthTiles: 8, heightTiles: 8, // 4x4 cells — bigger than the doc
       nametable: new Uint16Array(64),
       collisionA: new Uint16Array(16).fill(0x1234),

@@ -803,8 +803,13 @@ export default function ComposerCanvas() {
           if (o && o.chunkId !== null) {
             const liveProject = useProjectStore.getState().project;
             const chunk = liveProject?.chunkLibrary.find((c) => c.id === o.chunkId);
-            if (chunk) {
-              useEditorStore.getState().setMapClipboard(copyChunkToClipboard(chunk));
+            // THE TILE SET THIS CHUNK WAS DRAWN AGAINST, remembered with its
+            // words (PASTE-ACROSS-TILESETS). For a chunk document that is the
+            // open zone's, which is what `getAtlas` hands the composer; the
+            // chunk library is project-wide and carries no tile set of its own.
+            const zone = getCurrentZone(useProjectStore.getState());
+            if (chunk && zone) {
+              useEditorStore.getState().setMapClipboard(copyChunkToClipboard(chunk, zone.tileset));
               useToastStore.getState().addToast(
                 `Copied chunk ${chunk.id} (${chunk.widthTiles}×${chunk.heightTiles})`, 'success');
               // The copy is sourced from the SAVED chunk (see comment above) —

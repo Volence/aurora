@@ -1,12 +1,14 @@
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../model/s4-types';
-import type { Section, ChunkDef } from '../model/s4-types';
+import type { Section, ChunkDef, Tileset } from '../model/s4-types';
 import { buildRegionWriteCommand } from './map-stamp';
 import { withLinkBreaks } from './chunk-links';
 import type { BatchCommand } from './commands';
 
 /**
- * A copied map region: art always, both collision planes only when the region
- * is BLOCK-ALIGNED (see `artOnly`).
+ * A captured map region: art always, both collision planes only when the region
+ * is BLOCK-ALIGNED (see `artOnly`). What `copyFromSection` reads off a section,
+ * and what a flip, a save-as-chunk and a composer seed work on. The CLIPBOARD
+ * is this plus the tile set its words belong to (`MapClipboard`, below).
  *
  * THE ASYMMETRY THIS TYPE EXISTS TO CARRY. Art is per-8px TILE: one nametable
  * word per tile, `SECTION_TILES_WIDE`-strided. Collision is per-16px CELL: one
@@ -18,7 +20,7 @@ import type { BatchCommand } from './commands';
  * wrote one would either invent a winner among four tiles or corrupt the
  * neighbour. That is a property of the engine's data, not a gap in this code.
  */
-export interface MapClipboard {
+export interface MapRegion {
   widthTiles: number;
   heightTiles: number;
   nametable: Uint16Array;    // widthTiles*heightTiles, row-major
@@ -36,6 +38,47 @@ export interface MapClipboard {
    * wrongly and silently paste air over an author's collision.
    */
   artOnly: boolean;
+}
+
+/**
+ * THE MAP CLIPBOARD: a captured region, plus THE TILE SET ITS WORDS INDEX.
+ *
+ * A nametable word is a tile NUMBER. Number 5 means "tile 5 of the tile set
+ * this section is drawn with", and in aeon that is the open zone's
+ * (`Zone.tileset`: one per zone, shared by every act of it, and edited IN
+ * PLACE, so the object is the same for the life of a loaded project). The
+ * clipboard outlives an act, zone or project switch on purpose, so without this
+ * field a Ctrl+V re-armed in another zone wrote the first zone's numbers into
+ * the second zone's tile set, and the author got different tiles, silently
+ * (PASTE-ACROSS-TILESETS, docs/reviews/2026-09-11-paste-across-tilesets.md).
+ *
+ * COMPARED BY REFERENCE, NEVER BY CONTENT. Two tile sets whose pixels happen to
+ * agree today are still two tile sets: either can be edited without the other,
+ * and a reloaded project is a new object whose file may have changed on disk.
+ * The only answer the clipboard can vouch for is "the very tile set I was
+ * copied from". There is no remapping and no nearest-tile guess anywhere: a
+ * mismatch is refused (`clipboardFitsTileset`, `OTHER_TILESET_REFUSAL`).
+ *
+ * REQUIRED, on this repository's rule for load-bearing fields: an optional one
+ * reads downstream as "no tile set", which a consumer would have to guess at.
+ * Every producer states it: the map's Ctrl+C, the Art composer's chunk Ctrl+C
+ * (`copyChunkToClipboard`), and a flip (`flipClipboard` carries it through).
+ */
+export interface MapClipboard extends MapRegion {
+  tileset: Tileset;
+}
+
+/** The refusal an author sees when the copied words belong to another tile set.
+ *  One string, so Ctrl+V and the commit click cannot say it two ways. */
+export const OTHER_TILESET_REFUSAL =
+  'Not pasted: the copied tiles belong to another tile set, so pasting them here would put '
+  + 'different tiles down. Copy again from a map that uses this tile set.';
+
+/** May `clip` be pasted into a section drawn with `target`? Only when `target`
+ *  IS the tile set the clipboard was copied from (see `MapClipboard`). No open
+ *  tile set (`null`/`undefined`) is never a match: nothing can vouch for it. */
+export function clipboardFitsTileset(clip: MapClipboard, target: Tileset | null | undefined): boolean {
+  return target != null && clip.tileset === target;
 }
 
 export type PasteLayers = 'both' | 'art' | 'collision';
@@ -166,7 +209,7 @@ export function snapMarquee(c0: number, r0: number, c1: number, r1: number,
  * Missing/unseeded section collision planes read as air, as before.
  */
 export function copyFromSection(section: Section, col: number, row: number,
-  w: number, h: number): MapClipboard {
+  w: number, h: number): MapRegion {
   const nametable = new Uint16Array(w * h);
   for (let r = 0; r < h; r++) {
     for (let c = 0; c < w; c++) {
@@ -203,8 +246,10 @@ export function copyFromSection(section: Section, col: number, row: number,
 
 /** Thin pure adapter: a chunk's nametable + both collision planes as a
  *  MapClipboard, so a chunk can seed the map clipboard (Art mode Ctrl+C on a
- *  chunk doc). Copies, never aliases, the chunk's arrays. */
-export function copyChunkToClipboard(chunk: ChunkDef): MapClipboard {
+ *  chunk doc). Copies, never aliases, the chunk's arrays. `tileset` is the tile
+ *  set the caller drew the chunk against, and is kept by REFERENCE: it is the
+ *  identity a paste is checked against (see `MapClipboard`). */
+export function copyChunkToClipboard(chunk: ChunkDef, tileset: Tileset): MapClipboard {
   // Alignment read off the chunk's own SHAPE, not assumed: `chunkCellCount`
   // FLOORS (w>>1)*(h>>1), so an odd-sized chunk's collision planes are already
   // short of its footprint and pasting them would land a row/column out. Such a
@@ -217,6 +262,7 @@ export function copyChunkToClipboard(chunk: ChunkDef): MapClipboard {
     collisionA: aligned ? new Uint16Array(chunk.collisionA) : new Uint16Array(0),
     collisionB: aligned ? new Uint16Array(chunk.collisionB) : new Uint16Array(0),
     artOnly: !aligned,
+    tileset,
   };
 }
 
@@ -230,7 +276,7 @@ export function copyChunkToClipboard(chunk: ChunkDef): MapClipboard {
  * mode the builder then dropped would be exactly the silent degradation this
  * whole rule exists to avoid.
  */
-export function effectivePasteLayers(clip: MapClipboard, layers: PasteLayers): PasteLayers | null {
+export function effectivePasteLayers(clip: MapRegion, layers: PasteLayers): PasteLayers | null {
   if (!clip.artOnly) return layers;
   return layers === 'collision' ? null : 'art';
 }
@@ -244,7 +290,7 @@ export function effectivePasteLayers(clip: MapClipboard, layers: PasteLayers): P
  * art-only clipboard, which is the whole point of a tile-granular selection:
  * nothing downstream halves the base, so any tile is a legal origin.
  */
-export function pasteBaseStep(clip: MapClipboard): 1 | 2 {
+export function pasteBaseStep(clip: MapRegion): 1 | 2 {
   return clip.artOnly ? 1 : 2;
 }
 
@@ -256,7 +302,7 @@ export function pasteBaseStep(clip: MapClipboard): 1 | 2 {
  *  footprint), different source object. Returns null when nothing changes, and
  *  when the requested layers collapse to nothing (see effectivePasteLayers). */
 export function buildPasteCommand(args: {
-  clip: MapClipboard; section: Section; sectionIndex: number;
+  clip: MapRegion; section: Section; sectionIndex: number;
   baseCol: number; baseRow: number; layers: PasteLayers; description: string;
 }): BatchCommand | null {
   const { clip, section, sectionIndex, baseCol, baseRow, layers, description } = args;
