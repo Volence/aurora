@@ -22,7 +22,15 @@
 // test/main/classic-save-integration.test.ts.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { saveClassicProject, type GuardedWriteApi } from '../classic-save';
+import {
+  saveClassicProject,
+  savedFilesSentence,
+  artBytesClause,
+  artGrew,
+  landedArtSizes,
+  type ArtSize,
+  type GuardedWriteApi,
+} from '../classic-save';
 import { useClassicLevelStore, classicEditTiles, zoneArtDocIdForCurrentZone } from '../classicLevelStore';
 import { useClassicProjectStore } from '../classicProjectStore';
 import { useToastStore } from '../toastStore';
@@ -274,5 +282,137 @@ describe('§2 the zero-diff save is unchanged by the unchanged-art rule', () => 
     // how the packet shows this behaviour did not move.
     expect(writes[0].unchanged ?? []).toEqual([]);
     expect(dirty().tiles).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §3 OPTION (c): the save says what the art weighs. Seat A's own remedy for F3:
+// name the bytes written per art file, and flag growth. The figures come from
+// the guarded channel's `sizes` (stat before and after, in the main process;
+// test/main/guarded-write.test.ts holds that half against a real disk).
+// ---------------------------------------------------------------------------
+
+describe('§3 the art-bytes clause', () => {
+  const EM = String.fromCharCode(0x2014);
+  const EN = String.fromCharCode(0x2013);
+
+  it('names each art file with its size before and after and a signed delta, and heads with `art grew` when one grew', () => {
+    const art: ArtSize[] = [{ path: NEM_A, before: 100, after: 130 }, { path: NEM_B, before: 400, after: 380 }];
+    const s = artBytesClause(art);
+    expect(s.startsWith('art grew: ')).toBe(true);
+    expect(s).toContain(`${NEM_A} ${art[0].before} to ${art[0].after} bytes (+${art[0].after - art[0].before!})`);
+    expect(s).toContain(`${NEM_B} ${art[1].before} to ${art[1].after} bytes (${art[1].after - art[1].before!})`);
+  });
+
+  it('says `art size` when nothing grew, says an equal size in words, and calls a new file new (and growth)', () => {
+    expect(artBytesClause([{ path: NEM_A, before: 90, after: 90 }])).toBe(`art size: ${NEM_A} 90 to 90 bytes (same size)`);
+    expect(artBytesClause([{ path: NEM_A, before: 90, after: 70 }]).startsWith('art size: ')).toBe(true);
+    const fresh: ArtSize = { path: NEM_A, before: null, after: 50 };
+    expect(artGrew(fresh)).toBe(true);
+    expect(artBytesClause([fresh])).toBe(`art grew: ${NEM_A} 50 bytes (new file)`);
+    expect(artBytesClause([])).toBe('');
+  });
+
+  it('rides on the saved sentence after the file list, and is never folded into "+N more"', () => {
+    const art: ArtSize[] = [{ path: NEM_A, before: 100, after: 130 }];
+    expect(savedFilesSentence(1, [NEM_A], art)).toBe(`${savedFilesSentence(1, [NEM_A])} · ${artBytesClause(art)}`);
+    // A long save folds its FILE list; the art clause stays whole.
+    const many = [...Array.from({ length: 10 }, (_, i) => `x/f${i}.bin`), NEM_A];
+    const long = savedFilesSentence(1, many, art);
+    expect(long).toContain('more');
+    expect(long.endsWith(artBytesClause(art))).toBe(true);
+  });
+
+  it('shows no en dash and no em dash in any case (owner ruling: none in text a tool shows a person)', () => {
+    const cases: ArtSize[][] = [
+      [{ path: NEM_A, before: 100, after: 130 }],
+      [{ path: NEM_A, before: 130, after: 100 }],
+      [{ path: NEM_A, before: 100, after: 100 }],
+      [{ path: NEM_A, before: null, after: 100 }],
+    ];
+    for (const art of cases) {
+      const s = savedFilesSentence(1, [NEM_A], art);
+      expect(s.includes(EM) || s.includes(EN), s).toBe(false);
+    }
+  });
+
+  it('weighs only the doc\'s ART files among those that landed, and only with a measured size', async () => {
+    const { doc, read } = await readTwoFileAct();
+    const sizes = {
+      [NEM_A]: { before: 10, after: 12 },
+      [NEM_B]: { before: 20, after: 22 },          // measured but did not land
+      [read.paths.startpos]: { before: 4, after: 4 }, // landed but is not art
+    };
+    expect(landedArtSizes(doc, [NEM_A, read.paths.startpos], sizes)).toEqual([{ path: NEM_A, ...sizes[NEM_A] }]);
+    // Not measured means not shown: no size, no entry, never an estimate.
+    expect(landedArtSizes(doc, [NEM_A], undefined)).toEqual([]);
+    expect(landedArtSizes(doc, [NEM_A], {})).toEqual([]);
+  });
+});
+
+describe('§4 the save door carries the measured bytes to the author', () => {
+  /** A guarded channel that lands everything and reports `reported` for what it landed, as main does. */
+  function measuringApi(reported: Record<string, { before: number | null; after: number }>): GuardedWriteApi {
+    return {
+      async writeGuarded(_dir, files): Promise<GuardedWriteResult> {
+        const sizes = Object.fromEntries(files.filter((f) => reported[f.relPath]).map((f) => [f.relPath, reported[f.relPath]]));
+        return { written: files.map((f) => f.relPath), newMtimes: Object.fromEntries(files.map((f, i) => [f.relPath, 1000 + i])), sizes };
+      },
+    };
+  }
+
+  async function paintA(): Promise<Session> {
+    const session = await openSession();
+    const a = session.state.read.pristineTileFiles[0];
+    expect(classicEditTiles([{ tileIndex: a.tileStart, data: paintedTile(session.state.doc, a.tileStart).painted }])).toEqual({ ok: true });
+    return session;
+  }
+
+  const lastToast = () => useToastStore.getState().toasts.at(-1)!;
+
+  it('a save that GREW an art file raises a warning naming its bytes before and after', async () => {
+    await paintA();
+    const reported = { [NEM_A]: { before: 100, after: 130 } };
+    expect(await saveClassicProject(measuringApi(reported))).toEqual({ kind: 'saved', count: 1 });
+    const t = lastToast();
+    expect(t.type).toBe('warning');
+    expect(t.message.startsWith('Saved 1 level(s)')).toBe(true);
+    expect(t.message).toContain(`art grew: ${NEM_A} ${reported[NEM_A].before} to ${reported[NEM_A].after} bytes (+30)`);
+  });
+
+  it('a save whose art did not grow stays the plain success it always was', async () => {
+    await paintA();
+    const reported = { [NEM_A]: { before: 130, after: 100 } };
+    await saveClassicProject(measuringApi(reported));
+    const t = lastToast();
+    expect(t.type).toBe('success');
+    expect(t.message).toContain(`art size: ${NEM_A} 130 to 100 bytes (-30)`);
+  });
+
+  it('CONTROL: a channel that reports no sizes gets no figure at all, never an estimate', async () => {
+    await paintA();
+    await saveClassicProject(landingApi());
+    const t = lastToast();
+    expect(t.type).toBe('success');
+    expect(t.message).toContain(NEM_A);          // the file is still named
+    expect(t.message).not.toMatch(/ bytes/);     // but not weighed
+    expect(t.message).not.toMatch(/art (grew|size)/);
+  });
+
+  it('only art is weighed: a start position saved in the same write gets no figure', async () => {
+    const { state } = await paintA();
+    useClassicLevelStore.setState((s) => ({
+      doc: { ...s.doc!, start: { x: s.doc!.start.x + 1, y: s.doc!.start.y } },
+      dirty: { ...s.dirty, start: true },
+    }));
+    const startpos = state.read.paths.startpos;
+    const reported = { [NEM_A]: { before: 100, after: 130 }, [startpos]: { before: 4, after: 4 } };
+    await saveClassicProject(measuringApi(reported));
+    const msg = lastToast().message;
+    expect(msg).toContain(startpos);                       // named in the file list
+    const clause = msg.split(' · ').at(-1)!;
+    expect(clause.startsWith('art grew: ')).toBe(true);
+    expect(clause).toContain(NEM_A);
+    expect(clause).not.toContain(startpos);                // but not weighed
   });
 });
