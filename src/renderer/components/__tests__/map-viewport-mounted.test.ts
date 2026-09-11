@@ -1963,14 +1963,27 @@ describe('a marquee drag snaps from its start tile, follows the modifier live, a
   it('a move after an act switch does not extend the marquee into the act that opened', async () => {
     // React held back: the marquee's arm of `abandonStaleGestures` alone. Its
     // start carries a SECTION INDEX, and index 0 resolves in both acts.
+    //
+    // The row asks ONE thing: did the move extend the drag into act2. Whether the
+    // committed rect survives the switch is not this arm's job. editorStore's
+    // scope subscription clears it at the switch itself (a store listener, which
+    // holding React back does not hold back), and its rows are at the end of the
+    // paste block. So the rect after the move is compared with the rect the move
+    // WOULD write, not with the rect before it, which the subscription has
+    // already taken away. (It was `toEqual(before)` while the clear was an effect
+    // that a React-held-back row never let run.)
     const s = await mountMap();
     s.on().onMouseDown(tileAt(START.col, START.row));
     s.on().onMouseMove(tileAt(START.col + 1, START.row));
     const before = marquee();
+    const cursor = { col: END.col + 10, row: END.row + 6 };
+    const extended = rect(START, cursor, false);
+    expect(before, 'the premise: a drag in flight with a rect on screen').not.toBeNull();
+    expect(extended, 'ANTI-VACUOUS: the move would not have changed the rect').not.toEqual(before);
     const held = { ...s.on() };
     focusAct('act2');
-    held.onMouseMove(tileAt(END.col + 10, END.row + 6));
-    expect(marquee(), 'the drag kept extending after the act changed under it').toEqual(before);
+    held.onMouseMove(tileAt(cursor.col, cursor.row));
+    expect(marquee(), 'the drag kept extending after the act changed under it').not.toEqual(extended);
   });
 
   it('an act switch drops the committed marquee AND paste mode', async () => {
@@ -2082,14 +2095,16 @@ describe('paste mode commits at the hovered, snapped origin, and a middle drag s
   });
 
   /**
-   * Mount the map, THEN arm paste mode.
+   * Mount the map, THEN arm paste mode, which is the order an author does it in.
    *
    * ⚠ THE FIRST DRAFT ARMED IT IN `beforeEach`, BEFORE THE MOUNT, AND EVERY ROW
-   * IN THIS BLOCK WENT RED FOR A REASON THAT WAS NOT THE COMPONENT'S. The effect
-   * that clears the marquee and paste mode on an act switch is keyed on the open
-   * zone and act, and like every effect it also runs on the FIRST render. So
-   * paste mode armed before the map existed was dropped by the mount. In the
-   * app the author arms it with the map on screen, which is what this does.
+   * IN THIS BLOCK WENT RED FOR A REASON THAT WAS NOT THE COMPONENT'S. The clear
+   * of the marquee and paste mode on an act switch was then a `useEffect` keyed
+   * on the open zone and act, and like every effect it also ran on the FIRST
+   * render, so paste mode armed before the map existed was dropped by the mount.
+   * That clear is now a store subscription that never fires on a mount
+   * (MAP-REMOUNT-DROPS-PASTE; the nested block at the end of this one), so the
+   * order no longer decides the outcome. It is kept because it is the app's.
    */
   async function mountPasting(): Promise<Surface> {
     const s = await mountMap();

@@ -957,6 +957,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   })),
 }));
 
+// ═══ THE MAP SELECTION BELONGS TO THE ACT IT WAS MADE IN ═══
+//
+// `marquee` and `pasting` are per-act state held in a store that outlives the
+// map. A marquee is a section INDEX and a rect, and index 0 resolves in every
+// act; an armed paste commits the clipboard on the next click wherever the map
+// is. So both are dropped whenever the open act, zone or PROJECT changes. The
+// clipboard is not: copying in one act and pasting in another is the feature,
+// and Ctrl+V re-arms it deliberately.
+//
+// A SUBSCRIPTION, NOT A COMPONENT EFFECT, and that is the fix for
+// MAP-REMOUNT-DROPS-PASTE (docs/reviews/2026-09-11-map-remount-clear.md). The
+// clear was a `useEffect` in MapViewport keyed on zone and act. It also ran on
+// every mount, so a facet round trip through Art (Art's Canvas is not
+// MapViewport, so the map unmounts) threw away a marquee in the act still open,
+// where the same trip through Objects (same Canvas, no remount) kept it. And it
+// was keyed on zone and act alone, so opening a project whose open act has the
+// same ids (two checkouts of one tree) kept both with the map on screen. Here
+// it fires on the change itself, on screen or off, and never on a mount.
+//
+// PROJECT IDENTITY IS THE `config` REFERENCE. Its writers are `openLoaded` (the
+// aeon open, a fresh object every time, a same-directory reopen included) and
+// `reset`; `setConfig` has no production caller. `project` is NOT the identity:
+// `addChunks` and its two siblings replace that object on an edit.
+//
+// On EVERY change, not "when the act now differs from the one the state was
+// armed in": a mounted map clears at the first switch of a round trip, so an
+// unmounted one must too, and a comparison made at the next mount cannot see a
+// trip that came back to where it started.
+useProjectStore.subscribe((s, prev) => {
+  if (s.config === prev.config
+    && s.currentZoneId === prev.currentZoneId
+    && s.currentActId === prev.currentActId) return;
+  const ed = useEditorStore.getState();
+  if (ed.marquee === null && !ed.pasting) return;
+  useEditorStore.setState({ marquee: null, pasting: false });
+});
+
 /**
  * Centralized renderer-cache invalidation hook. The component that owns the
  * renderer caches (MapViewport) registers a listener here; every command that

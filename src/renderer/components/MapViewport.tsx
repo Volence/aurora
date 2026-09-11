@@ -1082,16 +1082,16 @@ export default function MapViewport() {
     reloadAllSections();
   }, [project, currentZoneId, currentActId, reloadAllSections]);
 
-  // A marquee/paste from a different act or zone is stale (and pasting into
-  // the wrong act would be actively dangerous) — clear both whenever the
-  // act/zone identity changes. Deliberately NOT keyed on `project` (which the
-  // effect above IS keyed on for reload) — edits mutate the project in place
-  // without changing this identity, so this only fires on an actual act/zone
-  // switch, not on every command.
-  useEffect(() => {
-    useEditorStore.getState().setMarquee(null);
-    useEditorStore.getState().setPasting(false);
-  }, [currentZoneId, currentActId]);
+  // THE ACT-IDENTITY CLEAR IS NOT HERE ANY MORE. A marquee or an armed paste
+  // from another act, zone or project is stale, and a paste armed there would
+  // commit into this one on the next click, so both are cleared on every such
+  // change. That was a `useEffect` keyed on [currentZoneId, currentActId], whose
+  // comment said it fired "only on an actual act/zone switch". It also fired on
+  // every MOUNT, so a facet round trip through Art (a remount) threw the marquee
+  // away, and a change made while the map was unmounted was caught only by that
+  // accident. The clear now sits beside the state it clears, as a store
+  // subscription in editorStore.ts (search `MAP SELECTION BELONGS TO THE ACT`):
+  // it fires on the change itself, mounted or not, and never on a mount.
 
   // Re-resolve the displayed BG when the active section changes — its
   // bgLayoutRef may point at a different library entry (or the act default).
