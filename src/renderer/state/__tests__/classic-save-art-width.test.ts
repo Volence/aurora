@@ -324,11 +324,16 @@ describe('§3 the art-bytes clause', () => {
   });
 
   it('shows no en dash and no em dash in any case (owner ruling: none in text a tool shows a person)', () => {
+    // THE TWO-ENTRY CASE IS THE ONE THAT MATTERS, and this row first shipped
+    // without it: with one art file per case the separator between entries is
+    // never produced, so a dash planted there went GREEN here (mutation M20 in
+    // the packet). GHZ is the zone with two art files, so it is not hypothetical.
     const cases: ArtSize[][] = [
       [{ path: NEM_A, before: 100, after: 130 }],
       [{ path: NEM_A, before: 130, after: 100 }],
       [{ path: NEM_A, before: 100, after: 100 }],
       [{ path: NEM_A, before: null, after: 100 }],
+      [{ path: NEM_A, before: 100, after: 130 }, { path: NEM_B, before: 400, after: 380 }],
     ];
     for (const art of cases) {
       const s = savedFilesSentence(1, [NEM_A], art);
