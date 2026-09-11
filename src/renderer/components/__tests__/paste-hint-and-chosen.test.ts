@@ -330,3 +330,88 @@ describe('the hint comes from the offer, over every fit (added with the fix)', (
     }
   });
 });
+
+// ── ART-ONLY-COLLISION-NO-CHOSEN ───────────────────────────────────────────────
+
+describe('the author\'s setting stays visible when it is a choice with nothing to write (ART-ONLY-COLLISION-NO-CHOSEN)', () => {
+  const dead = (b: El): boolean => b.props.disabled === true;
+  /** The panel's title for Collision when there is no collision to paste (the
+   *  string it carried before either parcel). */
+  const NO_COLLISION_TITLE = 'No collision to paste: this selection is not block-aligned, and collision '
+    + 'is stored per 16px block.';
+  /** How the grey-out parcel marks the author's own setting where the click
+   *  refuses it: Both, set, in another zone. */
+  function refusedChosenStyle(): unknown {
+    openZone(HERE, 'b');
+    const clip = withCollision();
+    arm(clip, 'both');
+    expect(clickRefusal(clip, 'both'), 'the premise: Both is refused in another zone').not.toBeNull();
+    const { buttons } = render();
+    expect(buttons.both.props.style, 'the premise: the refused setting is marked apart from the refused Art')
+      .not.toEqual(buttons.art.props.style);
+    return buttons.both.props.style;
+  }
+
+  it('pasting an art-only clipboard with Layers on Collision: Collision is unavailable AND shows as the chosen one, and the setting is not rewritten', () => {
+    openZone(HERE, 'a');
+    const clip = artOnly();
+    // WHY no button looked chosen: Collision collapses to NOTHING for this
+    // clipboard, and a paste of nothing is not a refusal (`pasteRefusal` of
+    // null layers is null by contract), so the offer's verdict for it is null.
+    // The panel greys it through the older no-collision rule instead.
+    expect(effectivePasteLayers(clip, 'collision'), 'the premise: Collision has nothing to write').toBeNull();
+    expect(pasteLayerOffer(clip, pasteFit(clip, SOURCE as never, { zones: HERE } as never), 'collision').refusals.collision,
+      'the premise: the offer does not call it refused').toBeNull();
+
+    arm(clip, 'both');
+    const unchosen = render().buttons.collision.props.style;
+    arm(clip, 'collision');
+    const { buttons } = render();
+    expect(useEditorStore.getState().pasteLayers, 'the panel rewrote the author\'s setting').toBe('collision');
+    expect(dead(buttons.collision), 'Collision is offered with nothing to write').toBe(true);
+    expect(buttons.collision.props.style, 'no choice shows as chosen: the set Collision looks exactly as it does when Layers is on Both')
+      .not.toEqual(unchosen);
+    expect(buttons.both.props.style, 'Both or Art took the chosen mark instead').toEqual(buttons.art.props.style);
+  });
+
+  it('it carries the SAME mark as a setting the click refuses: one meaning, one look', () => {
+    const refused = refusedChosenStyle();
+    openZone(HERE, 'a');
+    arm(artOnly(), 'collision');
+    expect(render().buttons.collision.props.style, 'the set, unavailable Collision is marked unlike the set, refused Both')
+      .toEqual(refused);
+  });
+
+  it('the same on the copy side: a selection that is not block-aligned, with Layers on Collision', () => {
+    openZone(HERE, 'a');
+    useEditorStore.getState().setTool('marquee');
+    useEditorStore.setState({ mapClipboard: null, marquee: { sectionIndex: 0, col: 1, row: 0, w: 3, h: 3 } });
+    useEditorStore.getState().setPasteLayers('both');
+    let r = render();
+    expect(useEditorStore.getState().pasting, 'the premise: not pasting').toBe(false);
+    expect(r.buttons.collision.props.title, 'the premise: this selection carries no collision').toBe(NO_COLLISION_TITLE);
+    const unchosen = r.buttons.collision.props.style;
+    useEditorStore.getState().setPasteLayers('collision');
+    r = render();
+    expect(useEditorStore.getState().pasteLayers).toBe('collision');
+    expect(dead(r.buttons.collision)).toBe(true);
+    expect(r.buttons.collision.props.style, 'no choice shows as chosen on the copy side').not.toEqual(unchosen);
+  });
+
+  it('CONTROL: with Layers on Both or Art the art-only panel is as it was: that choice highlighted, Collision in the plain unavailable look', () => {
+    const refused = refusedChosenStyle();
+    openZone(HERE, 'a');
+    const collisionStyles: unknown[] = [];
+    for (const sticky of ['both', 'art'] as const) {
+      arm(artOnly(), sticky);
+      const { buttons } = render();
+      const other = sticky === 'both' ? 'art' : 'both';
+      expect(buttons[sticky].props.style, `setting ${sticky}: the chosen choice is not highlighted`).not.toEqual(buttons[other].props.style);
+      expect(dead(buttons.collision)).toBe(true);
+      expect(buttons.collision.props.title).toBe(NO_COLLISION_TITLE);
+      collisionStyles.push(buttons.collision.props.style);
+    }
+    expect(collisionStyles[0], 'the unchosen Collision looks different under Both and under Art').toEqual(collisionStyles[1]);
+    expect(collisionStyles[0], 'the Collision the author did NOT set carries the chosen mark').not.toEqual(refused);
+  });
+});

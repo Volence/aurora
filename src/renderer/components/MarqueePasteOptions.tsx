@@ -261,7 +261,12 @@ export default function MarqueePasteOptions() {
                 ...styles.planeBtn,
                 ...(pasteLayers === value && !dead ? styles.planeSel : {}),
                 ...(dead ? styles.planeDead : {}),
-                ...(refusal !== null && pasteLayers === value ? styles.planeChosenDead : {}),
+                // The author's own setting, unavailable for EITHER reason: the
+                // click refuses it, or it has nothing to write (Collision over
+                // an art-only source, whose verdict is not a refusal).
+                // Keyed on the refusal alone, the second case showed no
+                // choice as chosen (ART-ONLY-COLLISION-NO-CHOSEN).
+                ...(dead && pasteLayers === value ? styles.planeChosenDead : {}),
               }}>{label}</button>
           );
         })}
