@@ -61,6 +61,14 @@ import { documentHistoryHub } from '../../state/history-hub';
 import type { ObjectPlacement, Section } from '../../../core/model/s4-types';
 import { unpackNametableWord, SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../core/model/s4-types';
 import { BG_WIDTH } from '../../../core/formats/bg-tiles';
+import {
+  BG_OVERRIDE_CONSUMER_OUT_DIR, LAYOUT_TILE_INDEX_MASK, type BgOverrideDocument,
+} from '../../../core/formats/bg-override/bg-override';
+import { documentBands, bandSlotBases } from '../../../core/formats/bg-override/bg-anim-band';
+import { packCollisionCell, unpackCollisionCell } from '../../../core/collision/collision-cell-word';
+import { SECTION_PLANE_WORDS } from '../../../core/collision/collision-cell-resolve';
+import { snapMarquee, effectiveGranularity, type MapClipboard } from '../../../core/editing/map-clipboard';
+import { SCREEN_WIDTH } from '../../../core/model/screen';
 
 // ── the fixture ────────────────────────────────────────────────────────────────
 
@@ -1263,5 +1271,392 @@ describe('a foreground tile stroke is one command, and is dropped by an act swit
     expect(depth, 'the no-op press put a second, empty command on the undo stack').toBe(1);
     expect(painted('act1'), 'and that one undo must leave the section as it started')
       .toHaveLength(0);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// map-coverage-3 STARTS HERE.
+//
+// Same harness, same rules: every row drives the component's REAL handlers over
+// the real stores, and every row was shown red with a mutation applied on disk
+// before it was trusted (the commit messages carry which mutation reddened
+// which row). Expected values are derived from engine constants or from the
+// rule a module states, never copied from the branch under test.
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Every row below resets the notices it reads, so a count is a count. */
+function toastsMatching(fragment: string): string[] {
+  return useToastStore.getState().toasts.map((t) => t.message).filter((m) => m.includes(fragment));
+}
+
+/** How many entries the focused undo stack holds, MEASURED by undoing to the
+ *  floor: `EditHistory` exposes no depth, and `canUndo` reads `true` for one
+ *  entry and for two. Leaves the document as it was before every entry. */
+function undoDepth(): number {
+  let depth = 0;
+  while (focusedHistory()?.canUndo && depth < 20) { focusedHistory()!.undo(); depth++; }
+  return depth;
+}
+
+// ── the BG override: a per-GAME document, bound to ONE act ─────────────────────
+//
+// `resolveDisplayedBg`'s FIRST arm. The override is on screen only on the act
+// aeon's injector bakes it into (`actBindsBgOverride`, keyed on the act's
+// `stripPath`), so the fixture binds act1 and leaves act2 unbound. An act
+// switch therefore moves the displayed background from `override` to `act`,
+// which is the event the two gestures below have to survive.
+
+/** Rows the override's plane is tall. Four, so a stamp pressed on row 1 grows
+ *  down without touching the plane's edge: the edge is a CLAMP, and a row
+ *  whose gesture lands on a clamp cannot tell a dead move from a clipped one. */
+const OV_ROWS = 4;
+/** The band every stamp row picks: 2x2, four slots, column-major. */
+const OV_BAND = { cols: 2, rows: 2 } as const;
+/** The blob's length. The band's prefix is slots 0..3; 4 and 5 are static. */
+const OV_TILES = 6;
+/**
+ * Every override cell's word before a gesture: a STATIC slot inside the blob,
+ * past the band's prefix. So every stamped word differs from it, and
+ * `OV_TILES - 1` (the LAST legal pick) differs from it too, which is what lets
+ * the refusal be tested on BOTH sides of its bound rather than far past it.
+ */
+const OV_FILL = 4;
+
+function overrideDoc(): BgOverrideDocument {
+  const slots = OV_BAND.cols * OV_BAND.rows;
+  return {
+    layout: new Array<number>(BG_WIDTH * OV_ROWS).fill(OV_FILL),
+    tiles: Array.from({ length: OV_TILES }, () => new Array<number>(64).fill(0)),
+    anims: [{
+      cols: OV_BAND.cols, rows: OV_BAND.rows, pattern_px: 8,
+      phases: Array.from({ length: 8 }, () =>
+        Array.from({ length: slots }, () => new Array<number>(64).fill(0))),
+    }],
+  };
+}
+
+/** Put `doc` on the project and make act1 the act it binds. act2 binds nothing. */
+function bindOverride(doc: BgOverrideDocument): void {
+  const project = useProjectStore.getState().project as unknown as {
+    zones: Array<{ acts: Array<{ stripPath: string | null }> }>;
+    bgOverride: unknown;
+  };
+  project.zones[0].acts[0].stripPath = BG_OVERRIDE_CONSUMER_OUT_DIR;
+  project.zones[0].acts[1].stripPath = null;
+  project.bgOverride = {
+    path: 'editor_bg_override.json', doc, unreadable: null, loadedText: null, notices: [],
+  };
+}
+
+/** Cells of the override DOCUMENT (the file that ships) off `OV_FILL`, with their words. */
+function docPainted(doc: BgOverrideDocument): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  doc.layout.forEach((w, i) => { if (w !== OV_FILL) out.push([i, w]); });
+  return out;
+}
+
+/**
+ * The plane the RENDERER holds, which is the canvas's mirror of the document.
+ *
+ * ⚠ READ FROM `sectionRenderer.getBg()`, NOT THROUGH `bgOverrideDisplay`. That
+ * function re-syncs the mirror FROM the document on every call ("any divergence
+ * from the document loses"), so reading through it would erase exactly the
+ * divergence a row about the two representations has to see.
+ */
+async function heldPlane(): Promise<Uint16Array> {
+  const { sectionRenderer } = await import('../MapViewport');
+  const bg = sectionRenderer.getBg();
+  if (!bg) throw new Error('map-viewport-mounted: the renderer holds no BG plane; every override row is vacuous');
+  return bg.nametable;
+}
+
+/** The act's OWN plane (`act.bgLayout`), for "the act that opened was not touched". */
+function actPlane(actId: 'act1' | 'act2'): Uint16Array {
+  const act = useProjectStore.getState().project?.zones[0]?.acts.find((a) => a.id === actId);
+  if (!act?.bgLayout) throw new Error(`map-viewport-mounted: no bgLayout on ${actId}; the fixture moved`);
+  return act.bgLayout;
+}
+
+/** A BG cell's client point under VIEWPORT at zoom 1 and camera 0: its centre. */
+const bgCell = (col: number, row: number) => mouse(col * 8 + 4, row * 8 + 4);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE BAND STAMP, the sixth gesture carrier (parcel J; `beginBandStampGesture`
+// … `endBandStampGesture`).
+//
+// COVERAGE. `map-band-stamp.test.ts` drives the pure machine through a fake
+// plane, and `map-gesture-witness.test.ts` scans that the carrier has a
+// witness ref. Nothing ran the carrier: not the press, not the document it
+// writes through, not its commit, and not its arm of `abandonStaleGestures`.
+//
+// ⚠ THE ROW SHAPE POINTED AT IT IS THE ONE THAT FOUND A LIVE DEFECT on the BG
+// carrier: "a move after the switch writes into NEITHER", with React held back
+// so the act-switch effect cannot do the row's work inside its own sample
+// window. This carrier does NOT set `isPaintDragging`, so the specific hole
+// found there (a flag left armed) has no twin here; what can survive a
+// cancellation on THIS carrier is the gesture ref itself, and that is what the
+// row's mutation plants.
+//
+// Expected words are DERIVED from the geometry `core/editing/band-stamp.ts`
+// states (slot = slotBase + pc * rows + pr, column-major, phase origin at the
+// press cell, attribute bits kept), with `slotBase` read off the document by
+// the same walk the gesture uses. Not from the gesture's own output.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('the band stamp writes the override through one writer, and is dropped by an act switch', () => {
+  let doc: BgOverrideDocument;
+
+  /** The word the stamp must put at (col,row) for a gesture anchored at `anchor`. */
+  function stampWord(col: number, row: number, anchor: { col: number; row: number }): number {
+    const slotBase = bandSlotBases(documentBands(doc))[0];
+    const mod = (n: number, m: number) => ((n % m) + m) % m;
+    const pc = mod(col - anchor.col, OV_BAND.cols);
+    const pr = mod(row - anchor.row, OV_BAND.rows);
+    const attrs = OV_FILL & ~LAYOUT_TILE_INDEX_MASK & 0xFFFF;
+    return attrs | ((slotBase + pc * OV_BAND.rows + pr) & LAYOUT_TILE_INDEX_MASK);
+  }
+  const idx = (col: number, row: number) => row * BG_WIDTH + col;
+  /** The press cell every row uses: off both plane edges, so nothing clips. */
+  const PRESS = { col: 2, row: 1 };
+
+  beforeEach(() => {
+    doc = overrideDoc();
+    bindOverride(doc);
+    useToastStore.setState({ toasts: [] });
+    useEditorStore.getState().setTool('stamp-band');
+    useEditorStore.getState().setSelectedBgBand(0);
+  });
+
+  it('HARNESS: a press lays one whole pattern into the DOCUMENT and the canvas mirror alike', async () => {
+    // The liveness row: without a bound override `beginBandStampGesture`
+    // refuses and writes nothing, which is silence and not a failure.
+    const s = await mountMap();
+    s.on().onMouseDown(bgCell(PRESS.col, PRESS.row));
+    const expected: Array<[number, number]> = [];
+    for (let r = 0; r < OV_BAND.rows; r++) {
+      for (let c = 0; c < OV_BAND.cols; c++) {
+        const col = PRESS.col + c, row = PRESS.row + r;
+        expected.push([idx(col, row), stampWord(col, row, PRESS)]);
+      }
+    }
+    expected.sort((a, b) => a[0] - b[0]);
+    expect(docPainted(doc), 'the FILE did not take the pattern: an edit the ROM would never see')
+      .toEqual(expected);
+    const held = await heldPlane();
+    expect(expected.map(([i]) => held[i]),
+      'the canvas mirror disagrees with the file: the author would see one picture and ship another')
+      .toEqual(expected.map(([, w]) => w));
+  });
+
+  it('a drag reshapes live, restores what it left, and lands exactly ONE command', async () => {
+    const s = await mountMap();
+    s.on().onMouseDown(bgCell(PRESS.col, PRESS.row));
+    // Along the press row: the rectangle becomes 4x1, so the pattern's second
+    // row (laid by the press) LEAVES it and must go back to before the gesture.
+    s.on().onMouseMove(bgCell(PRESS.col + 3, PRESS.row));
+    const live = [0, 1, 2, 3].map((c) => [idx(PRESS.col + c, PRESS.row),
+      stampWord(PRESS.col + c, PRESS.row, PRESS)] as [number, number]);
+    expect(docPainted(doc), 'the stamp did not follow the cursor, or kept a cell it left')
+      .toEqual(live);
+    expect(focusedHistory()?.canUndo ?? false, 'a stamp must not commit per move').toBe(false);
+
+    win!.dispatch('mouseup', {});
+    expect(docPainted(doc), 'the release changed the words it committed').toEqual(live);
+    expect(undoDepth(), 'the gesture must be ONE undo step').toBe(1);
+    expect(docPainted(doc), 'and that one undo must restore every word').toHaveLength(0);
+    const held = await heldPlane();
+    expect(live.map(([i]) => held[i]), 'the undo restored the file and left the canvas painted')
+      .toEqual(live.map(() => OV_FILL));
+  });
+
+  it('the act switching under the stamp puts every word back, writes no command, and says so', async () => {
+    const s = await mountMap();
+    s.on().onMouseDown(bgCell(PRESS.col, PRESS.row));
+    s.on().onMouseMove(bgCell(PRESS.col + 3, PRESS.row));
+    expect(docPainted(doc).length, 'the premise: the stamp is already in the file').toBeGreaterThan(0);
+    const act2Before = Array.from(actPlane('act2'));
+
+    const before = s.h.renders();
+    focusAct('act2');
+    expect(s.h.renders(), 'the component did not re-render on an act switch').toBeGreaterThan(before);
+
+    expect(docPainted(doc), 'the override kept an uncommitted stamp after its act closed').toHaveLength(0);
+    expect(Array.from(actPlane('act2')), 'and the act that opened must not have been touched')
+      .toEqual(act2Before);
+    expect(focusedHistory()?.canUndo ?? false, 'a cancelled stamp writes no command').toBe(false);
+    expect(toastsMatching('no longer the one on screen'), 'the cancellation was silent').toHaveLength(1);
+  });
+
+  it('a move after the switch writes into NEITHER background', async () => {
+    // React held back, so the guard at the top of `handleMouseMove` is on its
+    // own. What must not survive the cancellation on this carrier is the
+    // gesture REF: a stamp still armed would take this move and reshape itself
+    // into a document that is no longer on screen.
+    const s = await mountMap();
+    s.on().onMouseDown(bgCell(PRESS.col, PRESS.row));
+    const act2Before = Array.from(actPlane('act2'));
+    const held = { ...s.on() };   // captured BEFORE the switch: this read flushes
+    focusAct('act2');             // ...and nothing after it reads the tree
+    held.onMouseMove(bgCell(PRESS.col + 5, PRESS.row + 2));
+    expect(docPainted(doc), 'the stamp reshaped into the override after its act closed')
+      .toHaveLength(0);
+    expect(Array.from(actPlane('act2')), 'the cursor\'s cells were written into the act that opened')
+      .toEqual(act2Before);
+  });
+
+  it('refuses loudly with no band picked, and on an act the override does not bind', async () => {
+    const s = await mountMap();
+    useEditorStore.getState().setSelectedBgBand(null);
+    s.on().onMouseDown(bgCell(PRESS.col, PRESS.row));
+    win!.dispatch('mouseup', {});
+    expect(docPainted(doc), 'a stamp with no band wrote anyway').toHaveLength(0);
+    expect(toastsMatching('Pick a band first'), 'the refusal was silent').toHaveLength(1);
+
+    // The other refusal: the plane on screen is not the override at all.
+    useToastStore.setState({ toasts: [] });
+    useEditorStore.getState().setSelectedBgBand(0);
+    focusAct('act2');
+    s.h.renders();
+    const act2Before = Array.from(actPlane('act2'));
+    s.on().onMouseDown(bgCell(PRESS.col, PRESS.row));
+    win!.dispatch('mouseup', {});
+    expect(Array.from(actPlane('act2')), 'slot indices were written into a plane with no bands')
+      .toEqual(act2Before);
+    expect(docPainted(doc), 'nor into the override, which is not on screen').toHaveLength(0);
+    expect(toastsMatching('needs the act\'s BG override'), 'the second refusal was silent').toHaveLength(1);
+    expect(focusedHistory()?.canUndo ?? false, 'a refusal is not an undo entry').toBe(false);
+  });
+
+  it('says the refusal again on the NEXT press, not once per session', async () => {
+    // "Once per gesture" is the rule (bgRefusalShown); a flag that was never
+    // cleared would make the second attempt a silent dead tool.
+    const s = await mountMap();
+    useEditorStore.getState().setSelectedBgBand(null);
+    for (let i = 0; i < 2; i++) {
+      s.on().onMouseDown(bgCell(PRESS.col, PRESS.row));
+      win!.dispatch('mouseup', {});
+    }
+    expect(toastsMatching('Pick a band first'), 'the second press said nothing').toHaveLength(2);
+  });
+
+  it('CONTROL: an unmount mid-stamp COMMITS it, the way a release does', async () => {
+    const s = await mountMap();
+    s.on().onMouseDown(bgCell(PRESS.col, PRESS.row));
+    s.on().onMouseMove(bgCell(PRESS.col + 3, PRESS.row));
+    expect(focusedHistory()?.canUndo ?? false).toBe(false);
+    s.h.unmount();
+    mounted = null;
+    expect(focusedHistory()?.canUndo ?? false,
+      'the unmount discarded the stamp: the words are in the file with no command').toBe(true);
+    focusedHistory()!.undo();
+    expect(docPainted(doc)).toHaveLength(0);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE BG OVERRIDE ARM OF `paintBgTile`: the out-of-blob refusal and its toast.
+//
+// map-coverage-2 built the `act` arm. This is the `override` arm, and it is the
+// one arm with a REFUSAL in it: a word's low bits index the blob the ROM bakes,
+// the override's blob is only as long as the document says, and an index past
+// its end bakes cleanly and ships whatever art sits at that VRAM slot. The code
+// says there is no honest clamp, so the cell is left alone and the reason goes
+// on screen, ONCE per gesture.
+//
+// ⚠ THE BOUND IS TESTED ON BOTH SIDES. The control paints `OV_TILES - 1`, the
+// last legal pick, and the refusal rows pick `OV_TILES`, the first illegal one.
+// A refusal row picking far past the end would pass on an off-by-one bound.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('a BG stroke on the override refuses a tile outside the blob, and says so once', () => {
+  let doc: BgOverrideDocument;
+  const LAST_LEGAL = OV_TILES - 1;
+  const FIRST_ILLEGAL = OV_TILES;
+
+  beforeEach(() => {
+    doc = overrideDoc();
+    bindOverride(doc);
+    useToastStore.setState({ toasts: [] });
+    useEditorStore.getState().setTool('paint-tile');
+    useEditorStore.getState().setEditingLayer('bg');
+  });
+
+  it('CONTROL: the last legal pick paints the FILE and the mirror, as one command', async () => {
+    useEditorStore.getState().setSelectedBgTileIndex(LAST_LEGAL);
+    const s = await mountMap();
+    s.on().onMouseDown(bgCell(2, 1));
+    s.on().onMouseMove(bgCell(3, 1));
+    const cells = [BG_WIDTH + 2, BG_WIDTH + 3];
+    expect(docPainted(doc).map(([i]) => i), 'the file did not take the stroke').toEqual(cells);
+    for (const [, w] of docPainted(doc)) {
+      expect(unpackNametableWord(w).tileIndex, 'the painted word does not name the pick').toBe(LAST_LEGAL);
+    }
+    const held = await heldPlane();
+    expect(cells.map((i) => held[i]), 'the mirror disagrees with the file')
+      .toEqual(cells.map((i) => doc.layout[i]));
+    expect(toastsMatching('outside this background'), 'a legal pick was refused').toHaveLength(0);
+
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'the stroke must be ONE undo step').toBe(1);
+    expect(docPainted(doc), 'and its undo must restore the file').toHaveLength(0);
+  });
+
+  it('a pick past the blob\'s end paints nothing, commits nothing, and names the blob', async () => {
+    useEditorStore.getState().setSelectedBgTileIndex(FIRST_ILLEGAL);
+    const s = await mountMap();
+    const heldBefore = Array.from(await heldPlane());
+    s.on().onMouseDown(bgCell(2, 1));
+    s.on().onMouseMove(bgCell(3, 1));
+    win!.dispatch('mouseup', {});
+    expect(docPainted(doc), 'an out-of-blob index was written into the file').toHaveLength(0);
+    expect(Array.from(await heldPlane()), 'or into the mirror').toEqual(heldBefore);
+    expect(focusedHistory()?.canUndo ?? false, 'a refusal is not an undo entry').toBe(false);
+    const said = toastsMatching('outside this background');
+    expect(said, 'the refusal was silent').toHaveLength(1);
+    expect(said[0], 'the notice must name the pick').toContain(`Tile ${FIRST_ILLEGAL} `);
+    expect(said[0], 'and the blob\'s real length, from the document').toContain(`${OV_TILES}-tile`);
+  });
+
+  it('a drag across several cells with a refused pick says it ONCE', async () => {
+    // One per gesture, not one per cell: a sixty-cell drag would otherwise bury
+    // the author in sixty copies of the same sentence.
+    useEditorStore.getState().setSelectedBgTileIndex(FIRST_ILLEGAL);
+    const s = await mountMap();
+    s.on().onMouseDown(bgCell(2, 1));
+    s.on().onMouseMove(bgCell(3, 1));
+    s.on().onMouseMove(bgCell(4, 1));
+    s.on().onMouseMove(bgCell(5, 1));
+    expect(toastsMatching('outside this background'), 'the refusal repeated per cell').toHaveLength(1);
+  });
+
+  it('and says it again on the NEXT gesture, not once per session', async () => {
+    useEditorStore.getState().setSelectedBgTileIndex(FIRST_ILLEGAL);
+    const s = await mountMap();
+    for (let i = 0; i < 2; i++) {
+      s.on().onMouseDown(bgCell(2, 1));
+      s.on().onMouseMove(bgCell(3, 1));
+      win!.dispatch('mouseup', {});
+    }
+    expect(toastsMatching('outside this background'), 'the second gesture was refused silently')
+      .toHaveLength(2);
+  });
+
+  it('the act switching under an override stroke puts back the FILE, not only the canvas', async () => {
+    // `revertBgStroke`'s document arm. The override has two representations of
+    // one fact, and a revert through the mirror alone would leave the file
+    // carrying words nobody committed: on screen it looks undone, on disk it
+    // ships.
+    useEditorStore.getState().setSelectedBgTileIndex(LAST_LEGAL);
+    const s = await mountMap();
+    s.on().onMouseDown(bgCell(2, 1));
+    s.on().onMouseMove(bgCell(3, 1));
+    expect(docPainted(doc), 'the premise: two cells are in the file').toHaveLength(2);
+    const act2Before = Array.from(actPlane('act2'));
+    const before = s.h.renders();
+    focusAct('act2');
+    expect(s.h.renders()).toBeGreaterThan(before);
+    expect(docPainted(doc), 'the FILE kept the uncommitted stroke').toHaveLength(0);
+    expect(Array.from(actPlane('act2')), 'and the act that opened was painted').toEqual(act2Before);
+    expect(focusedHistory()?.canUndo ?? false).toBe(false);
   });
 });
