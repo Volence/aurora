@@ -2204,6 +2204,106 @@ describe('paste mode commits at the hovered, snapped origin, and a middle drag s
   });
 
   // ══════════════════════════════════════════════════════════════════════════
+  // THE COORDINATE READOUT IN PASTE MODE (PASTE-READOUT-HIDDEN, map-coverage-4)
+  //
+  // The screen sweep's report: in paste mode the readout (the hover bar) stays
+  // hidden once the cursor leaves the map and comes back. `onMouseLeave` hides
+  // the bar, and the one line that shows it again sits at the bottom of
+  // `handleMouseMove`, below the paste branch's `return`. The same shape as the
+  // middle-drag pan the owner reported in this mode (the row above): a rule at
+  // the bottom of the handler is off for every mode whose branch returns first.
+  //
+  // Nested here for the block's `document` stub: paste mode rasterises a ghost.
+  // The bar is a host stub (element-stub.ts), so `style.display` and
+  // `innerHTML` are what the component wrote, and nothing is laid out: whether
+  // the bar is legible on screen is a foreground question.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  describe('the coordinate readout follows the cursor in paste mode as it does outside it', () => {
+    const A = { col: 3, row: 3 };
+    const B = { col: 9, row: 5 };
+    const C = { col: 12, row: 7 };
+
+    // ⚠ THE LAYER IS SET, and the first run of these rows is why. The top-level
+    // beforeEach resets the tool and the selection but NOT the editing layer, so
+    // this block inherited 'bg' from the BG blocks earlier in the file and the
+    // CONTROL went red reading "BG | Pos 28, 28": a red that was the fixture's,
+    // not the component's. (Every paste row above runs on that inherited layer
+    // too; the paste branch never reads it, so none of them noticed.)
+    beforeEach(() => { useEditorStore.getState().setEditingLayer('fg'); });
+
+    /** The hover bar's host stub: the one div rendered hidden with no pointer
+     *  events and a ref, found in the tree rather than by attach order. */
+    function readout(s: Surface): { style: Record<string, unknown>; innerHTML: string } {
+      const found: Array<{ current: unknown }> = [];
+      const walk = (node: unknown): void => {
+        if (Array.isArray(node)) { for (const c of node) walk(c); return; }
+        if (!node || typeof node !== 'object') return;
+        const el = node as { type?: unknown; props?: Record<string, unknown> };
+        const style = el.props?.style as Record<string, unknown> | undefined;
+        const ref = el.props?.ref as { current: unknown } | undefined;
+        if (el.type === 'div' && ref && style?.display === 'none' && style?.pointerEvents === 'none') found.push(ref);
+        walk(el.props?.children);
+      };
+      walk(s.h.el());
+      expect(found, 'HARNESS: exactly one hover bar in the rendered tree').toHaveLength(1);
+      const bar = found[0].current as { style: Record<string, unknown>; innerHTML: string } | null;
+      if (!bar) throw new Error('map-viewport-mounted: the hover bar ref was never filled');
+      return bar;
+    }
+
+    /** The readout must NAME the tile under the cursor and its world point.
+     *  Under VIEWPORT at zoom 1 and camera 0, tileAt(c, r) is world (8c+4, 8r+4). */
+    function expectNames(bar: { innerHTML: string }, t: { col: number; row: number }, why: string): void {
+      for (const frag of [`Tile (${t.col}, ${t.row})`, `Pos ${t.col * 8 + 4}, ${t.row * 8 + 4}`]) {
+        expect(bar.innerHTML, why).toContain(frag);
+      }
+    }
+
+    /** Hover A with the map in its ordinary mode, then arm paste with Ctrl+V. */
+    async function hoverThenArm(): Promise<{ s: Surface; bar: { style: Record<string, unknown>; innerHTML: string } }> {
+      const s = await mountMap();
+      s.on().onMouseMove(tileAt(A.col, A.row));
+      const bar = readout(s);
+      expect(bar.style.display, 'the premise: the readout shows before paste mode').toBe('flex');
+      expect(win!.dispatch('keydown', keydown('v', { ctrlKey: true })), 'nothing heard Ctrl+V').toBeGreaterThan(0);
+      expect(useEditorStore.getState().pasting, 'the premise: Ctrl+V armed paste mode').toBe(true);
+      return { s, bar };
+    }
+
+    it('CONTROL: outside paste mode the readout hides when the cursor leaves, and comes back naming the new tile', async () => {
+      const s = await mountMap();
+      expect(useEditorStore.getState().pasting, 'the premise: not in paste mode').toBe(false);
+      s.on().onMouseMove(tileAt(A.col, A.row));
+      const bar = readout(s);
+      expect(bar.style.display, 'the readout never showed').toBe('flex');
+      expectNames(bar, A, 'the readout does not name the tile under the cursor');
+      s.on().onMouseLeave(mouse(700, 700));
+      expect(bar.style.display, 'leaving the map did not hide the readout').toBe('none');
+      s.on().onMouseMove(tileAt(B.col, B.row));
+      expect(bar.style.display, 'coming back did not show the readout').toBe('flex');
+      expectNames(bar, B, 'the readout came back naming somewhere other than the tile under the cursor');
+    });
+
+    it('in paste mode the readout comes back when the cursor leaves the map and returns, naming the tile it returned to', async () => {
+      const { s, bar } = await hoverThenArm();
+      s.on().onMouseLeave(mouse(700, 700));
+      expect(bar.style.display, 'leaving the map did not hide the readout').toBe('none');
+      s.on().onMouseMove(tileAt(B.col, B.row));
+      expect(bar.style.display, 'the readout stayed hidden after the cursor came back in paste mode').toBe('flex');
+      expectNames(bar, B, 'the readout came back naming somewhere other than the tile under the cursor');
+    });
+
+    it('in paste mode the readout follows the cursor from tile to tile', async () => {
+      const { s, bar } = await hoverThenArm();
+      s.on().onMouseMove(tileAt(B.col, B.row));
+      expectNames(bar, B, 'in paste mode the readout froze on the tile it showed before the mode');
+      s.on().onMouseMove(tileAt(C.col, C.row));
+      expectNames(bar, C, 'in paste mode the readout did not follow the cursor');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
   // THE MARQUEE AND AN ARMED PASTE BELONG TO THE ACT, NOT TO THE MOUNT
   // (MAP-REMOUNT-DROPS-PASTE; docs/reviews/2026-09-11-map-remount-clear.md)
   //
