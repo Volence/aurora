@@ -274,12 +274,21 @@ interface Surface {
   container(): HostStub;
 }
 
-async function mountMap(): Promise<Surface> {
+/**
+ * Mount the map with its refs filled at `rect`.
+ *
+ * `rect` defaults to VIEWPORT, whose origin IS the client origin, so there a
+ * client coordinate and a container-local one are the same number. That is
+ * convenient and it is also a blind spot: every `clientX - rect.left` in the
+ * component is invisible at VIEWPORT. A row about a hit test or a placement in
+ * local space passes an offset rect (map-coverage-3's OFFSET) to see it.
+ */
+async function mountMap(rect: typeof VIEWPORT = VIEWPORT): Promise<Surface> {
   win = installWindowStub();
   const mod = await import('../MapViewport');
   const h = renderHooked(mod.default as unknown as (p: object) => React.ReactElement, {});
   mounted = h;
-  const attached = attachRefs(h.el(), VIEWPORT);
+  const attached = attachRefs(h.el(), rect);
   hosts = attached.all();
   // A render after the refs are filled, because `useAttachedEffect` decides from
   // the ELEMENT and has to see it appear: this is the pass that attaches the
@@ -1658,5 +1667,692 @@ describe('a BG stroke on the override refuses a tile outside the blob, and says 
     expect(docPainted(doc), 'the FILE kept the uncommitted stroke').toHaveLength(0);
     expect(Array.from(actPlane('act2')), 'and the act that opened was painted').toEqual(act2Before);
     expect(focusedHistory()?.canUndo ?? false).toBe(false);
+  });
+});
+
+// ── the foreground and collision planes, per act, for the blocks below ────────
+//
+// ⚠ BOTH COLLISION PLANES ARE SIZED FROM `SECTION_PLANE_WORDS`, the engine
+// constant, for the reason the nametable is: an out-of-range typed-array store
+// is DROPPED, not thrown, and a row painting past an under-sized plane would
+// watch nothing happen. The fills are per act AND per plane, so a write into the
+// wrong act or the wrong plane is a wrong VALUE and not merely a wrong array.
+
+const COLL_SHAPE = { act1: { a: 1, b: 2 }, act2: { a: 3, b: 4 } } as const;
+const collWord = (shape: number): number =>
+  packCollisionCell({ shape, xFlip: false, yFlip: false, solidity: 'all' });
+
+function sectionOf(actId: 'act1' | 'act2'): Section {
+  const act = useProjectStore.getState().project?.zones[0]?.acts.find((a) => a.id === actId);
+  const sec = act?.sections[0];
+  if (!sec) throw new Error(`map-viewport-mounted: no section 0 in ${actId}; the fixture moved`);
+  return sec;
+}
+
+function seedCollision(): void {
+  for (const actId of ['act1', 'act2'] as const) {
+    const sec = sectionOf(actId);
+    sec.collisionEdit = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(COLL_SHAPE[actId].a));
+    sec.collisionEditB = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(COLL_SHAPE[actId].b));
+  }
+}
+
+function collPlane(actId: 'act1' | 'act2', plane: 'a' | 'b'): Uint16Array {
+  const sec = sectionOf(actId);
+  const words = plane === 'a' ? sec.collisionEdit : sec.collisionEditB;
+  if (!words) throw new Error(`map-viewport-mounted: plane ${plane} of ${actId} is unseeded`);
+  return words;
+}
+
+/** Cells of a collision plane off that act's and that plane's fill. */
+function collPainted(actId: 'act1' | 'act2', plane: 'a' | 'b'): Array<[number, number]> {
+  const fill = collWord(COLL_SHAPE[actId][plane]);
+  const out: Array<[number, number]> = [];
+  collPlane(actId, plane).forEach((w, i) => { if (w !== fill) out.push([i, w]); });
+  return out;
+}
+
+/** Cells of the FOREGROUND nametable off that act's fill. */
+function fgPainted(actId: 'act1' | 'act2'): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  sectionOf(actId).tileGrid.nametable.forEach((w, i) => { if (w !== FG_FILL[actId]) out.push([i, w]); });
+  return out;
+}
+
+/** The four 8px sub-tile indices of the 16px collision cell (cc, cr), ascending. */
+const cellSubTiles = (cc: number, cr: number): number[] =>
+  [0, 1].flatMap((dr) => [0, 1].map((dc) => (2 * cr + dr) * SECTION_TILES_WIDE + 2 * cc + dc))
+    .sort((a, b) => a - b);
+
+/** The client point at the centre of the 8px tile (col,row) under VIEWPORT, zoom 1, camera 0. */
+const tileAt = (col: number, row: number, over: Record<string, unknown> = {}) =>
+  mouse(col * 8 + 4, row * 8 + 4, over);
+/** The client point inside the 16px collision cell (cc,cr), on its top-left tile. */
+const collCell = (cc: number, cr: number, over: Record<string, unknown> = {}) =>
+  mouse(cc * 16 + 4, cr * 16 + 4, over);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COLLISION PAINT (`paintCollisionCell`), including the both-planes stroke.
+//
+// COVERAGE. The collision brush shares `recordPaint` / `endPaintStroke` /
+// `revertPaintStroke` with the FG stroke, but it is a different KIND of stroke
+// with a different command and, in both-planes mode, a SECOND entry map
+// (`otherEntries`) that nothing on the FG carrier exercises. Four things here
+// are collision-only: the aimed plane, the both-planes write, the mode being
+// LATCHED at the press, and the section being claimed at the press even when
+// the click changes nothing (CollisionPalette's Reset and Clear act on that
+// index).
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('a collision stroke is one command on one or both planes, and is dropped by an act switch', () => {
+  /** A shape no fixture plane carries, so every write is a visible change. */
+  const PICK = 9;
+
+  beforeEach(() => {
+    seedCollision();
+    useToastStore.setState({ toasts: [] });
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-collision');
+    ed.setSelectedCollisionProfile(PICK);
+    ed.setSelectedCollisionSolidity('all');
+    ed.setCollisionPaintPlane('a');
+    ed.setCollisionPaintBothPlanes(false);
+    ed.setCollisionBrushSize(1);
+  });
+
+  afterEach(() => {
+    // Arming both-planes turns a lens on as a side effect; it is view state
+    // that outlives this block and nothing else here should inherit it.
+    useViewStore.getState().setOverlay('showSolidBothPlanes', false);
+    useEditorStore.getState().setCollisionPaintBothPlanes(false);
+  });
+
+  const shapes = (cells: Array<[number, number]>) => cells.map(([, w]) => unpackCollisionCell(w).shape);
+
+  it('HARNESS: a press paints the 16px cell under the cursor, four sub-tiles, with the picked shape', async () => {
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1));
+    expect(collPainted('act1', 'a').map(([i]) => i),
+      'nothing was painted: the press never reached a collision cell').toEqual(cellSubTiles(1, 1));
+    // DERIVED from the store, not a literal: the painted words must carry the pick.
+    expect(shapes(collPainted('act1', 'a')), 'the stroke wrote a shape nobody picked')
+      .toEqual(cellSubTiles(1, 1).map(() => useEditorStore.getState().selectedCollisionProfile));
+    expect(collPainted('act1', 'b'), 'a plane-A stroke wrote plane B').toHaveLength(0);
+  });
+
+  it('a drag paints live and lands exactly ONE command on release', async () => {
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1));
+    s.on().onMouseMove(collCell(2, 1));
+    s.on().onMouseMove(collCell(3, 1));
+    const cells = [...cellSubTiles(1, 1), ...cellSubTiles(2, 1), ...cellSubTiles(3, 1)].sort((a, b) => a - b);
+    expect(collPainted('act1', 'a').map(([i]) => i), 'the drag did not paint every cell it crossed')
+      .toEqual(cells);
+    expect(focusedHistory()?.canUndo ?? false, 'a collision stroke must not commit per cell').toBe(false);
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'the stroke must be ONE undo step').toBe(1);
+    expect(collPainted('act1', 'a'), 'and that one undo must take the whole stroke back').toHaveLength(0);
+  });
+
+  it('BOTH PLANES: one stroke writes A and B, and one undo takes BOTH back', async () => {
+    // The half-finished second plane is what this brush exists to prevent, so
+    // undoing it must not leave geometry on one plane either.
+    useEditorStore.getState().setCollisionPaintBothPlanes(true);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1));
+    s.on().onMouseMove(collCell(2, 1));
+    const cells = [...cellSubTiles(1, 1), ...cellSubTiles(2, 1)].sort((a, b) => a - b);
+    expect(collPainted('act1', 'a').map(([i]) => i), 'plane A missed the stroke').toEqual(cells);
+    expect(collPainted('act1', 'b').map(([i]) => i), 'plane B missed the stroke').toEqual(cells);
+    expect(shapes(collPainted('act1', 'b')), 'plane B took a shape nobody picked')
+      .toEqual(cells.map(() => PICK));
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'a both-planes stroke must still be ONE undo step').toBe(1);
+    expect([collPainted('act1', 'a'), collPainted('act1', 'b')],
+      'the undo left geometry on one plane').toEqual([[], []]);
+  });
+
+  it('the both-planes mode is LATCHED at the press: toggling it mid-drag does not split the stroke', async () => {
+    useEditorStore.getState().setCollisionPaintBothPlanes(true);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1));
+    useEditorStore.getState().setCollisionPaintBothPlanes(false);
+    s.on().onMouseMove(collCell(2, 1));
+    expect(collPainted('act1', 'b').map(([i]) => i),
+      'the chip toggled mid-drag switched one gesture between one plane and two')
+      .toEqual([...cellSubTiles(1, 1), ...cellSubTiles(2, 1)].sort((a, b) => a - b));
+  });
+
+  it('the aimed plane is the one written: plane B, and not A', async () => {
+    useEditorStore.getState().setCollisionPaintPlane('b');
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1));
+    expect(collPainted('act1', 'b').map(([i]) => i), 'plane B was aimed at and not written')
+      .toEqual(cellSubTiles(1, 1));
+    expect(collPainted('act1', 'a'), 'plane A was written instead').toHaveLength(0);
+  });
+
+  it('the act switching under a both-planes stroke puts BOTH planes back, and writes no command', async () => {
+    useEditorStore.getState().setCollisionPaintBothPlanes(true);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1));
+    s.on().onMouseMove(collCell(2, 1));
+    expect(collPainted('act1', 'b').length, 'the premise: plane B is already painted').toBeGreaterThan(0);
+    const before = s.h.renders();
+    focusAct('act2');
+    expect(s.h.renders(), 'the component did not re-render on an act switch').toBeGreaterThan(before);
+    expect(collPainted('act1', 'a'), 'plane A kept the uncommitted stroke').toHaveLength(0);
+    expect(collPainted('act1', 'b'), 'plane B kept it: the other-plane half was not reverted').toHaveLength(0);
+    expect([collPainted('act2', 'a'), collPainted('act2', 'b')], 'the act that opened was written')
+      .toEqual([[], []]);
+    expect(focusedHistory()?.canUndo ?? false, 'a cancelled stroke writes no command').toBe(false);
+    expect(toastsMatching('Cancelled a gesture in flight'), 'the cancellation was silent').toHaveLength(1);
+  });
+
+  it('a paint after the switch writes into NEITHER act\'s collision', async () => {
+    // The row shape that found the live defect on the BG carrier, on this one:
+    // React held back, the guard at the top of `handleMouseMove` on its own.
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1));
+    const held = { ...s.on() };   // captured BEFORE the switch: this read flushes
+    focusAct('act2');             // ...and nothing after it reads the tree
+    held.onMouseMove(collCell(3, 1));
+    expect(collPainted('act1', 'a'), 'act1\'s uncommitted collision stays in the file').toHaveLength(0);
+    expect(collPainted('act2', 'a'), 'the cursor\'s cell was painted into the act that just opened')
+      .toHaveLength(0);
+  });
+
+  it('a press claims its section even when it changes nothing, and costs no undo entry', async () => {
+    // CollisionPalette's Reset and Clear are keyed on `activeSectionIndex`, and
+    // the success path's claim sits behind four early returns. A click that
+    // changed nothing used to leave the index on whatever another tool touched.
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(1, 1));
+    win!.dispatch('mouseup', {});
+    expect(collPainted('act1', 'a'), 'the first press did not paint, so this row measures nothing')
+      .toHaveLength(4);
+    useEditorStore.getState().setActiveSectionIndex(7);   // "another tool was last here"
+    s.on().onMouseDown(collCell(1, 1));                   // the SAME cell, the SAME shape
+    win!.dispatch('mouseup', {});
+    expect(useEditorStore.getState().activeSectionIndex,
+      'a no-op press left the palette\'s destructive buttons aimed at another section').toBe(0);
+    expect(undoDepth(), 'the no-op press put an empty command on the undo stack').toBe(1);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE MARQUEE DRAG AND ITS SNAP (`applyMarqueeSnap`, the Ctrl/Cmd modifier).
+//
+// COVERAGE. `map-clipboard` pins `snapMarquee` and `effectiveGranularity` as
+// pure functions. Nothing drove the drag that calls them: which tile is the
+// start, whether the pointer event's own modifier bit is read, whether a Ctrl
+// TAP with the hand held still re-snaps (the reason `marqueeDragLast` exists),
+// whether a blur un-sticks it, and the marquee's arm of `abandonStaleGestures`.
+//
+// Expected rects come from `snapMarquee` with the granularity the RULE says is
+// in force (`effectiveGranularity`), not from the component's output. The two
+// granularities are asserted to DIFFER at the chosen corners first: at corners
+// where block and tile agree, every modifier row below would be vacuous.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('a marquee drag snaps from its start tile, follows the modifier live, and is dropped by an act switch', () => {
+  const START = { col: 3, row: 3 };
+  const END = { col: 6, row: 4 };
+  const rect = (a: { col: number; row: number }, b: { col: number; row: number }, invert: boolean) =>
+    ({ sectionIndex: 0, ...snapMarquee(a.col, a.row, b.col, b.row, effectiveGranularity('block', invert)) });
+  const marquee = () => useEditorStore.getState().marquee;
+  const ctrl = (type: 'keydown' | 'keyup', down: boolean) =>
+    ({ ...keydown('Control', { ctrlKey: down }), type });
+
+  beforeEach(() => {
+    const ed = useEditorStore.getState();
+    ed.setTool('marquee');
+    ed.setMarqueeGranularity('block');
+    ed.setMarqueeSnapInvert(false);
+    ed.setMarquee(null);
+  });
+
+  it('ANTI-VACUOUS: block and tile snapping disagree at these corners', () => {
+    expect(rect(START, END, false), 'the modifier rows below could not tell the modes apart')
+      .not.toEqual(rect(START, END, true));
+  });
+
+  it('a drag sets the rect from the START tile to the cursor, snapped to blocks', async () => {
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(START.col, START.row));
+    expect(marquee(), 'a press is already a (one-block) marquee').toEqual(rect(START, START, false));
+    s.on().onMouseMove(tileAt(END.col, END.row));
+    expect(marquee(), 'the drag did not resolve from its start tile to the cursor').toEqual(rect(START, END, false));
+  });
+
+  it('Ctrl on the pointer event inverts the snap, and the panel is told', async () => {
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(START.col, START.row, { ctrlKey: true }));
+    s.on().onMouseMove(tileAt(END.col, END.row, { ctrlKey: true }));
+    expect(marquee(), 'the pointer\'s own modifier bit was not read').toEqual(rect(START, END, true));
+    expect(useEditorStore.getState().marqueeSnapInvert, 'the panel would narrate the wrong mode').toBe(true);
+  });
+
+  it('a Ctrl TAP with the hand held still re-snaps at once, and letting go snaps back', async () => {
+    // The reason `marqueeDragLast` exists: no mouse motion between the key and
+    // the rect. Without it the panel and the rect disagree until a stray pixel.
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(START.col, START.row));
+    s.on().onMouseMove(tileAt(END.col, END.row));
+    expect(marquee()).toEqual(rect(START, END, false));
+    expect(win!.dispatch('keydown', ctrl('keydown', true)), 'nothing was listening').toBeGreaterThan(0);
+    expect(marquee(), 'the rect waited for the mouse to move before following the key')
+      .toEqual(rect(START, END, true));
+    win!.dispatch('keyup', ctrl('keyup', false));
+    expect(marquee(), 'letting go of Ctrl did not snap back').toEqual(rect(START, END, false));
+  });
+
+  it('a window blur mid-chord un-sticks the modifier', async () => {
+    // A window that loses focus with the key down never delivers the keyup.
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(START.col, START.row));
+    s.on().onMouseMove(tileAt(END.col, END.row));
+    win!.dispatch('keydown', ctrl('keydown', true));
+    expect(marquee()).toEqual(rect(START, END, true));
+    expect(win!.dispatch('blur', {}), 'nothing was listening for blur').toBeGreaterThan(0);
+    expect(marquee(), 'the rect stayed inverted for a key no finger is holding').toEqual(rect(START, END, false));
+    expect(useEditorStore.getState().marqueeSnapInvert).toBe(false);
+  });
+
+  it('a move after an act switch does not extend the marquee into the act that opened', async () => {
+    // React held back: the marquee's arm of `abandonStaleGestures` alone. Its
+    // start carries a SECTION INDEX, and index 0 resolves in both acts.
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(START.col, START.row));
+    s.on().onMouseMove(tileAt(START.col + 1, START.row));
+    const before = marquee();
+    const held = { ...s.on() };
+    focusAct('act2');
+    held.onMouseMove(tileAt(END.col + 10, END.row + 6));
+    expect(marquee(), 'the drag kept extending after the act changed under it').toEqual(before);
+  });
+
+  it('an act switch drops the committed marquee AND paste mode', async () => {
+    // Pasting into the wrong act is the dangerous half: a clipboard armed in one
+    // act must not commit into another on the next click.
+    const s = await mountMap();
+    useEditorStore.getState().setMarquee(rect(START, END, false));
+    useEditorStore.getState().setPasting(true);
+    const before = s.h.renders();
+    focusAct('act2');
+    expect(s.h.renders()).toBeGreaterThan(before);
+    expect(marquee(), 'a marquee from the other act survived the switch').toBeNull();
+    expect(useEditorStore.getState().pasting, 'paste mode survived the switch').toBe(false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PASTE MODE (the `pasting` branches of `handleMouseDown` / `handleMouseMove`).
+//
+// COVERAGE. `map-clipboard` pins `buildPasteCommand`, `pasteBaseStep` and
+// `effectivePasteLayers` as pure functions; `map-escape` pins how Escape leaves
+// the mode. Nothing drove the mode: the hover that decides WHERE, the click
+// that commits, the modifiers that override the sticky layers for one click,
+// the refusal, and the owner's report that a middle drag could not pan in it.
+//
+// Every hover is on an ODD tile, so the snap is doing work: an unsnapped paste
+// would land one tile off, and at an even tile the two are indistinguishable.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('paste mode commits at the hovered, snapped origin, and a middle drag still pans', () => {
+  const CLIP_ART = [0x0033, 0x0034, 0x0035, 0x0036];
+  const CLIP_SHAPE = { a: 7, b: 8 } as const;
+  const HOVER = { col: 3, row: 3 };
+
+  function clip(artOnly: boolean): MapClipboard {
+    return {
+      widthTiles: 2, heightTiles: 2, nametable: Uint16Array.from(CLIP_ART),
+      collisionA: artOnly ? new Uint16Array(0) : Uint16Array.of(collWord(CLIP_SHAPE.a)),
+      collisionB: artOnly ? new Uint16Array(0) : Uint16Array.of(collWord(CLIP_SHAPE.b)),
+      artOnly,
+    };
+  }
+  /** The clipboard's art at `base`, as the [index, word] pairs the section must carry. */
+  const artAt = (base: { col: number; row: number }): Array<[number, number]> =>
+    [0, 1].flatMap((r) => [0, 1].map((c) =>
+      [(base.row + r) * SECTION_TILES_WIDE + base.col + c, CLIP_ART[r * 2 + c]] as [number, number]))
+      .sort((a, b) => a[0] - b[0]);
+
+  /**
+   * THE ONE `document` CALL PASTE MODE MAKES, and nothing else.
+   *
+   * With paste mode armed, the preview pass rasterises the clipboard into a
+   * ghost through `regionPreviewCanvas` (canvas/region-preview.ts), which asks
+   * `document.createElement('canvas')`, a 2D context, `createImageData` and
+   * `putImageData`. This suite has no DOM, so every row here died with
+   * `ReferenceError: document is not defined` the moment paste mode was armed
+   * with the map mounted.
+   *
+   * Scoped to THIS block rather than added to `window-stub.ts`, whose header
+   * refuses to grow into a DOM: it serves the one call, throws on any other
+   * tag, refuses to shadow a real `document`, and is removed exactly. Nothing
+   * paints and no row here asserts on the ghost's pixels; that would be a
+   * drawing claim, and drawing claims are foreground-only.
+   */
+  let hadDocument = false;
+  function installDocumentStub(): void {
+    const g = globalThis as unknown as Record<string, unknown>;
+    if (g.document !== undefined && g.document !== null) {
+      throw new Error('map-viewport-mounted: a real `document` exists; this stub would shadow it');
+    }
+    hadDocument = 'document' in g;
+    g.document = {
+      createElement(tag: string) {
+        if (tag !== 'canvas') {
+          throw new Error(`map-viewport-mounted: document.createElement('${tag}') is not stubbed; `
+            + 'a row reaching it is asking a DOM question this suite cannot answer');
+        }
+        return {
+          width: 0,
+          height: 0,
+          getContext: () => ({
+            createImageData: (w: number, h: number) =>
+              ({ width: w, height: h, data: new Uint8ClampedArray(4 * w * h) }),
+            putImageData: () => undefined,
+          }),
+        };
+      },
+    };
+  }
+  function removeDocumentStub(): void {
+    const g = globalThis as unknown as Record<string, unknown>;
+    if (hadDocument) g.document = undefined;
+    else delete g.document;
+  }
+
+  beforeEach(() => {
+    installDocumentStub();
+    seedCollision();
+    useToastStore.setState({ toasts: [] });
+    const ed = useEditorStore.getState();
+    ed.setTool('select');          // any tool: paste outranks it. (setTool clears pasting.)
+    ed.setMapClipboard(clip(false));
+    ed.setPasteLayers('both');
+  });
+
+  afterEach(() => {
+    useEditorStore.getState().setMapClipboard(null);
+    removeDocumentStub();
+  });
+
+  /**
+   * Mount the map, THEN arm paste mode.
+   *
+   * ⚠ THE FIRST DRAFT ARMED IT IN `beforeEach`, BEFORE THE MOUNT, AND EVERY ROW
+   * IN THIS BLOCK WENT RED FOR A REASON THAT WAS NOT THE COMPONENT'S. The effect
+   * that clears the marquee and paste mode on an act switch is keyed on the open
+   * zone and act, and like every effect it also runs on the FIRST render. So
+   * paste mode armed before the map existed was dropped by the mount. In the
+   * app the author arms it with the map on screen, which is what this does.
+   */
+  async function mountPasting(): Promise<Surface> {
+    const s = await mountMap();
+    useEditorStore.getState().setPasting(true);
+    return s;
+  }
+
+  it('a click pastes art and collision at the even-snapped origin, as ONE undo step, and stays armed', async () => {
+    const s = await mountPasting();
+    s.on().onMouseMove(tileAt(HOVER.col, HOVER.row));
+    const e = tileAt(HOVER.col, HOVER.row);
+    s.on().onMouseDown(e);
+    // A clipboard with collision lands on the 16px grid: tile 3 floors to 2.
+    const base = { col: 2, row: 2 };
+    expect(fgPainted('act1'), 'the art did not land at the snapped origin').toEqual(artAt(base));
+    const cell = cellSubTiles(base.col >> 1, base.row >> 1);
+    expect(collPainted('act1', 'a'), 'plane A did not take the clipboard\'s cell')
+      .toEqual(cell.map((i) => [i, collWord(CLIP_SHAPE.a)]));
+    expect(collPainted('act1', 'b'), 'plane B did not take the clipboard\'s cell')
+      .toEqual(cell.map((i) => [i, collWord(CLIP_SHAPE.b)]));
+    expect(e.wasPrevented()).toBe(true);
+    expect(useEditorStore.getState().pasting, 'a paste must stay armed for the next one').toBe(true);
+    expect(undoDepth(), 'a paste must be ONE undo step').toBe(1);
+    expect([fgPainted('act1'), collPainted('act1', 'a'), collPainted('act1', 'b')],
+      'and its undo must take art AND collision back').toEqual([[], [], []]);
+  });
+
+  it('an ART-ONLY clipboard lands on any tile, not the 16px grid', async () => {
+    useEditorStore.getState().setMapClipboard(clip(true));
+    const s = await mountPasting();
+    s.on().onMouseMove(tileAt(HOVER.col, HOVER.row));
+    s.on().onMouseDown(tileAt(HOVER.col, HOVER.row));
+    expect(fgPainted('act1'), 'a tile-granular selection was forced onto blocks').toEqual(artAt(HOVER));
+    expect([collPainted('act1', 'a'), collPainted('act1', 'b')], 'an art-only paste wrote collision')
+      .toEqual([[], []]);
+  });
+
+  it('Shift over an art-only clipboard refuses OUT LOUD and writes nothing', async () => {
+    useEditorStore.getState().setMapClipboard(clip(true));
+    const s = await mountPasting();
+    s.on().onMouseMove(tileAt(HOVER.col, HOVER.row));
+    const e = tileAt(HOVER.col, HOVER.row, { shiftKey: true });
+    s.on().onMouseDown(e);
+    expect(toastsMatching('carries no collision'), 'a click that did nothing said nothing').toHaveLength(1);
+    expect(fgPainted('act1'), 'a collision-only paste wrote art').toHaveLength(0);
+    expect(focusedHistory()?.canUndo ?? false).toBe(false);
+    expect(e.wasPrevented()).toBe(true);
+  });
+
+  it('Alt pastes the art alone for that one click, and the sticky setting survives', async () => {
+    const s = await mountPasting();
+    s.on().onMouseMove(tileAt(HOVER.col, HOVER.row));
+    s.on().onMouseDown(tileAt(HOVER.col, HOVER.row, { altKey: true }));
+    expect(fgPainted('act1'), 'Alt did not paste the art').toEqual(artAt({ col: 2, row: 2 }));
+    expect([collPainted('act1', 'a'), collPainted('act1', 'b')], 'Alt pasted collision as well')
+      .toEqual([[], []]);
+    expect(useEditorStore.getState().pasteLayers, 'a one-click modifier rewrote the sticky setting')
+      .toBe('both');
+  });
+
+  it('a middle-button drag pans the map in paste mode, and pastes nothing', async () => {
+    // The owner's report (2026-08-28): the map froze for the whole of paste
+    // mode. PARKED off the pan clamp at 0, so a pan in either direction shows.
+    useViewStore.setState({ vpX: 256, vpY: 256, zoom: 1 });
+    const s = await mountPasting();
+    const middle = { button: 1, buttons: 4 };
+    s.on().onMouseDown(mouse(300, 300, middle));
+    s.on().onMouseMove(mouse(340, 330, middle));
+    const { vpX, vpY } = useViewStore.getState();
+    // The same sign convention the keyboard rows pin: the camera moves AGAINST
+    // the hand, by the hand's distance at zoom 1 (`pan` divides by the zoom).
+    expect([vpX, vpY], 'the middle drag did not move the camera in paste mode')
+      .toEqual([256 - 40, 256 - 30]);
+    win!.dispatch('mouseup', {});
+    expect(fgPainted('act1'), 'the pan pasted').toHaveLength(0);
+    expect(focusedHistory()?.canUndo ?? false).toBe(false);
+    expect(useEditorStore.getState().pasting, 'and the mode is still armed').toBe(true);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE SCREEN FRAME'S DRAG (triage 2026-08-26 row G), on an UNLOCKED view.
+//
+// COVERAGE. `screen-frame.ts` pins the hit test and the drag arithmetic as pure
+// functions. Nothing drove the press that decides whether the frame or the
+// tool gets the gesture, the preview through a ref, or the single store write
+// on release.
+//
+// ⚠ THE RECT IS OFFSET FROM THE CLIENT ORIGIN, deliberately, and every earlier
+// block in this file cannot say that. At `VIEWPORT` a client coordinate IS a
+// canvas coordinate, so a hit test that forgot to subtract `rect.left` would
+// pass every row. `OFFSET` makes the two differ.
+//
+// ⚠ AND THE VIEW IS PARKED OFF ITS DEFAULTS (zoom 2, camera off 0), so a drag
+// that ignored the zoom, or measured from the origin, is a wrong number.
+//
+// FOREGROUND-ONLY and not attempted: the LOCKED-scene arm, where the frame's Y
+// is a scene's `v_offset` and the drag commits a document edit. It needs
+// `activeGuideScene()`, which is gated on the Effects facet (the predicate
+// `inEffectsFacet()` spells), and that is outside this parcel's reach by rule.
+// ══════════════════════════════════════════════════════════════════════════════
+
+const OFFSET = { left: 100, top: 40, width: 640, height: 480 };
+
+describe('the screen frame takes a press on its EDGE only, and writes the store once, on release', () => {
+  const ANCHOR = { x: 64, y: 64 };
+  const VIEW = { vpX: 32, vpY: 32, zoom: 2 };
+  /** The client point over world (x,y), through OFFSET and VIEW. */
+  const at = (x: number, y: number) =>
+    mouse(OFFSET.left + (x - VIEW.vpX) * VIEW.zoom, OFFSET.top + (y - VIEW.vpY) * VIEW.zoom);
+  /** On the frame's LEFT edge, a third of the way down. */
+  const EDGE = { x: ANCHOR.x, y: ANCHOR.y + 36 };
+  /** Deep inside the frame, far from all four edges. */
+  const INSIDE = { x: ANCHOR.x + 86, y: ANCHOR.y + 86 };
+  const frame = () => useViewStore.getState().screenFrame;
+
+  beforeEach(() => {
+    useViewStore.setState(VIEW);
+    useViewStore.getState().setOverlay('showScreenFrame', true);
+    useViewStore.getState().setScreenFrame(ANCHOR.x, ANCHOR.y);
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-tile');
+    ed.setEditingLayer('fg');
+    ed.setSelectedTileIndex(5);
+  });
+
+  afterEach(() => {
+    useViewStore.getState().setOverlay('showScreenFrame', false);
+    useViewStore.getState().setScreenFrame(0, 0);
+  });
+
+  it('ANTI-VACUOUS: INSIDE is inside the frame and nowhere near an edge', () => {
+    expect(INSIDE.x - ANCHOR.x).toBeGreaterThan(8);
+    expect(ANCHOR.x + SCREEN_WIDTH - INSIDE.x).toBeGreaterThan(8);
+  });
+
+  it('a press on the edge takes the gesture from the tool', async () => {
+    const s = await mountMap(OFFSET);
+    const e = at(EDGE.x, EDGE.y);
+    s.on().onMouseDown(e);
+    expect(fgPainted('act1'), 'the tool painted under a press the frame should have taken').toHaveLength(0);
+    expect(e.wasPrevented()).toBe(true);
+  });
+
+  it('the drag moves the frame by the WORLD delta, previewing through a ref and writing the store ONCE', async () => {
+    const s = await mountMap(OFFSET);
+    s.on().onMouseDown(at(EDGE.x, EDGE.y));
+    s.on().onMouseMove(at(EDGE.x + 20, EDGE.y + 10));
+    expect(frame(), 'the store was written mid-drag: one gesture, many writes').toEqual(ANCHOR);
+    win!.dispatch('mouseup', {});
+    expect(frame(), 'the release did not land the frame where the hand took it')
+      .toEqual({ x: ANCHOR.x + 20, y: ANCHOR.y + 10 });
+    expect(focusedHistory()?.canUndo ?? false,
+      'an unlocked frame is a session reference, not a document edit').toBe(false);
+  });
+
+  it('CONTROL: a press INSIDE the frame belongs to the tool', async () => {
+    const s = await mountMap(OFFSET);
+    s.on().onMouseDown(at(INSIDE.x, INSIDE.y));
+    win!.dispatch('mouseup', {});
+    expect(fgPainted('act1'), 'the frame swallowed a press on its interior').toHaveLength(1);
+    expect(frame(), 'and moved').toEqual(ANCHOR);
+  });
+
+  it('a HIDDEN frame never takes a press, even on its edge', async () => {
+    useViewStore.getState().setOverlay('showScreenFrame', false);
+    const s = await mountMap(OFFSET);
+    s.on().onMouseDown(at(EDGE.x, EDGE.y));
+    win!.dispatch('mouseup', {});
+    expect(fgPainted('act1'), 'a frame nobody can see stole the press').toHaveLength(1);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE CONTEXT MENU (`handleContextMenu` and its close effect).
+//
+// COVERAGE. Nothing ran it. What these rows can see: where it opens, in
+// CONTAINER-local coordinates (measured through OFFSET, for the reason the
+// frame block states); that the browser's own menu is always suppressed, even
+// where this one does not open; that a right press never paints; and the three
+// ways it closes, including the sprite-tab guard on its Escape.
+//
+// NOT DRIVEN: the two menu actions. Each opens an Art document through
+// `confirmArtDocumentOpen` and then switches facet, and that is a shell flow
+// with its own tests, not a map behaviour.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('the context menu opens where it was asked for, and closes on click-away or Escape', () => {
+  /** Every element of `type` in a subtree, as data. */
+  function elements(node: unknown, type: string, out: Array<React.ReactElement<Record<string, unknown>>> = []) {
+    if (Array.isArray(node)) { for (const c of node) elements(c, type, out); return out; }
+    if (!node || typeof node !== 'object') return out;
+    const el = node as React.ReactElement<Record<string, unknown>>;
+    if (el.type === type) out.push(el);
+    const children = (el.props as { children?: unknown } | undefined)?.children;
+    if (children !== undefined) elements(children, type, out);
+    return out;
+  }
+  /** The menu box: the one child of the root that holds buttons, or null. */
+  function menuOf(s: Surface): React.ReactElement<Record<string, unknown>> | null {
+    const rootChildren = (s.h.el().props as { children?: unknown }).children;
+    return elements(rootChildren, 'div').find((d) => elements(d.props.children, 'button').length > 0) ?? null;
+  }
+  const rightClick = (x: number, y: number) => mouse(x, y, { button: 2, buttons: 2 });
+
+  beforeEach(() => {
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-tile');
+    ed.setEditingLayer('fg');
+    ed.setSelectedTileIndex(5);
+  });
+
+  it('opens at the click, in CONTAINER-local coordinates, with both actions', async () => {
+    const s = await mountMap(OFFSET);
+    expect(menuOf(s), 'a menu was open before anyone asked').toBeNull();
+    const e = rightClick(300, 170);
+    s.on().onContextMenu(e);
+    expect(e.wasPrevented(), 'the browser\'s own menu was left to open').toBe(true);
+    const box = menuOf(s);
+    expect(box, 'no menu opened').not.toBeNull();
+    expect({ left: (box!.props.style as { left: number }).left, top: (box!.props.style as { top: number }).top },
+      'the menu is placed in CLIENT space, off by the container\'s own offset')
+      .toEqual({ left: 300 - OFFSET.left, top: 170 - OFFSET.top });
+    expect(elements(box!.props.children, 'button').length, 'the menu lost an action').toBe(2);
+  });
+
+  it('a right-button press never paints', async () => {
+    const s = await mountMap();
+    s.on().onMouseDown(mouse(20, 20, { button: 2, buttons: 2 }));
+    win!.dispatch('mouseup', {});
+    expect(fgPainted('act1'), 'the right button painted under the tool').toHaveLength(0);
+  });
+
+  it('the browser menu is suppressed even where this one does not open', async () => {
+    const s = await mountMap();
+    // On the BG layer the map offers no menu at all.
+    useEditorStore.getState().setEditingLayer('bg');
+    const onBg = rightClick(100, 60);
+    s.on().onContextMenu(onBg);
+    expect(onBg.wasPrevented(), 'the browser menu opened over the BG layer').toBe(true);
+    expect(menuOf(s), 'a map menu opened over the BG layer').toBeNull();
+    // Off the section grid there is no cell to act on.
+    useEditorStore.getState().setEditingLayer('fg');
+    useViewStore.setState({ vpX: SECTION_TILES_WIDE * 8 * 4, vpY: 0, zoom: 1 });
+    const offGrid = rightClick(100, 60);
+    s.on().onContextMenu(offGrid);
+    expect(offGrid.wasPrevented(), 'the browser menu opened off the grid').toBe(true);
+    expect(menuOf(s), 'a menu opened over no cell').toBeNull();
+  });
+
+  it('closes on a click anywhere, and on Escape, but not on an Escape meant for a sprite tab', async () => {
+    const s = await mountMap();
+    s.on().onContextMenu(rightClick(100, 60));
+    expect(menuOf(s)).not.toBeNull();
+    expect(win!.dispatch('mousedown', {}), 'no click-away listener').toBeGreaterThan(0);
+    expect(menuOf(s), 'a click elsewhere left the menu open').toBeNull();
+
+    s.on().onContextMenu(rightClick(100, 60));
+    expect(menuOf(s)).not.toBeNull();
+    useSessionStore.setState({ activeId: 'doc:sprite:untitled' });
+    win!.dispatch('keydown', keydown('Escape'));
+    expect(menuOf(s), 'an Escape aimed at the sprite editor closed the hidden map\'s menu').not.toBeNull();
+    focusAct('act1');
+    win!.dispatch('keydown', keydown('Escape'));
+    expect(menuOf(s), 'Escape on the level tab did not close the menu').toBeNull();
   });
 });
