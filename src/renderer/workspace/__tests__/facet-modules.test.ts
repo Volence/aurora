@@ -1,6 +1,6 @@
 // The OffscreenCanvas global that register-facets → MapViewport needs at import
 // time is installed by vitest setupFiles (src/test/offscreen-canvas-stub.ts).
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { facetModules, registerFacetModule, moduleFor, mapFacet, resolveFacet } from '../facet-registry';
@@ -77,7 +77,35 @@ describe('mapFacet slots override the aeon defaults', () => {
   });
 });
 
+/*
+ * THE REGISTRY'S FIRST IMPORT IS PAID IN A BOUNDED HOOK, NOT IN WHICHEVER ROW
+ * HAPPENS TO RUN FIRST. docs/reviews/2026-09-11-suite-timeout-rows.md has the
+ * measurements.
+ *
+ * `register-facets` pulls in every facet module and the React surfaces under
+ * them, so the first `await import` of it costs the whole graph's transform and
+ * evaluation, and every later one resolves from the module cache. That cost used
+ * to land on "covers all six built facets", the first row to import it, on
+ * vitest's 5s default; it timed out there in the 2026-09-11 landings at load 33
+ * to 36 and passed in ~0.6s alone. The await waits on module loading and
+ * nothing else: no module under src/ has a top-level await, and no facet module
+ * registers itself at import time (checked with a live control).
+ *
+ * THE LIMIT. Idle median of that first import 645ms (610, 645 and 653ms, load
+ * 7.9 to 8.3); inside the full suite it measured 3045ms and 3026ms at load 15 to
+ * 20, 4.7x. Headroom x20, the factor test/config/prose-constant-fold.test.ts
+ * derives for the same box: 12.9s, rounded up to 15s. Every describe that
+ * imports the registry declares the hook, because `-t` can run any one of them
+ * alone; only the first to run pays. src/renderer/providers/__tests__/map-status-classic.test.ts
+ * carries its own bound for the same import, set before this one.
+ *
+ * IF THE HOOK EVER HITS 15s, DO NOT RAISE IT. Measure what the graph gained.
+ */
+const REGISTRY_IMPORT_MS = 15_000;
+const warmRegistry = async (): Promise<void> => { await import('../register-facets'); };
+
 describe('registerAeonFacetModules registers every aeon facet', () => {
+  beforeAll(warmRegistry, REGISTRY_IMPORT_MS);
   beforeEach(() => { facetModules.clear(); });
 
   it('covers all six built facets', async () => {
@@ -104,6 +132,7 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
   // profile edit has to come through here — the house style for these.
   const S1_GRANT = ['layout', 'objects', 'collision', 'palette', 'art'] as const;
 
+  beforeAll(warmRegistry, REGISTRY_IMPORT_MS);
   beforeEach(() => { facetModules.clear(); });
 
   it('serves all five, and nothing outside the grant', async () => {
@@ -474,6 +503,7 @@ describe('App registers both engines at mount, before any project can load', () 
 // workspace header shows them only for facets built by mapFacet(). This is the
 // data behind that gate — the header itself is .tsx and not collected.
 describe('mapOverlays marks the facets viewStore.overlays actually paints on', () => {
+  beforeAll(warmRegistry, REGISTRY_IMPORT_MS);
   beforeEach(() => { facetModules.clear(); });
 
   it('is set on every map facet and absent on the art facet', async () => {
