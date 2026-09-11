@@ -44,10 +44,15 @@
 import React, { useState } from 'react';
 import { T } from '../ui';
 import { submitTypedPath } from './typed-path-open';
+import type { TypedPathOpener } from './typed-path-open';
 
 export interface OpenByPathProps {
-  /** App passes `openProjectByPath` (= useProject.openPath): the GUARDED road. */
-  onOpenPath: (dir: string) => void;
+  /**
+   * App passes `openProjectByPath` (= useProject.openProjectPath): the GUARDED
+   * road. It resolves `true` only when the project opened, which is the only
+   * outcome that clears the field.
+   */
+  onOpenPath: TypedPathOpener;
   /** Shown above the field. Differs between "no project yet" and "switch". */
   label: string;
 }
@@ -71,7 +76,10 @@ export default function OpenByPath({ onOpenPath, label }: OpenByPathProps): Reac
 
   // The decision lives in typed-path-open.ts, where a node-only suite can
   // execute it; this component owns only the value, the key and the placement.
-  function submit(): void { submitTypedPath(text, onOpenPath, setRefusal); }
+  // `setText` goes in so a SUCCESSFUL open can empty the field
+  // (HOME-PATH-FIELD-KEEPS-OLD-PATH); Enter and the Open button are the only two
+  // ways to commit it, and both come here.
+  function submit(): void { void submitTypedPath(text, onOpenPath, setRefusal, setText); }
 
   return (
     <div style={styles.wrap} data-testid="open-by-path">

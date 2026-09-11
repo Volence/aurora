@@ -18,6 +18,7 @@ import { normalizeProjectPath } from '../../../shared/project-path';
 import { GUIDES } from '../guide/guides';
 import { openGuide } from '../../state/guideStore';
 import OpenByPath from './OpenByPath';
+import type { TypedPathOpener } from './typed-path-open';
 
 /**
  * THE GUIDES, ON HOME, IN BOTH STATES.
@@ -59,8 +60,10 @@ export interface HomeTabProps {
    * for, a typed one is not, and a prop named for recents carrying hand-typed
    * strings is the kind of name lie that survives until someone changes one of
    * the two roads. See OpenByPath.tsx for why a field rather than argv.
+   * It reports whether the open succeeded, because only a success clears the
+   * field (HOME-PATH-FIELD-KEEPS-OLD-PATH).
    */
-  onOpenPath: (dir: string) => void;
+  onOpenPath: TypedPathOpener;
 }
 
 export default function HomeTab({ onOpenProject, onOpenRecent, onOpenPath }: HomeTabProps) {
