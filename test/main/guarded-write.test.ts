@@ -189,3 +189,46 @@ describe('performGuardedWrite', () => {
     expect(readBytes('y.bin')).toEqual(before.y);
   });
 });
+
+// ═══ WHAT A SAVE WROTE, IN BYTES (A-F3-ART-SAVE-WIDTH, option (c)) ═════════
+//
+// UX seat A's F3: one save grew two art files by 329 bytes and nothing said so.
+// The classic saver now names each art file's size before and after, and those
+// figures must be the DISK's, never an estimate from the buffer handed in. Both
+// are read by `stat` here: `before` from the same probe the conflict check
+// makes, `after` from the stat that reads the new mtime.
+
+describe('performGuardedWrite reports what each landed file weighed, before and after', () => {
+  it('before is the size on disk when the write began, after is the size it landed at, and a new file has no before', async () => {
+    fs.writeFileSync(path.join(dir, 'a.bin'), Buffer.from([1]));
+    const beforeA = fs.statSync(path.join(dir, 'a.bin')).size;
+    const res = await performGuardedWrite(dir, [
+      { relPath: 'a.bin', bytes: new Uint8Array([9, 9, 9, 9, 9]), expectedMtimeMs: statMtime('a.bin') },
+      { relPath: 'sub/n.bin', bytes: new Uint8Array([7, 7, 7]), expectedMtimeMs: null },
+    ]);
+    if (!('written' in res)) throw new Error('expected the write to land');
+    // Derived from the disk on both sides, not from the buffers.
+    expect(res.sizes).toEqual({
+      'a.bin': { before: beforeA, after: fs.statSync(path.join(dir, 'a.bin')).size },
+      'sub/n.bin': { before: null, after: fs.statSync(path.join(dir, 'sub/n.bin')).size },
+    });
+    // ANTI-VACUOUS: the file really changed size, so a `before` taken from the
+    // buffer, or an `after` taken from the probe, cannot pass the row above.
+    expect(res.sizes!['a.bin'].before).not.toBe(res.sizes!['a.bin'].after);
+  });
+
+  it('a partial batch reports sizes for the files that landed and for no other', async () => {
+    fs.writeFileSync(path.join(dir, 'a.bin'), Buffer.from([1, 2]));
+    fs.mkdirSync(path.join(dir, 'b')); // a directory where a file is expected: rename fails
+    const beforeA = fs.statSync(path.join(dir, 'a.bin')).size;
+    const res = await performGuardedWrite(dir, [
+      { relPath: 'a.bin', bytes: new Uint8Array([0xaa]), expectedMtimeMs: statMtime('a.bin') },
+      { relPath: 'b', bytes: new Uint8Array([0xbb]), expectedMtimeMs: statMtime('b') },
+      { relPath: 'c.bin', bytes: new Uint8Array([0xcc]), expectedMtimeMs: null },
+    ]);
+    if (!('written' in res)) throw new Error('expected a partial write, not a conflict');
+    expect(res.failed?.path).toBe('b');
+    expect(Object.keys(res.sizes ?? {})).toEqual(['a.bin']);
+    expect(res.sizes!['a.bin']).toEqual({ before: beforeA, after: fs.statSync(path.join(dir, 'a.bin')).size });
+  });
+});

@@ -321,9 +321,33 @@ export type GuardedWriteResult =
   | {
       written: string[];
       newMtimes: Record<string, number>;
+      /**
+       * Every LANDED file's size before and after (see WrittenSize). Filled by
+       * `performGuardedWrite` under exactly the condition `newMtimes` is: a file
+       * in `written` whose post-write stat succeeded. Optional only because test
+       * fakes predate it. A consumer must read a missing entry as "not
+       * measured" and never put an estimate in its place.
+       */
+      sizes?: Record<string, WrittenSize>;
       failed?: { path: string; message: string };
       unwritten?: string[];
     };
+
+/**
+ * One landed file's size on disk just before and just after a guarded write, in
+ * bytes, BOTH read by `stat` in the main process: `before` by the same probe the
+ * conflict check makes, `after` by the stat that reads the new mtime. `before`
+ * is null when there was no file there.
+ *
+ * Added for UX seat A's F3 (ledger A-F3-ART-SAVE-WIDTH): one save grew two art
+ * files by 329 bytes and nothing said so. The classic saver names these figures
+ * per art file. They are the disk's, never `bytes.length`, so the report is a
+ * measurement and not a claim about what should have happened.
+ */
+export interface WrittenSize {
+  before: number | null;
+  after: number;
+}
 
 /**
  * Marker the read-binary IPC handler RESOLVES with for a missing file instead

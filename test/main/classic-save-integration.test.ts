@@ -286,6 +286,7 @@ describe('F3 (b): a GHZ save writes only the art file that changed (temp copy of
     const [ghz1, ghz2] = paths.tiles;
     const ghz2Before = new Uint8Array(fs.readFileSync(path.join(tmp, ghz2)));
     const ghz2MtimeBefore = fs.statSync(path.join(tmp, ghz2)).mtimeMs;
+    const ghz1SizeBefore = fs.statSync(path.join(tmp, ghz1)).size;
 
     doc.tiles[SEAT_A_TILE * 32] = (doc.tiles[SEAT_A_TILE * 32] ^ 0x0f) & 0xff;
     const result = await levels.write(ref, doc, { tiles: true });
@@ -296,6 +297,10 @@ describe('F3 (b): a GHZ save writes only the art file that changed (temp copy of
     const landed = await persist(result);
     if (!('written' in landed)) throw new Error('expected the guarded write to land');
     expect(landed.written).toEqual([ghz1]);
+    // Option (c): the guarded channel reports GHZ1's size on both sides, read by
+    // stat on this disk, and reports nothing for GHZ2, which it never touched.
+    expect(landed.sizes?.[ghz1]).toEqual({ before: ghz1SizeBefore, after: fs.statSync(path.join(tmp, ghz1)).size });
+    expect(landed.sizes?.[ghz2]).toBeUndefined();
     // GHZ2 was not rewritten: same bytes, same mtime. Before 2026-09-11 this file
     // came back 5193 bytes with no edit in it.
     expect(Buffer.from(fs.readFileSync(path.join(tmp, ghz2))).equals(Buffer.from(ghz2Before))).toBe(true);
