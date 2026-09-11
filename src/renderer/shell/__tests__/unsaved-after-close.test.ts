@@ -225,7 +225,10 @@ describe('each surface renders from its rule', () => {
   it('the window title: WindowTitle sets it from the rule, and App mounts it and no longer sets it', () => {
     expect(title).toMatch(/document\.title\s*=\s*windowTitle\(/);
     expect(title).toContain('hasUnsavedWork(useDirtySnapshot())');
-    expect(app).toContain('<WindowTitle />');
+    // THE MOUNT AS A JSX LINE OF ITS OWN, not the substring. App.tsx's comment
+    // names `<WindowTitle />` too, and a plain `toContain` was satisfied by that
+    // comment with the mount deleted: measured, the row stayed green over it.
+    expect(app).toMatch(/^\s*<WindowTitle \/>\s*$/m);
     expect(app).not.toMatch(/document\.title\s*=/);
   });
 
