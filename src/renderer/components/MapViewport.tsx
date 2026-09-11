@@ -3734,6 +3734,79 @@ export default function MapViewport() {
     }
   }, [applyMarqueeSnap]);
 
+  /**
+   * THE COORDINATE READOUT (the hover bar), written for the world point under
+   * the cursor. ONE writer with TWO callers: the plain hover at the bottom of
+   * `handleMouseMove`, and the paste branch, which returns long before it.
+   *
+   * ⚠ THE PASTE BRANCH USED TO SKIP IT (PASTE-READOUT-HIDDEN, the 2026-09-11
+   * screen sweep). `onMouseLeave` hides the bar, and the only line that showed
+   * it again sat below the paste branch's `return`, so in paste mode the
+   * readout stayed hidden once the cursor left the map and came back, and never
+   * followed the cursor at all. It is the hazard `panFromEvent`'s docblock
+   * names: a rule at the bottom of this handler is silently off for every mode
+   * whose branch returns above it. The drag branches (marquee, band stamp,
+   * paint, object drag, pan) return above it too; a readout frozen for the
+   * length of a drag is a behaviour question and is deliberately not changed here.
+   */
+  function writeHoverReadout(bar: HTMLDivElement, world: { x: number; y: number }): void {
+    bar.style.display = 'flex';
+
+    if (useEditorStore.getState().editingLayer === 'bg') {
+      const bgTile = worldToBgTile(world.x, world.y);
+      if (bgTile) {
+        bar.innerHTML = `BG | Tile (${bgTile.col}, ${bgTile.row}) | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
+      } else {
+        bar.innerHTML = `BG | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
+      }
+      return;
+    }
+
+    const info = worldToSectionTile(world.x, world.y);
+    if (!info) {
+      bar.innerHTML = `Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
+      return;
+    }
+    let extra = '';
+    const overlays = useViewStore.getState().overlays;
+    if (overlays.showCollision || overlays.showCollisionPathB) {
+      const act = getCurrentAct(useProjectStore.getState());
+      const section = act?.sections[info.sectionIndex] ?? null;
+      if (section) {
+        // Snap to the 16px cell's top-left tile (both tiles share the byte).
+        const cellCol = Math.floor(info.col / 2) * 2;
+        const cellRow = Math.floor(info.row / 2) * 2;
+        // In the A/B diff (both overlays on) the base shown is A, so report A.
+        const pathB = overlays.showCollisionPathB && !overlays.showCollision;
+        // Same bound the overlay uses, and the same one this readout indexes
+        // with below (cellRow * SECTION_TILES_WIDE + cellCol): never an array's
+        // own length (ROADMAP §5.1 item 10).
+        const len = SECTION_PLANE_WORDS;
+        const words = pathB
+          ? resolvePlaneWords(section.collisionEditB, section.engineCollisionB ?? section.engineCollision, len)
+          : resolvePlaneWords(section.collisionEdit, section.engineCollision, len);
+        const word = words[cellRow * SECTION_TILES_WIDE + cellCol];
+        const profiles = useProjectStore.getState().collisionProfiles;
+        const path = pathB ? 'B' : 'A';
+        const c = unpackCollisionCell(word);
+        const rc = resolveCell(profiles, word);
+        const flips = `${c.xFlip ? ' ⇄' : ''}${c.yFlip ? ' ⇅' : ''}`;
+        if (rc.air) {
+          extra = ` | Coll ${path}: air`;
+        } else if (!profiles) {
+          extra = ` | Coll ${path} #${c.shape}${flips} (tables not loaded)`;
+        } else if (rc.known) {
+          const p = rc.profile!;
+          const deg = angleDegrees(p);
+          extra = ` | Coll ${path} #${c.shape}${flips} ${p.solidity} ${deg === null ? '--' : deg + '°'} ${heightSparkline(p.heights)}`;
+        } else {
+          extra = ` | Coll ${path} #${c.shape}${flips} (unknown)`;
+        }
+      }
+    }
+    bar.innerHTML = `Sec ${info.sectionIndex} | Tile (${info.col}, ${info.row}) | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}${extra}`;
+  }
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const tool = useEditorStore.getState().tool;
 
@@ -3833,6 +3906,10 @@ export default function MapViewport() {
       // when the cell changes. "The ghost never updated" and "the ghost updated
       // to the same cell" are different facts, and the second is what a frozen
       // ghost looks like from outside; only a paint count can tell them apart.
+      // THE READOUT TOO (PASTE-READOUT-HIDDEN): this branch returns before the
+      // plain hover below, which was the only thing that showed the bar again
+      // after `onMouseLeave` hid it. See `writeHoverReadout`.
+      if (hoverBarRef.current) writeHoverReadout(hoverBarRef.current, world);
       publishPasteGhostReport({ pasting: true, hover: pasteHoverRef.current });
       return;
     }
@@ -4008,61 +4085,16 @@ export default function MapViewport() {
       return;
     }
 
-    // Hover info
+    // Hover info. The READOUT is `writeHoverReadout`, which the paste branch
+    // above calls too; what stays here is the collision ghost's own hover.
     const bar = hoverBarRef.current;
     if (!bar) return;
     const world = screenToWorld(e.clientX, e.clientY);
-    bar.style.display = 'flex';
+    writeHoverReadout(bar, world);
 
-    if (useEditorStore.getState().editingLayer === 'bg') {
-      const bgTile = worldToBgTile(world.x, world.y);
-      if (bgTile) {
-        bar.innerHTML = `BG | Tile (${bgTile.col}, ${bgTile.row}) | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
-      } else {
-        bar.innerHTML = `BG | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
-      }
-    } else {
+    if (useEditorStore.getState().editingLayer !== 'bg') {
       const info = worldToSectionTile(world.x, world.y);
       if (info) {
-        let extra = '';
-        const overlays = useViewStore.getState().overlays;
-        if (overlays.showCollision || overlays.showCollisionPathB) {
-          const act = getCurrentAct(useProjectStore.getState());
-          const section = act?.sections[info.sectionIndex] ?? null;
-          if (section) {
-            // Snap to the 16px cell's top-left tile (both tiles share the byte).
-            const cellCol = Math.floor(info.col / 2) * 2;
-            const cellRow = Math.floor(info.row / 2) * 2;
-            // In the A/B diff (both overlays on) the base shown is A, so report A.
-            const pathB = overlays.showCollisionPathB && !overlays.showCollision;
-            // Same bound the overlay uses, and the same one this readout
-            // indexes with below (cellRow * SECTION_TILES_WIDE + cellCol) —
-            // never an array's own length (ROADMAP §5.1 item 10).
-            const len = SECTION_PLANE_WORDS;
-            const words = pathB
-              ? resolvePlaneWords(section.collisionEditB, section.engineCollisionB ?? section.engineCollision, len)
-              : resolvePlaneWords(section.collisionEdit, section.engineCollision, len);
-            const word = words[cellRow * SECTION_TILES_WIDE + cellCol];
-            const profiles = useProjectStore.getState().collisionProfiles;
-            const path = pathB ? 'B' : 'A';
-            const c = unpackCollisionCell(word);
-            const rc = resolveCell(profiles, word);
-            const flips = `${c.xFlip ? ' ⇄' : ''}${c.yFlip ? ' ⇅' : ''}`;
-            if (rc.air) {
-              extra = ` | Coll ${path}: air`;
-            } else if (!profiles) {
-              extra = ` | Coll ${path} #${c.shape}${flips} (tables not loaded)`;
-            } else if (rc.known) {
-              const p = rc.profile!;
-              const deg = angleDegrees(p);
-              extra = ` | Coll ${path} #${c.shape}${flips} ${p.solidity} ${deg === null ? '--' : deg + '°'} ${heightSparkline(p.heights)}`;
-            } else {
-              extra = ` | Coll ${path} #${c.shape}${flips} (unknown)`;
-            }
-          }
-        }
-        bar.innerHTML = `Sec ${info.sectionIndex} | Tile (${info.col}, ${info.row}) | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}${extra}`;
-
         // Collision paint ghost: track the hovered block; redraw only when the
         // cell (or Alt) changes, so it stays cheap while the mouse moves.
         if (useEditorStore.getState().tool === 'paint-collision') {
@@ -4091,7 +4123,6 @@ export default function MapViewport() {
           drawCollisionPreview();
         }
       } else {
-        bar.innerHTML = `Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
         if (previewHoverRef.current) { previewHoverRef.current = null; drawCollisionPreview(); }
       }
     }
