@@ -52,7 +52,7 @@ import { renderHooked, type Hooked } from '../../../test/render-hooked';
 import { installWindowStub, type WindowStub } from '../../../test/window-stub';
 import { attachRefs, type HostStub } from '../../../test/element-stub';
 import { useProjectStore } from '../../state/projectStore';
-import { useEditorStore, focusedHistory } from '../../state/editorStore';
+import { useEditorStore, focusedHistory, RING_PATTERNS } from '../../state/editorStore';
 import { useSessionStore } from '../../state/sessionStore';
 import { useViewStore } from '../../state/viewStore';
 import { useToastStore } from '../../state/toastStore';
@@ -3754,5 +3754,234 @@ describe('the context menu\'s two actions open the clicked cell in Art, and swit
     await settle();
     expect(art()?.name, 'the open the author agreed to did not happen').not.toBe('drawing in progress');
     expect(facet(), 'the open the author agreed to did not switch the tab').toBe('art');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE ONE-PRESS TOOLS: paint-block, place-object, place-ring.
+//
+// COVERAGE. Each is a single command per press, and nothing ran any of them.
+// The object and ring rows use the TWO-SECTION act, through OFFSET and a zoomed,
+// parked view: a placement is stored in its SECTION's local space, and on the
+// fixture's one section at the origin "local" and "world" are one number.
+// Every world point is a whole pixel, so no row asks what `Math.round` does.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('paint-block, place-object and place-ring: one press, one command, at the point under the cursor', () => {
+  const W = SECTION_TILES_WIDE;
+  /** Section 1 sits SECTION_PIXEL_SIZE in; the camera shows its first columns. */
+  const VIEW = { vpX: SECTION_PIXEL_SIZE - 64, vpY: 32, zoom: 2 };
+  /** The client point over act1 section 1's LOCAL point (x, y), through OFFSET and VIEW. */
+  const atLocal1 = (x: number, y: number) => mouse(
+    OFFSET.left + (SECTION_PIXEL_SIZE + x - VIEW.vpX) * VIEW.zoom,
+    OFFSET.top + (y - VIEW.vpY) * VIEW.zoom,
+  );
+  function act1Sec(i: 0 | 1): Section {
+    const sec = useProjectStore.getState().project?.zones[0]?.acts.find((a) => a.id === 'act1')?.sections[i];
+    if (!sec) throw new Error(`map-viewport-mounted: no section ${i} in act1; the fixture moved`);
+    return sec;
+  }
+
+  afterEach(() => {
+    useEditorStore.getState().setSelectedRingPattern(0);
+    useEditorStore.getState().setSelectedObjectTypeId(null);
+  });
+
+  it('paint-block paints the 2x2 block on the 16px grid under the cursor, the pick at its top-left and the next three after it, as ONE undo entry', async () => {
+    // tool-meta.ts: "Click to place a 16×16 px block (2×2 tiles)".
+    const PICK = 20;
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-block');
+    ed.setSelectedTileIndex(PICK);
+    ed.setActiveSectionIndex(7);                // off the default, so a claim is visible
+    const at = { col: 5, row: 3 };              // odd both ways, so the snap does work
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(at.col, at.row));
+    const got = fgPainted('act1');
+    expect(got.map(([i]) => i), 'the block did not land on the 16px block under the cursor')
+      .toEqual(cellSubTiles(at.col >> 1, at.row >> 1));
+    const tiles = got.map(([, w]) => unpackNametableWord(w).tileIndex);
+    expect(tiles[0], 'the top-left tile is not the pick').toBe(PICK);
+    expect(asc(tiles), 'the block is not the pick and the three tiles after it').toEqual([PICK, PICK + 1, PICK + 2, PICK + 3]);
+    // PINNED AS FOUND: the order of the other three. No module states it; the
+    // only statement is MapViewport's own `tileOffset = dr * 2 + dc`, row-major.
+    expect(tiles, 'PINNED AS FOUND: the block reads row-major. If that changed on purpose, re-pin it')
+      .toEqual([PICK, PICK + 1, PICK + 2, PICK + 3]);
+    expect(useEditorStore.getState().activeSectionIndex, 'the press did not claim its section').toBe(0);
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'a block press must be ONE undo entry').toBe(1);
+    expect(fgPainted('act1'), 'and its undo must take all four tiles back').toHaveLength(0);
+  });
+
+  it('CONTROL: a paint-block press on a block already carrying those four tiles costs no undo entry', async () => {
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-block');
+    ed.setSelectedTileIndex(20);
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(5, 3));
+    win!.dispatch('mouseup', {});
+    expect(fgPainted('act1'), 'the first press did not paint, so this row measures nothing').toHaveLength(4);
+    s.on().onMouseDown(tileAt(4, 2));           // the same block, the same pick
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'a press that changed nothing put a second, empty entry on the stack').toBe(1);
+  });
+
+  it('place-object adds the picked type and subtype at the point under the cursor, in THAT section\'s local space, as ONE undo entry', async () => {
+    makeAct1TwoSections();
+    useViewStore.setState(VIEW);
+    const ed = useEditorStore.getState();
+    ed.setTool('place-object');
+    ed.setSelectedObjectTypeId('spring', 3);
+    ed.setActiveSectionIndex(7);
+    const local = { x: 300, y: 200 };
+    const s = await mountMap(OFFSET);
+    s.on().onMouseDown(atLocal1(local.x, local.y));
+    expect(act1Sec(1).objects, 'the object is not the pick, or not at section 1\'s local point under the cursor')
+      .toEqual([{ x: local.x, y: local.y, typeId: 'spring', subtype: 3 }]);
+    expect(act1Sec(0).objects, 'section 0 was written as well').toEqual([OBJ(64, 64)]);
+    expect(useEditorStore.getState().activeSectionIndex, 'the press did not claim section 1').toBe(1);
+    win!.dispatch('mouseup', {});
+    expect(undoDepth(), 'a placement must be ONE undo entry').toBe(1);
+    expect(act1Sec(1).objects, 'and its undo must remove the object').toHaveLength(0);
+  });
+
+  it('place-ring puts one ring at the local point, and a pattern puts every ring of it in ONE press', async () => {
+    makeAct1TwoSections();
+    useViewStore.setState(VIEW);
+    const ed = useEditorStore.getState();
+    ed.setTool('place-ring');
+    ed.setSelectedRingPattern(0);
+    expect(RING_PATTERNS[0].offsets, 'the premise: pattern 0 is one ring at the point').toEqual([{ dx: 0, dy: 0 }]);
+    const DIAMOND = RING_PATTERNS.findIndex((p) => p.name === 'Diamond');
+    expect(DIAMOND, 'the premise: a multi-ring pattern to pick').toBeGreaterThan(0);
+    const s = await mountMap(OFFSET);
+    s.on().onMouseDown(atLocal1(300, 200));
+    win!.dispatch('mouseup', {});
+    ed.setSelectedRingPattern(DIAMOND);
+    s.on().onMouseDown(atLocal1(400, 120));
+    win!.dispatch('mouseup', {});
+    expect(act1Sec(1).rings, 'the rings are not the patterns, at section 1\'s local points under the cursor')
+      .toEqual([{ x: 300, y: 200 }, ...RING_PATTERNS[DIAMOND].offsets.map((o) => ({ x: 400 + o.dx, y: 120 + o.dy }))]);
+    expect(act1Sec(0).rings, 'section 0 was written as well').toHaveLength(0);
+    expect(undoDepth(), 'each press must be ONE undo entry, the whole pattern included').toBe(2);
+    expect(act1Sec(1).rings).toHaveLength(0);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE FLIP KEYS, X AND Y, on a committed marquee.
+//
+// COVERAGE. `flipAxisForKey`, `resolveFlip` and region-flip's transforms are
+// pinned as pure functions, and the paste block pins the CLIPBOARD half (a flip
+// in paste mode keeps the tile set). What nothing drove is the in-place half
+// from the keyboard: the key reaching `performMapFlip`, the map rewritten as one
+// undo step, the key claimed, the hoisted chord guard in front of it, and the
+// marquee-tool scoping map-flip.ts argues for ("a flip REWRITES THE MAP").
+//
+// The region is 4 by 4 tiles, two by two 16px cells, every tile and every cell
+// distinct, so a mirror on either axis moves every word and a wrong axis shows.
+// Expected words come from region-flip's rule: the mirrored source cell, with
+// that axis's flip bit toggled.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('the flip keys mirror a committed marquee in place, only under the marquee tool, and never as a chord', () => {
+  const W = SECTION_TILES_WIDE;
+  const R = { col: 2, row: 2, w: 4, h: 4 };
+  const artTile = (r: number, c: number) => 1 + r * R.w + c;
+  const collShape = (cy: number, cx: number) => 20 + cy * 2 + cx;
+  const CELLS = { w: R.w / 2, h: R.h / 2 };
+
+  /** A keydown whose `preventDefault` a row can read back. */
+  function pressKey(k: string, mods: Parameters<typeof keydown>[1] = {}) {
+    let prevented = false;
+    return { ...keydown(k, mods), preventDefault: () => { prevented = true; }, wasPrevented: () => prevented };
+  }
+  const art = (r: number, c: number) =>
+    unpackNametableWord(sectionOf('act1').tileGrid.nametable[(R.row + r) * W + R.col + c]);
+  const coll = (cy: number, cx: number) =>
+    unpackCollisionCell(collPlane('act1', 'a')[cellSubTiles((R.col >> 1) + cx, (R.row >> 1) + cy)[0]]);
+  /** The region's art as [tile, hFlip, vFlip] and its plane-A cells as [shape, xFlip, yFlip]. */
+  function region() {
+    const a: Array<[number, boolean, boolean]> = [];
+    for (let r = 0; r < R.h; r++) for (let c = 0; c < R.w; c++) { const w = art(r, c); a.push([w.tileIndex, w.hFlip, w.vFlip]); }
+    const k: Array<[number, boolean, boolean]> = [];
+    for (let cy = 0; cy < CELLS.h; cy++) for (let cx = 0; cx < CELLS.w; cx++) { const w = coll(cy, cx); k.push([w.shape, w.xFlip, w.yFlip]); }
+    return { art: a, coll: k };
+  }
+  function expected(axis: 'h' | 'v') {
+    const a: Array<[number, boolean, boolean]> = [];
+    for (let r = 0; r < R.h; r++) {
+      for (let c = 0; c < R.w; c++) {
+        a.push(axis === 'h' ? [artTile(r, R.w - 1 - c), true, false] : [artTile(R.h - 1 - r, c), false, true]);
+      }
+    }
+    const k: Array<[number, boolean, boolean]> = [];
+    for (let cy = 0; cy < CELLS.h; cy++) {
+      for (let cx = 0; cx < CELLS.w; cx++) {
+        k.push(axis === 'h' ? [collShape(cy, CELLS.w - 1 - cx), true, false] : [collShape(CELLS.h - 1 - cy, cx), false, true]);
+      }
+    }
+    return { art: a, coll: k };
+  }
+  let original: ReturnType<typeof region>;
+
+  beforeEach(() => {
+    seedCollision();
+    useToastStore.setState({ toasts: [] });
+    const nt = sectionOf('act1').tileGrid.nametable;
+    for (let r = 0; r < R.h; r++) {
+      for (let c = 0; c < R.w; c++) nt[(R.row + r) * W + R.col + c] = packNametableWord(artTile(r, c), 0, false, false, false);
+    }
+    for (let cy = 0; cy < CELLS.h; cy++) {
+      for (let cx = 0; cx < CELLS.w; cx++) {
+        for (const i of cellSubTiles((R.col >> 1) + cx, (R.row >> 1) + cy)) collPlane('act1', 'a')[i] = collWord(collShape(cy, cx));
+      }
+    }
+    const ed = useEditorStore.getState();
+    ed.setTool('marquee');
+    ed.setMarquee({
+      sectionIndex: 0,
+      ...snapMarquee(R.col, R.row, R.col + R.w - 1, R.row + R.h - 1, effectiveGranularity('block', false)),
+    });
+    expect(ed.marquee ?? useEditorStore.getState().marquee, 'the premise: the marquee is the planted region')
+      .toEqual({ sectionIndex: 0, ...R });
+    original = region();
+  });
+
+  afterEach(() => { useEditorStore.getState().setMarquee(null); });
+
+  for (const [key, axis, words] of [['x', 'h', 'left to right'], ['y', 'v', 'top to bottom']] as const) {
+    it(`${key.toUpperCase()} mirrors the selection ${words}, art AND collision, as ONE undo step, and claims the key`, async () => {
+      expect(expected(axis), 'ANTI-VACUOUS: the mirror moves every word').not.toEqual(original);
+      await mountMap();
+      const e = pressKey(key);
+      expect(win!.dispatch('keydown', e), 'nothing was listening').toBeGreaterThan(0);
+      expect(region(), `${key.toUpperCase()} did not mirror the region ${words}`).toEqual(expected(axis));
+      expect(e.wasPrevented(), 'the flip key was left to the browser as well').toBe(true);
+      expect(undoDepth(), 'a flip must be ONE undo step').toBe(1);
+      expect(region(), 'and its undo must put the region back').toEqual(original);
+    });
+  }
+
+  it('GUARD: X or Y with Ctrl, Alt or Meta is somebody else\'s chord and flips nothing', async () => {
+    await mountMap();
+    for (const mod of ['ctrlKey', 'altKey', 'metaKey'] as const) {
+      for (const key of ['x', 'y']) win!.dispatch('keydown', pressKey(key, { [mod]: true }));
+    }
+    expect(region(), 'a modified flip key rewrote the map').toEqual(original);
+    expect(focusedHistory()?.canUndo ?? false, 'and put it on the undo stack').toBe(false);
+  });
+
+  it('CONTROL: under another tool X leaves the selection alone and does not claim the key', async () => {
+    // map-flip.ts: "An author who has switched to paint-tile and types `x` is
+    // typing at his paint tool, not at a rectangle he selected minutes ago."
+    useEditorStore.getState().setTool('paint-tile');
+    expect(useEditorStore.getState().marquee, 'the premise: the marquee outlives the tool switch').not.toBeNull();
+    await mountMap();
+    const e = pressKey('x');
+    win!.dispatch('keydown', e);
+    expect(region(), 'X under the paint tool rewrote a selection made with another tool').toEqual(original);
+    expect(focusedHistory()?.canUndo ?? false).toBe(false);
+    expect(e.wasPrevented(), 'a key that did nothing was swallowed').toBe(false);
   });
 });
