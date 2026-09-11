@@ -1,5 +1,5 @@
 import type { ComposerDoc } from './composer-buffer';
-import type { MapClipboard } from '../editing/map-clipboard';
+import type { MapRegion } from '../editing/map-clipboard';
 import { copyFromSection } from '../editing/map-clipboard';
 import { collisionPaintWord } from '../editing/collision-word';
 import type { Section } from '../model/s4-types';
@@ -32,8 +32,13 @@ export function paintDocCollision(
  *  (cell 0,0) — art is out of scope (chunk art still comes from stamps/save).
  *  Size-clamped to the smaller of the clipboard's and the doc's cell grids so
  *  an oversized clipboard silently truncates instead of overflowing. Returns
- *  true if anything changed. */
-export function applyClipboardCollisionToDoc(doc: ComposerDoc, clip: MapClipboard): boolean {
+ *  true if anything changed.
+ *
+ *  Takes a `MapRegion`, not the clipboard, because it writes no nametable word:
+ *  a collision word's shape number indexes the collision shape set, not the
+ *  tile set, so the clipboard's tile-set identity (PASTE-ACROSS-TILESETS) is
+ *  not a question this writer has to answer. */
+export function applyClipboardCollisionToDoc(doc: ComposerDoc, clip: MapRegion): boolean {
   const docCellsW = doc.widthTiles >> 1, docCellsH = doc.heightTiles >> 1;
   const clipCellsW = clip.widthTiles >> 1, clipCellsH = clip.heightTiles >> 1;
   const w = Math.min(docCellsW, clipCellsW);

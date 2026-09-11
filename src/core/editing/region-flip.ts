@@ -107,7 +107,7 @@
 import { packNametableWord } from '../model/s4-types';
 import type { Section } from '../model/s4-types';
 import { packCollisionCell } from '../collision/collision-cell-word';
-import type { MapClipboard } from './map-clipboard';
+import type { MapRegion } from './map-clipboard';
 import { copyFromSection } from './map-clipboard';
 import { buildRegionWriteCommand } from './map-stamp';
 import { withLinkBreaks } from './chunk-links';
@@ -200,8 +200,16 @@ function flipPlane(
  * the footprint's cell count is copied verbatim rather than flipped — that is
  * the art-only clipboard's length-0 planes, and refusing to touch them is what
  * stops a flip from inventing collision.
+ *
+ * GENERIC OVER THE REGION, AND THE SPREAD IS LOAD-BEARING. The in-place flip
+ * hands this a bare `MapRegion`; the paste-mode flip hands it the clipboard,
+ * which also carries the TILE SET its words index (PASTE-ACROSS-TILESETS). A
+ * mirror does not change which tile set a word's number refers to, so whatever
+ * the input carries besides the three planes comes through unchanged. A field
+ * list here would drop the tile set, and the next click would refuse the
+ * author's own paste in the zone he copied it from.
  */
-export function flipClipboard(clip: MapClipboard, axis: FlipAxis): MapClipboard {
+export function flipClipboard<T extends MapRegion>(clip: T, axis: FlipAxis): T {
   const cellsW = clip.widthTiles >> 1, cellsH = clip.heightTiles >> 1;
   const cells = cellsW * cellsH;
   const plane = (src: Uint16Array): Uint16Array => (
@@ -210,13 +218,11 @@ export function flipClipboard(clip: MapClipboard, axis: FlipAxis): MapClipboard 
       : new Uint16Array(src)
   );
   return {
-    widthTiles: clip.widthTiles,
-    heightTiles: clip.heightTiles,
+    ...clip,
     nametable: flipPlane(clip.nametable, clip.widthTiles, clip.heightTiles, axis,
       (word) => flipArtWord(word, axis)),
     collisionA: plane(clip.collisionA),
     collisionB: plane(clip.collisionB),
-    artOnly: clip.artOnly,
   };
 }
 

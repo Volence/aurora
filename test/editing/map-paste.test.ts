@@ -3,7 +3,7 @@ import { createSection, SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../src
 import type { S4Level } from '../../src/core/editing/commands';
 import { EditHistory } from '../../src/core/editing/history';
 import { buildPasteCommand, copyFromSection } from '../../src/core/editing/map-clipboard';
-import type { MapClipboard } from '../../src/core/editing/map-clipboard';
+import type { MapRegion } from '../../src/core/editing/map-clipboard';
 import { cellTileIndices } from '../../src/core/collision/collision-cell';
 import { packCollisionCell } from '../../src/core/collision/collision-cell-word';
 
@@ -19,7 +19,7 @@ const WORD_B = packCollisionCell({ shape: 9, xFlip: true, yFlip: false, solidity
 
 /** Build a source section with distinct nametable words and A/B collision
  *  words over a w*h (even) region at (col,row), then copy it out. */
-function buildSourceClip(col: number, row: number, w: number, h: number): MapClipboard {
+function buildSourceClip(col: number, row: number, w: number, h: number): MapRegion {
   const source = seededSection();
   for (let r = 0; r < h; r++) {
     for (let c = 0; c < w; c++) {

@@ -60,7 +60,9 @@ import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { switchFacet } from '../../workspace/facet-tools';
 import { documentHistoryHub } from '../../state/history-hub';
 import type { ObjectPlacement, Section } from '../../../core/model/s4-types';
-import { unpackNametableWord, SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../core/model/s4-types';
+import {
+  unpackNametableWord, packNametableWord, SECTION_TILES_WIDE, SECTION_TILES_HIGH,
+} from '../../../core/model/s4-types';
 import { BG_WIDTH } from '../../../core/formats/bg-tiles';
 import {
   BG_OVERRIDE_CONSUMER_OUT_DIR, LAYOUT_TILE_INDEX_MASK, type BgOverrideDocument,
@@ -2019,11 +2021,17 @@ describe('paste mode commits at the hovered, snapped origin, and a middle drag s
   const HOVER = { col: 3, row: 3 };
 
   function clip(artOnly: boolean): MapClipboard {
+    // The OPEN zone's own tile set, read at the call: these rows paste where
+    // they copied, and a clipboard from any other tile set is refused
+    // (PASTE-ACROSS-TILESETS, the nested block at the end of this one).
+    const tileset = useProjectStore.getState().project?.zones[0]?.tileset;
+    if (!tileset) throw new Error('map-viewport-mounted: the fixture has no zone tile set to copy from');
     return {
       widthTiles: 2, heightTiles: 2, nametable: Uint16Array.from(CLIP_ART),
       collisionA: artOnly ? new Uint16Array(0) : Uint16Array.of(collWord(CLIP_SHAPE.a)),
       collisionB: artOnly ? new Uint16Array(0) : Uint16Array.of(collWord(CLIP_SHAPE.b)),
       artOnly,
+      tileset,
     };
   }
   /** The clipboard's art at `base`, as the [index, word] pairs the section must carry. */
@@ -2340,6 +2348,328 @@ describe('paste mode commits at the hovered, snapped origin, and a middle drag s
       expect(ed().marquee, 'a marquee from the other project survived the open').toBeNull();
       expect(ed().pasting, 'the other project\'s paste stayed armed').toBe(false);
     });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // THE CLIPBOARD'S WORDS INDEX THE TILE SET THEY WERE COPIED FROM
+  // (PASTE-ACROSS-TILESETS; docs/reviews/2026-09-11-paste-across-tilesets.md)
+  //
+  // A nametable word is a tile NUMBER in the open zone's tile set
+  // (`sectionRenderer.prepareTiles(zone.tileset.tiles, ...)`, and the ghost
+  // rasterises the clipboard against the same). The clipboard outlives act,
+  // zone and project switches on purpose, so a Ctrl+V re-armed in another zone
+  // wrote the first zone's tile numbers into the second zone's tile set:
+  // different pictures, silently.
+  //
+  // THE FIXTURE GIVES THE TWO ZONES DIFFERENT TILES AT EVERY INDEX USED, and
+  // the rows assert that before trusting anything, so "nothing was written" can
+  // never be the vacuous reading of two tile sets that happened to agree. The
+  // copy goes through the real marquee drag and the real Ctrl+C, because the
+  // tile set a clipboard belongs to is decided at the copy and nowhere else.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  describe('a paste is refused where the copied words would index another tile set', () => {
+    const OTHER = 'mgz';
+    const TILES = 8;
+    /** Tile i is solid colour pick(i). The source zone is i and the other zone
+     *  15 - i, which differ at every index because 15 is odd. */
+    const tilesOf = (pick: (i: number) => number) => ({
+      tiles: Array.from({ length: TILES }, (_, i) => ({ pixels: new Uint8Array(64).fill(pick(i)) })),
+    });
+    const FG_OTHER = 0x0303;
+    /** One 16px block, so the copy carries collision as well as art. */
+    const COPY = { from: { col: 2, row: 2 }, to: { col: 3, row: 3 } };
+    const copyRect = () => ({
+      sectionIndex: 0,
+      ...snapMarquee(COPY.from.col, COPY.from.row, COPY.to.col, COPY.to.row, effectiveGranularity('block', false)),
+    });
+    /** Tile numbers 1 to 4, planted where the copy is made, so the clipboard
+     *  holds words that are neither a section's fill nor zero. */
+    const SOURCE_WORDS = [1, 2, 3, 4].map((t) => packNametableWord(t, 0, false, false, false));
+    /** Far from the copy, so a paste in the source act is a visible change
+     *  and not the region pasted onto itself. Odd, so the snap does work. */
+    const PASTE_AT = { col: 9, row: 5 };
+    const ed = () => useEditorStore.getState();
+
+    function zone(id: string) {
+      const z = useProjectStore.getState().project?.zones.find((x) => x.id === id);
+      if (!z) throw new Error(`map-viewport-mounted: no zone ${id}; the fixture moved`);
+      return z;
+    }
+    function sectionIn(zoneId: string, actId: string): Section {
+      const sec = zone(zoneId).acts.find((a) => a.id === actId)?.sections[0];
+      if (!sec) throw new Error(`map-viewport-mounted: no section 0 in ${zoneId}/${actId}; the fixture moved`);
+      return sec;
+    }
+    /** Focus an act of ANY zone the way the shell does: the store and the tab. */
+    function focusZoneAct(zoneId: string, actId: string): void {
+      useProjectStore.getState().setCurrentAct(zoneId, actId);
+      useSessionStore.setState({ activeId: `level:${zoneId}:${actId}` });
+    }
+
+    beforeEach(() => {
+      const p = twoActProject() as unknown as { zones: Array<Record<string, unknown>> };
+      p.zones[0].tileset = tilesOf((i) => i);
+      p.zones.push({
+        id: OTHER, name: 'MGZ', tileset: tilesOf((i) => 15 - i),
+        palette: { lines: [{ colors: [{ r: 0, g: 0, b: 0, a: 255 }] }] },
+        acts: [{
+          id: 'act1', name: 'act1', gridWidth: 1, gridHeight: 1,
+          sections: [section([OBJ(64, 64)], FG_OTHER)],
+          bgLayout: bgLayout(BG_FILL.act1), bgTiles: bgTiles(),
+        }],
+      });
+      useProjectStore.setState({ project: p as never });
+      focusAct('act1');
+      seedCollision();
+      const other = sectionIn(OTHER, 'act1');
+      other.collisionEdit = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(5));
+      other.collisionEditB = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(6));
+      const src = sectionIn('ojz', 'act1');
+      for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 2; c++) {
+          src.tileGrid.nametable[(COPY.from.row + r) * SECTION_TILES_WIDE + COPY.from.col + c] = SOURCE_WORDS[r * 2 + c];
+        }
+      }
+    });
+
+    /** Every word plane of every section of every act of every zone. */
+    type Planes = Array<{ where: string; words: Uint16Array }>;
+    function planes(): Planes {
+      const out: Planes = [];
+      for (const z of useProjectStore.getState().project?.zones ?? []) {
+        for (const a of z.acts) {
+          a.sections.forEach((sec, i) => {
+            if (!sec) return;
+            const at = `${z.id}/${a.id}/s${i}`;
+            out.push({ where: `${at}/fg`, words: new Uint16Array(sec.tileGrid.nametable) });
+            if (sec.collisionEdit) out.push({ where: `${at}/collA`, words: new Uint16Array(sec.collisionEdit) });
+            if (sec.collisionEditB) out.push({ where: `${at}/collB`, words: new Uint16Array(sec.collisionEditB) });
+          });
+        }
+      }
+      return out;
+    }
+    const hex = (w: number) => `0x${w.toString(16).padStart(4, '0')}`;
+    /** Every word that differs from `before`, named, so a failure says WHAT landed where. */
+    function changesSince(before: Planes): string[] {
+      const after = planes();
+      const out: string[] = [];
+      if (after.length !== before.length) out.push(`plane count ${before.length} became ${after.length}`);
+      for (const b of before) {
+        const a = after.find((x) => x.where === b.where);
+        if (!a) { out.push(`${b.where} is gone`); continue; }
+        for (let i = 0; i < b.words.length; i++) {
+          if (a.words[i] !== b.words[i]) out.push(`${b.where}[${i}] ${hex(b.words[i])} became ${hex(a.words[i])}`);
+        }
+      }
+      return out;
+    }
+
+    /** The author's copy: a marquee drag over the planted words, then Ctrl+C,
+     *  in the source zone with the map on screen. Both premises asserted. */
+    async function copyInSource(): Promise<Surface> {
+      ed().setTool('marquee');
+      ed().setMarqueeGranularity('block');
+      ed().setMarqueeSnapInvert(false);
+      ed().setMarquee(null);
+      const s = await mountMap();
+      s.on().onMouseDown(tileAt(COPY.from.col, COPY.from.row));
+      s.on().onMouseMove(tileAt(COPY.to.col, COPY.to.row));
+      win!.dispatch('mouseup', {});
+      expect(ed().marquee, 'the drag committed no marquee, so nothing below was copied').toEqual(copyRect());
+      win!.dispatch('keydown', keydown('c', { ctrlKey: true }));
+      expect([...(ed().mapClipboard?.nametable ?? [])], 'Ctrl+C did not copy the planted words')
+        .toEqual(SOURCE_WORDS);
+      return s;
+    }
+
+    /** Hover then press at PASTE_AT, then release: a whole click. */
+    function clickAtPaste(s: Surface) {
+      s.on().onMouseMove(tileAt(PASTE_AT.col, PASTE_AT.row));
+      const e = tileAt(PASTE_AT.col, PASTE_AT.row);
+      s.on().onMouseDown(e);
+      win!.dispatch('mouseup', {});
+      return e;
+    }
+
+    /** ANTI-VACUOUS: every copied word names a tile that is a DIFFERENT picture
+     *  in the other zone, so a paste there would visibly put the wrong tile down. */
+    function assertTheTileSetsDisagree(): void {
+      const clip = ed().mapClipboard;
+      expect(clip, 'nothing was copied').not.toBeNull();
+      for (const w of clip!.nametable) {
+        const t = unpackNametableWord(w).tileIndex;
+        expect(t, 'a copied word names a tile outside both fixture tile sets').toBeLessThan(TILES);
+        expect([...zone(OTHER).tileset.tiles[t].pixels],
+          `tile ${t} is the same picture in both zones, so a wrong paste could not show`)
+          .not.toEqual([...zone('ojz').tileset.tiles[t].pixels]);
+      }
+    }
+
+    it('Ctrl+V in a zone with another tile set is REFUSED out loud, and nothing is written', async () => {
+      const s = await copyInSource();
+      assertTheTileSetsDisagree();
+      focusZoneAct(OTHER, 'act1');
+      useToastStore.setState({ toasts: [] });
+      const before = planes();
+      win!.dispatch('keydown', keydown('v', { ctrlKey: true }));
+      const armed = ed().pasting;
+      clickAtPaste(s);
+      expect(changesSince(before),
+        'the other zone took the copied tile numbers, which are different tiles in its tile set').toEqual([]);
+      expect(armed, 'Ctrl+V armed a paste over another tile set').toBe(false);
+      const said = toastsMatching('another tile set');
+      expect(said, 'the refusal was silent').toHaveLength(1);
+      expect(said[0], 'the refusal did not say what a paste here would do').toContain('different tiles');
+      expect(focusedHistory()?.canUndo ?? false, 'a refusal put an entry on the undo stack').toBe(false);
+    });
+
+    it('a paste armed any other way is refused at the CLICK too, and nothing is written', async () => {
+      // The store's own arm, around Ctrl+V, so this row measures the commit's
+      // check and not the key's: the write must not trust whoever armed it.
+      const s = await copyInSource();
+      assertTheTileSetsDisagree();
+      focusZoneAct(OTHER, 'act1');
+      ed().setPasting(true);
+      expect(ed().pasting, 'the premise: paste mode is armed over the other zone').toBe(true);
+      useToastStore.setState({ toasts: [] });
+      const before = planes();
+      const e = clickAtPaste(s);
+      expect(changesSince(before),
+        'the click wrote the copied tile numbers into a tile set they do not index').toEqual([]);
+      expect(toastsMatching('another tile set'), 'the refused click was silent').toHaveLength(1);
+      expect(ed().pasting, 'a refused paste stayed armed, so its ghost stays under the cursor').toBe(false);
+      expect(e.wasPrevented(), 'the refused click fell through to the tool').toBe(true);
+      expect(focusedHistory()?.canUndo ?? false, 'a refusal put an entry on the undo stack').toBe(false);
+    });
+
+    /** Where a paste at PASTE_AT lands: the copy carries collision, so the
+     *  origin snaps to the 16px grid (`pasteBaseStep` is 2 for such a clipboard). */
+    const PASTE_BASE = { col: Math.floor(PASTE_AT.col / 2) * 2, row: Math.floor(PASTE_AT.row / 2) * 2 };
+    /** The 2x2 words at PASTE_BASE in one act's section, row-major like SOURCE_WORDS. */
+    function wordsAtPaste(zoneId: string, actId: string): number[] {
+      const nt = sectionIn(zoneId, actId).tileGrid.nametable;
+      return [0, 1].flatMap((r) => [0, 1].map((c) =>
+        nt[(PASTE_BASE.row + r) * SECTION_TILES_WIDE + PASTE_BASE.col + c]));
+    }
+
+    it('CONTROL: in the act it was copied in, the same gestures paste exactly as before', async () => {
+      const s = await copyInSource();
+      expect(wordsAtPaste('ojz', 'act1'), 'ANTI-VACUOUS: the paste target already holds the copy')
+        .not.toEqual(SOURCE_WORDS);
+      useToastStore.setState({ toasts: [] });
+      win!.dispatch('keydown', keydown('v', { ctrlKey: true }));
+      expect(ed().pasting, 'Ctrl+V did not arm in the tile set the words came from').toBe(true);
+      clickAtPaste(s);
+      expect(wordsAtPaste('ojz', 'act1'), 'the paste did not land').toEqual(SOURCE_WORDS);
+      expect(toastsMatching('another tile set'), 'a paste into its own tile set was refused').toHaveLength(0);
+    });
+
+    it('act to act in ONE zone pastes, because every act of a zone draws with the zone\'s tile set', async () => {
+      const s = await copyInSource();
+      expect(zone('ojz').acts.map((a) => a.id), 'the premise: two acts under one zone tile set')
+        .toEqual(['act1', 'act2']);
+      focusZoneAct('ojz', 'act2');
+      useToastStore.setState({ toasts: [] });
+      win!.dispatch('keydown', keydown('v', { ctrlKey: true }));
+      expect(ed().pasting, 'Ctrl+V refused a paste into another act of the same zone').toBe(true);
+      clickAtPaste(s);
+      expect(wordsAtPaste('ojz', 'act2'), 'the paste did not land in the other act').toEqual(SOURCE_WORDS);
+      expect(toastsMatching('another tile set'), 'act to act in one zone was called another tile set')
+        .toHaveLength(0);
+    });
+
+    it('a refusal keeps the clipboard: back in the zone it came from, it pastes again', async () => {
+      const s = await copyInSource();
+      focusZoneAct(OTHER, 'act1');
+      useToastStore.setState({ toasts: [] });
+      win!.dispatch('keydown', keydown('v', { ctrlKey: true }));
+      expect(toastsMatching('another tile set'), 'the premise: the other zone refused').toHaveLength(1);
+      focusZoneAct('ojz', 'act1');
+      win!.dispatch('keydown', keydown('v', { ctrlKey: true }));
+      expect(ed().pasting, 'the clipboard did not survive the refusal and the trip back').toBe(true);
+      clickAtPaste(s);
+      expect(wordsAtPaste('ojz', 'act1'), 'the paste back at the source did not land').toEqual(SOURCE_WORDS);
+    });
+
+    it('a project opened over the source, with the SAME zone and act ids, is another tile set too', async () => {
+      // Two checkouts of one tree, and a reopen of this one, are this shape: the
+      // ids agree and the tile set is a fresh load that may differ on disk.
+      const s = await copyInSource();
+      const next = twoActProject() as unknown as { zones: Array<Record<string, unknown>> };
+      next.zones[0].tileset = tilesOf((i) => 15 - i);
+      useProjectStore.getState().openLoaded({
+        config: { basePath: '/paste-tileset/another-checkout', zones: [] },
+        project: next,
+        collisionProfiles: null, capabilities: null, legacyAtlasMerged: false,
+      } as never);
+      focusZoneAct('ojz', 'act1');
+      assertTheTileSetsDisagreeWith(zone('ojz').tileset);
+      useToastStore.setState({ toasts: [] });
+      const before = planes();
+      win!.dispatch('keydown', keydown('v', { ctrlKey: true }));
+      const armed = ed().pasting;
+      clickAtPaste(s);
+      expect(changesSince(before), 'the other checkout took this one\'s tile numbers').toEqual([]);
+      expect(armed, 'Ctrl+V armed a paste into another project because the ids matched').toBe(false);
+      expect(toastsMatching('another tile set'), 'the refusal was silent').toHaveLength(1);
+    });
+
+    it('a flip in paste mode keeps the tile set, so the mirrored paste still lands where it was copied', async () => {
+      const s = await copyInSource();
+      win!.dispatch('keydown', keydown('v', { ctrlKey: true }));
+      expect(ed().pasting, 'the premise: Ctrl+V armed').toBe(true);
+      useToastStore.setState({ toasts: [] });
+      win!.dispatch('keydown', keydown('x'));
+      const mirrored = [...(ed().mapClipboard?.nametable ?? [])];
+      expect(mirrored, 'the premise: X mirrored the pending paste').not.toEqual(SOURCE_WORDS);
+      clickAtPaste(s);
+      expect(wordsAtPaste('ojz', 'act1'), 'the mirrored paste did not land in its own tile set').toEqual(mirrored);
+      expect(toastsMatching('another tile set'), 'a flip made the author\'s own paste foreign').toHaveLength(0);
+    });
+
+    it('the tile set is the OPEN zone\'s at the copy: copied in the other zone, it pastes there and is refused in the first', async () => {
+      // Every row above copies in the project's FIRST zone, so a capture that
+      // took `zones[0]` instead of the open zone would pass all of them.
+      const other = sectionIn(OTHER, 'act1');
+      for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 2; c++) {
+          other.tileGrid.nametable[(COPY.from.row + r) * SECTION_TILES_WIDE + COPY.from.col + c] = SOURCE_WORDS[r * 2 + c];
+        }
+      }
+      focusZoneAct(OTHER, 'act1');
+      const s = await copyInSource();
+      assertTheTileSetsDisagreeWith(zone('ojz').tileset);
+      useToastStore.setState({ toasts: [] });
+      win!.dispatch('keydown', keydown('v', { ctrlKey: true }));
+      expect(ed().pasting, 'Ctrl+V refused a paste in the zone the copy was made in').toBe(true);
+      clickAtPaste(s);
+      expect(wordsAtPaste(OTHER, 'act1'), 'the paste did not land in the zone it was copied in')
+        .toEqual(SOURCE_WORDS);
+      focusZoneAct('ojz', 'act1');
+      const before = planes();
+      win!.dispatch('keydown', keydown('v', { ctrlKey: true }));
+      const armed = ed().pasting;
+      clickAtPaste(s);
+      expect(changesSince(before), 'the first zone took the other zone\'s tile numbers').toEqual([]);
+      expect(armed, 'Ctrl+V armed in a zone the copy was not made in').toBe(false);
+      expect(toastsMatching('another tile set'), 'the refusal was silent').toHaveLength(1);
+    });
+
+    /** The same anti-vacuous check against a tile set other than the fixture's
+     *  second zone: every copied word names a different picture in `target`. */
+    function assertTheTileSetsDisagreeWith(target: { tiles: Array<{ pixels: Uint8Array }> }): void {
+      const clip = ed().mapClipboard;
+      expect(clip, 'nothing was copied').not.toBeNull();
+      expect(target, 'the premise: the target is not the tile set the copy came from').not.toBe(clip!.tileset);
+      for (const w of clip!.nametable) {
+        const t = unpackNametableWord(w).tileIndex;
+        expect(t, 'a copied word names a tile outside the target tile set').toBeLessThan(target.tiles.length);
+        expect([...target.tiles[t].pixels], `tile ${t} is the same picture in both tile sets`)
+          .not.toEqual([...clip!.tileset.tiles[t].pixels]);
+      }
+    }
   });
 });
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   snapMarquee, isBlockAligned, copyFromSection, copyChunkToClipboard,
   buildPasteCommand, effectivePasteLayers, pasteBaseStep, selectionSizeLabel, artOnlyReason,
-  effectiveGranularity,
+  effectiveGranularity, clipboardFitsTileset,
 } from '../map-clipboard';
 import { buildRegionWriteCommand } from '../map-stamp';
 import { selectionToChunk } from '../selection-to-chunk';
@@ -377,13 +377,34 @@ describe('7. saving as a chunk is refused rather than made lossy', () => {
     + 'collision planes are already short of its footprint (chunkCellCount floors)', () => {
     const odd = createChunkDef('c', 'c', 5, 3);
     expect(odd.collisionA.length).toBe((5 >> 1) * (3 >> 1));   // 2, for a 5x3 footprint
-    const clip = copyChunkToClipboard(odd);
+    const clip = copyChunkToClipboard(odd, { tiles: [] });
     expect(clip.artOnly).toBe(true);
     expect(clip.collisionA.length).toBe(0);
     // ...while an even chunk still carries its planes.
-    const even = copyChunkToClipboard(createChunkDef('d', 'd', 4, 4));
+    const even = copyChunkToClipboard(createChunkDef('d', 'd', 4, 4), { tiles: [] });
     expect(even.artOnly).toBe(false);
     expect(even.collisionA.length).toBe(4);
+  });
+});
+
+describe('7c. the clipboard remembers the tile set its words index (PASTE-ACROSS-TILESETS)', () => {
+  /** A one-tile tile set. Two calls make two tile sets with identical pixels. */
+  const tileset = () => ({ tiles: [{ pixels: new Uint8Array(64).fill(3) }] });
+
+  it('7c-1. a chunk copied to the clipboard carries the very tile set it was drawn against', () => {
+    const ts = tileset();
+    expect(copyChunkToClipboard(createChunkDef('c', 'c', 4, 4), ts).tileset).toBe(ts);
+  });
+
+  it('7c-2. only that very tile set fits: a twin with the same pixels does not, and no tile set never does', () => {
+    const ts = tileset();
+    const clip = copyChunkToClipboard(createChunkDef('c', 'c', 4, 4), ts);
+    expect(clipboardFitsTileset(clip, ts), 'the tile set the copy came from was refused').toBe(true);
+    const twin = tileset();
+    expect(twin, 'ANTI-VACUOUS: the twin has exactly the same pixels').toEqual(ts);
+    expect(clipboardFitsTileset(clip, twin), 'a tile set that merely looks the same was trusted').toBe(false);
+    expect(clipboardFitsTileset(clip, null), 'no open tile set was trusted').toBe(false);
+    expect(clipboardFitsTileset(clip, undefined), 'no open tile set was trusted').toBe(false);
   });
 });
 

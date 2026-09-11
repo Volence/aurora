@@ -31,7 +31,7 @@ import { withLinkBreaks, chunkOriginAt } from '../../core/editing/chunk-links';
 import {
   snapMarquee, copyFromSection, buildPasteCommand, isBlockAligned,
   effectivePasteLayers, pasteBaseStep, selectionSizeLabel, artOnlyReason,
-  effectiveGranularity,
+  effectiveGranularity, clipboardFitsTileset, OTHER_TILESET_REFUSAL,
 } from '../../core/editing/map-clipboard';
 import type { MapClipboard } from '../../core/editing/map-clipboard';
 import { regionPreviewCanvas, publishPasteGhostReport } from '../canvas/region-preview';
@@ -1914,8 +1914,16 @@ export default function MapViewport() {
         const marquee = useEditorStore.getState().marquee;
         if (marquee) {
           const section = act?.sections[marquee.sectionIndex];
-          if (section) {
-            const clip = copyFromSection(section, marquee.col, marquee.row, marquee.w, marquee.h);
+          const zone = getCurrentZone(state);
+          if (section && zone) {
+            // THE TILE SET IS REMEMBERED HERE, at the copy, because this is the
+            // only moment anything knows which tile set these words' numbers
+            // belong to (PASTE-ACROSS-TILESETS). Ctrl+V and the commit click
+            // compare it with the open zone's and refuse on a difference.
+            const clip: MapClipboard = {
+              ...copyFromSection(section, marquee.col, marquee.row, marquee.w, marquee.h),
+              tileset: zone.tileset,
+            };
             useEditorStore.getState().setMapClipboard(clip);
             // WHAT WAS COPIED, in its own units, and — when it is art-only —
             // WHY, at the moment the author would otherwise assume collision
@@ -1941,7 +1949,18 @@ export default function MapViewport() {
       // handleMouseMove) when there's something to paste. A no-op Ctrl+V (empty
       // map clipboard) falls through, mirroring the Ctrl+C no-op above.
       if (chord === 'paste') {
-        if (useEditorStore.getState().mapClipboard) {
+        const clip = useEditorStore.getState().mapClipboard;
+        if (clip) {
+          // REFUSED, OUT LOUD, WHERE THE WORDS WOULD INDEX ANOTHER TILE SET
+          // (PASTE-ACROSS-TILESETS). The clipboard survives a switch on
+          // purpose, so going back to where it was copied still pastes; here,
+          // nothing is armed and the key is still claimed, because a Ctrl+V
+          // that fell through to the page would read as a dead key.
+          if (!clipboardFitsTileset(clip, getCurrentZone(state)?.tileset)) {
+            useToastStore.getState().addToast(OTHER_TILESET_REFUSAL, 'warning');
+            e.preventDefault();
+            return;
+          }
           useEditorStore.getState().setPasting(true);
           e.preventDefault();
           return;
@@ -3257,6 +3276,18 @@ export default function MapViewport() {
       const hover = pasteHoverRef.current;
       const level = getActiveLevel();
       if (clip && hover && level) {
+        // THE WRITE CHECKS FOR ITSELF, and does not trust whoever armed it
+        // (PASTE-ACROSS-TILESETS). Ctrl+V refuses first and an act, zone or
+        // project change disarms, so no shipped gesture reaches this with the
+        // wrong tile set; `setPasting` is a public store action all the same.
+        // Paste mode is left too, so no ghost drawn from another tile set's
+        // numbers stays under the cursor.
+        if (!clipboardFitsTileset(clip, getCurrentZone(useProjectStore.getState())?.tileset)) {
+          useToastStore.getState().addToast(OTHER_TILESET_REFUSAL, 'warning');
+          useEditorStore.getState().setPasting(false);
+          e.preventDefault();
+          return;
+        }
         const section = getSectionByIndex(hover.sectionIndex);
         if (section) {
           ensureCollisionPlanes(section);

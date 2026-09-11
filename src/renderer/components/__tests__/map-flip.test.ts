@@ -127,8 +127,12 @@ function clip(): MapClipboard {
     collisionA: new Uint16Array([9]),
     collisionB: new Uint16Array([0]),
     artOnly: false,
+    tileset: FLIP_TILESET,
   };
 }
+/** The tile set the fixture clipboard's words belong to. A flip must carry
+ *  this very object through (PASTE-ACROSS-TILESETS). */
+const FLIP_TILESET = { tiles: [] };
 
 function resetEditor(): void {
   const ed = useEditorStore.getState();
@@ -184,6 +188,25 @@ describe('performMapFlip: one action, both surfaces', () => {
     expect(after).not.toBe(c0);
     // ...and the row is not vacuous: this fixture is genuinely asymmetric.
     expect([...after.nametable]).not.toEqual([...c0.nametable]);
+    resetEditor();
+  });
+
+  // A mirror does not change which tile set a word's number refers to, so the
+  // flipped clipboard must belong to the very tile set the original did
+  // (PASTE-ACROSS-TILESETS). Dropped or replaced, the next click would refuse
+  // the author's own paste in the zone he copied it from.
+  it('carries the clipboard\'s TILE SET through the flip: the same object, not a copy', () => {
+    resetEditor();
+    const c0 = clip();
+    const ed = useEditorStore.getState();
+    ed.setMapClipboard(c0);
+    ed.setPasting(true);
+
+    performMapFlip('h');
+    const after = useEditorStore.getState().mapClipboard!;
+    expect(after, 'the premise: the flip built a new clipboard').not.toBe(c0);
+    expect(after.tileset, 'the flip dropped or replaced the tile set the words belong to')
+      .toBe(FLIP_TILESET);
     resetEditor();
   });
 
