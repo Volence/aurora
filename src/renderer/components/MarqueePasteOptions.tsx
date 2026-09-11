@@ -5,7 +5,7 @@ import { useToastStore } from '../state/toastStore';
 import type { PasteLayers, MarqueeGranularity } from '../../core/editing/map-clipboard';
 import {
   isBlockAligned, selectionSizeLabel, artOnlyReason, copyFromSection,
-  effectiveGranularity,
+  effectiveGranularity, pasteFit, pasteLayerOffer, PASTE_LAYER_LABEL,
 } from '../../core/editing/map-clipboard';
 import { selectionToChunk } from '../../core/editing/selection-to-chunk';
 import { regionPreviewCanvas } from '../canvas/region-preview';
@@ -35,9 +35,9 @@ const FLIP_OPTS: ReadonlyArray<{ axis: FlipAxis; label: string; what: string }> 
 ];
 
 const LAYER_OPTS: ReadonlyArray<{ value: PasteLayers; label: string; title: string }> = [
-  { value: 'both', label: 'Both', title: 'Paste art + collision (default)' },
-  { value: 'art', label: 'Art', title: 'Paste art only, leave collision untouched' },
-  { value: 'collision', label: 'Collision', title: 'Paste collision only, leave the nametable untouched' },
+  { value: 'both', label: PASTE_LAYER_LABEL.both, title: 'Paste art + collision (default)' },
+  { value: 'art', label: PASTE_LAYER_LABEL.art, title: 'Paste art only, leave collision untouched' },
+  { value: 'collision', label: PASTE_LAYER_LABEL.collision, title: 'Paste collision only, leave the nametable untouched' },
 ];
 
 const GRAIN_OPTS: ReadonlyArray<{ value: MarqueeGranularity; label: string; title: string }> = [
@@ -156,6 +156,22 @@ export default function MarqueePasteOptions() {
   // selection may still be lying around: you are placing what you copied.
   const layersLocked = pasting ? (clipboard?.artOnly ?? false) : !aligned;
 
+  // WHAT A CLICK CAN LAND WHERE THE AUTHOR IS NOW (PASTE-LAYERS-GREY-OUT). Tile
+  // words fit only the tile set they were copied from, collision words anywhere
+  // in the project they were copied in, so in another zone Both and Art cannot
+  // land. The fit is asked through `pasteFit`, from the open zone and project,
+  // exactly as the map's commit click asks it, and each choice's verdict is the
+  // click's own (`pasteLayerOffer`), so the panel cannot offer a choice the click
+  // refuses. Only while PASTING: otherwise these buttons describe the selection,
+  // and the next Ctrl+C replaces the clipboard anyway. The setting is never
+  // changed here: a refused choice the author picked shows as picked and
+  // unavailable, and the notice says why.
+  const project = useProjectStore((s) => s.project);
+  const openTileset = useProjectStore((s) => getCurrentZone(s)?.tileset);
+  const offer = pasting && clipboard
+    ? pasteLayerOffer(clipboard, pasteFit(clipboard, openTileset, project), pasteLayers)
+    : null;
+
   // Default name uses the selection's own units — `selectionSizeLabel` prints
   // blocks for an aligned rect and tiles for one that has no block size.
   const autoName = marquee ? `Selection ${sizeLabel}` : '';
@@ -230,21 +246,29 @@ export default function MarqueePasteOptions() {
           // silently downgraded at paste time. `Both` stays enabled and means
           // "everything there is" — for an art-only source that is the art —
           // while `Collision` is the one that would write nothing at all.
-          const dead = layersLocked && value === 'collision';
+          const noCollision = layersLocked && value === 'collision';
+          // A choice the click would REFUSE here (another zone's tile set) is
+          // disabled too, and the author's own pick stays marked as his.
+          const refusal = offer?.refusals[value] ?? null;
+          const dead = noCollision || refusal !== null;
           return (
             <button key={value} onClick={() => !dead && setPasteLayers(value)} disabled={dead}
-              title={dead
+              title={noCollision
                 ? 'No collision to paste: this selection is not block-aligned, and collision '
                   + 'is stored per 16px block.'
-                : title}
+                : refusal !== null ? (offer?.notice ?? refusal) : title}
               style={{
                 ...styles.planeBtn,
                 ...(pasteLayers === value && !dead ? styles.planeSel : {}),
                 ...(dead ? styles.planeDead : {}),
+                ...(refusal !== null && pasteLayers === value ? styles.planeChosenDead : {}),
               }}>{label}</button>
           );
         })}
       </div>
+      {/* WHY A CHOICE IS UNAVAILABLE HERE, as text under the control it
+          constrains, never only in a tooltip (PASTE-LAYERS-GREY-OUT). */}
+      {offer?.notice && <div style={styles.warnLine}>{offer.notice}</div>}
 
       {/* FLIP — always MOUNTED, disabled when nothing is eligible. A control
           that vanishes teaches nothing about when it applies, and "when does
@@ -345,6 +369,9 @@ const styles: Record<string, React.CSSProperties> = {
   planeBtn: { padding: `2px ${T.s2}`, background: T.overlay, color: T.textBase, borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rSm, cursor: 'pointer', fontSize: T.tXs, minWidth: 26, textAlign: 'center' },
   planeSel: { background: T.accent, color: T.onAccent, borderColor: T.accent },
   planeDead: { opacity: 0.4, cursor: 'not-allowed', color: T.textLo },
+  /** The author's own setting, unavailable here: still told apart from the
+   *  choices he did not pick, in the colour of the notice that explains it. */
+  planeChosenDead: { opacity: 0.7, borderColor: T.warning, borderStyle: 'dashed' },
   overrideLine: { fontSize: T.t2xs, color: T.accent, padding: `${T.s2} ${T.s2} 0`, lineHeight: 1.35 },
   warnLine: { fontSize: T.t2xs, color: T.warning, padding: `${T.s2} ${T.s2} 0`, lineHeight: 1.35 },
   sizeLine: { fontSize: T.tXs, padding: `${T.s2} ${T.s2} 2px` },

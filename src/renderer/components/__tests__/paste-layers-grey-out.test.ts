@@ -39,8 +39,10 @@ import { useEditorStore } from '../../state/editorStore';
 import { useProjectStore, getCurrentZone } from '../../state/projectStore';
 import {
   copyChunkToClipboard, pasteFit, pasteRefusal, effectivePasteLayers, armRefusal,
-  COLLISION_ONLY_HERE,
+  pasteLayerOffer, stickyRefusedHere, PASTE_LAYER_LABEL,
+  COLLISION_ONLY_HERE, OTHER_TILESET_REFUSAL, OTHER_PROJECT_COLLISION_REFUSAL,
 } from '../../../core/editing/map-clipboard';
+import type { PasteFit } from '../../../core/editing/map-clipboard';
 import type { MapClipboard, PasteLayers } from '../../../core/editing/map-clipboard';
 import { createChunkDef } from '../../../core/model/s4-types';
 
@@ -307,6 +309,68 @@ describe('the panel and the click ask ONE decision', () => {
     // the two identity questions behind them.
     for (const second of ['clipboardFitsTileset', 'clipboardFromProject', 'fit.art', 'fit.collision', 'pasteRefusal(']) {
       expect(panel.includes(second), `the panel carries its own copy of the rule (${second})`).toBe(false);
+    }
+  });
+});
+
+describe('pasteLayerOffer, the function the panel reads (added with it)', () => {
+  // Every fit a PasteFit can hold, the one the map cannot reach included, so a
+  // copy of the rule that agrees only on the reachable three still goes red.
+  const FITS: ReadonlyArray<[string, PasteFit]> = [
+    ['home', { art: true, collision: true }],
+    ['another zone', { art: false, collision: true }],
+    ['another project', { art: false, collision: false }],
+    ['tiles fit, collision does not (unreachable on the map)', { art: true, collision: false }],
+  ];
+
+  it('each choice\'s verdict is the click\'s own, for every clipboard kind, fit and setting', () => {
+    for (const make of [withCollision, artOnly]) {
+      const clip = make();
+      for (const [where, fit] of FITS) {
+        for (const sticky of LAYERS) {
+          const offer = pasteLayerOffer(clip, fit, sticky);
+          for (const v of LAYERS) {
+            expect(offer.refusals[v], `${where}, art only ${clip.artOnly}, setting ${sticky}: ${v}`)
+              .toBe(pasteRefusal(fit, effectivePasteLayers(clip, v)));
+          }
+        }
+      }
+    }
+    // And one row of it by the rule's own sentences (7d-2 in map-clipboard.test.ts):
+    // in another zone the tiles are refused and the collision lands.
+    const offer = pasteLayerOffer(withCollision(), { art: false, collision: true }, 'both');
+    expect(LAYERS.map((v) => offer.refusals[v])).toEqual([OTHER_TILESET_REFUSAL, OTHER_TILESET_REFUSAL, null]);
+  });
+
+  it('the notice: none at home, the arming notice in another zone, the Ctrl+V refusal where nothing lands', () => {
+    const clip = withCollision();
+    for (const sticky of LAYERS) {
+      expect(pasteLayerOffer(clip, FITS[0][1], sticky).notice, `home, setting ${sticky}`).toBeNull();
+      expect(pasteLayerOffer(clip, FITS[2][1], sticky).notice, `another project, setting ${sticky}`)
+        .toBe(armRefusal(clip, FITS[2][1], sticky));
+      expect(pasteLayerOffer(artOnly(), FITS[1][1], sticky).notice, `art only in another zone, setting ${sticky}`)
+        .toBe(armRefusal(artOnly(), FITS[1][1], sticky));
+    }
+    expect(pasteLayerOffer(clip, FITS[1][1], 'collision').notice).toBe(COLLISION_ONLY_HERE);
+    expect(pasteLayerOffer(clip, FITS[1][1], 'both').notice).toBe(`${COLLISION_ONLY_HERE} ${stickyRefusedHere('both')}`);
+    expect(pasteLayerOffer(clip, FITS[1][1], 'art').notice).toBe(`${COLLISION_ONLY_HERE} ${stickyRefusedHere('art')}`);
+    // Where the TILES land and the collision does not, the arming notice would
+    // say the opposite of the truth; the click's own refusal is said instead.
+    for (const sticky of LAYERS) {
+      const notice = pasteLayerOffer(clip, FITS[3][1], sticky).notice;
+      expect(notice, `setting ${sticky}: the arming notice was said where the collision is what cannot land`)
+        .not.toContain(COLLISION_ONLY_HERE);
+      expect(notice).toBe(OTHER_PROJECT_COLLISION_REFUSAL);
+    }
+  });
+
+  it('the sentence about the setting names the label its button shows, and carries no dash', () => {
+    expect(PASTE_LAYER_LABEL, 'the panel\'s button labels and this file\'s disagree').toEqual(LABEL);
+    // The en and em dash by code point, so this file carries neither character.
+    const dash = new RegExp(`[${String.fromCharCode(0x2013, 0x2014)}]`);
+    for (const v of LAYERS) {
+      expect(stickyRefusedHere(v)).toContain(`set to ${PASTE_LAYER_LABEL[v]},`);
+      expect(stickyRefusedHere(v), 'a person-facing sentence carries a dash').not.toMatch(dash);
     }
   });
 });

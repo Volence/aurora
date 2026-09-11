@@ -182,6 +182,71 @@ export function armRefusal(clip: MapClipboard, fit: PasteFit, sticky: PasteLayer
 
 export type PasteLayers = 'both' | 'art' | 'collision';
 
+const PASTE_LAYER_ORDER: ReadonlyArray<PasteLayers> = ['both', 'art', 'collision'];
+
+/** What the Paste layers control calls each choice. One table, so a button and
+ *  a sentence about the setting cannot name the same choice two ways. */
+export const PASTE_LAYER_LABEL: Readonly<Record<PasteLayers, string>> = {
+  both: 'Both', art: 'Art', collision: 'Collision',
+};
+
+/** Said beside the Paste layers control when the author's own setting is a
+ *  choice a plain click here would refuse. The setting is left as he chose it:
+ *  this tells him why a plain click will not paste, and what would. */
+export function stickyRefusedHere(sticky: PasteLayers): string {
+  return `Layers is set to ${PASTE_LAYER_LABEL[sticky]}, so a plain click here is refused. `
+    + 'Choose Collision to paste with a plain click.';
+}
+
+/** See `pasteLayerOffer`. */
+export interface PasteLayerOffer {
+  /** Per choice: what a plain click with it gets (`pasteRefusal`), or null when it lands. */
+  refusals: Readonly<Record<PasteLayers, string | null>>;
+  /** The one sentence shown beside the control, or null when every choice lands. */
+  notice: string | null;
+}
+
+/**
+ * What the Paste layers control offers where the author is now
+ * (PASTE-LAYERS-GREY-OUT, docs/reviews/2026-09-11-paste-layers-grey-out.md).
+ *
+ * THE CLICK'S DECISION, NOT A COPY OF IT. `refusals[v]` is the map's commit
+ * click's own expression for a plain click with choice `v`,
+ * `pasteRefusal(fit, effectivePasteLayers(clip, v))`, so the panel greys out
+ * exactly the choices the click would refuse. A second statement of the rule
+ * here is how the panel and the click would come to disagree.
+ *
+ * The notice, chosen by what can land:
+ *  - every choice lands (the zone the copy was made in): none;
+ *  - nothing can land (another project, or an art-only copy in another zone):
+ *    the Ctrl+V refusal itself, `armRefusal`, word for word;
+ *  - the collision lands and the tiles do not (another zone of the project):
+ *    the arming notice `COLLISION_ONLY_HERE`, plus `stickyRefusedHere` when the
+ *    author's setting is one of the refused choices;
+ *  - the tiles land and the collision does not: the click's own refusal for the
+ *    setting, or for the first refused choice. The map cannot reach this (its
+ *    open tile set is always one of the open project's), and the arming notice
+ *    would be false there, so it is not used.
+ *
+ * Never changes the setting. Whether a plain click then pastes is the click's
+ * decision, unchanged.
+ */
+export function pasteLayerOffer(clip: MapClipboard, fit: PasteFit, sticky: PasteLayers): PasteLayerOffer {
+  const click = (v: PasteLayers) => pasteRefusal(fit, effectivePasteLayers(clip, v));
+  const refusals = { both: click('both'), art: click('art'), collision: click('collision') };
+  const refused = PASTE_LAYER_ORDER.filter((v) => refusals[v] !== null);
+  if (refused.length === 0) return { refusals, notice: null };
+  const nothingLands = armRefusal(clip, fit, sticky);
+  if (nothingLands !== null) return { refusals, notice: nothingLands };
+  if (refusals.collision === null) {
+    return {
+      refusals,
+      notice: refusals[sticky] === null ? COLLISION_ONLY_HERE : `${COLLISION_ONLY_HERE} ${stickyRefusedHere(sticky)}`,
+    };
+  }
+  return { refusals, notice: refusals[sticky] ?? refusals[refused[0]] };
+}
+
 /**
  * The granularity a marquee drag snaps to.
  *
