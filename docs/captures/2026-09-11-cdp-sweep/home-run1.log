@@ -1,0 +1,81 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5f8575a69bc762fe
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5f8575a69bc762fe
+=== cdp-sweep 2026-09-11 harness, PART=home ===
+    node         : v24.15.0
+    loadavg      : 6.42 7.94 10.18
+    ORACLE_SOCKET: /tmp/cdps0911-LiKBdX/o.sock   (private; the directory was made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-0911-harness-3401120-644f175e   (pinned by spawnGuarded, derived fresh per process)
+    captures     : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5f8575a69bc762fe/docs/captures/2026-09-11-cdp-sweep   tag run1
+    PORT         : 9492   DISPLAY: xvfb-run -a (auto, never :0)
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.sonic-level-editor/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-0911-harness-3401120-644f175e — see HAZARD 6
+    dpr at start : 1
+
+──── R4: F-3, `zon` typed into Filter… with no project and no recents ────
+FAIL  [R4.0] PRECONDITION: this profile lists NO recent projects (fresh --user-data-dir)   [load 10.82/8.82/10.44]
+        getRecentProjects -> {}; Explorer reads "No project\nRun a command\nCtrl+K\nOpen Project…"
+PASS  [R4.1] CONTROL: before any typing the sentence is ABSENT and `Open Project…` is painted   [load 10.82/8.82/10.44]
+        {"sentence":{"found":false},"open":{"found":true,"text":"Open Project…","rect":{"x":62.16,"y":128,"w":114.69,"h":26},"rects":1,"visible":true,"centre":{"x":120,"y":141},"hitInside":true,"hitTag":"BUTTON","scroller":{"y":112,"bottom":872,"x":0,"right":239},"inScrollerBox":true,"inViewport":true,"viewport":{"w":1400,"h":872},"dpr":1}}
+   shot: docs/captures/2026-09-11-cdp-sweep/home-r4-no-project-filter-run1.png
+PASS  [R4.2] `zon` is in the box, typed through real key events at an integer aim   [load 10.82/8.82/10.44]
+        value "zon"; aim {"x":129,"y":91,"hitOk":true,"hitTag":"INPUT","dpr":1,"rect":{"x":35,"y":82,"w":187,"h":17}}
+PASS  [R4.3] "No project is open, so there is nothing to filter" is PAINTED   [load 10.82/8.82/10.44]
+        {"found":true,"text":"No project is open, so there is nothing to filter","rect":{"x":0,"y":112,"w":239,"h":66},"rects":1,"visible":true,"centre":{"x":120,"y":145},"hitInside":true,"hitTag":"DIV","scroller":{"y":112,"bottom":872,"x":0,"right":239},"inScrollerBox":true,"inViewport":true,"viewport":{"w":1400,"h":872},"dpr":1}
+PASS  [R4.4] `Open Project…` is STILL painted beside it   [load 10.82/8.82/10.44]
+        {"found":true,"text":"Open Project…","rect":{"x":62.16,"y":194,"w":114.69,"h":26},"rects":1,"visible":true,"centre":{"x":120,"y":207},"hitInside":true,"hitTag":"BUTTON","scroller":{"y":112,"bottom":872,"x":0,"right":239},"inScrollerBox":true,"inViewport":true,"viewport":{"w":1400,"h":872},"dpr":1}
+PASS  [R4.5] and the old false sentence `No matches` is nowhere in the Explorer   [load 10.82/8.82/10.44]
+        No matches present: false
+
+──── R3: F-2, the badge pressed at a missing path, then at a dead socket ────
+FAIL  [R3.0] PRECONDITION: the badge is painted and offline, no refusal toast is up, and no file exists at ORACLE_SOCKET   [load 10.82/8.82/10.44]
+        badge {"found":false}; toasts []; exists(/tmp/cdps0911-LiKBdX/o.sock)=false
+   shot: docs/captures/2026-09-11-cdp-sweep/home-r3-enoent-run1.png
+FAIL  [R3.1] press 1 (no file): the toast reads the ENOENT sentence EXACTLY, and it is painted   [load 13.54/9.47/10.64]
+        aim null
+        toast null
+        expected "Aether: could not connect. No emulator is listening at /tmp/cdps0911-LiKBdX/o.sock. There is no socket file at that path (connect ENOENT)."
+        store []
+NOTE  [R3] dead socket made: child signal SIGKILL, status null; /tmp/cdps0911-LiKBdX/o.sock isSocket=true
+   shot: docs/captures/2026-09-11-cdp-sweep/home-r3-econnrefused-run1.png
+FAIL  [R3.2] press 2 (dead socket file): the toast reads the ECONNREFUSED sentence EXACTLY, and it is painted   [load 15.70/10.06/10.82]
+        aim null
+        toast null
+        expected "Aether: could not connect. No emulator is listening at /tmp/cdps0911-LiKBdX/o.sock. A socket file is there, but nothing answers on it; an emulator that has exited can leave one behind (connect ECONNREFUSED)."
+FAIL  [R3.3] CONTROL: the two presses said DIFFERENT things, and no toast carries the old raw relay   [load 15.70/10.06/10.82]
+        toasts now []
+
+──── R4 control: the same `zon` with one recent project listed ────
+   shot: docs/captures/2026-09-11-cdp-sweep/home-r4-control-with-recent-run1.png
+FAIL  [R4.6] CONTROL: with one recent listed the same typing says "No recent project matches" and NOT the no-project sentence   [load 16.77/10.38/10.92]
+        recents {}; sentence {"found":true,"text":"No recent project matches","rect":{"x":0,"y":112,"w":239,"h":49},"rects":1,"visible":true,"centre":{"x":120,"y":137},"hitInside":true,"hitTag":"DIV","scroller":{"y":112,"bottom":872,"x":0,"right":239},"inScrollerBox":true,"inViewport":true,"viewport":{"w":1400,"h":872},"dpr":1}; nothing-to-filter found=false
+cleanup: tree under pid 3401183 (11 process(es)):
+           3401183 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           3401206 Xvfb :116 -screen 0 1680x1050x24 -nolisten tcp
+           3407034 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           3407049 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           3407080 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3407081 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3407090 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3408106 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3408120 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3408263 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           3408389 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 49 ms; then the wrapper group with the X server still up, tree gone in 51 ms; teardown 400 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PART=home: 5/11 rows PASS · 6 FAIL · 0 UNMEASURABLE · 34.1s ════
+     loadavg at start 6.42 7.94 10.18 · at end 16.77 10.38 10.92
+FAILING:
+  [R4.0] PRECONDITION: this profile lists NO recent projects (fresh --user-data-dir)
+  [R3.0] PRECONDITION: the badge is painted and offline, no refusal toast is up, and no file exists at ORACLE_SOCKET
+  [R3.1] press 1 (no file): the toast reads the ENOENT sentence EXACTLY, and it is painted
+  [R3.2] press 2 (dead socket file): the toast reads the ECONNREFUSED sentence EXACTLY, and it is painted
+  [R3.3] CONTROL: the two presses said DIFFERENT things, and no toast carries the old raw relay
+  [R4.6] CONTROL: with one recent listed the same typing says "No recent project matches" and NOT the no-project sentence
+END-OF-RUN
