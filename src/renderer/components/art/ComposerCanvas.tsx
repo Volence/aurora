@@ -864,6 +864,17 @@ export default function ComposerCanvas() {
             e.preventDefault();
             return;
           }
+          // An ART-ONLY clipboard has no collision to paste, and this paste is
+          // collision only. Said out loud: `applyClipboardCollisionToDoc` now
+          // writes nothing for one, and a key that silently does nothing reads
+          // as a broken tool (the map's Shift click says the same thing).
+          if (mapClip.artOnly) {
+            useToastStore.getState().addToast(
+              'Not pasted: this clipboard carries no collision, because it was copied from a selection '
+              + 'that is not block-aligned, and the composer pastes collision only.', 'warning');
+            e.preventDefault();
+            return;
+          }
           // Snapshot first, bank only if the paste landed — the same pattern the
           // tile-space tools use, for the same reason: `applyClipboardCollisionToDoc`
           // writes the planes in place and only then says whether it wrote.

@@ -40,6 +40,13 @@ export function paintDocCollision(
  *  (ComposerCanvas refuses another project's collision through `pasteRefusal`,
  *  COLLISION-PASTE-ACROSS-TILESETS); this writer only copies words. */
 export function applyClipboardCollisionToDoc(doc: ComposerDoc, clip: MapRegion): boolean {
+  // AN ART-ONLY REGION CARRIES NO COLLISION, AND WRITES NONE. Its planes are
+  // EMPTY (length 0) on purpose, so "no collision" can never read as "all air"
+  // (`copyFromSection`). Without this the loop below read `undefined` past the
+  // end of them, and a Uint16Array stores that as 0: air over the document's
+  // collision, reported as a change (COLLISION-PASTE-ACROSS-TILESETS, found
+  // while guarding the composer's Ctrl+V).
+  if (clip.artOnly) return false;
   const docCellsW = doc.widthTiles >> 1, docCellsH = doc.heightTiles >> 1;
   const clipCellsW = clip.widthTiles >> 1, clipCellsH = clip.heightTiles >> 1;
   const w = Math.min(docCellsW, clipCellsW);

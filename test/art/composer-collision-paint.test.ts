@@ -144,3 +144,24 @@ describe('seedDocCollisionFromSection', () => {
     expect(seedDocCollisionFromSection(doc, section, 0, 0)).toBe(false);
   });
 });
+
+describe('applyClipboardCollisionToDoc: an ART-ONLY region writes no collision (COLLISION-PASTE-ACROSS-TILESETS)', () => {
+  it('leaves the document\'s collision exactly as it was, and reports no change', () => {
+    const solid = packCollisionCell({ shape: 5, xFlip: false, yFlip: false, solidity: 'all' });
+    const doc = createDoc(4, 4);
+    doc.collisionA.fill(solid);
+    doc.collisionB.fill(solid);
+    // The shape `copyFromSection` gives an unaligned marquee: a footprint, and
+    // EMPTY collision planes, so that "no collision" can never read as air.
+    const clip: MapRegion = {
+      widthTiles: 3, heightTiles: 3, nametable: new Uint16Array(9),
+      collisionA: new Uint16Array(0), collisionB: new Uint16Array(0), artOnly: true,
+    };
+    expect([clip.widthTiles >> 1, clip.heightTiles >> 1],
+      'ANTI-VACUOUS: the footprint covers a whole cell, so a writer that ignored the flag would write one')
+      .toEqual([1, 1]);
+    expect(applyClipboardCollisionToDoc(doc, clip), 'a region with no collision reported a change').toBe(false);
+    expect([...doc.collisionA, ...doc.collisionB], 'the document\'s collision was erased')
+      .toEqual(new Array(8).fill(solid));
+  });
+});

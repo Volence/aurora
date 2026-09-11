@@ -80,7 +80,8 @@ function sourceChunk(): ChunkDef {
 function project(pick: (i: number) => number = (i) => i) {
   return {
     zones: [zoneOf('ojz', tilesOf(pick)), zoneOf('mgz', tilesOf((i) => 15 - i))],
-    chunkLibrary: [sourceChunk()],
+    // c3 is ODD-sized, so a copy of it is ART ONLY (`copyChunkToClipboard`).
+    chunkLibrary: [sourceChunk(), createChunkDef('c3', 'c3', 3, 3)],
     bgLibrary: [],
   };
 }
@@ -247,5 +248,33 @@ describe('the composer\'s collision-only Ctrl+V: zones share the collision shape
     expect(toasts('Pasted collision'), 'a refused paste also announced itself as pasted').toHaveLength(0);
     expect(e.wasPrevented(), 'the refused Ctrl+V fell through to the page, which reads as a dead key').toBe(true);
     expect(targetCanUndo(), 'a refusal put an entry on the undo stack').toBe(false);
+  });
+
+  it('an ART-ONLY clipboard carries no collision, so Ctrl+V writes none, and the document\'s collision is not erased', async () => {
+    // Found while guarding this handler, and the same wrong-write class. An
+    // odd-sized chunk copies as art only, exactly as an unaligned marquee does:
+    // its collision planes are EMPTY, length 0, precisely so that "no
+    // collision" can never be mistaken for "all air" (map-clipboard.ts,
+    // `copyFromSection`). The composer's writer indexed them anyway, and an
+    // out-of-range read is `undefined`, which a Uint16Array stores as 0: air,
+    // written over the author's collision, announced as a paste.
+    await mountComposer();
+    useArtStore.getState().openDocument({
+      doc: createDoc(3, 3), chunkId: 'c3', liveTileIndex: null, name: 'c3', dirty: false,
+    });
+    press(key('c', { ctrlKey: true }));
+    const clip = useEditorStore.getState().mapClipboard;
+    expect(clip?.artOnly, 'the premise: an odd chunk copies as art only').toBe(true);
+    expect([clip!.collisionA.length, clip!.collisionB.length],
+      'the premise: an art-only copy carries no collision').toEqual([0, 0]);
+    const doc = openTarget();
+    useToastStore.setState({ toasts: [] });
+    const e = key('v', { ctrlKey: true });
+    press(e);
+    expect(planesOf(doc), 'a paste carrying no collision erased the document\'s collision').toEqual(UNTOUCHED);
+    expect(toasts('Pasted collision'), 'a paste that wrote nothing announced itself as pasted').toHaveLength(0);
+    expect(toasts('no collision'), 'nothing was written and nothing said why').toHaveLength(1);
+    expect(e.wasPrevented(), 'the Ctrl+V fell through to the page, which reads as a dead key').toBe(true);
+    expect(targetCanUndo(), 'a paste that wrote nothing put an entry on the undo stack').toBe(false);
   });
 });
