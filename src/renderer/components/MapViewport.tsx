@@ -30,7 +30,7 @@ import { buildStampCommand } from '../../core/editing/map-stamp';
 import { withLinkBreaks, chunkOriginAt } from '../../core/editing/chunk-links';
 import {
   snapMarquee, copyFromSection, buildPasteCommand, isBlockAligned,
-  effectivePasteLayers, pasteBaseStep, selectionSizeLabel, artOnlyReason,
+  effectivePasteLayers, pasteClickLayers, pasteBaseStep, selectionSizeLabel, artOnlyReason,
   effectiveGranularity, clipboardFitsTileset, pasteFit, armRefusal, pasteRefusal, COLLISION_ONLY_HERE,
 } from '../../core/editing/map-clipboard';
 import type { MapClipboard } from '../../core/editing/map-clipboard';
@@ -3293,8 +3293,8 @@ export default function MapViewport() {
       const level = getActiveLevel();
       if (clip && hover && level) {
         // Modifiers override the sticky pasteLayers setting for THIS click only.
-        const layers: PasteLayers = e.altKey ? 'art' : e.shiftKey ? 'collision'
-          : useEditorStore.getState().pasteLayers;
+        // `pasteClickLayers` is also what the paste hint line describes.
+        const layers: PasteLayers = pasteClickLayers(e, useEditorStore.getState().pasteLayers);
         // THE WRITE CHECKS FOR ITSELF, and does not trust whoever armed it
         // (PASTE-ACROSS-TILESETS). It refuses exactly the words that would not
         // fit (COLLISION-PASTE-ACROSS-TILESETS): tile words outside the tile set

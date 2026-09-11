@@ -16,8 +16,8 @@
  *
  * WHAT WAS RULED OUT, and none of it was free:
  *
- *   • `Alt` and `Shift` are SPENT on the paste click — `e.altKey ? 'art' :
- *     e.shiftKey ? 'collision'` — and a modifier meaning "art only" on the
+ *   • `Alt` and `Shift` are SPENT on the paste click — `pasteClickLayers` in
+ *     map-clipboard.ts, Alt art, Shift collision — and a modifier meaning "art only" on the
  *     mouse and "mirror" on the keyboard in the same mode is one mode with two
  *     grammars.
  *   • `Ctrl` is claimed as the marquee's snap-grid modifier.
