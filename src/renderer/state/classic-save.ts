@@ -283,9 +283,13 @@ export async function saveClassicProject(
         // any the artist edited while the write was in flight. Those edits are
         // not in the bytes on disk, and clearing them would lose the work with
         // no dot, no prompt and a "nothing to save" on the next Ctrl+S.
+        // `result.unchanged` counts as landed: those files already hold what the
+        // doc says, and the writer skipped them for that reason (F3). Without it
+        // a GHZ tile save, which now writes one of its two art files, would never
+        // clear `tiles`.
         notifyMidSaveEdits(useClassicLevelStore.getState().markDomainsClean(
           dl.ref,
-          domainsToClear(dl.doc, dl.dirty, outcome.written),
+          domainsToClear(dl.doc, dl.dirty, [...outcome.written, ...(result.unchanged ?? [])]),
           dl.gen,
         ));
         writtenPaths.push(...outcome.written);
@@ -298,7 +302,7 @@ export async function saveClassicProject(
         levels.updateMtimes?.(dl.ref, outcome.newMtimes);
         notifyMidSaveEdits(useClassicLevelStore.getState().markDomainsClean(
           dl.ref,
-          domainsToClear(dl.doc, dl.dirty, outcome.written),
+          domainsToClear(dl.doc, dl.dirty, [...outcome.written, ...(result.unchanged ?? [])]),
           dl.gen,
         ));
         useToastStore.getState().addToast(

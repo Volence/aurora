@@ -46,10 +46,27 @@
 //         (T-tileStart)*32.
 //       - if T is neither (a zero-filled gap tile between base art and an anim
 //         region) → WriteResult error; not representable.
-//   * every pristine `.nem` file is then re-encoded (Nemesis) from its — possibly
-//     patched — decoded copy and emitted. This preserves the two-file split. A
-//     zero-edit save re-encodes the pristine bytes unchanged, so the self-check
-//     (decode == pristine) always passes and the round-trip is decode-identical.
+//   * each pristine `.nem` file whose patched copy DIFFERS from what was read (or
+//     that a save has written since the read) is re-encoded (Nemesis) and
+//     emitted. This preserves the two-file split.
+//   * a file whose copy did NOT change is emitted only when nothing else in the
+//     whole write is; otherwise it is reported in `unchanged` and left alone on
+//     disk. UX seat A's F3 (docs/reviews/2026-09-09-uxpair-findings.md §4): our
+//     Nemesis encoder is not the original, so re-encoding an untouched file
+//     grows it (`8x8 - GHZ2.nem` 5031 to 5193 with no edit), and one pixel in
+//     GHZ1 used to rewrite GHZ2 as well. The "only when something else is
+//     emitted" half is the save contract's, not decoration: a write with no
+//     files makes `saveClassicWriteResult` answer `nothing`, which does NOT
+//     clear the dirty domains, so skipping unconditionally would turn a
+//     tiles-dirty, zero-diff Ctrl+S into a silent no-op with the dot left up.
+//     The "written since the read" half is correctness: `pristineTileFiles` is
+//     READ-time content and is not refreshed by a save, so a file an earlier
+//     save rewrote can match it while disk does not (paint, save, undo).
+//     `writtenSinceRead` (filled by the adapter's `updateMtimes`) makes such a
+//     file always emit.
+//   * A zero-edit save that does emit the art re-encodes the pristine bytes, so
+//     the self-check (decode == pristine) always passes and the round-trip is
+//     decode-identical.
 //
 // ---------------------------------------------------------------------------
 // Self-check gate
@@ -163,6 +180,15 @@ export interface S1ReadState {
    * after a successful write so subsequent saves expect the new on-disk mtimes.
    */
   fileMtimes: Record<string, number>;
+  /**
+   * Every path a save has LANDED since this read, filled by the adapter's
+   * `updateMtimes` (whose keys are exactly the landed paths). The tile writer
+   * reads it to decide that an art file is unchanged: `pristineTileFiles` holds
+   * READ-time bytes and no save refreshes them, so a file rewritten by an earlier
+   * save can equal them while disk does not (paint, save, undo past the save).
+   * Such a file must always be emitted, never skipped. A fresh read starts empty.
+   */
+  writtenSinceRead: Set<string>;
 }
 
 /** LevelDoc plus the read-side bookkeeping the writer consumes. */
@@ -184,6 +210,14 @@ const REAL_CODECS: S1WriteCodecs = { nemesisCompress, enigmaCompress, kosinskiCo
 export interface S1WriteResult {
   files: { path: string; bytes: Uint8Array }[];
   errors: { path: string; message: string }[];
+  /**
+   * Art files of a dirty `tiles` domain that were deliberately NOT emitted
+   * because their content is what is on disk (see the tile write contract in
+   * this file's header). Never non-empty while `files` is empty: when nothing
+   * else would be written the writer emits them instead, so the saver's
+   * `nothing` arm is reached exactly as before.
+   */
+  unchanged: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -407,6 +441,7 @@ export async function readS1Level(
       paletteOriginals,
       paths,
       fileMtimes,
+      writtenSinceRead: new Set<string>(),
     },
   };
 }
@@ -470,6 +505,8 @@ export function writeS1Level(
   };
 
   // --- tiles ---------------------------------------------------------------
+  /** Art files whose content did not change; decided at the end (see header). */
+  const deferredArt: { path: string; buf: Uint8Array }[] = [];
   if (dirty.tiles) {
     const orig = read.originalDisplayTiles;
     const cur = doc.tiles;
@@ -511,9 +548,13 @@ export function writeS1Level(
         message: 'edited tile lies outside any source art file (gap or appended tile, not writable in v1)',
       });
     }
-    // Re-encode every pristine file (patched or not) — preserves the file split.
+    // Re-encode each file that changed, which preserves the file split. A file
+    // whose copy still equals what was read, and that no save has written since,
+    // is deferred: emitted at the end only if nothing else is (F3, see header).
     for (const c of copies) {
-      emitCompressed(c.file.path, c.buf, codecs.nemesisCompress, nemesisDecompress);
+      const untouched = bytesEqual(c.buf, c.file.bytes) && !read.writtenSinceRead.has(c.file.path);
+      if (untouched) deferredArt.push({ path: c.file.path, buf: c.buf });
+      else emitCompressed(c.file.path, c.buf, codecs.nemesisCompress, nemesisDecompress);
     }
   }
 
@@ -672,7 +713,20 @@ export function writeS1Level(
     }
   }
 
-  return { files, errors };
+  // --- unchanged art: emitted only when nothing else is --------------------
+  // Decided LAST because it depends on every domain above. See the tile write
+  // contract in this file's header: a write with no files would make the saver
+  // answer `nothing` and leave the dirty domains standing, so in that one case
+  // the art is written as it always was; otherwise it is left alone and
+  // REPORTED, so the saver can still clear `tiles`.
+  const unchanged: string[] = [];
+  if (files.length === 0) {
+    for (const d of deferredArt) emitCompressed(d.path, d.buf, codecs.nemesisCompress, nemesisDecompress);
+  } else {
+    for (const d of deferredArt) unchanged.push(d.path);
+  }
+
+  return { files, errors, unchanged };
 }
 
 // ---------------------------------------------------------------------------

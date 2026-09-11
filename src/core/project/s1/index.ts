@@ -572,12 +572,18 @@ export const s1Adapter: ProjectAdapter = {
           errors: result.errors,
           files: result.files,
           fileMtimes,
+          unchanged: result.unchanged,
         };
       },
       updateMtimes: (ref: ZoneActRef, newMtimes: Record<string, number>): void => {
         const read = readStates.get(refKey(ref));
         if (!read) return; // never read → nothing cached to refresh
-        for (const [p, m] of Object.entries(newMtimes)) read.fileMtimes[p] = m;
+        for (const [p, m] of Object.entries(newMtimes)) {
+          read.fileMtimes[p] = m;
+          // Landed, so its read-time bytes no longer describe the disk; the
+          // writer must never skip it as unchanged again. See s1-io's header.
+          read.writtenSinceRead.add(p);
+        }
       },
       editableTileRange: (ref: ZoneActRef) => {
         const read = readStates.get(refKey(ref));
