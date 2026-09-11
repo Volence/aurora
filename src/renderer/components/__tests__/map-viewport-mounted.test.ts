@@ -71,6 +71,7 @@ import { documentBands, bandSlotBases } from '../../../core/formats/bg-override/
 import { packCollisionCell, unpackCollisionCell } from '../../../core/collision/collision-cell-word';
 import { SECTION_PLANE_WORDS } from '../../../core/collision/collision-cell-resolve';
 import { snapMarquee, effectiveGranularity, type MapClipboard } from '../../../core/editing/map-clipboard';
+import { selectionToChunk } from '../../../core/editing/selection-to-chunk';
 import { SCREEN_WIDTH } from '../../../core/model/screen';
 
 // ── the fixture ────────────────────────────────────────────────────────────────
@@ -2670,6 +2671,161 @@ describe('paste mode commits at the hovered, snapped origin, and a middle drag s
           .not.toEqual([...clip!.tileset.tiles[t].pixels]);
       }
     }
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// A CHUNK SAVED IN ONE ZONE AND STAMPED IN ANOTHER. KNOWN, AND BLOCKED.
+// (CHUNK-STAMP-ACROSS-ZONES; docs/reviews/2026-09-11-chunk-stamp-across-zones.md)
+//
+// The chunk library is ONE array per project (`S4Project.chunkLibrary`) and a
+// `ChunkDef` records no tile set. Its words are tile NUMBERS in whichever zone's
+// tile set they were minted against, and every minting path uses the OPEN
+// zone's. The stamp tool offers the whole library in every zone, so in a
+// project with two zones a chunk saved from zone A's map lands in zone B as
+// zone A's numbers, which are other pictures in zone B's tile set.
+//
+// NOT REFUSED, because there is no honest identity to refuse on: the library is
+// saved as one unmarked file and read back with every chunk attributed to the
+// first zone (the packet says where). So the first row PINS today's write, and a
+// fix has to turn it into a refusal row on purpose. The second row is the
+// control any fix must keep: a stamp inside the zone the chunk was saved in
+// lands.
+//
+// THE CHUNK IS MINTED BY THE SAVE-AS-CHUNK BUTTON'S OWN TWO CALLS
+// (MarqueePasteOptions.tsx `saveAsChunk`: `selectionToChunk` over the open act's
+// section, then `addChunks`), not by a hand-built ChunkDef, so its words are the
+// words zone A's map holds. The stamp is the real mounted click. Nothing hovers,
+// so the stamp ghost (which needs a `document`) is never drawn: a ghost is a
+// drawing claim, and drawing claims are foreground-only.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('a chunk saved in one zone and stamped in another (KNOWN, BLOCKED: CHUNK-STAMP-ACROSS-ZONES)', () => {
+  const OTHER = 'mgz';
+  const TILES = 8;
+  /** Tile i is solid colour pick(i). Zone ojz is i and zone mgz is 15 - i,
+   *  which differ at every index because 15 is odd. */
+  const tilesOf = (pick: (i: number) => number) => ({
+    tiles: Array.from({ length: TILES }, (_, i) => ({ pixels: new Uint8Array(64).fill(pick(i)) })),
+  });
+  const FG_OTHER = 0x0303;
+  /** One 16px block of ojz/act1, planted with tile numbers 1 to 4. */
+  const SOURCE = { col: 2, row: 2, w: 2, h: 2 };
+  const SOURCE_WORDS = [1, 2, 3, 4].map((t) => packNametableWord(t, 0, false, false, false));
+  const CHUNK_ID = 'saved-in-ojz';
+  /** Where the click lands. Odd, so the stamp's own snap (to the chunk's size) does work. */
+  const CLICK = { col: 9, row: 5 };
+  const ed = () => useEditorStore.getState();
+
+  function zone(id: string) {
+    const z = useProjectStore.getState().project?.zones.find((x) => x.id === id);
+    if (!z) throw new Error(`map-viewport-mounted: no zone ${id}; the fixture moved`);
+    return z;
+  }
+  function sectionIn(zoneId: string, actId: string): Section {
+    const sec = zone(zoneId).acts.find((a) => a.id === actId)?.sections[0];
+    if (!sec) throw new Error(`map-viewport-mounted: no section 0 in ${zoneId}/${actId}; the fixture moved`);
+    return sec;
+  }
+  /** Focus an act of ANY zone the way the shell does: the store and the tab. */
+  function focusZoneAct(zoneId: string, actId: string): void {
+    useProjectStore.getState().setCurrentAct(zoneId, actId);
+    useSessionStore.setState({ activeId: `level:${zoneId}:${actId}` });
+  }
+  function libraryChunk() {
+    const c = useProjectStore.getState().project?.chunkLibrary.find((k) => k.id === CHUNK_ID);
+    if (!c) throw new Error('map-viewport-mounted: the saved chunk is not in the library; the fixture moved');
+    return c;
+  }
+  /** The chunk-sized words where a click at CLICK stamps: `MapViewport` snaps
+   *  the origin to the chunk's own size, so this reads the same snap. */
+  function wordsAtStamp(zoneId: string, actId: string): number[] {
+    const c = libraryChunk();
+    const baseCol = Math.floor(CLICK.col / c.widthTiles) * c.widthTiles;
+    const baseRow = Math.floor(CLICK.row / c.heightTiles) * c.heightTiles;
+    const nt = sectionIn(zoneId, actId).tileGrid.nametable;
+    const out: number[] = [];
+    for (let r = 0; r < c.heightTiles; r++) {
+      for (let col = 0; col < c.widthTiles; col++) out.push(nt[(baseRow + r) * SECTION_TILES_WIDE + baseCol + col]);
+    }
+    return out;
+  }
+
+  beforeEach(() => {
+    const p = twoActProject() as unknown as { zones: Array<Record<string, unknown>> };
+    p.zones[0].tileset = tilesOf((i) => i);
+    p.zones.push({
+      id: OTHER, name: 'MGZ', tileset: tilesOf((i) => 15 - i),
+      palette: { lines: [{ colors: [{ r: 0, g: 0, b: 0, a: 255 }] }] },
+      acts: [{
+        id: 'act1', name: 'act1', gridWidth: 1, gridHeight: 1,
+        sections: [section([OBJ(64, 64)], FG_OTHER)],
+        bgLayout: bgLayout(BG_FILL.act1), bgTiles: bgTiles(),
+      }],
+    });
+    useProjectStore.setState({ project: p as never });
+    focusAct('act1');
+    seedCollision();
+    const other = sectionIn(OTHER, 'act1');
+    other.collisionEdit = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(5));
+    other.collisionEditB = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(6));
+    const src = sectionIn('ojz', 'act1');
+    for (let r = 0; r < SOURCE.h; r++) {
+      for (let c = 0; c < SOURCE.w; c++) {
+        src.tileGrid.nametable[(SOURCE.row + r) * SECTION_TILES_WIDE + SOURCE.col + c] = SOURCE_WORDS[r * SOURCE.w + c];
+      }
+    }
+    // The save-as-chunk button, pressed in ojz/act1 (the open act).
+    const def = selectionToChunk(src, SOURCE.col, SOURCE.row, SOURCE.w, SOURCE.h, 'Saved in OJZ', CHUNK_ID);
+    if (!def) throw new Error('map-viewport-mounted: selectionToChunk refused an aligned block; the fixture moved');
+    useProjectStore.getState().addChunks([def]);
+    ed().setSelectedChunkId(CHUNK_ID);
+    ed().setTool('stamp-chunk');
+    useToastStore.setState({ toasts: [] });
+  });
+
+  /** ANTI-VACUOUS: every chunk word names a tile that is a DIFFERENT picture in
+   *  mgz than in ojz, so a stamp there visibly puts other tiles down. */
+  function assertTheTileSetsDisagree(): void {
+    for (const w of libraryChunk().nametable) {
+      const t = unpackNametableWord(w).tileIndex;
+      expect(t, 'a chunk word names a tile outside both fixture tile sets').toBeLessThan(TILES);
+      expect([...zone(OTHER).tileset.tiles[t].pixels],
+        `tile ${t} is the same picture in both zones, so a wrong stamp could not show`)
+        .not.toEqual([...zone('ojz').tileset.tiles[t].pixels]);
+    }
+  }
+
+  /** Mount the map on whatever act is focused, and click once at CLICK. */
+  async function clickStamp(): Promise<void> {
+    const s = await mountMap();
+    s.on().onMouseDown(tileAt(CLICK.col, CLICK.row));
+    win!.dispatch('mouseup', {});
+  }
+
+  it('PINNED AS FOUND: a chunk saved in zone A is stamped into zone B as zone A\'s tile numbers, and nothing says so', async () => {
+    expect([...libraryChunk().nametable], 'the premise: the library chunk holds the words saved from ojz\'s map')
+      .toEqual(SOURCE_WORDS);
+    assertTheTileSetsDisagree();
+    focusZoneAct(OTHER, 'act1');
+    expect(wordsAtStamp(OTHER, 'act1'), 'ANTI-VACUOUS: the target already holds the chunk').not.toEqual(SOURCE_WORDS);
+    await clickStamp();
+    // THE DEFECT, PINNED. These are ojz tile numbers written into mgz, where
+    // they name other pictures. A fix that refuses this stamp must replace this
+    // row with a refusal row (nothing written, a toast saying why), not delete it.
+    expect(wordsAtStamp(OTHER, 'act1'),
+      'the cross-zone stamp no longer writes the chunk: if that is a fix, turn this row into a refusal row')
+      .toEqual(SOURCE_WORDS);
+    expect(toastsMatching('tile set'), 'the stamp now says something about tile sets: update this pin with the fix')
+      .toHaveLength(0);
+  });
+
+  it('CONTROL: in the zone the chunk was saved in, another act takes the stamp', async () => {
+    focusZoneAct('ojz', 'act2');
+    expect(wordsAtStamp('ojz', 'act2'), 'ANTI-VACUOUS: the target already holds the chunk').not.toEqual(SOURCE_WORDS);
+    await clickStamp();
+    expect(wordsAtStamp('ojz', 'act2'), 'a stamp inside the chunk\'s own zone did not land').toEqual(SOURCE_WORDS);
+    expect(toastsMatching('tile set'), 'a stamp inside the chunk\'s own zone was refused').toHaveLength(0);
   });
 });
 
