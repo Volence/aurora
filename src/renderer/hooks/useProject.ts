@@ -4,36 +4,49 @@ import { openAeonProject } from '../state/aeon-open';
 import { confirmProjectOpen } from '../shell/project-open-guard';
 import { recordRecentProject } from '../state/recents';
 
-export function useProject() {
-  // Open a directory. A single project-registry fingerprint (Task 17) routes it:
-  // a classic (disasm) project → 'opened', classicProjectStore owns the view; an
-  // aeon match → 'not-classic', so we hand off to the untouched aeon loader; an
-  // unrecognized dir → 'error', the classic store already surfaced the notice, so
-  // there is nothing more to do here.
-  const openPath = useCallback(async (dir: string) => {
-    // Stage-3 deferred gap #1: opening a project used to reset classic/aeon/sprite
-    // stores unconditionally, silently discarding unsaved work. The ask→save→
-    // re-snapshot flow lives in project-open-guard.ts (confirmProjectOpen) so it's
-    // unit-testable without a React hook / jsdom — this hook is just the glue.
-    if (!(await confirmProjectOpen())) return;
-    const classic = useClassicProjectStore.getState();
-    const outcome = await classic.openDirectory(dir);
-    if (outcome === 'opened') {
-      // Register in recent-projects, mirroring the aeon path (openAeonProject
-      // calls addRecentProject on success). Reopening a classic recent routes
-      // back through here classic-first, so it re-detects and refreshes its entry.
-      const name = useClassicProjectStore.getState().label ?? dir;
-      await recordRecentProject(dir, name);
-    } else if (outcome === 'not-classic') {
-      await openAeonProject(dir);
-    }
-  }, []);
+/**
+ * Open a directory. A single project-registry fingerprint (Task 17) routes it:
+ * a classic (disasm) project → 'opened', classicProjectStore owns the view; an
+ * aeon match → 'not-classic', so we hand off to the untouched aeon loader; an
+ * unrecognized dir → 'error', the classic store already surfaced the notice, so
+ * there is nothing more to do here.
+ *
+ * Resolves `true` only when a project is now open from `dir`, `false` when the
+ * open ran and failed, and `undefined` when the guard stopped it. Home's typed
+ * path field clears on `true` and on nothing else
+ * (HOME-PATH-FIELD-KEEPS-OLD-PATH). The guard line keeps its bare `return;`:
+ * shell/__tests__/project-open-door-census.test.ts asserts that exact shape.
+ *
+ * A plain function, not a closure inside the hook, so a node-only suite can
+ * execute it; it has no dependencies to memoize.
+ */
+export async function openProjectPath(dir: string): Promise<boolean | undefined> {
+  // Stage-3 deferred gap #1: opening a project used to reset classic/aeon/sprite
+  // stores unconditionally, silently discarding unsaved work. The ask→save→
+  // re-snapshot flow lives in project-open-guard.ts (confirmProjectOpen) so it's
+  // unit-testable without a React hook / jsdom. This function is just the glue.
+  if (!(await confirmProjectOpen())) return;
+  const classic = useClassicProjectStore.getState();
+  const outcome = await classic.openDirectory(dir);
+  if (outcome === 'opened') {
+    // Register in recent-projects, mirroring the aeon path (openAeonProject
+    // calls addRecentProject on success). Reopening a classic recent routes
+    // back through here classic-first, so it re-detects and refreshes its entry.
+    const name = useClassicProjectStore.getState().label ?? dir;
+    await recordRecentProject(dir, name);
+    return true;
+  } else if (outcome === 'not-classic') {
+    return openAeonProject(dir);
+  }
+  return false;
+}
 
+export function useProject() {
   const openProject = useCallback(async () => {
     const dir = await window.api.selectDirectory();
     if (!dir) return;
-    await openPath(dir);
-  }, [openPath]);
+    await openProjectPath(dir);
+  }, []);
 
-  return { openProject, openProjectByPath: openPath };
+  return { openProject, openProjectByPath: openProjectPath };
 }

@@ -28,7 +28,11 @@ import { submitTypedPath } from '../typed-path-open';
 function run(raw: string): { opened: string[]; refusals: (string | null)[] } {
   const opened: string[] = [];
   const refusals: (string | null)[] = [];
-  submitTypedPath(raw, (d) => opened.push(d), (w) => refusals.push(w));
+  // The opener is async and resolves `true`; submitTypedPath calls it
+  // synchronously after the parse, so `opened` is filled before this returns.
+  // What happens to the FIELD after the open is typed-path-field-after-open.test.ts.
+  void submitTypedPath(raw, async (d) => { opened.push(d); return true; },
+    (w) => refusals.push(w), () => {});
   return { opened, refusals };
 }
 
@@ -91,7 +95,9 @@ describe('F1 §2 · the wiring, from source, since this suite has no DOM', () =>
   it('the component delegates to the rule tested above, and holds no copy of it', () => {
     const text = read(HOME_DIR, 'OpenByPath.tsx');
     expect(text).toContain("import { submitTypedPath } from './typed-path-open'");
-    expect(text).toMatch(/submitTypedPath\(text,\s*onOpenPath,\s*setRefusal\)/);
+    // `setText` as the fourth argument is the seam the after-open rows model:
+    // without it the rule would clear a field nobody is holding.
+    expect(text).toMatch(/submitTypedPath\(text,\s*onOpenPath,\s*setRefusal,\s*setText\)/);
     // A second parse in the component would be the rule spelled twice, and the
     // copy that is not under test is the one that drifts.
     expect(text).not.toContain('parseTypedProjectPath');
