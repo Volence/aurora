@@ -44,6 +44,36 @@ export interface RpcFailure extends Error { code: number; data?: unknown }
 const rpcError = (code: number, message: string, data?: unknown): RpcFailure =>
   Object.assign(new Error(message), { code, data });
 
+/**
+ * WHAT A PERSON READS WHEN THE SOCKET DIES, worded from the errno and the path
+ * this client dialled.
+ *
+ * UX seat B, F4: pressing the emulator badge with no emulator running showed
+ * `Aether socket error: connect ENOENT /tmp/uxb-dead.sock`, a raw Node errno
+ * that says nothing about an emulator. The renderer relays this text VERBATIM
+ * into its refusal toast (`aetherStore.connect`, CONNECT_FAILED_PREFIX), so this
+ * is the one place the sentence can be fixed.
+ *
+ * THE TWO COMMON REFUSALS ARE KEPT APART, because they are the one axis on which
+ * "no emulator" is diagnosed (see `sockError`): no FILE at the path (ENOENT) is a
+ * different fix from a file nobody answers on (ECONNREFUSED, what a crashed or
+ * killed server leaves behind). Both sentences name the path, and both keep the
+ * errno in brackets at the end so a bug report still carries it.
+ *
+ * Any OTHER errno keeps the old raw relay. A sentence for a code nobody has
+ * measured would be a guess wearing the voice of a diagnosis.
+ */
+export function describeSocketError(e: Error & { code?: unknown }, socketPath: string): string {
+  if (e.code === 'ENOENT') {
+    return `No emulator is listening at ${socketPath}. There is no socket file at that path (connect ENOENT).`;
+  }
+  if (e.code === 'ECONNREFUSED') {
+    return `No emulator is listening at ${socketPath}. A socket file is there, but nothing answers on it; `
+      + 'an emulator that has exited can leave one behind (connect ECONNREFUSED).';
+  }
+  return `Aether socket error: ${e.message}`;
+}
+
 interface InitializeResult {
   serverName?: string;
   serverVersion?: string;
@@ -240,9 +270,14 @@ export class AetherClient {
   private onClose(): void {
     const e = this.sockError;
     this.sockError = null;
-    // `e.message` is node's `connect ECONNREFUSED /path` — code and path both
-    // named, which is exactly what a user at a stale link needs to read.
-    this.teardown(e ? new Error(`Aether socket error: ${e.message}`, { cause: e }) : new Error('Aether socket disconnected'));
+    // `e.message` is node's `connect ECONNREFUSED /path`: code and path, but no
+    // word about an emulator, and it reaches a person verbatim through the
+    // renderer's refusal toast. `describeSocketError` words the two common
+    // refusals as sentences (still naming the path and the errno) and relays
+    // anything else raw. `cause` keeps node's own error for anyone who wants it.
+    this.teardown(e
+      ? new Error(describeSocketError(e, this.opts.socketPath), { cause: e })
+      : new Error('Aether socket disconnected'));
   }
 
   private teardown(reason: Error): void {

@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { AetherClient } from '../client';
+import { AetherClient, describeSocketError } from '../client';
 
 /**
  * What the client SURFACES at a dead link — measured against a real unix
@@ -63,5 +63,48 @@ describe('AetherClient at a dead link', () => {
     await expect(c.connect()).rejects.toThrow(/ENOENT/);
     await expect(c.connect().catch((e: Error) => e.message)).resolves.toContain(absent);
     expect(c.status).toBe('disconnected');
+  });
+
+  /**
+   * UX seat B, F4 (wording half): this text reaches a person verbatim, through
+   * the renderer's refusal toast, and it used to read `Aether socket error:
+   * connect ENOENT <path>`. Measured on the SAME two real fixtures as the rows
+   * above, so the sentence is checked against the errno the OS really hands
+   * back rather than against a code this file made up.
+   */
+  const messageAt = async (path: string): Promise<string> =>
+    client(path).connect().then(() => 'CONNECTED (fixture broken)', (e: Error) => e.message);
+
+  it('F4: no socket FILE reads as a sentence about an emulator, naming the path', async () => {
+    const m = await messageAt(absent);
+    expect(m).toBe(describeSocketError(Object.assign(new Error('x'), { code: 'ENOENT' }), absent));
+    expect(m.startsWith(`No emulator is listening at ${absent}.`)).toBe(true);
+    expect(m).toContain('no socket file');
+    expect(m).not.toContain('Aether socket error');
+  });
+
+  it('F4: a file NOBODY ANSWERS ON reads differently, and still names the path', async () => {
+    const m = await messageAt(dead);
+    expect(m).toBe(describeSocketError(Object.assign(new Error('x'), { code: 'ECONNREFUSED' }), dead));
+    expect(m.startsWith(`No emulator is listening at ${dead}.`)).toBe(true);
+    expect(m).toContain('nothing answers on it');
+    expect(m).not.toContain('Aether socket error');
+  });
+
+  it('F4: the two refusals stay DISTINGUISHABLE once their paths are taken out', async () => {
+    const a = (await messageAt(absent)).split(absent).join('<path>');
+    const d = (await messageAt(dead)).split(dead).join('<path>');
+    expect(a).not.toBe(d);
+  });
+});
+
+describe('describeSocketError: what it does NOT word', () => {
+  it('CONTROL: an errno nobody measured keeps the raw relay, message and all', () => {
+    const e = Object.assign(new Error('connect EACCES /tmp/x.sock'), { code: 'EACCES' });
+    expect(describeSocketError(e, '/tmp/x.sock')).toBe('Aether socket error: connect EACCES /tmp/x.sock');
+  });
+
+  it('CONTROL: an error with no code at all keeps the raw relay', () => {
+    expect(describeSocketError(new Error('boom'), '/tmp/x.sock')).toBe('Aether socket error: boom');
   });
 });

@@ -194,12 +194,14 @@ export const useAetherStore = create<AetherState>((set, get) => ({
     //
     // ⚠ THE TEXT IS THE PRODUCER'S, RELAYED VERBATIM, not rewritten here. One
     // of the two refusals seat B provoked is excellent (it names the 104-byte
-    // unix-socket limit, the remedy, and the offending path) and the other is a
-    // raw Node errno (`connect ENOENT /tmp/uxb-dead.sock`) that says nothing
-    // about what Aether is or that an emulator must be running. Improving the
-    // second is a change to the MAIN process's message and a separate call;
-    // showing either one at all is this one, and it is the half that outranks
-    // the wording — neither message was SHOWN.
+    // unix-socket limit, the remedy, and the offending path) and the other was a
+    // raw Node errno (`connect ENOENT /tmp/uxb-dead.sock`) that said nothing
+    // about what Aether is or that an emulator must be running. That second
+    // one is now worded where it is produced, in the main process
+    // (`describeSocketError` in src/main/aether/client.ts, which keeps ENOENT
+    // and ECONNREFUSED apart and still names the path). Showing either one at
+    // all is this file's half, and it is the half that outranked the wording:
+    // neither message was SHOWN.
     if (get().status !== 'connected') {
       const why = get().error;
       useToastStore.getState().addToast(
