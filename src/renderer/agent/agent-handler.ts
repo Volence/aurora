@@ -31,7 +31,7 @@ import { sceneIdRefusal } from '../../core/formats/effects/scene-ui';
 import {
   deleteSceneCommand, replaceSceneCommand, sectionSceneCommand,
 } from '../providers/effects-aeon';
-import { parseEffectsPreset } from '../../core/formats/effects/preset';
+import { parseEffectsPreset, presetProgramArm } from '../../core/formats/effects/preset';
 import {
   deletePresetCommand, presetIdRefusal, replacePresetCommand, sectionPresetCommand,
   PRESET_LIMITS,
@@ -1042,6 +1042,16 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
           id: p.id,
           name: typeof p.name === 'string' ? p.name : null,
           bands: (p.bands ?? []).length,
+          // ⚠ WHICH PROGRAM THE DOCUMENT CARRIES, BESIDE THE COUNT (bands-not-
+          // required audit, 2026-09-11). `bands` left the schema's `required`
+          // when the root became an exactly-one `oneOf`, so a ramp, base_swap
+          // or boundary preset has no `bands` key and the count above is 0. On
+          // its own that zero reads as an empty band list, which the schema
+          // says cannot exist. It is the defect `presetListSummary` fixed on the
+          // panel's copy of this list, and the value is the one that fix reads
+          // (`PresetListEntry.channel`): the program ARM, not the raster channel,
+          // so a boundary document is named rather than reported as null.
+          program: presetProgramArm(p),
         })),
         // NOT silently omitted, on list_effects_scenes' rule: a file that would
         // not parse is a preset id an agent must not take and a file it must not

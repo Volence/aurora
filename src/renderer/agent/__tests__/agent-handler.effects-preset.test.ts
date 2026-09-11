@@ -151,7 +151,7 @@ describe('list_effects_presets', () => {
       // `name` is an OBJECT here, and the reply reports null rather than the
       // panel's `label` collapse: an agent must be able to tell "no string name"
       // from "named after itself", which `presetListEntries` deliberately cannot.
-      { id: 'glare', name: null, bands: glare().bands!.length },
+      { id: 'glare', name: null, bands: glare().bands!.length, program: 'bands' },
     ]);
     expect(r.unreadable).toEqual([
       { path: 'data/editor/effects/presets/broken.json', reason: 'not valid JSON' },
