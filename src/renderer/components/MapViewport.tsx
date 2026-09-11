@@ -31,7 +31,7 @@ import { withLinkBreaks, chunkOriginAt } from '../../core/editing/chunk-links';
 import {
   snapMarquee, copyFromSection, buildPasteCommand, isBlockAligned,
   effectivePasteLayers, pasteBaseStep, selectionSizeLabel, artOnlyReason,
-  effectiveGranularity, clipboardFitsTileset, OTHER_TILESET_REFUSAL,
+  effectiveGranularity, clipboardFitsTileset, pasteFit, armRefusal, pasteRefusal, COLLISION_ONLY_HERE,
 } from '../../core/editing/map-clipboard';
 import type { MapClipboard } from '../../core/editing/map-clipboard';
 import { regionPreviewCanvas, publishPasteGhostReport } from '../canvas/region-preview';
@@ -852,8 +852,15 @@ export default function MapViewport() {
         const px = pOffset.x + pasteHover.baseCol * 8, py = pOffset.y + pasteHover.baseRow * 8;
         const pw = clip.widthTiles * 8, ph = clip.heightTiles * 8;
 
+        // THE ART IS DRAWN ONLY OVER THE TILE SET ITS NUMBERS INDEX
+        // (COLLISION-PASTE-ACROSS-TILESETS). Paste mode arms over another zone's
+        // tile set for a collision-only paste, and there the clipboard's tile
+        // numbers name different pictures: rasterising them would show art the
+        // click refuses to write. The footprint, the collision shading and the
+        // outline below still draw.
         const pasteZone = getCurrentZone(useProjectStore.getState());
-        if (pasteZone
+        const showArt = pasteZone !== null && clipboardFitsTileset(clip, pasteZone.tileset);
+        if (showArt && pasteZone
           && (pasteGhostRef.current?.clip !== clip || pasteGhostRef.current?.zoneId !== pasteZone.id)) {
           const pc = regionPreviewCanvas(clip, pasteZone.tileset.tiles, pasteZone.palette);
           pasteGhostRef.current = pc ? { clip, zoneId: pasteZone.id, canvas: pc } : null;
@@ -864,7 +871,7 @@ export default function MapViewport() {
         ctx.scale(pZoom, pZoom);
         ctx.translate(-pvpX, -pvpY);
         const pGhost = pasteGhostRef.current;
-        if (pGhost && pGhost.clip === clip) {
+        if (showArt && pGhost && pGhost.clip === clip) {
           ctx.globalAlpha = 0.55;    // clearly a preview, still readable as art
           ctx.drawImage(pGhost.canvas, px, py, pw, ph);
           ctx.globalAlpha = 1;
@@ -1951,16 +1958,25 @@ export default function MapViewport() {
       if (chord === 'paste') {
         const clip = useEditorStore.getState().mapClipboard;
         if (clip) {
-          // REFUSED, OUT LOUD, WHERE THE WORDS WOULD INDEX ANOTHER TILE SET
-          // (PASTE-ACROSS-TILESETS). The clipboard survives a switch on
-          // purpose, so going back to where it was copied still pastes; here,
-          // nothing is armed and the key is still claimed, because a Ctrl+V
-          // that fell through to the page would read as a dead key.
-          if (!clipboardFitsTileset(clip, getCurrentZone(state)?.tileset)) {
-            useToastStore.getState().addToast(OTHER_TILESET_REFUSAL, 'warning');
+          // REFUSED, OUT LOUD, ONLY WHERE NO CLICK COULD LAND ANYTHING
+          // (PASTE-ACROSS-TILESETS, then COLLISION-PASTE-ACROSS-TILESETS). Tile
+          // words fit only the tile set they were copied from. Collision words
+          // fit every zone of the project they were copied in, because a shape
+          // number indexes the project's one collision bank. The layers are
+          // decided at the click (Shift is collision only), so a clipboard
+          // whose collision fits arms even over another tile set: the click
+          // refuses what does not fit, and the ghost draws no art from the
+          // wrong tile set. The clipboard survives a switch on purpose. A
+          // refusal still claims the key, because a Ctrl+V that fell through to
+          // the page would read as a dead key.
+          const fit = pasteFit(clip, getCurrentZone(state)?.tileset, state.project);
+          const refusal = armRefusal(clip, fit, useEditorStore.getState().pasteLayers);
+          if (refusal) {
+            useToastStore.getState().addToast(refusal, 'warning');
             e.preventDefault();
             return;
           }
+          if (!fit.art) useToastStore.getState().addToast(COLLISION_ONLY_HERE, 'info');
           useEditorStore.getState().setPasting(true);
           e.preventDefault();
           return;
@@ -3276,14 +3292,23 @@ export default function MapViewport() {
       const hover = pasteHoverRef.current;
       const level = getActiveLevel();
       if (clip && hover && level) {
+        // Modifiers override the sticky pasteLayers setting for THIS click only.
+        const layers: PasteLayers = e.altKey ? 'art' : e.shiftKey ? 'collision'
+          : useEditorStore.getState().pasteLayers;
         // THE WRITE CHECKS FOR ITSELF, and does not trust whoever armed it
-        // (PASTE-ACROSS-TILESETS). Ctrl+V refuses first and an act, zone or
-        // project change disarms, so no shipped gesture reaches this with the
-        // wrong tile set; `setPasting` is a public store action all the same.
-        // Paste mode is left too, so no ghost drawn from another tile set's
-        // numbers stays under the cursor.
-        if (!clipboardFitsTileset(clip, getCurrentZone(useProjectStore.getState())?.tileset)) {
-          useToastStore.getState().addToast(OTHER_TILESET_REFUSAL, 'warning');
+        // (PASTE-ACROSS-TILESETS). It refuses exactly the words that would not
+        // fit (COLLISION-PASTE-ACROSS-TILESETS): tile words outside the tile set
+        // they were copied from, collision words outside the project. Ctrl+V
+        // arms over another zone's tile set for a collision-only paste, so a
+        // plain click there is refused HERE, and nothing is written. Paste mode
+        // is left on a refusal, as it was, and `setPasting` is a public store
+        // action, so a click in another project is checked here too.
+        const pstate = useProjectStore.getState();
+        const refusal = pasteRefusal(
+          pasteFit(clip, getCurrentZone(pstate)?.tileset, pstate.project),
+          effectivePasteLayers(clip, layers));
+        if (refusal) {
+          useToastStore.getState().addToast(refusal, 'warning');
           useEditorStore.getState().setPasting(false);
           e.preventDefault();
           return;
@@ -3291,9 +3316,6 @@ export default function MapViewport() {
         const section = getSectionByIndex(hover.sectionIndex);
         if (section) {
           ensureCollisionPlanes(section);
-          // Modifiers override the sticky pasteLayers setting for THIS click only.
-          const layers: PasteLayers = e.altKey ? 'art' : e.shiftKey ? 'collision'
-            : useEditorStore.getState().pasteLayers;
           // Shift ('collision only') over an ART-ONLY clipboard has nothing to
           // write — `buildPasteCommand` returns null for it. Say so, because a
           // click that silently does nothing is the one outcome an author reads

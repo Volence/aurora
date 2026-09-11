@@ -3,7 +3,10 @@ import {
   snapMarquee, isBlockAligned, copyFromSection, copyChunkToClipboard,
   buildPasteCommand, effectivePasteLayers, pasteBaseStep, selectionSizeLabel, artOnlyReason,
   effectiveGranularity, clipboardFitsTileset,
+  clipboardFromProject, pasteFit, pasteRefusal, armRefusal,
+  OTHER_TILESET_REFUSAL, OTHER_PROJECT_REFUSAL, OTHER_PROJECT_COLLISION_REFUSAL, COLLISION_ONLY_HERE,
 } from '../map-clipboard';
+import type { PasteLayers } from '../map-clipboard';
 import { buildRegionWriteCommand } from '../map-stamp';
 import { selectionToChunk } from '../selection-to-chunk';
 import { cellTileIndices } from '../../collision/collision-cell';
@@ -405,6 +408,85 @@ describe('7c. the clipboard remembers the tile set its words index (PASTE-ACROSS
     expect(clipboardFitsTileset(clip, twin), 'a tile set that merely looks the same was trusted').toBe(false);
     expect(clipboardFitsTileset(clip, null), 'no open tile set was trusted').toBe(false);
     expect(clipboardFitsTileset(clip, undefined), 'no open tile set was trusted').toBe(false);
+  });
+});
+
+describe('7d. collision words fit the PROJECT, tile words the TILE SET (COLLISION-PASTE-ACROSS-TILESETS)', () => {
+  // A collision word's shape number indexes the project's one collision base
+  // bank, so it means the same shape in every zone of a project and not
+  // necessarily in another project. A tile word means one picture only in the
+  // tile set it was copied from. Every refusal below is derived from those two
+  // sentences, never from the implementation.
+  const tileset = () => ({ tiles: [{ pixels: new Uint8Array(64).fill(3) }] });
+  const source = tileset();
+  const otherZone = tileset();
+  /** The project the copy was made in: two zones, two tile sets. */
+  const here = { zones: [{ tileset: source }, { tileset: otherZone }] };
+  /** Another load under the same ids: fresh tile sets, identical pixels. */
+  const elsewhere = { zones: [{ tileset: tileset() }, { tileset: tileset() }] };
+  const withCollision = () => copyChunkToClipboard(createChunkDef('c', 'c', 4, 4), source);
+  const artOnly = () => copyChunkToClipboard(createChunkDef('o', 'o', 3, 3), source);
+
+  it('7d-1. the copy came from THIS project exactly when its tile set is one of the project\'s zones\'', () => {
+    const clip = withCollision();
+    expect(clipboardFromProject(clip, here), 'the project the copy was made in was refused').toBe(true);
+    expect(elsewhere.zones[0].tileset, 'ANTI-VACUOUS: the other load looks the same').toEqual(source);
+    expect(clipboardFromProject(clip, elsewhere), 'another load that merely looks the same was trusted').toBe(false);
+    expect(clipboardFromProject(clip, null), 'no open project was trusted').toBe(false);
+  });
+
+  it('7d-2. every layer choice, in each of the three places a paste can be: refused exactly where a written word would not fit', () => {
+    const clip = withCollision();
+    const sameTileset = pasteFit(clip, source, here);
+    const otherZoneFit = pasteFit(clip, otherZone, here);
+    const otherProject = pasteFit(clip, elsewhere.zones[0].tileset, elsewhere);
+    expect([sameTileset, otherZoneFit, otherProject], 'the premise: the three places')
+      .toEqual([{ art: true, collision: true }, { art: false, collision: true }, { art: false, collision: false }]);
+    const table = (fit: typeof sameTileset) =>
+      (['both', 'art', 'collision'] as PasteLayers[]).map((l) => pasteRefusal(fit, l));
+    expect(table(sameTileset), 'a paste into its own tile set was refused').toEqual([null, null, null]);
+    expect(table(otherZoneFit), 'another zone: the tiles must be refused and the collision must land')
+      .toEqual([OTHER_TILESET_REFUSAL, OTHER_TILESET_REFUSAL, null]);
+    expect(table(otherProject), 'another project: every choice refused, each for what it would write')
+      .toEqual([OTHER_PROJECT_REFUSAL, OTHER_TILESET_REFUSAL, OTHER_PROJECT_COLLISION_REFUSAL]);
+    expect(pasteRefusal(otherProject, null), 'nothing to write is the caller\'s sentence, not a refusal').toBeNull();
+  });
+
+  it('7d-3. arming is refused only where NO click could land anything', () => {
+    const clip = withCollision();
+    const flat = artOnly();
+    expect(flat.artOnly, 'the premise: an odd chunk copies as art only').toBe(true);
+    const arm = (c: typeof clip, ts: typeof source, p: typeof here, sticky: PasteLayers) =>
+      armRefusal(c, pasteFit(c, ts, p), sticky);
+    expect(arm(clip, source, here, 'both'), 'its own tile set did not arm').toBeNull();
+    expect(arm(clip, otherZone, here, 'both'), 'another zone did not arm, though its collision fits').toBeNull();
+    expect(arm(flat, otherZone, here, 'both'), 'an art-only copy armed where its tiles do not fit')
+      .toBe(OTHER_TILESET_REFUSAL);
+    const away = elsewhere.zones[0].tileset;
+    expect(arm(clip, away, elsewhere, 'both')).toBe(OTHER_PROJECT_REFUSAL);
+    expect(arm(clip, away, elsewhere, 'art')).toBe(OTHER_TILESET_REFUSAL);
+    expect(arm(clip, away, elsewhere, 'collision')).toBe(OTHER_PROJECT_COLLISION_REFUSAL);
+    expect(arm(flat, away, elsewhere, 'collision'), 'an art-only copy was refused in terms of collision it does not carry')
+      .toBe(OTHER_TILESET_REFUSAL);
+  });
+
+  it('7d-4. each sentence names only the kind of word it refuses, and says what to do', () => {
+    expect(OTHER_PROJECT_COLLISION_REFUSAL).toBe(
+      'Not pasted: the copied collision belongs to another project, whose collision shapes can differ '
+      + 'from this one\'s, so pasting it here could put different shapes down. Copy again from this project.');
+    expect(OTHER_PROJECT_REFUSAL).toBe(
+      'Not pasted: this was copied in another project, whose tiles and collision shapes can differ '
+      + 'from this one\'s, so pasting here could put different ones down. Copy again from this project.');
+    expect(COLLISION_ONLY_HERE).toBe(
+      'Only the collision can be pasted here: the copied tiles belong to another tile set. '
+      + 'Shift+click pastes collision only.');
+    expect(OTHER_PROJECT_COLLISION_REFUSAL, 'a collision refusal talked about tiles').not.toMatch(/tile/i);
+    expect(OTHER_TILESET_REFUSAL, 'the tile refusal talked about collision').not.toMatch(/collision/i);
+    // The en and em dash by code point, so this file carries neither character.
+    const dash = new RegExp(`[${String.fromCharCode(0x2013, 0x2014)}]`);
+    for (const s of [OTHER_TILESET_REFUSAL, OTHER_PROJECT_REFUSAL, OTHER_PROJECT_COLLISION_REFUSAL, COLLISION_ONLY_HERE]) {
+      expect(s, 'a person-facing sentence carries a dash').not.toMatch(dash);
+    }
   });
 });
 
