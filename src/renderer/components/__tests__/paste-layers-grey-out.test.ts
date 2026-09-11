@@ -237,6 +237,18 @@ describe('the CONTROL: in the zone the copy was made in, the panel is as it was'
     }
   });
 
+  it('NOT pasting, a clipboard from another zone greys nothing: there the buttons describe the selection, and the next Ctrl+C replaces the clipboard', () => {
+    openZone(HERE, 'b');
+    useEditorStore.getState().setTool('marquee');
+    useEditorStore.setState({ mapClipboard: withCollision(), marquee: null });
+    expect(useEditorStore.getState().pasting, 'the premise: not pasting').toBe(false);
+    expect(clickRefusal(withCollision(), 'both'), 'the premise: armed, this clipboard would be refused here').not.toBeNull();
+    const { buttons, text } = render();
+    expect(LAYERS.map((v) => dead(buttons[v])), 'a stale clipboard greyed the copy-side buttons').toEqual([false, false, false]);
+    for (const v of LAYERS) expect(buttons[v].props.title).toBe(TITLES[v]);
+    expect(text, 'a notice appeared while not pasting').not.toContain('Only the collision');
+  });
+
   it('an art-only clipboard: Collision unavailable for the reason it always was, Both and Art available', () => {
     openZone(HERE, 'a');
     arm(artOnly(), 'both');
