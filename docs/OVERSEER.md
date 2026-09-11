@@ -61,11 +61,18 @@ him. His directives are transcribed into the **hub's** log:
 
 ```sh
 git -C ../empyrean fetch -q origin && \
-git -C ../empyrean show origin/main:docs/OVERSEER.md | grep -n "OWNER, 20" | tail -20
+git -C ../empyrean show origin/main:docs/OVERSEER.md | grep -nE "OWNER(, VERBATIM)?,? [(~]?20[0-9]{2}-"
 ```
 
-Read the tail of that list at boot and read the entries verbatim, not the hub's reading of
-them. **Instance:** at 05:38Z the owner put aurora in a four-lane overnight run — *"get
+⚠ **FIXED 2026-09-11: THE OLD FORM WAS `grep -n "OWNER, 20" | tail -20` AND IT MISSED EVERY CURRENT
+INSTRUCTION.** The hub now heads his words `OWNER, VERBATIM, 2026-…`, which that pattern cannot match.
+Measured at empyrean `origin/main` that night: 13 hits for the old form and 18 for this one, and the five
+it missed included all three standing instructions then in force (the 09-10 overnight order, the 09-11
+"besides seraph" go, and the 09-11 clearing rule). The file is also NEWEST-FIRST, so `tail` kept the oldest
+entries. Read the WHOLE list, top first. And if it prints nothing, suspect the pattern before concluding
+there are no standing words.
+
+Read the entries verbatim, not the hub's reading of them. **Instance:** at 05:38Z the owner put aurora in a four-lane overnight run — *"get
 everything running and doing things overnight... let's just go with aeon, sigil, oracle, and
 aurora"* — and added *"make sure aeon and aurora at least keep pushing the parallax/raster
 tooling and engine items"*. That is this lane, named twice, told to choose its own next item
