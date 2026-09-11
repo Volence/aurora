@@ -344,8 +344,14 @@ async function classicPart({ c, COPY, shot, realClick, key }) {
   await sleep(1500);
 
   const LEVELS = `document.querySelector('[data-section="explorer.levels"]')`;
-  const LEVELS_HEADER = String.raw`(() => { const s = ${LEVELS}; if (!s) return null;
-    return [...s.querySelectorAll('*')].find((e) => e.children.length === 0 && (e.textContent || '').trim() === 'Levels') || null; })()`;
+  // ⚠ THE TITLE IS A BARE TEXT NODE beside the chevron span
+  // (CollapsibleSection.tsx: `<span>{chevron}{title}</span>` inside the header
+  // div that owns onClick), so NO element's own text is exactly "Levels". Run 1
+  // hunted a leaf with that text, found null, sent no click, and read "no rows"
+  // as the group's contents. The aim is the title span, first child of the
+  // header div; its centre is on the word.
+  const LEVELS_HEADER = String.raw`(() => { const s = ${LEVELS}; if (!s || !s.firstElementChild) return null;
+    return s.firstElementChild.querySelector('span') || s.firstElementChild; })()`;
   const levelsCollapsed = () => c.evalExpr(`(() => { const s = ${LEVELS}; return s ? s.getAttribute('data-section-collapsed') : null; })()`);
   const setLevels = async (want) => {
     for (let i = 0; i < 3; i++) {

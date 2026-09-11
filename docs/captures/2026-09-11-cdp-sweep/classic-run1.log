@@ -1,0 +1,104 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5f8575a69bc762fe
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5f8575a69bc762fe
+=== cdp-sweep 2026-09-11 harness, PART=classic ===
+    node         : v24.15.0
+    loadavg      : 9.22 11.06 11.21
+    ORACLE_SOCKET: /tmp/cdps0911-aFtbcL/o.sock   (private; the directory was made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-0911-harness-376076-f430446d   (pinned by spawnGuarded, derived fresh per process)
+    captures     : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5f8575a69bc762fe/docs/captures/2026-09-11-cdp-sweep   tag run1
+    PORT         : 9491   DISPLAY: xvfb-run -a (auto, never :0)
+    project copy : /tmp/cdps0911-s1-fD5Sxk   (fresh cpSync of /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5f8575a69bc762fe/test/fixtures/s1disasm)
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.sonic-level-editor/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-0911-harness-376076-f430446d — see HAZARD 6
+    dpr at start : 1
+
+    stat BEFORE  : GHZ1 {"size":5727,"mtimeNs":"1789155093247256650"}  GHZ2 {"size":5031,"mtimeNs":"1789155093247256650"}
+PASS  [0a] the COPIED fixture opened as a classic project (setup, through __dbg.openDir)   [load 8.79/10.91/11.16]
+        openDir -> ok; projStatus {"status":"open","zones":18}
+
+──── R1: A-F3, a tile in GHZ1 painted and saved through Ctrl+S ────
+FAIL  [R1.0] GHZ act 1 opened by a REAL click on its Explorer row   [load 8.79/10.91/11.16]
+        rows []; clicked null; levelState {"status":"ready","zone":"ghz","act":1}
+PASS  [R1.1] a real pencil press on tile $30 (Art > Tile) changed the tile, and the tab says so   [load 8.96/10.91/11.16]
+        arm {"art":{"x":522,"y":54,"hitOk":true,"hitTag":"BUTTON","dpr":1,"rect":{"x":503.19,"y":44.5,"w":38.06,"h":18}},"tier":{"x":387,"y":85,"hitOk":true,"hitTag":"BUTTON","dpr":1,"rect":{"x":365.14,"y":76,"w":43.33,"h":18}},"thumbTitle":"tile $30 · unused","thumbLocked":false,"thumb":{"x":870,"y":346,"hitOk":true,"hitTag":"CANVAS","dpr":1,"rect":{"x":857.33,"y":333,"w":26,"h":26}},"tileTitle":"Tile $30","pencil":{"x":262,"y":126,"hitOk":true,"hitTag":"svg","dpr":1,"rect":{"x":247.5,"y":112,"w":28,"h":28}}}
+        paint {"before":187360325,"after":2237619125,"swatch":{"x":680,"y":827,"hitOk":true,"hitTag":"BUTTON","dpr":1,"rect":{"x":669,"y":816,"w":22,"h":22}},"pt":{"x":485,"y":390,"z":24,"hitOk":true,"dpr":1,"rect":{"x":472.67,"y":377.5,"w":192,"h":192}},"swatchIndex":15}
+        tabs [{"title":"Home","dirty":false},{"title":"Green Hill Zone Act 1","dirty":true}]
+   shot: docs/captures/2026-09-11-cdp-sweep/classic-r1-painted-run1.png
+   shot: docs/captures/2026-09-11-cdp-sweep/classic-r1-toast-1s-run1.png
+   shot: docs/captures/2026-09-11-cdp-sweep/classic-r1-toast-5s-run1.png
+    stat AFTER   : GHZ1 {"size":5884,"mtimeNs":"1789155108227380713"}  GHZ2 {"size":5031,"mtimeNs":"1789155093247256650"}
+PASS  [R1.2] a save toast appears carrying the art clause `art grew: ... GHZ1.nem A to B bytes (+N)`   [load 9.56/10.92/11.16]
+        first seen 12ms after the chord: "Saved 1 level(s) · 1 file: artnem/8x8 - GHZ1.nem · art grew: artnem/8x8 - GHZ1.nem 5727 to 5884 bytes (+157)"
+PASS  [R1.3] the toast is WARNING tier (the store), with its border colour printed off the screen   [load 9.56/10.92/11.16]
+        store [{"message":"Saved 1 level(s) · 1 file: artnem/8x8 - GHZ1.nem · art grew: artnem/8x8 - GHZ1.nem 5727 to 5884 bytes (+157)","type":"warning"}]; painted border rgb(251, 191, 36)
+PASS  [R1.4] it is PAINTED at ~1s: rects, hit at its integer centre, inside the viewport   [load 9.56/10.92/11.16]
+        {"atMs":1002,"toast":{"text":"Saved 1 level(s) · 1 file: artnem/8x8 - GHZ1.nem · art grew: artnem/8x8 - GHZ1.nem 5727 to 5884 bytes (+157)","rect":{"x":420,"y":792,"w":560,"h":48},"rects":1,"hitInside":true,"inViewport":true,"border":"rgb(251, 191, 36)","opacity":"1","dpr":1}}
+PASS  [R1.5] it is STILL painted at ~5s and ~7.5s, past the 2.2s a success toast gets   [load 9.56/10.92/11.16]
+        {"atMs":5005,"toast":{"text":"Saved 1 level(s) · 1 file: artnem/8x8 - GHZ1.nem · art grew: artnem/8x8 - GHZ1.nem 5727 to 5884 bytes (+157)","rect":{"x":420,"y":792,"w":560,"h":48},"rects":1,"hitInside":true,"inViewport":true,"border":"rgb(251, 191, 36)","opacity":"1","dpr":1}}
+        {"atMs":7505,"toast":{"text":"Saved 1 level(s) · 1 file: artnem/8x8 - GHZ1.nem · art grew: artnem/8x8 - GHZ1.nem 5727 to 5884 bytes (+157)","rect":{"x":420,"y":792,"w":560,"h":48},"rects":1,"hitInside":true,"inViewport":true,"border":"rgb(251, 191, 36)","opacity":"1","dpr":1}}
+PASS  [R1.6] and it has left by ~11s (a timed 8s dwell, not a stuck toast)   [load 9.56/10.92/11.16]
+        {"atMs":11004,"toast":null}
+PASS  [R1.7] GHZ2 on disk: bytes AND mtime unchanged   [load 9.56/10.92/11.16]
+        GHZ2 {"size":5031,"mtimeNs":"1789155093247256650"} -> {"size":5031,"mtimeNs":"1789155093247256650"}
+PASS  [R1.8] CONTROL for R1.7: GHZ1 on disk DID change (the save landed, so GHZ2 standing still means something)   [load 9.56/10.92/11.16]
+        GHZ1 {"size":5727,"mtimeNs":"1789155093247256650"} -> {"size":5884,"mtimeNs":"1789155108227380713"} (size delta 157)
+PASS  [R1.9] the toast's two sizes are the ones `stat` reads on this disk, and it never names GHZ2   [load 9.56/10.92/11.16]
+        toast 5727 -> 5884 (+157); stat 5727 -> 5884
+
+──── R2: F-1, a dirty level tab closed ────
+   shot: docs/captures/2026-09-11-cdp-sweep/classic-r2-control-clean-close-run1.png
+PASS  [R2.0] CONTROL: a CLEAN level tab closed leaves no marker anywhere (title, header, DOM scan, seat B's scan)   [load 9.56/10.92/11.16]
+        title before any edit "Aurora - Sonic 1 Disassembly (GitHub) - Green Hill Zone Act 1"; {"tabsBefore":[{"title":"Home","dirty":false},{"title":"Green Hill Zone Act 1","dirty":false}],"titleBefore":"Aurora - Sonic 1 Disassembly (GitHub) - Green Hill Zone Act 1","close":{"x":460,"y":17,"hitOk":true,"hitTag":"path","dpr":1,"rect":{"x":452.14,"y":8.5,"w":16,"h":16}},"tabsAfter":[{"title":"Home","dirty":false}],"title":"Aurora - Sonic 1 Disassembly (GitHub)","dots":0,"seatB":[],"collapsed":"true","headerDot":{"found":false}}
+FAIL  [R2.1] the level is dirty again by a real pencil press, and its TAB carries the dot   [load 12.08/11.42/11.32]
+        reopen null {"status":"ready","zone":"ghz","act":1}; arm {"art":{"x":0,"y":0,"hitOk":false,"hitTag":"DIV","dpr":1,"rect":{"x":0,"y":0,"w":0,"h":0}},"tier":null,"thumbTitle":null,"thumbLocked":null,"thumb":null,"tileTitle":null,"pencil":null}; paint {"before":2237619125,"after":2237619125,"swatch":null,"pt":null,"swatchIndex":null}; tabs [{"title":"Home","dirty":false}]; title "Aurora - Sonic 1 Disassembly (GitHub)"
+FAIL  [R2.2] the ✕ press closed the tab, and the edit is still resident (tile $30 still holds the paint)   [load 12.08/11.42/11.32]
+        close null; tabs [{"title":"Home","dirty":false}]; tileHash 2237619125 vs painted 2237619125
+FAIL  [R2.3] document.title starts with `● Aurora - ` after the close   [load 12.08/11.42/11.32]
+        "Aurora - Sonic 1 Disassembly (GitHub)"
+   shot: docs/captures/2026-09-11-cdp-sweep/classic-r2-dirty-closed-collapsed-run1.png
+FAIL  [R2.4] the COLLAPSED Levels header paints the dot (in the tree scroller's box, the viewport, and hit)   [load 12.08/11.42/11.32]
+        collapsed=true; dot {"found":false}; title null
+   shot: docs/captures/2026-09-11-cdp-sweep/classic-r2-dirty-closed-expanded-run1.png
+FAIL  [R2.5] expanded, the GHZ act 1 ROW paints the dot; act 2's row does not (control)   [load 13.75/11.78/11.44]
+        row dot {"found":false}; act 2 dot "no-act2-row"; rows []
+FAIL  [R2.6] a full-DOM scan for aria-label="Unsaved changes" is non-empty, and so is seat B's /unsaved/i title scan   [load 13.75/11.78/11.44]
+        {"dots":0,"seatB":[]}
+   shot: docs/captures/2026-09-11-cdp-sweep/classic-r2-after-save-all-run1.png
+FAIL  [R2.7] Ctrl+Shift+S clears the title marker, every dot, and seat B's scan   [load 13.75/11.78/11.44]
+        {"title":"Aurora - Sonic 1 Disassembly (GitHub)","dots":0,"seatB":[],"rowDot":"no-row","toasts":[]}
+FAIL  [R2.8] CONTROL for R2.7: the chord actually WROTE (GHZ1 mtime moved), so the clearing is a save and not a lost edit; GHZ2 still untouched   [load 13.75/11.78/11.44]
+        GHZ1 mtime 1789155108227380713 -> 1789155108227380713 (size 5884); GHZ2 {"size":5031,"mtimeNs":"1789155093247256650"} vs pristine {"size":5031,"mtimeNs":"1789155093247256650"}
+cleanup: tree under pid 376406 (11 process(es)):
+           376406 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           376428 Xvfb :116 -screen 0 1680x1050x24 -nolisten tcp
+           388006 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           388111 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           388174 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           388180 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           388244 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           388543 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           388550 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           388554 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           388563 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 51 ms; then the wrapper group with the X server still up, tree gone in 51 ms; teardown 402 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PART=classic: 11/20 rows PASS · 9 FAIL · 0 UNMEASURABLE · 37.3s ════
+     loadavg at start 9.22 11.06 11.21 · at end 13.75 11.78 11.44
+FAILING:
+  [R1.0] GHZ act 1 opened by a REAL click on its Explorer row
+  [R2.1] the level is dirty again by a real pencil press, and its TAB carries the dot
+  [R2.2] the ✕ press closed the tab, and the edit is still resident (tile $30 still holds the paint)
+  [R2.3] document.title starts with `● Aurora - ` after the close
+  [R2.4] the COLLAPSED Levels header paints the dot (in the tree scroller's box, the viewport, and hit)
+  [R2.5] expanded, the GHZ act 1 ROW paints the dot; act 2's row does not (control)
+  [R2.6] a full-DOM scan for aria-label="Unsaved changes" is non-empty, and so is seat B's /unsaved/i title scan
+  [R2.7] Ctrl+Shift+S clears the title marker, every dot, and seat B's scan
+  [R2.8] CONTROL for R2.7: the chord actually WROTE (GHZ1 mtime moved), so the clearing is a save and not a lost edit; GHZ2 still untouched
+END-OF-RUN
