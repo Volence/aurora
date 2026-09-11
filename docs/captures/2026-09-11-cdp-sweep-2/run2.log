@@ -1,0 +1,154 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afdf8033018bbab0f
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afdf8033018bbab0f
+=== cdp-sweep-2 2026-09-11 harness ===
+    node         : v24.15.0
+    loadavg      : 25.23 19.77 16.57
+    ORACLE_SOCKET: /tmp/cdps2-sock-4ohqWJ/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-2-0911-harness-1053808-7ee1b9f6   (pinned by spawnGuarded, fresh per process)
+    captures     : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afdf8033018bbab0f/docs/captures/2026-09-11-cdp-sweep-2   tag run2
+    aeon tarball : /tmp/cdps2-work-1MfcIk/aeon-b3db547e.tar
+    copy C1      : /tmp/cdps2-C1-HqTkBv   name "Sonic 4 (sweep C1)"   ojz_tiles.bin 29408 bytes
+    copy C2      : /tmp/cdps2-C2-UQnwsH   name "Sonic 4 (sweep C2)"
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.sonic-level-editor/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-2-0911-harness-1053808-7ee1b9f6 — see HAZARD 6
+    dpr at start : 1
+
+──── 0: open copy C1 through the typed-path field on Home ────
+PASS  [0a] C1 opened by a real click, typed path and Enter; title names C1; the first act is ojz act1   [load 26.42/20.21/16.74]
+        field {"x":785,"y":238,"hitOk":true,"dpr":1,"rect":{"x":472,"y":221,"w":626.64,"h":33}}; typed true; title "Aurora - Sonic 4 (sweep C1) - Oracle Jungle Zone · act1"; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  [0b] the copy loaded all three levels this file added (ojz act1, ojz act2, Sweep Zone B act1) and the facet bar has Layout and Art   [load 26.42/20.21/16.74]
+        rows ["Oracle Jungle Zone · act1","Oracle Jungle Zone · act2","Sweep Zone B · act1"]; facets ["Layout","Objects","Effects","Rings","Collision","Palette","Art"]
+NOTE  [0] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1,"vw":1400,"vh":872}; view {"x":0,"y":0,"zoom":1}; layout click {"x":280,"y":54,"hitOk":true,"dpr":1,"rect":{"x":250,"y":44.5,"w":60.06,"h":18}}; pick {"S":{"col":16,"row":26,"distinct":12},"H":{"col":36,"row":26,"differ":16}}
+NOTE  [0] S {"col":16,"row":26,"distinct":12,"w":4,"h":4} box {"x":125,"y":205,"w":38,"h":38}; H {"col":36,"row":26,"differ":16} aim {"x":575,"y":285} box {"x":285,"y":205,"w":38,"h":38}; park {"x":722,"y":68,"hitTag":"DIV","onCanvas":false}
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r1-A0-no-marquee-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+PASS  [0c] NULL CONTROL: two clips of the untouched map 0.9s apart are pixel-identical (the map does not animate under these compares)   [load 25.51/20.12/16.73]
+        tool marquee; {"comparable":true,"changed":0,"total":631596,"inside":null,"bboxClient":null}
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r3-ref-hover-clean-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+
+──── R1: marquee, Layout -> Art -> Layout ────
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r1-A1-marquee-drawn-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+PASS  [R1.1] a real drag drew a marquee: the probe holds it and the clip shows it, inside its own box   [load 25.51/20.12/16.73]
+        dpr 1; drag {"from":{"x":415,"y":285},"to":{"x":439,"y":309}}; marquee {"sectionIndex":0,"col":16,"row":26,"w":4,"h":4,"aligned":true}; diff(A0, A1) {"comparable":true,"changed":1088,"total":631596,"inside":1088,"bboxClient":{"x":127,"y":207,"x1":160,"y1":240}}
+   shot: docs/captures/2026-09-11-cdp-sweep-2/r1-art-facet-run2.png
+PASS  [R1.2] the trip REMOUNTED the map: #map-canvas left the DOM under Art and a NEW element came back   [load 25.51/20.12/16.73]
+        Art {"x":636,"y":54,"hitOk":true,"dpr":1,"rect":{"x":616.75,"y":44.5,"w":38.06,"h":18}}; Layout {"x":279,"y":54,"hitOk":true,"dpr":1,"rect":{"x":250,"y":44.5,"w":57.03,"h":18}}; absent under Art true; back true; mark on the returned element null
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r1-A2-after-art-trip-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+   shot: docs/captures/2026-09-11-cdp-sweep-2/r1-after-art-trip-full-run2.png
+PASS  [R1.3] THE ROW: after the Art round trip the marquee is still there, in the store and on screen (clip identical to before the trip)   [load 25.51/20.12/16.73]
+        dpr 1; view {"x":0,"y":0,"zoom":1}; marquee {"sectionIndex":0,"col":16,"row":26,"w":4,"h":4,"aligned":true}; diff(A1, A2) {"comparable":true,"changed":0,"total":631596,"inside":null,"bboxClient":null}; diff(A0, A2) {"comparable":true,"changed":1088,"total":631596,"inside":1088,"bboxClient":{"x":127,"y":207,"x1":160,"y1":240}}
+PASS  [R1.4] and Ctrl+C copies it: a painted `Copied ...` toast and a 4x4 clipboard holding real art   [load 24.18/19.94/16.69]
+        toast {"text":"Copied 2×2 blocks","rect":{"x":631.38,"y":809,"w":137.25,"h":31},"rects":1,"hitInside":true,"inViewport":true,"border":"rgb(52, 211, 153)","dpr":1}; clipboard {"widthTiles":4,"heightTiles":4,"artOnly":false,"collisionALen":4,"collisionBLen":4,"nonzeroTiles":16}
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r1-A3-control-act2-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+PASS  [R1.5] CONTROL: a real act switch (Explorer row, act 2, a byte copy of act 1) clears it: probe null, clip identical to the pre-marquee A0   [load 24.18/19.94/16.69]
+        row {"x":120,"y":169,"hitOk":true,"dpr":1,"rect":{"x":4,"y":159,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act2","sections":9,"gridWidth":3,"gridHeight":3,"tool":"marquee","dirty":false,"dirtyActs":[]}; marquee null; diff(A0, A3) {"comparable":true,"changed":0,"total":631596,"inside":0,"bboxClient":null}
+
+──── R2: armed paste, Layout -> Art -> Layout ────
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r2-B0-marquee-hover-unarmed-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r2-B1-ghost-armed-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+PASS  [R2.1] CONTROL: Ctrl+V armed the paste: real moves advance the ghost's paint count, and the ghost is painted at H   [load 22.73/19.70/16.63]
+        row back to act1 {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"marquee","dirty":false,"dirtyActs":[]}; layout true; paints 0 -> 2; ghost {"pasting":true,"hover":{"sectionIndex":0,"baseCol":36,"baseRow":26},"paints":2}; diff(B0, B1) {"comparable":true,"changed":1088,"total":631596,"inside":1088,"bboxClient":{"x":287,"y":207,"x1":320,"y1":240}}
+   shot: docs/captures/2026-09-11-cdp-sweep-2/r2-armed-full-run2.png
+PASS  [R2.2] THE ROW, paste mode: after the trip, real moves over the map leave the ghost's paint count where it was, so paste mode is OFF   [load 21.15/19.43/16.56]
+        remount true/true; paints 2 -> 2 across 4 moves; tool after the trip marquee
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r2-B2-after-art-trip-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+PASS  [R2.3] THE ROW, the picture: hovering H after the trip gives the unarmed picture B0 exactly (marquee kept, no ghost)   [load 21.15/19.43/16.56]
+        dpr 1; diff(B0, B2) {"comparable":true,"changed":0,"total":631596,"inside":null,"bboxClient":null}; diff(B1 ghost, B2) {"comparable":true,"changed":1088,"total":631596,"inside":1088,"bboxClient":{"x":287,"y":207,"x1":320,"y1":240}}; marquee {"sectionIndex":0,"col":16,"row":26,"w":4,"h":4,"aligned":true}
+
+──── R3: marquee + armed paste, then the SECOND copy is opened ────
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r3-D1-both-on-screen-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+PASS  [R3.0] PRECONDITION on screen: the marquee AND the paste ghost are both painted (against the clean hover reference)   [load 21.15/19.43/16.56]
+        marquee {"sectionIndex":0,"col":16,"row":26,"w":4,"h":4,"aligned":true}; ghost {"pasting":true,"hover":{"sectionIndex":0,"baseCol":36,"baseRow":26},"paints":4}; {"marquee":{"comparable":true,"changed":2176,"total":631596,"inside":1088,"bboxClient":{"x":127,"y":207,"x1":320,"y1":240}},"ghost":{"comparable":true,"changed":2176,"total":631596,"inside":1088,"bboxClient":{"x":127,"y":207,"x1":320,"y1":240}}}
+   shot: docs/captures/2026-09-11-cdp-sweep-2/r3-before-open-full-run2.png
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r3-D1b-after-home-trip-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+   shot: docs/captures/2026-09-11-cdp-sweep-2/r3-after-home-trip-full-run2.png
+FAIL  [R3.1] CONTROL: Home and back WITHOUT an open keeps both (map mounted but hidden on Home; moves still advance the ghost; clip identical)   [load 21.15/19.43/16.56]
+        on Home: canvas mark "R3", rect {"x":0,"y":0,"w":0,"h":0,"dpr":1,"vw":1400,"vh":872}; back {"active":null,"tabs":["Home","Oracle Jungle Zone · act1","Oracle Jungle Zone · act2"],"how":"tab press at (406, 17)"}; paints 4 -> 6; marquee {"sectionIndex":0,"col":16,"row":26,"w":4,"h":4,"aligned":true}; diff {"comparable":true,"changed":21900,"total":631596,"inside":null,"bboxClient":{"x":0,"y":696,"x1":875,"y1":720}}
+PASS  [R3.2] the SECOND copy opened through the typed path: title names C2, and the open act has the SAME ids (ojz, act1)   [load 19.77/19.17/16.49]
+        field {"x":785,"y":594,"hitOk":true,"dpr":1,"rect":{"x":472,"y":577,"w":626.64,"h":33}}; title "Aurora - Sonic 4 (sweep C2) - Oracle Jungle Zone · act1"; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"marquee","dirty":false,"dirtyActs":[]}
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r3-D2-after-second-copy-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+   shot: docs/captures/2026-09-11-cdp-sweep-2/r3-after-open-full-run2.png
+PASS  [R3.3] THE ROW: after the open, the marquee is gone (probe null) and paste mode is off (moves leave the paint count), and the clip equals the clean hover reference   [load 19.31/19.08/16.48]
+        marquee right after the open null; back {"active":null,"tabs":["Home","Oracle Jungle Zone · act1"],"how":"tab press at (406, 17)"}; tool marquee; paints 6 -> 6; diff(REF_H, D2) {"comparable":true,"changed":0,"total":631596,"inside":null,"bboxClient":null}; clipboard kept {"widthTiles":4,"heightTiles":4,"artOnly":false,"collisionALen":4,"collisionBLen":4,"nonzeroTiles":16} -> {"widthTiles":4,"heightTiles":4,"artOnly":false,"collisionALen":4,"collisionBLen":4,"nonzeroTiles":16}
+PASS  [R3.4] the packet's source claim: the map stayed MOUNTED across the project open (the same #map-canvas element carries the mark)   [load 19.31/19.08/16.48]
+        mark after the open "R3"
+
+──── R6a: in the SECOND copy, Ctrl+V with the first copy's clipboard ────
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r6a-E0-before-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+   shot: docs/captures/2026-09-11-cdp-sweep-2/r6a-refusal-toast-full-run2.png
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r6a-E1-after-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+PASS  [r6a.a] second copy C2: Ctrl+V is REFUSED with the sentence from map-clipboard.ts verbatim, painted, warning tier   [load 17.87/18.78/16.41]
+        dpr 1; toast {"text":"Not pasted: the copied tiles belong to another tile set, so pasting them here would put different tiles down. Copy again from a map that uses this tile set.","rect":{"x":420,"y":792,"w":560,"h":48},"rects":1,"hitInside":true,"inViewport":true,"border":"rgb(251, 191, 36)","dpr":1}; store [{"message":"Not pasted: the copied tiles belong to another tile set, so pasting them here would put different tiles down. Copy again from a map that uses this tile set.","type":"warning"}] (had 0 before)
+PASS  [r6a.b] second copy C2: nothing is armed (moves leave the paint count) and a click at H writes NOTHING (every word plane, the undo stack)   [load 17.87/18.78/16.41]
+        paints 6 -> 6 -> 6; words {"zone":"ojz","act":"act1","sections":9,"planes":27,"words":1769472,"hash":2701596095} -> {"zone":"ojz","act":"act1","sections":9,"planes":27,"words":1769472,"hash":2701596095}; canUndo false -> false
+PASS  [r6a.R7] R7 at second copy C2: after the refusal and the click the map clip is pixel-identical (null click control first)   [load 17.87/18.78/16.41]
+        null click {"comparable":true,"changed":0,"total":631596,"inside":null,"bboxClient":null}; diff(E0, E1) {"comparable":true,"changed":0,"total":631596,"inside":0,"bboxClient":null}; toast gone after 6530ms
+
+──── R6b: reopen the FIRST copy, Ctrl+V ────
+PASS  [R6.0] the FIRST copy reopened through the typed path (title names C1), on ojz act1; the clipboard survived   [load 16.76/18.54/16.34]
+        field {"x":785,"y":610,"hitOk":true,"dpr":1,"rect":{"x":472,"y":593,"w":626.64,"h":33}}; value before clearing "/tmp/cdps2-C2-UQnwsH", after ""; typed true; title "Aurora - Sonic 4 (sweep C1)"; back {"active":null,"tabs":["Home","Oracle Jungle Zone · act1","Oracle Jungle Zone · act2"],"how":"tab press at (406, 17)"}; clipboard {"widthTiles":4,"heightTiles":4,"artOnly":false,"collisionALen":4,"collisionBLen":4,"nonzeroTiles":16}
+NOTE  [OBS] the switch-case typed-path field held "/tmp/cdps2-C2-UQnwsH" when Home was shown again (C2 was opened through it earlier: "/tmp/cdps2-C2-UQnwsH"); R3's open of C2 found it holding ""
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r6b-E0-before-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+   shot: docs/captures/2026-09-11-cdp-sweep-2/r6b-refusal-toast-full-run2.png
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r6b-E1-after-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+PASS  [r6b.a] reopened first copy C1: Ctrl+V is REFUSED with the sentence from map-clipboard.ts verbatim, painted, warning tier   [load 16.07/18.33/16.30]
+        dpr 1; toast {"text":"Not pasted: the copied tiles belong to another tile set, so pasting them here would put different tiles down. Copy again from a map that uses this tile set.","rect":{"x":420,"y":792,"w":560,"h":48},"rects":1,"hitInside":true,"inViewport":true,"border":"rgb(251, 191, 36)","dpr":1}; store [{"message":"Not pasted: the copied tiles belong to another tile set, so pasting them here would put different tiles down. Copy again from a map that uses this tile set.","type":"warning"}] (had 0 before)
+PASS  [r6b.b] reopened first copy C1: nothing is armed (moves leave the paint count) and a click at H writes NOTHING (every word plane, the undo stack)   [load 16.07/18.33/16.30]
+        paints 6 -> 6 -> 6; words {"zone":"ojz","act":"act1","sections":9,"planes":27,"words":1769472,"hash":2701596095} -> {"zone":"ojz","act":"act1","sections":9,"planes":27,"words":1769472,"hash":2701596095}; canUndo false -> false
+PASS  [r6b.R7] R7 at reopened first copy C1: after the refusal and the click the map clip is pixel-identical (null click control first)   [load 16.07/18.33/16.30]
+        null click {"comparable":true,"changed":0,"total":631596,"inside":null,"bboxClient":null}; diff(E0, E1) {"comparable":true,"changed":0,"total":631596,"inside":0,"bboxClient":null}; toast gone after 6303ms
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r6-control-fresh-copy-armed-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+PASS  [R6.1] CONTROL: after a fresh Ctrl+C in the reopened copy, Ctrl+V ARMS (paint count moves, ghost painted, no refusal)   [load 15.83/18.24/16.28]
+        paints 6 -> 8; diff {"comparable":true,"changed":1088,"total":631596,"inside":1088,"bboxClient":{"x":287,"y":207,"x1":320,"y1":240}}; refusal toast false
+
+──── R4: copy in zone A (ojz), Ctrl+V in zone B ────
+   shot: docs/captures/2026-09-11-cdp-sweep-2/r4-zone-b-full-run2.png
+PASS  [R4.0] zone B opened by a real Explorer click, and its tile set really differs (zone-art hash)   [load 15.83/18.24/16.28]
+        row {"x":120,"y":189,"hitOk":true,"dpr":1,"rect":{"x":4,"y":179,"w":231,"h":20}}; state {"open":true,"zone":"zb","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"marquee","dirty":false,"dirtyActs":[]}; zoneArtHash ojz 628154474 vs zb 1662671378
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r4-E0-before-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+   shot: docs/captures/2026-09-11-cdp-sweep-2/r4-refusal-toast-full-run2.png
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r4-E1-after-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+PASS  [r4.a] zone B: Ctrl+V is REFUSED with the sentence from map-clipboard.ts verbatim, painted, warning tier   [load 19.55/18.94/16.54]
+        dpr 1; toast {"text":"Not pasted: the copied tiles belong to another tile set, so pasting them here would put different tiles down. Copy again from a map that uses this tile set.","rect":{"x":420,"y":792,"w":560,"h":48},"rects":1,"hitInside":true,"inViewport":true,"border":"rgb(251, 191, 36)","dpr":1}; store [{"message":"Not pasted: the copied tiles belong to another tile set, so pasting them here would put different tiles down. Copy again from a map that uses this tile set.","type":"warning"}] (had 0 before)
+PASS  [r4.b] zone B: nothing is armed (moves leave the paint count) and a click at H writes NOTHING (every word plane, the undo stack)   [load 19.55/18.94/16.54]
+        paints 8 -> 8 -> 8; words {"zone":"zb","act":"act1","sections":9,"planes":27,"words":1769472,"hash":2701596095} -> {"zone":"zb","act":"act1","sections":9,"planes":27,"words":1769472,"hash":2701596095}; canUndo false -> false
+PASS  [r4.R7] R7 at zone B: after the refusal and the click the map clip is pixel-identical (null click control first)   [load 19.55/18.94/16.54]
+        null click {"comparable":true,"changed":0,"total":631596,"inside":null,"bboxClient":null}; diff(E0, E1) {"comparable":true,"changed":0,"total":631596,"inside":0,"bboxClient":null}; toast gone after 6309ms
+
+──── R4 back in zone A, then R5 act 1 -> act 2 ────
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r4.back-P0-before-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r4.back-P1-after-paste-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+PASS  [r4.back] back in zone A (ojz act1): Ctrl+V arms with no refusal, the click at H WRITES, and the clip changes at H   [load 19.55/18.94/16.54]
+        dpr 1; row {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"select","dirty":false,"dirtyActs":[]}; paints 8 -> 10; refusal toast false; words 2701596095 -> 2935966382; canUndo true; diff(P0, P1) {"comparable":true,"changed":538,"total":631596,"inside":538,"bboxClient":{"x":288,"y":208,"x1":319,"y1":235}}
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r5-P0-before-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+   clip: docs/captures/2026-09-11-cdp-sweep-2/r5-P1-after-paste-run2.png  (clip {"x":284,"y":74,"width":876,"height":721,"scale":1})
+PASS  [r5] act 1 -> act 2 of ojz: Ctrl+V arms with no refusal, the click at H WRITES, and the clip changes at H   [load 20.39/19.13/16.61]
+        dpr 1; row {"x":120,"y":169,"hitOk":true,"dpr":1,"rect":{"x":4,"y":159,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act2","sections":9,"gridWidth":3,"gridHeight":3,"tool":"select","dirty":true,"dirtyActs":["ojz/act1"]}; paints 11 -> 13; refusal toast false; words 2701596095 -> 2935966382; canUndo true; diff(P0, P1) {"comparable":true,"changed":538,"total":631596,"inside":538,"bboxClient":{"x":288,"y":208,"x1":319,"y1":235}}
+PASS  [R7.control] R7 CONTROL: a real paste at H DOES change the same clip, so the refusal rows' zero is an instrument that can see a paste   [load 20.39/19.13/16.61]
+        zone A {"comparable":true,"changed":538,"total":631596,"inside":538,"bboxClient":{"x":288,"y":208,"x1":319,"y1":235}}; act 2 {"comparable":true,"changed":538,"total":631596,"inside":538,"bboxClient":{"x":288,"y":208,"x1":319,"y1":235}}
+   shot: docs/captures/2026-09-11-cdp-sweep-2/r5-after-paste-full-run2.png
+cleanup: tree under pid 1053827 (11 process(es)):
+           1053827 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           1053837 Xvfb :133 -screen 0 1680x1050x24 -nolisten tcp
+           1054811 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           1054818 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           1054822 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1054824 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           1054826 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           1054888 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1054896 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1054899 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           1054906 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server still up, tree gone in 51 ms; teardown 401 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ 30/31 rows PASS · 1 FAIL · 0 UNMEASURABLE · 93.1s ════
+     loadavg at end 20.39 19.13 16.61
+FAILING:
+  [R3.1] CONTROL: Home and back WITHOUT an open keeps both (map mounted but hidden on Home; moves still advance the ghost; clip identical)
+END-OF-RUN
