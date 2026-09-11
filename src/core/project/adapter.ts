@@ -372,6 +372,24 @@ export interface WriteResult {
    * mtime" → the renderer sends `expectedMtimeMs: null` for that file.
    */
   fileMtimes?: Record<string, number>;
+  /**
+   * Paths of a DIRTY domain the writer deliberately did not emit, because their
+   * content is already what is on disk. Classic art only today (UX seat A's F3,
+   * docs/reviews/2026-09-09-uxpair-findings.md §4): re-encoding an untouched
+   * `.nem` file grows it, so a GHZ save whose pixels are all in GHZ1 no longer
+   * rewrites GHZ2.
+   *
+   * The saver counts these as landed when it decides which dirty domains to
+   * clear (`domainsToClear` in renderer/state/classic-save.ts). Without that, a
+   * domain with one skipped file would never clear, and the dot would stay up
+   * after every save.
+   *
+   * INVARIANT the save contract rests on: non-empty only when `files` is too.
+   * The writer emits unchanged files itself when nothing else would be written,
+   * so a write with no files still reaches the saver as `nothing`, exactly as
+   * before this field existed. Optional; absent means none.
+   */
+  unchanged?: string[];
 }
 
 /**
@@ -410,6 +428,12 @@ export interface ClassicLevelAccess {
    * write (Task 10): the freshly-written files now have new on-disk mtimes, so
    * the NEXT write's conflict check must expect these rather than the original
    * read-time values. OPTIONAL — omitted by non-classic adapters and test fakes.
+   *
+   * The KEYS are also a statement: these are the paths that landed. The S1
+   * adapter records them as written since the read, so a later save never skips
+   * one of them as unchanged against read-time bytes it no longer holds (see
+   * `WriteResult.unchanged`). Callers must pass exactly the landed paths, which
+   * the guarded channel's `newMtimes` already is.
    */
   updateMtimes?(ref: ZoneActRef, newMtimes: Record<string, number>): void;
   /**

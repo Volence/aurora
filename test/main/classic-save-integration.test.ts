@@ -8,6 +8,7 @@ import { s1Profile, type LevelAct } from '../../src/core/project/profiles/s1';
 import { readS1Level, writeS1Level, type ResolvedLevelPaths } from '../../src/core/level-classic/s1-io';
 import { s1Adapter } from '../../src/core/project/s1/index';
 import { performGuardedWrite } from '../../src/main/guarded-write';
+import { nemesisDecompress } from '../../src/core/compress/nemesis';
 import { referencePath, S1_PINNED } from '../support/fixture-tree';
 import { whenS1Act } from '../support/s1-checkout';
 
@@ -238,4 +239,96 @@ describe('classic save integration (temp copy of real s1disasm)', () => {
       expect(result2.fileMtimes![startPath]).toBe(first.newMtimes[startPath]);
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// UX seat A's F3, option (b), on the real files and the real adapter: one tile
+// painted in GHZ1 no longer rewrites GHZ2 (ledger A-F3-ART-SAVE-WIDTH, packet
+// docs/reviews/2026-09-11-a-f3-art-save-width.md). The writer's rule is pinned
+// on a synthetic act in src/core/level-classic/__tests__/s1-art-save-width.test.ts;
+// what only this file can reach is the ADAPTER's half (the `unchanged` it hands
+// the saver, and `updateMtimes` recording what landed) and the bytes on a disk.
+// ---------------------------------------------------------------------------
+
+describe('F3 (b): a GHZ save writes only the art file that changed (temp copy of real s1disasm)', () => {
+  /** Tile $30 is the tile seat A painted. Its file is DERIVED from the read below. */
+  const SEAT_A_TILE = 0x30;
+
+  async function openGhz1() {
+    const act = s1Profile.zones[0].acts[0]; // GHZ1
+    const paths = realPaths(act);
+    copyInto([
+      ...paths.tiles,
+      paths.blocks, paths.chunks, paths.colind, paths.fg, paths.bg,
+      paths.objpos, paths.startpos, ...paths.palette,
+      ...paths.animatedArt.filter((p): p is string => p !== undefined),
+      paths.collisionNormal, paths.collisionAngleMap,
+    ]);
+    fs.writeFileSync(path.join(tmp, 'sonic.asm'), 'x');
+    const handle = await s1Adapter.open(realFs(tmp));
+    const levels = handle.levels!;
+    const ref = { zone: s1Profile.zones[0].id, act: 1, label: act.name, available: true };
+    const doc = await levels.read(ref);
+    return { paths, levels, ref, doc };
+  }
+
+  const persist = (res: { files?: { path: string; bytes: Uint8Array }[]; fileMtimes?: Record<string, number> }) =>
+    performGuardedWrite(tmp, (res.files ?? []).map((f) => ({
+      relPath: f.path, bytes: f.bytes, expectedMtimeMs: res.fileMtimes?.[f.path] ?? null,
+    })));
+
+  it("seat A's case: tile $30 painted writes GHZ1 alone, and GHZ2 on disk is untouched", whenS1Act('ghz', 1), async () => {
+    const { paths, levels, ref, doc } = await openGhz1();
+    // Which file holds the tile, from the files rather than the report: the pool
+    // is GHZ1 then GHZ2, so the tile is in GHZ1 iff it is below GHZ1's count.
+    const ghz1Tiles = nemesisDecompress(new Uint8Array(fs.readFileSync(path.join(tmp, paths.tiles[0])))).length / 32;
+    expect(SEAT_A_TILE).toBeLessThan(ghz1Tiles);
+    const [ghz1, ghz2] = paths.tiles;
+    const ghz2Before = new Uint8Array(fs.readFileSync(path.join(tmp, ghz2)));
+    const ghz2MtimeBefore = fs.statSync(path.join(tmp, ghz2)).mtimeMs;
+    const ghz1SizeBefore = fs.statSync(path.join(tmp, ghz1)).size;
+
+    doc.tiles[SEAT_A_TILE * 32] = (doc.tiles[SEAT_A_TILE * 32] ^ 0x0f) & 0xff;
+    const result = await levels.write(ref, doc, { tiles: true });
+    expect(result.errors).toEqual([]);
+    expect(result.files!.map((f) => f.path)).toEqual([ghz1]);
+    expect(result.unchanged).toEqual([ghz2]);
+
+    const landed = await persist(result);
+    if (!('written' in landed)) throw new Error('expected the guarded write to land');
+    expect(landed.written).toEqual([ghz1]);
+    // Option (c): the guarded channel reports GHZ1's size on both sides, read by
+    // stat on this disk, and reports nothing for GHZ2, which it never touched.
+    expect(landed.sizes?.[ghz1]).toEqual({ before: ghz1SizeBefore, after: fs.statSync(path.join(tmp, ghz1)).size });
+    expect(landed.sizes?.[ghz2]).toBeUndefined();
+    // GHZ2 was not rewritten: same bytes, same mtime. Before 2026-09-11 this file
+    // came back 5193 bytes with no edit in it.
+    expect(Buffer.from(fs.readFileSync(path.join(tmp, ghz2))).equals(Buffer.from(ghz2Before))).toBe(true);
+    expect(fs.statSync(path.join(tmp, ghz2)).mtimeMs).toBe(ghz2MtimeBefore);
+  });
+
+  it('a file an earlier save rewrote is written again when the document returns to its read-time content', whenS1Act('ghz', 1), async () => {
+    const { paths, levels, ref, doc } = await openGhz1();
+    const [ghz1, ghz2] = paths.tiles;
+    const original = doc.tiles[SEAT_A_TILE * 32];
+
+    // Paint and save: GHZ1 lands with the paint in it.
+    doc.tiles[SEAT_A_TILE * 32] = (original ^ 0x0f) & 0xff;
+    const first = await levels.write(ref, doc, { tiles: true });
+    const landed = await persist(first);
+    if (!('newMtimes' in landed)) throw new Error('expected the guarded write to land');
+    levels.updateMtimes!(ref, landed.newMtimes); // what the saver does on success
+
+    // Undo past the save: the document is back to READ-time content for GHZ1,
+    // and disk is not. Something else is dirty too, so the zero-diff fallback
+    // cannot be what emits GHZ1; only `writtenSinceRead` can.
+    doc.tiles[SEAT_A_TILE * 32] = original;
+    const second = await levels.write(ref, doc, { tiles: true, start: true });
+    expect(second.errors).toEqual([]);
+    const art = second.files!.filter((f) => paths.tiles.includes(f.path));
+    expect(art.map((f) => f.path)).toEqual([ghz1]);
+    expect(nemesisDecompress(art[0].bytes)[SEAT_A_TILE * 32]).toBe(original);
+    // CONTROL: GHZ2 was never written, so it is still skipped.
+    expect(second.unchanged).toEqual([ghz2]);
+  });
 });

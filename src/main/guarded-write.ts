@@ -35,7 +35,7 @@
 import { stat, writeFile, rename, mkdir, unlink } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import { isRelPathSafe } from '../shared/rel-path';
-import type { GuardedWriteFile, GuardedWriteResult } from '../shared/ipc-types';
+import type { GuardedWriteFile, GuardedWriteResult, WrittenSize } from '../shared/ipc-types';
 import { planGuardedWrite, type CurrentMtime, type GuardedFileSpec } from '../core/project/save-guard';
 
 /**
@@ -54,9 +54,14 @@ import { planGuardedWrite, type CurrentMtime, type GuardedFileSpec } from '../co
  * 'unknown' WITH ITS REASON, which the guard turns into a conflict the author is
  * told the truth about.
  */
-async function currentMtime(fullPath: string): Promise<CurrentMtime> {
+async function currentMtime(fullPath: string, sizeOut?: (bytes: number) => void): Promise<CurrentMtime> {
   try {
-    return { state: 'present', mtimeMs: (await stat(fullPath)).mtimeMs };
+    const st = await stat(fullPath);
+    // The SAME stat supplies the "before" size a save reports (see
+    // `GuardedWriteResult.sizes`), so the figure is the disk's at the moment the
+    // conflict check looked, not a second read that could disagree with it.
+    sizeOut?.(st.size);
+    return { state: 'present', mtimeMs: st.mtimeMs };
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e?.code === 'ENOENT' || e?.code === 'ENOTDIR') return { state: 'absent' };
@@ -68,9 +73,10 @@ async function currentMtime(fullPath: string): Promise<CurrentMtime> {
  * Perform an mtime-guarded multi-file write rooted at `basePath`. Rejects
  * (throws) ONLY for an unsafe relPath. Returns `{ conflicts }` (writing nothing)
  * when the conflict check fails. Otherwise writes each file atomically and
- * returns `{ written, newMtimes }`; if an fs error interrupts the batch it
+ * returns `{ written, newMtimes, sizes }`; if an fs error interrupts the batch it
  * returns a PARTIAL result carrying `failed` (the erroring file) and `unwritten`
- * (files after it, never attempted) alongside what did land.
+ * (files after it, never attempted) alongside what did land. `sizes` covers
+ * exactly the landed files, each measured by stat before and after.
  */
 export async function performGuardedWrite(
   basePath: string,
@@ -84,11 +90,15 @@ export async function performGuardedWrite(
   }
 
   // 2. Conflict check across ALL files, up front, before any write (the sole
-  //    all-or-nothing guarantee).
+  //    all-or-nothing guarantee). The probe also records each present file's
+  //    size, which is the "before" half of the save's byte report.
   const currentMtimes: Record<string, CurrentMtime> = {};
+  const sizeBefore: Record<string, number> = {};
   await Promise.all(
     files.map(async (f) => {
-      currentMtimes[f.relPath] = await currentMtime(resolve(basePath, f.relPath));
+      currentMtimes[f.relPath] = await currentMtime(resolve(basePath, f.relPath), (n) => {
+        sizeBefore[f.relPath] = n;
+      });
     }),
   );
   const specs: GuardedFileSpec[] = files.map((f) => ({
@@ -104,6 +114,7 @@ export async function performGuardedWrite(
   //    roll back), which the caller surfaces via `failed`/`unwritten`.
   const written: string[] = [];
   const newMtimes: Record<string, number> = {};
+  const sizes: Record<string, WrittenSize> = {};
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
     const fullPath = resolve(basePath, f.relPath);
@@ -113,16 +124,21 @@ export async function performGuardedWrite(
       await writeFile(tmpPath, f.bytes);
       await rename(tmpPath, fullPath);
       written.push(f.relPath);
-      newMtimes[f.relPath] = (await stat(fullPath)).mtimeMs;
+      // ONE stat for both: the mtime the next save expects, and the size the
+      // save report calls "after". Read from the disk, never `f.bytes.length`.
+      const landed = await stat(fullPath);
+      newMtimes[f.relPath] = landed.mtimeMs;
+      sizes[f.relPath] = { before: sizeBefore[f.relPath] ?? null, after: landed.size };
     } catch (e) {
       await unlink(tmpPath).catch(() => {}); // best-effort orphan cleanup
       return {
         written,
         newMtimes,
+        sizes,
         failed: { path: f.relPath, message: (e as Error).message },
         unwritten: files.slice(i + 1).map((x) => x.relPath),
       };
     }
   }
-  return { written, newMtimes };
+  return { written, newMtimes, sizes };
 }

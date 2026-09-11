@@ -266,12 +266,22 @@ function decodeFor(kind: 'nem' | 'eni' | 'kos', b: Uint8Array): Uint8Array {
 }
 
 /**
- * The set of files a save with EVERY domain dirty must emit, derived from the
- * resolved paths rather than counted: writeS1Level emits each pristine tile
- * file, the seven single-path domains, and one buffer per distinct palette
- * component file. Used as the per-act non-vacuity gate — without it a case
- * whose writer emitted nothing would sail through the comparison loop below
- * with zero iterations and report green.
+ * The set of files a save with EVERY domain dirty must ACCOUNT FOR, derived
+ * from the resolved paths rather than counted: each pristine tile file, the
+ * seven single-path domains, and one buffer per distinct palette component
+ * file. Used as the per-act non-vacuity gate: without it a case whose writer
+ * emitted nothing would sail through the comparison loop below with zero
+ * iterations and report green.
+ *
+ * RESTATED 2026-09-11 (ledger A-F3-ART-SAVE-WIDTH). Until then every one of
+ * these was EMITTED and the gate was "the emitted set equals this". The writer
+ * now skips an art file whose content did not change whenever something else
+ * is being written (UX seat A's F3, docs/reviews/2026-09-09-uxpair-findings.md
+ * §4), so a zero-edit all-dirty save REPORTS the tile files as `unchanged`
+ * instead of emitting them. The gate is split, not loosened: emitted and
+ * unchanged must be disjoint, their union must be exactly this set, and the
+ * unchanged half must be exactly the act's art files. The art itself is still
+ * round-tripped for every act, through the tiles-only save that does emit it.
  */
 function expectedWrittenPaths(p: ResolvedLevelPaths): Set<string> {
   return new Set<string>([
@@ -326,14 +336,34 @@ describe('s1-io (c) zero-edit round-trip (all 18 acts)', () => {
       const result = writeS1Level(state, ALL_DIRTY);
       expect(result.errors, `${zone} act${act.act}: ${JSON.stringify(result.errors)}`).toEqual([]);
 
-      // Non-vacuity: the comparison loop below must have something to compare,
-      // and it must cover every domain the save claims to write.
+      // Non-vacuity, restated for the unchanged-art rule (see
+      // expectedWrittenPaths): every file of every dirty domain is ACCOUNTED
+      // FOR, emitted or reported unchanged, never both and never neither.
+      const emitted = new Set(result.files.map((f) => f.path));
+      const unchanged = new Set(result.unchanged);
       expect(
-        new Set(result.files.map((f) => f.path)),
-        `${zone} act${act.act}: written file set`,
+        [...emitted].filter((p) => unchanged.has(p)),
+        `${zone} act${act.act}: a file both emitted and reported unchanged`,
+      ).toEqual([]);
+      expect(
+        new Set([...emitted, ...unchanged]),
+        `${zone} act${act.act}: accounted file set`,
       ).toEqual(expectedWrittenPaths(paths));
+      // WHICH files are unchanged is derived, not left to the writer: with zero
+      // edits it is exactly the act's art.
+      expect(unchanged, `${zone} act${act.act}: unchanged set`).toEqual(new Set(paths.tiles));
 
-      for (const f of result.files) {
+      // The art is still round-tripped for every act, through the road that
+      // emits it: a tiles-only save, where nothing else is written, so the
+      // writer re-encodes every art file (the zero-diff save contract).
+      const artOnly = writeS1Level(state, { tiles: true });
+      expect(artOnly.errors, `${zone} act${act.act} tiles-only: ${JSON.stringify(artOnly.errors)}`).toEqual([]);
+      expect(
+        new Set(artOnly.files.map((f) => f.path)),
+        `${zone} act${act.act}: tiles-only emitted set`,
+      ).toEqual(new Set(paths.tiles));
+
+      for (const f of [...result.files, ...artOnly.files]) {
         const disk = readDisk(f.path);
         const kind = isCompressed(f.path);
         if (kind) {
@@ -370,6 +400,14 @@ describe('s1-io (d) self-check gate', () => {
     const fa = realFs(S1DIR);
     const act = s1Profile.zones[0].acts[0];
     const state = await readS1Level(act, realPaths(act), fa);
+    // One tile edited in EVERY art file. Since 2026-09-11 an art file whose
+    // content did not change is skipped whenever something else is written (UX
+    // seat A's F3), and a skipped file is never encoded, so with no edit the
+    // broken encoder below would never run and this row would test nothing. The
+    // tiles are derived from the read's own spans.
+    for (const f of state.read.pristineTileFiles) {
+      state.doc.tiles[f.tileStart * 32] = (state.doc.tiles[f.tileStart * 32] ^ 0x0f) & 0xff;
+    }
 
     const brokenNemesis = (): Uint8Array => new Uint8Array([0, 0, 0, 0]); // will not decode back
     const result = writeS1Level(

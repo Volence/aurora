@@ -8,7 +8,7 @@
 // only and is NEVER read for bytes here. `WriteResult.fileMtimes` supplies each
 // file's expected (read-time) mtime for the guarded write's conflict check.
 
-import type { GuardedWriteFile, GuardedWriteResult } from '../../shared/ipc-types';
+import type { GuardedWriteFile, GuardedWriteResult, WrittenSize } from '../../shared/ipc-types';
 import type { GuardConflict } from '../../core/project/save-guard';
 import { saveConflictMessage } from '../../core/project/conflict-message';
 import type { WriteResult, ProjectHandle, ZoneActRef, DirtyDomains, LevelDoc } from '../../core/project/adapter';
@@ -37,11 +37,78 @@ import { nameSome } from '../../core/project/notice';
  *
  * BOUNDED THROUGH `nameSome`, the idiom `aeon-save.ts` and the Save-All fold
  * already use, so a large save is "+N more" and never a wall on a 2.2 s dwell.
+ *
+ * AND WHAT THE ART WEIGHS (2026-09-11, ledger A-F3-ART-SAVE-WIDTH: option (c) of
+ * docs/reviews/2026-09-09-uxpair-findings.md §4, seat A's own remedy). Naming the
+ * files said WHAT was written; it did not say the art grew, which was the half
+ * of F3 that was news. So the sentence also carries each landed ART file's size
+ * before and after, and says `art grew` when any of them did. The file list
+ * above is bounded and can fold an art file into "+N more"; the art clause is
+ * not, because it is the part the author asked for (and an act has at most two).
  */
-export function savedFilesSentence(levels: number, written: readonly string[]): string {
+export function savedFilesSentence(levels: number, written: readonly string[], art: readonly ArtSize[] = []): string {
   const head = `Saved ${levels} level(s)`;
-  if (written.length === 0) return head;
-  return `${head} · ${written.length} file${written.length === 1 ? '' : 's'}: ${nameSome(written)}`;
+  const files = written.length === 0
+    ? head
+    : `${head} · ${written.length} file${written.length === 1 ? '' : 's'}: ${nameSome(written)}`;
+  const bytes = artBytesClause(art);
+  return bytes === '' ? files : `${files} · ${bytes}`;
+}
+
+/** One landed art file, with the sizes the guarded channel measured on disk. */
+export interface ArtSize {
+  path: string;
+  /** Bytes on disk before the write; null when there was no file. */
+  before: number | null;
+  after: number;
+}
+
+/** Whether an art file ended larger than it started. A new file counts: it is bytes added. */
+export function artGrew(a: ArtSize): boolean {
+  return a.after > (a.before ?? 0);
+}
+
+/**
+ * The art files' sizes as the clause a success toast appends, or '' for none.
+ *
+ *   art grew: artnem/8x8 - GHZ1.nem 5727 to 5894 bytes (+167)
+ *   art size: artnem/x.nem 900 to 880 bytes (-20); artnem/y.nem 400 to 400 bytes (same size)
+ *
+ * The head says `art grew` when ANY file did, because growth is the fact seat A
+ * was never told; each file then carries its own signed delta. Plain ASCII
+ * throughout: no dash of any kind but the minus of a negative number.
+ */
+export function artBytesClause(art: readonly ArtSize[]): string {
+  if (art.length === 0) return '';
+  const parts = art.map((a) => {
+    if (a.before === null) return `${a.path} ${a.after} bytes (new file)`;
+    const d = a.after - a.before;
+    const delta = d === 0 ? 'same size' : d > 0 ? `+${d}` : `${d}`;
+    return `${a.path} ${a.before} to ${a.after} bytes (${delta})`;
+  });
+  return `${art.some(artGrew) ? 'art grew' : 'art size'}: ${parts.join('; ')}`;
+}
+
+/**
+ * The ART files among those that LANDED, each with the size the guarded channel
+ * measured. "Art" is the doc's own `tiles` domain (`domainFilePaths`), never a
+ * guess from a file extension. A landed art file the channel reported no size
+ * for is LEFT OUT rather than estimated: a figure on this line is a measurement
+ * of the disk, and `bytes.length` is not one.
+ */
+export function landedArtSizes(
+  doc: LevelDoc,
+  written: readonly string[],
+  sizes: Readonly<Record<string, WrittenSize>> | undefined,
+): ArtSize[] {
+  if (!sizes) return [];
+  const art = new Set(domainFilePaths(doc).tiles);
+  const out: ArtSize[] = [];
+  for (const p of written) {
+    const s = sizes[p];
+    if (art.has(p) && s !== undefined) out.push({ path: p, before: s.before, after: s.after });
+  }
+  return out;
 }
 
 /** The narrow guarded-write capability the save pipe needs (window.api by default). */
@@ -51,13 +118,20 @@ export interface GuardedWriteApi {
 
 export type SaveClassicResult =
   | { kind: 'nothing' }
-  | { kind: 'saved'; written: string[]; newMtimes: Record<string, number> }
+  | {
+      kind: 'saved';
+      written: string[];
+      newMtimes: Record<string, number>;
+      /** The channel's measured sizes, when it reported them. See WrittenSize. */
+      sizes?: Record<string, WrittenSize>;
+    }
   | {
       // The conflict check passed and writing began, but an fs error interrupted
       // the batch: `written`/`newMtimes` did land; `failed`/`unwritten` did not.
       kind: 'partial';
       written: string[];
       newMtimes: Record<string, number>;
+      sizes?: Record<string, WrittenSize>;
       failed: { path: string; message: string };
       unwritten: string[];
     }
@@ -108,16 +182,20 @@ export async function saveClassicWriteResult(
     return { kind: 'channel-error', message: e instanceof Error ? e.message : String(e) };
   }
   if ('conflicts' in res) return { kind: 'conflict', conflicts: res.conflicts };
+  // `sizes` is carried only when the channel reported it, so a producer that
+  // predates it yields the same shape as before and never an invented figure.
+  const sizes = res.sizes ? { sizes: res.sizes } : {};
   if (res.failed) {
     return {
       kind: 'partial',
       written: res.written,
       newMtimes: res.newMtimes,
+      ...sizes,
       failed: res.failed,
       unwritten: res.unwritten ?? [],
     };
   }
-  return { kind: 'saved', written: res.written, newMtimes: res.newMtimes };
+  return { kind: 'saved', written: res.written, newMtimes: res.newMtimes, ...sizes };
 }
 
 /** A dirty act to save: which ref, its current doc, and which domains changed. */
@@ -257,6 +335,9 @@ export async function saveClassicProject(
   /** Every path the guarded channel reported as landed, across all acts, for the
    *  success sentence. See `savedFilesSentence`. */
   const writtenPaths: string[] = [];
+  /** Every landed ART file across all acts, with the sizes the channel measured
+   *  on disk. See `landedArtSizes`; nothing here is ever estimated. */
+  const artSizes: ArtSize[] = [];
   // BOUNDED BY ITS PRODUCER, NOT BY THIS LOOP. Every toast below is followed by
   // a `return`, so the switch's failure arms cost one toast however long
   // `dirtyLevels` is — but `notifyMidSaveEdits` in the 'saved' arm is NOT: that
@@ -283,12 +364,17 @@ export async function saveClassicProject(
         // any the artist edited while the write was in flight. Those edits are
         // not in the bytes on disk, and clearing them would lose the work with
         // no dot, no prompt and a "nothing to save" on the next Ctrl+S.
+        // `result.unchanged` counts as landed: those files already hold what the
+        // doc says, and the writer skipped them for that reason (F3). Without it
+        // a GHZ tile save, which now writes one of its two art files, would never
+        // clear `tiles`.
         notifyMidSaveEdits(useClassicLevelStore.getState().markDomainsClean(
           dl.ref,
-          domainsToClear(dl.doc, dl.dirty, outcome.written),
+          domainsToClear(dl.doc, dl.dirty, [...outcome.written, ...(result.unchanged ?? [])]),
           dl.gen,
         ));
         writtenPaths.push(...outcome.written);
+        artSizes.push(...landedArtSizes(dl.doc, outcome.written, outcome.sizes));
         saved++;
         break;
       case 'partial':
@@ -298,7 +384,7 @@ export async function saveClassicProject(
         levels.updateMtimes?.(dl.ref, outcome.newMtimes);
         notifyMidSaveEdits(useClassicLevelStore.getState().markDomainsClean(
           dl.ref,
-          domainsToClear(dl.doc, dl.dirty, outcome.written),
+          domainsToClear(dl.doc, dl.dirty, [...outcome.written, ...(result.unchanged ?? [])]),
           dl.gen,
         ));
         useToastStore.getState().addToast(
@@ -325,7 +411,15 @@ export async function saveClassicProject(
     }
   }
   if (saved > 0) {
-    useToastStore.getState().addToast(savedFilesSentence(saved, writtenPaths), 'success');
+    // A save that GREW art is a `warning`, which is toastStore's own tier for a
+    // successful gesture's aside: nothing failed and the write landed, but the
+    // sentence has to be read and 2.2 s is not long enough (its dwell is 8 s and
+    // a click ends it). Seat A's F3 was precisely growth nobody was told about.
+    // Any other save is the 2.2 s success it has always been.
+    useToastStore.getState().addToast(
+      savedFilesSentence(saved, writtenPaths, artSizes),
+      artSizes.some(artGrew) ? 'warning' : 'success',
+    );
   }
   return saved > 0 ? { kind: 'saved', count: saved } : { kind: 'nothing' };
 }

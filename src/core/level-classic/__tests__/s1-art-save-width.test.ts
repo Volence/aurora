@@ -11,54 +11,55 @@ import { referencePath, S1_PINNED } from '../../../../test/support/fixture-tree'
 import { whenS1Files } from '../../../../test/support/s1-checkout';
 
 /**
- * UX SEAT A, FINDING F3 — "14 pixels in one UNUSED tile rewrote two art files
+ * UX SEAT A, FINDING F3: "14 pixels in one UNUSED tile rewrote two art files
  * and grew the ROM art by 329 bytes, unannounced"
- * (docs/reviews/2026-09-07-lens-ux/uxa-walk.md). The seat measured the two file
- * sizes and said plainly that it had NOT determined the cause. This file is the
- * cause, executed.
+ * (docs/reviews/2026-09-07-lens-ux/uxa-walk.md). The cause was determined on
+ * 2026-09-09 (docs/reviews/2026-09-09-uxpair-findings.md §4) and option (b) of
+ * that write-up was built on 2026-09-11 (ledger A-F3-ART-SAVE-WIDTH, packet
+ * docs/reviews/2026-09-11-a-f3-art-save-width.md).
  *
- * ═══ WHY TWO FILES ═══════════════════════════════════════════════════════
+ * ═══ WHY TWO FILES, AND WHY NOT ANY MORE ═════════════════════════════════
  *
  * A Sonic 1 act's tile pool is built by decoding one or more `.nem` files and
  * CONCATENATING them (`profiles/s1.ts`: GHZ_TILES is two files, every other zone
  * one). `writeS1Level`'s tile branch patches only the file whose span contains
- * an edited tile — and then re-encodes and emits EVERY pristine file, "patched
- * or not", to preserve the split (`s1-io.ts`, the tile-write contract). So one
- * tile edited anywhere in GHZ writes both GHZ files, by construction. §1 drives
- * that on a synthetic two-file act, so it holds on any machine.
+ * an edited tile. Until 2026-09-11 it then re-encoded and emitted EVERY pristine
+ * file, "patched or not", so one tile edited anywhere in GHZ wrote both files.
+ *
+ * It now emits a file only when its content changed (or a save has written it
+ * since the read), and leaves an unchanged one alone, REPORTED in `unchanged`.
+ * With one exception that is the save contract's and not decoration: when
+ * nothing else in the write would be emitted, the unchanged art IS emitted,
+ * exactly as before. A write with no files makes `saveClassicWriteResult`
+ * answer `nothing`, which does not clear the dirty domains, so skipping there
+ * would turn a tiles-dirty zero-diff Ctrl+S into a silent no-op with the dot
+ * left up. §1 drives all of it on a synthetic two-file act, so it holds on any
+ * machine.
  *
  * ═══ WHY THEY GREW ═══════════════════════════════════════════════════════
  *
  * Aurora's `nemesisCompress` is not the encoder that produced the disassembly's
  * files, so re-encoding bytes that did not change does not reproduce them: it
- * produces a slightly larger stream. The repo already knows this and bounds it —
- * `formats/classic/__tests__/s1-compression-goldens.test.ts` pins the seven
- * stock artnem files at a measured 1.02x-1.05x under a 1.10x ceiling — but
- * nothing connected that known cost to what a SAVE writes. §2 does, on the
- * vendored files, and the arithmetic closes seat A's figure exactly:
+ * produces a slightly larger stream. `formats/classic/__tests__/
+ * s1-compression-goldens.test.ts` bounds that at 1.02x-1.05x under a 1.10x
+ * ceiling. §2 ties it to what a save writes, on the vendored files:
  *
- *   `8x8 - GHZ2.nem` is not in tile $30's span. It was not patched. Re-encoding
- *   it with ZERO edits produces 5193 bytes against 5031 on disk — and 5193 is
- *   character-for-character the AFTER size the seat measured. Every one of that
- *   file's +162 bytes is re-encode overhead on art nobody touched.
+ *   `8x8 - GHZ2.nem` re-encodes with ZERO edits at 5193 bytes against 5031 on
+ *   disk, which is exactly the AFTER size seat A measured. That file was not in
+ *   tile $30's span, so its whole +162 was overhead on art nobody touched. It is
+ *   the half (b) removes: an edit in GHZ1 no longer writes GHZ2 at all.
  *
- *   `8x8 - GHZ1.nem` re-encodes with ZERO edits at 5881 against 5727 on disk.
- *   The seat measured 5894 after painting, so ~154 of its +167 predates the
- *   first pixel.
+ *   `8x8 - GHZ1.nem` re-encodes with ZERO edits at 5881 against 5727. That
+ *   overhead remains on the file that WAS edited, and is what the save's own
+ *   report (option (c), renderer/state/classic-save.ts) now names.
  *
- * So of seat A's +329, about 316 bytes — 96% — is re-encode overhead on bytes
- * that did not change, and roughly 13 bytes is the drawing.
- *
- * ⚠ WHAT THIS FILE DOES **NOT** CLAIM. These are REPRODUCTION rows: they state
- * what the writer does today, not what it should do. Two changes would turn
- * them red and both would be the row retiring rather than breaking — a writer
- * that stops re-emitting unchanged art files (§1's last row), and an encoder
- * that reproduces the original streams (§2). Both are written up as parked
- * questions in docs/reviews/2026-09-09-uxpair-findings.md, because the obvious
- * mechanical version of the first collides with the save contract: with nothing
- * emitted, `saveClassicWriteResult` answers `nothing`, which does not clear the
- * dirty domains — so a Ctrl+S after a paint-and-undo would go silent, which is
- * the defect class this queue is closing, not one to open.
+ * ⚠ §2 IS STILL A REPRODUCTION. Its rows state what the encoder does today. An
+ * encoder that reproduced the original streams (option (d)) would turn them red,
+ * and that would be the finding expiring, not a row breaking: delete them and
+ * say so. §1's first three rows were reproduction rows too until 2026-09-11 and
+ * are now restated for the new rule; the fourth ("a tiles-dirty save with NO
+ * tile differing still emits both files") SURVIVED the fix unchanged, because it
+ * is the save contract's case above, and it is now stated as a rule.
  */
 
 // -- §1 · the split, on a synthetic act ------------------------------------
@@ -142,7 +143,12 @@ function buildTwoFileAct(): { fa: FileAccess; act: LevelAct; paths: ResolvedLeve
   return { fa: memFs(files), act, paths, tilesA, tilesB };
 }
 
-describe('F3 §1 · one edited tile emits every art file backing the act', () => {
+/** Flip one nibble of the first byte of pool tile `t`. */
+function paintTile(tiles: Uint8Array, t: number): void {
+  tiles[t * 32] = (tiles[t * 32] ^ 0x0f) & 0xff;
+}
+
+describe('F3 §1 · an edited tile writes only the art file that changed', () => {
   it('GHZ really is the two-file zone, and it is the only one, read from the profile rather than memory', () => {
     const counts = new Map<string, number>();
     for (const zone of s1Profile.zones) {
@@ -156,44 +162,95 @@ describe('F3 §1 · one edited tile emits every art file backing the act', () =>
     expect(multi.sort()).toEqual(['ghz/1', 'ghz/2', 'ghz/3']);
   });
 
-  it('an edit inside file A emits BOTH files: the "two files" half of F3', async () => {
+  /**
+   * RESTATED 2026-09-11. This row used to read "an edit inside file A emits BOTH
+   * files", the "two files" half of F3, and it went red at the fix, which is
+   * what its own header said a fix would do.
+   */
+  it('an edit inside file A emits A alone, and reports B as unchanged', async () => {
     const { fa, act, paths } = buildTwoFileAct();
     const state = await readS1Level(act, paths, fa);
-    // Tile 1 lives in file A's span (tiles 0-3); file B holds 4-7 and is untouched.
-    state.doc.tiles[1 * 32] = (state.doc.tiles[1 * 32] ^ 0x0f) & 0xff;
+    // A tile in A's span, derived from the read rather than typed: A's first.
+    const [a, b] = state.read.pristineTileFiles;
+    expect(a.tileCount).toBeGreaterThan(0);
+    paintTile(state.doc.tiles, a.tileStart);
 
     const result = writeS1Level(state, { tiles: true });
     expect(result.errors).toEqual([]);
-    const written = result.files.map((f) => f.path);
-    expect(written).toContain(NEM_A);
-    expect(written).toContain(NEM_B);
-  });
-
-  it('and the untouched file is emitted with its CONTENT unchanged: it is a pure re-encode', async () => {
-    const { fa, act, paths, tilesB } = buildTwoFileAct();
-    const state = await readS1Level(act, paths, fa);
-    state.doc.tiles[1 * 32] = (state.doc.tiles[1 * 32] ^ 0x0f) & 0xff;
-
-    const result = writeS1Level(state, { tiles: true });
-    const b = result.files.find((f) => f.path === NEM_B)!;
-    expect(nemesisDecompress(b.bytes)).toEqual(tilesB);
-    // ANTI-VACUOUS, and the other direction: file A's emitted bytes DO carry the
-    // edit, so "unchanged" above is a property of B and not of the whole write.
-    const a = result.files.find((f) => f.path === NEM_A)!;
-    expect(nemesisDecompress(a.bytes)).not.toEqual(state.read.pristineTileFiles[0].bytes);
+    expect(result.files.map((f) => f.path)).toEqual([a.path]);
+    expect(result.unchanged).toEqual([b.path]);
   });
 
   /**
-   * THE MECHANISM, isolated: the emit is unconditional on the domain's dirty
-   * flag and consults nothing about whether a given file changed. This is the
-   * row a fix would flip.
+   * RESTATED 2026-09-11. It used to read "the untouched file is emitted with its
+   * CONTENT unchanged: it is a pure re-encode". The untouched file is no longer
+   * emitted at all; what is left to pin is that the file that IS emitted carries
+   * exactly the document's span, so "A alone" above is not "A, unedited".
    */
-  it('REPRODUCTION: a tiles-dirty save with NO tile differing still emits both files', async () => {
+  it("and A's emitted bytes are exactly the document's span of the pool, edit included", async () => {
+    const { fa, act, paths, tilesA } = buildTwoFileAct();
+    const state = await readS1Level(act, paths, fa);
+    const a = state.read.pristineTileFiles[0];
+    paintTile(state.doc.tiles, a.tileStart);
+
+    const result = writeS1Level(state, { tiles: true });
+    const emitted = nemesisDecompress(result.files.find((f) => f.path === a.path)!.bytes);
+    const span = state.doc.tiles.slice(a.tileStart * 32, (a.tileStart + a.tileCount) * 32);
+    expect(emitted).toEqual(span);
+    // ANTI-VACUOUS: the span really does differ from what was on disk.
+    expect(emitted).not.toEqual(tilesA);
+  });
+
+  /**
+   * THE SAVE CONTRACT'S CASE, and it was a reproduction row until 2026-09-11. It
+   * SURVIVED the fix unchanged, deliberately: with only `tiles` dirty and no
+   * tile differing, nothing else is written, so the writer emits the art as it
+   * always did. If it skipped here the write would carry no files, the saver
+   * would answer `nothing`, and the dirty dot would stay up with nothing said.
+   */
+  it('RULE: a tiles-dirty save with NO tile differing and nothing else to write still emits both files', async () => {
     const { fa, act, paths } = buildTwoFileAct();
     const state = await readS1Level(act, paths, fa);
     const result = writeS1Level(state, { tiles: true }); // not one byte edited
     expect(result.errors).toEqual([]);
     expect(result.files.map((f) => f.path).sort()).toEqual([NEM_A, NEM_B].sort());
+    // The invariant `WriteResult.unchanged` documents: never reported while
+    // nothing is emitted, because then it is emitted instead.
+    expect(result.unchanged).toEqual([]);
+  });
+
+  it('THE OTHER DIRECTION: the same zero-diff tiles plus a domain that IS written emits no art file at all', async () => {
+    const { fa, act, paths } = buildTwoFileAct();
+    const state = await readS1Level(act, paths, fa);
+    const result = writeS1Level(state, { tiles: true, start: true });
+    expect(result.errors).toEqual([]);
+    expect(result.files.map((f) => f.path)).toEqual([paths.startpos]);
+    expect(result.unchanged.sort()).toEqual([NEM_A, NEM_B].sort());
+  });
+
+  /**
+   * The half of the rule that is correctness rather than size. The writer judges
+   * "unchanged" against READ-time bytes, which no save refreshes. After a save
+   * has rewritten A, the document can come back to A's read-time content (paint,
+   * save, undo past the save) while disk holds the painted version. Skipping A
+   * then would leave disk and document disagreeing with the dot cleared. The
+   * adapter records landed paths in `writtenSinceRead` (its wiring is pinned in
+   * test/main/classic-save-integration.test.ts); this is the writer's half.
+   */
+  it('a file a save has written since the read is emitted even when it matches the read', async () => {
+    const { fa, act, paths, tilesA } = buildTwoFileAct();
+    const state = await readS1Level(act, paths, fa);
+    state.read.writtenSinceRead.add(NEM_A);
+
+    const result = writeS1Level(state, { tiles: true, start: true }); // zero tile diff
+    expect(result.errors).toEqual([]);
+    const written = result.files.map((f) => f.path);
+    expect(written).toContain(NEM_A);
+    // What it writes is the document's content, which here is the read's.
+    expect(nemesisDecompress(result.files.find((f) => f.path === NEM_A)!.bytes)).toEqual(tilesA);
+    // CONTROL, same call: B was never written, so B is still skipped.
+    expect(written).not.toContain(NEM_B);
+    expect(result.unchanged).toEqual([NEM_B]);
   });
 });
 
