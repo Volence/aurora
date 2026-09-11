@@ -1,0 +1,326 @@
+ORACLE_SOCKET=/tmp/cdps0911-cv-sWAoTq/o.sock S1DISASM_DIR=fresh cp of test/fixtures/s1disasm
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5f8575a69bc762fe
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5f8575a69bc762fe
+
+=== session: A — create, draw, undo, save, reopen (port 9364 verified free) ===
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.sonic-level-editor/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/canvas-cdp-harness-1375770-50983d5f — see HAZARD 6
+NOTE  [env] GHZ act 1 ready — {"status":"ready","zone":"ghz","act":1}
+PASS  [11a] the New Canvas dialog opens from ⌘K and renders
+        dlgOpen()=true
+NOTE  [11a] dialog as it opens — {"name":"","nums":["256","256"],"profile":"genesis-level-art","profileOptions":["genesis-level-art","genesis-sprite","genesis-unrestricted","none"],"createDisabled":true,"createOpacity":"0.5","error":null,"panelW":460}
+   shot: 01-dialog-open.png
+PASS  [11b] it opens with no refusal on screen and Create disabled (no name yet)
+        error=none; createDisabled=true; opacity=0.5
+PASS  [11c] it opens on its own declared defaults (256x256, genesis-level-art)
+        want 256x256 genesis-level-art; nums=["256","256"] profile=genesis-level-art options=["genesis-level-art","genesis-sprite","genesis-unrestricted","none"]
+NOTE  [11d] focus when the dialog opens — {"tag":"INPUT","type":"text","text":"","inDialog":true}
+PASS  [11e] FOCUS TRAP: Tab never leaves the dialog
+        8 Tab presses landed on: INPUT/number → INPUT/number → SELECT/select-one → BUTTON/button → INPUT/text → INPUT/number → INPUT/number → SELECT/select-one
+   shot: 02-dialog-refusal-unsafe-name.png
+PASS  [11f] typing "sky tiles" shows the name rule inline, and Create is disabled
+        426x62px, lh 16.5px: "A canvas name must start with a letter or digit and use only letters, digits, - and _ (no spaces, dots or slashes), up to 64 characters. It is the name of the file on disk."
+PASS  [11g] the name-rule refusal wraps rather than clipping
+        height 62px vs one line 16.5px — 4 lines
+PASS  [11h] Enter on an invalid name neither creates nor closes
+        dialog still open=true; open canvas documents=[]
+   shot: 03-dialog-emptied-width.png
+NOTE  [11i] width field after select-all + Backspace — value=""; error="Width must be a whole number between 8 and 1024 pixels."; createDisabled=true
+PASS  [11i] an emptied width field does NOT display a literal 0
+        the field reads ""
+PASS  [11j] Enter from a NUMBER field submits the form
+        dialog open=false; documents=["doc:canvas:entertest"]
+NOTE  [11j] entertest canvas — created=true (by Enter)
+   shot: 02b-dialog-refusal-collision.png
+PASS  [11n] typing the name of an existing canvas refuses it, names the file, and disables Create
+        426x62px in a 460px panel, lh 16.5px: "A canvas named "entertest" already exists (.aurora/canvas/entertest.png). Creating over it would replace that art with a blank canvas; pick another name, or open the existing one from the Explorer."
+PASS  [11o] the collision refusal wraps and is not clipped
+        4 lines at 426px wide inside a 460px panel
+PASS  [11k] Escape closes the dialog
+        dlgOpen()=false
+NOTE  [dialog] ⌘K attempt 1 did not open the New Canvas dialog — command palette input present=true
+PASS  [11l] a backdrop click does NOT discard a filled-in form
+        form was {"name":"backdroptest","nums":["200","200"]}; after the backdrop click {"name":"backdroptest","nums":["200","200"]}
+neg-ok  [11l] (planted) the backdrop click closed the dialog — dialog still present=true
+NOTE  [dialog] ⌘K attempt 1 did not open the New Canvas dialog — command palette input present=true
+PASS  [11m] Escape then reopening gives a fresh form
+        want name "" and 256x256; name="" nums=["256","256"]
+NOTE  [1] classic act loaded — {"tiles":965,"blocks":439,"chunks":82}
+NOTE  [1] dialog before Create — {"name":"ghz-cliffs","nums":["64","64"],"profile":"genesis-level-art","createDisabled":false}
+   shot: 04-canvas-created.png
+PASS  [1a] a canvas tab opens with the requested document
+        state={"name":"ghz-cliffs","width":64,"height":64,"profileId":"genesis-level-art","gridOrigin":{"originX":0,"originY":0},"dirty":false,"source":{"pngPath":".aurora/canvas/ghz-cliffs.png","sidecarPath":".aurora/canvas/ghz-cliffs.canvas.json","sidecarRejected":false}}; activeDocId=doc:canvas:ghz-cliffs; a canvas element is mounted=true
+PASS  [1b] the palette shows the ZONE's colours, not black
+        61/64 palette words are non-zero; the 64 rendered swatches show 43 distinct backgrounds; first 8 = ["rgba(0, 0, 0, 0)","rgb(0, 0, 0)","rgb(36, 36, 146)","rgb(73, 73, 182)","rgb(109, 109, 219)","rgb(146, 146, 255)","rgb(255, 255, 255)","rgb(182, 182, 182)"]
+neg-ok  [1b] (planted) the palette is entirely black — 61 non-zero words
+NOTE  [1c] status bar — "ViewFGS1 · Green Hill Zone Act 148×5 chunks · 82 chunks · 439 blocks · 214 objects−58%+Aether ◇ offline"
+NOTE  [2] armed paint index by clicking swatch 6 — 6
+   shot: 05-before-stroke.png
+   shot: 06-after-stroke.png
+PASS  [2a] a drag draws pixels — on screen AND in the document
+        drawn 0 → 31; the pixel at art (20,20) went 42,42,58,255 → 255,255,255,255
+PASS  [2b] the tab picks up the unsaved dot
+        dirty false → true; dots on screen 0 → 1 (["Canvas · ghz-cliffs"])
+neg-ok  [2a] (planted) the screen pixel is unchanged after the stroke — 42,42,58,255 vs 255,255,255,255
+   shot: 07-after-one-ctrl-z.png
+PASS  [3] ONE Ctrl+Z removes the WHOLE stroke
+        Undo chip was enabled after the drag=true; drawn pixels 31 → 0; buffer hash back to the pre-stroke value (1995431365)=true; Undo chip still enabled=false
+neg-ok  [3] (planted) the stroke survived the undo — 0 drawn pixels remain
+NOTE  [3] re-drew an X for the later rows — 61 drawn pixels, buffer hash 203401955
+   shot: 08-after-ctrl-s.png
+PASS  [4] Ctrl+S clears the dot and both files are on disk
+        dirty true → false; dots 1 → 0; /tmp/claude-1000/-home-volence-sonic-hacks-aurora/fbc06905-e5e4-4182-8feb-47a899c7c7d0/scratchpad/s1copy-canvas-run1/.aurora/canvas/ghz-cliffs.png 400 bytes (was 301 bytes at creation); /tmp/claude-1000/-home-volence-sonic-hacks-aurora/fbc06905-e5e4-4182-8feb-47a899c7c7d0/scratchpad/s1copy-canvas-run1/.aurora/canvas/ghz-cliffs.canvas.json present
+NOTE  [4] sidecar contents — { "version": 1, "profile": "genesis-level-art", "palette": [ 0, 0, 2082, 2628, 3174, 3720, 3822, 2730, 2184, 1092, 2222, 1130, 14, 8, 4, 238, 2048, 0, 578, 1124, 1670, 2248, 3822, 2730, 2184, 1092, 2282, 1130, 238, 136, 68, 14, 3712, 2, 3822, 38, 72, 108, 142, 206, 2694, 3718, 3752, 3786, 64, 96, 16
+PASS  [5] the PNG is a valid 8-bit indexed (colormap) PNG of the right size
+        file(1): /tmp/claude-1000/-home-volence-sonic-hacks-aurora/fbc06905-e5e4-4182-8feb-47a899c7c7d0/scratchpad/s1copy-canvas-run1/.aurora/canvas/ghz-cliffs.png: PNG image data, 64 x 64, 8-bit colormap, non-interlaced
+        IHDR: {"width":64,"height":64,"bitDepth":8,"colorType":3} (colorType 3 = indexed)
+NOTE  [5] the drawn shape — 61 of 4096 pixels are non-zero in the document that was written
+NOTE  [10] ground — flood-filled 4096/4096 pixels with canvas index 3
+NOTE  [10] grid chips — 8 was true, 16 was false; visibleGrids now [8,16]
+   shot: 09-grid-origin-0.png
+NOTE  [10] origin (0,0), zoom 11× — samples — {"bg":"73,73,182,255","bg2":"73,73,182,255","px8":"95,95,190,255","px8b":"95,95,190,255","px8c":"95,95,190,255","px16":"130,130,204,255","px16b":"130,130,204,255","px16c":"130,130,204,255"}
+NOTE  [10] origin (0,0) — device-pixel scan of art columns 0..39 at y=30 — ["130,130,204,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","95,95,190,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","130,130,204,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","95,95,190,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","130,130,204,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255"]
+   shot: 10-grid-origin-3.png
+NOTE  [10] origin {"originX":3,"originY":3} (set ok=true, 4096/4096 still filled) — samples — {"bg":"73,73,182,255","bg2":"73,73,182,255","px8":"95,95,190,255","px8b":"95,95,190,255","px8c":"95,95,190,255","px16":"130,130,204,255","px16b":"130,130,204,255","px16c":"130,130,204,255","oldPx8":"73,73,182,255","oldPx16":"73,73,182,255"}
+NOTE  [10] origin (3,3) — device-pixel scan of art columns 0..39 at y=30 — ["73,73,182,255","73,73,182,255","73,73,182,255","130,130,204,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","95,95,190,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","130,130,204,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","95,95,190,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255","130,130,204,255","73,73,182,255","73,73,182,255","73,73,182,255","73,73,182,255"]
+PASS  [10z] the ground under both measurements is the SAME uniform colour (so a colour difference can only be the grid)
+        origin 0 background 73,73,182,255/73,73,182,255; origin 3 background 73,73,182,255/73,73,182,255
+PASS  [10a] the guides MOVE when the origin moves
+        art column 8 (an 8px line at origin 0) is now plain background 73,73,182,255 = 73,73,182,255; column 16 likewise 73,73,182,255; the 8px line has moved to column 11 (95,95,190,255)
+PASS  [10b] the offset 8px mesh is drawn at EXACTLY the aligned 8px weight — it does not brighten
+        aligned 8px lines 95,95,190,255/95,95,190,255/95,95,190,255 vs offset 8px lines 95,95,190,255/95,95,190,255/95,95,190,255
+PASS  [10c] the 16px block grid still reads as DISTINCT from the 8px mesh at a non-zero origin
+        at origin 3: 16px 130,130,204,255 vs 8px 95,95,190,255; at origin 0: 16px 130,130,204,255 vs 8px 95,95,190,255
+PASS  [10d] the offset 16px grid is drawn at the aligned 16px weight
+        aligned 130,130,204,255/130,130,204,255/130,130,204,255 vs offset 130,130,204,255/130,130,204,255/130,130,204,255
+neg-ok  [10b] (planted) the offset 8px mesh matches the 16px weight (the historical bug) — offset 8px 95,95,190,255 vs aligned 16px 130,130,204,255
+neg-ok  [10a] (planted) the grid did not move at all — column 8 was 95,95,190,255, is now 73,73,182,255
+NOTE  [10] back on the working canvas — hash 203401955, 61 drawn
+NOTE  [6] closed the canvas tab — close button hit=true; open documents now ["doc:canvas:entertest","doc:canvas:escapetest","doc:canvas:backdroptest","doc:canvas:gridtest"]; tabs ["Green Hill Zone Act 1","Canvas · entertest","Canvas · escapetest","Canvas · backdroptest","Canvas · gridtest"]
+NOTE  [6] Explorer rows visible while filtering for it — ["","Run a commandCtrl+K","ghz-cliffs","Fit","","","","","","","",""]
+   shot: 11-reopened-from-explorer.png
+PASS  [6] closing and reopening the canvas brings back the pixels AND the palette exactly
+        Explorer row clicked=true; reopened state={"w":64,"h":64,"profile":"genesis-level-art","dirty":false}; pixel hash 203401955 → 203401955 (identical); palette identical=true
+neg-ok  [6] (planted) the reopened document is blank — 61 drawn pixels
+   shot: 12-second-canvas.png
+   shot: 13-switched-back-to-A.png
+PASS  [7a] each canvas tab keeps its OWN pixels across a switch
+        A: active=doc:canvas:ghz-cliffs hash=203401955 (expected 203401955) canvas=640x640 screenHash=1658551241
+        B: active=doc:canvas:second hash=229469433 (expected 229469433, 1225 drawn) canvas=672x672 screenHash=1956293508
+PASS  [7b] each dots independently
+        tabs currently showing the unsaved dot: ["Canvas · gridtest","Canvas · second"] (A was saved, B is not) — right after B's edit it was ["Canvas · gridtest","Canvas · second"]
+neg-ok  [7a] (planted) the two tabs render the same bitmap — A's composed canvas 1658551241 vs B's 1956293508
+NOTE  [8] level tab — title="Green Hill Zone Act 1" focused=true
+NOTE  [8] level edit — nav={"pill":true} tier={"bar":true} paintChip=true; pool {"tiles":965,"blocks":439,"chunks":82} → {"tiles":965,"blocks":440,"chunks":82}; the LEVEL header's Undo chip enabled=null
+   shot: 14-ctrl-z-under-canvas-tab.png
+PASS  [8] with a canvas tab active, Ctrl+Z undoes the CANVAS and leaves the level alone
+        canvas buffer hash 3211761003 → 203401955 (changed = the canvas undid); classic pool {"tiles":965,"blocks":440,"chunks":82} → {"tiles":965,"blocks":440,"chunks":82} (unmoved)
+neg-ok  [8] (planted) the classic pool moved on that Ctrl+Z — {"tiles":965,"blocks":440,"chunks":82} vs {"tiles":965,"blocks":440,"chunks":82}
+   shot: 14b-one-ctrl-z-one-entry.png
+PASS  [8b] one Ctrl+Z on a canvas tab consumes exactly ONE undo entry, with the level pane mounted behind it
+        two strokes: 77 drawn (hash 470095601) then 93 drawn (hash 880481923); after ONE Ctrl+Z: 77 drawn (hash 470095601). Back to after-stroke-1=true; collapsed all the way to the pre-stroke state (203401955, false) would mean two handlers fired
+neg-ok  [8b] (planted) one Ctrl+Z collapsed BOTH strokes — pre-stroke hash 203401955, after one undo 470095601
+   shot: 15-no-zone-canvas.png
+PASS  [12] a canvas created with NO ZONE open shows the four ramps and arms a VISIBLE colour
+        level state at create time={"status":"idle","zone":null,"act":null}; 59/64 words non-zero; 59 distinct swatch backgrounds; armed paint index 15 whose word is 0xeee; status bar: "nozoneGenesis level art64×64tiles 1 uniquecolours 0·0·0·0 / 15 per linecolour 15 · line 0 idx 1511× zoom"
+neg-ok  [12] (planted) the no-zone canvas is black on black — nonBlack=59, armed word=0xeee
+   shot: 16-no-zone-stroke.png
+PASS  [12b] a stroke on the no-zone canvas is actually VISIBLE on screen
+        the pixel at art (20,20) went 42,42,58,255 → 255,255,255,255
+   shot: 18-refused-create-over-dirty-canvas.png
+PASS  [R] a refused create over a DIRTY canvas never flashes the "could not be loaded" card
+        canvas was dirty=true; the refusal on screen was "A canvas named \"second\" already exists (.aurora/canvas/second.png). Creating over it would"; unloaded card ever seen across 8 samples=false; activeDocId doc:canvas:ghz-cliffs → doc:canvas:ghz-cliffs; buffer hash unchanged=true; still dirty=true
+NOTE  [A-end] stored session at the end of A — {"aurora.session.v1:/tmp/claude-1000/-home-volence-sonic-hacks-aurora/fbc06905-e5e4-4182-8feb-47a899c7c7d0/scratchpad/s1copy-canvas-run1":"{\"tabs\":[{\"id\":\"home\",\"kind\":\"home\",\"title\":\"Home\"},{\"id\":\"level:ghz:1\",\"kind\":\"level\",\"title\":\"Green Hill Zone Act 1\"},{\"id\":\"doc:canvas:entertest\",\"kind\":\"art-doc\",\"title\":\"Canvas · entertest\"},{\"id\":\"doc:canvas:escapetest\",\"kind\":\"art-doc\",\"title\":\"Canvas · escapetest\"},{\"id\":\"doc:canvas:backdroptest\",\"kind\":\"art-doc\",\"title\":\"Canvas · backdroptest\"},{\"id\":\"doc:canvas:gridtest\",\"kind\":\"art-doc\",\"title\":\"Canvas · gridtest\"},{\"id\":\"doc:canvas:ghz-cliffs\",\"kind\":\"art-doc\",\"title\":\"Canvas · ghz-cliffs\"},{\"id\":\"doc:canvas:second\",\"kind\":\"art-doc\",\"title\":\"Canvas · second\"},{\"id\":\"doc:canvas:nozone\",\"kind\":\"art-doc\",\"title\":\"Canvas · nozone\"}],\"activeId\":\"doc:canvas:ghz-cliffs\",\"workspace\":{\"level:ghz:1\":{\"facet\":\"art\"}}}"}
+NOTE  [A-end] live tab strip — ["Green Hill Zone Act 1","Canvas · entertest","Canvas · escapetest","Canvas · backdroptest","Canvas · gridtest","Canvas · ghz-cliffs","Canvas · second","Canvas · nozone"]
+NOTE  [A-end] session A ends with the canvas tab active and everything saved — hash 203401955, 61 drawn, dirty tabs ["Canvas · nozone"]
+   shot: 19-session-A-end.png
+NOTE  [9] setup — focused the canvas tab=true; it is dirty=true
+   shot: 17-project-switch-confirm.png
+PASS  [9a] a dirty canvas raises the project-open confirm
+        {"label":"Unsaved changes","text":"Unsaved changesOpening a project discards unsaved edits and undo history in the current one.Save & openDiscard & openCancel","buttons":["Save & open","Discard & open","Cancel"]}
+PASS  [9b] Cancel keeps the documents and their unsaved work
+        the guard answered false; open documents ["doc:canvas:entertest","doc:canvas:escapetest","doc:canvas:backdroptest","doc:canvas:gridtest","doc:canvas:ghz-cliffs","doc:canvas:second","doc:canvas:nozone"]; the canvas is still dirty=true
+   shot: 18-after-discard-and-open.png
+PASS  [9c] Discard drops every canvas document, and NO write lands in the old project
+        confirm copy: "Unsaved changesOpening a project discards unsaved edits and undo history in the current one.Save & openDiscard & openCancel"; the guard answered true; open documents afterwards []; activeDocId=null; ghz-cliffs.png on disk is byte-identical before/after=true (400 bytes) — so the unsaved stroke was NOT written into the project being left
+neg-ok  [9c] (planted) the discard wrote the unsaved stroke to disk — 400 vs 400 bytes
+NOTE  [9] after reloading the tab from disk — documents ["doc:canvas:ghz-cliffs"], drawn 61
+   shot: 19b-session-A-exit.png
+NOTE  [A-exit] stored session as session A exits — {"aurora.session.v1:/tmp/claude-1000/-home-volence-sonic-hacks-aurora/fbc06905-e5e4-4182-8feb-47a899c7c7d0/scratchpad/s1copy-canvas-run1":"{\"tabs\":[{\"id\":\"home\",\"kind\":\"home\",\"title\":\"Home\"},{\"id\":\"level:ghz:1\",\"kind\":\"level\",\"title\":\"Green Hill Zone Act 1\"},{\"id\":\"doc:canvas:entertest\",\"kind\":\"art-doc\",\"title\":\"Canvas · entertest\"},{\"id\":\"doc:canvas:escapetest\",\"kind\":\"art-doc\",\"title\":\"Canvas · escapetest\"},{\"id\":\"doc:canvas:backdroptest\",\"kind\":\"art-doc\",\"title\":\"Canvas · backdroptest\"},{\"id\":\"doc:canvas:gridtest\",\"kind\":\"art-doc\",\"title\":\"Canvas · gridtest\"},{\"id\":\"doc:canvas:ghz-cliffs\",\"kind\":\"art-doc\",\"title\":\"Canvas · ghz-cliffs\"},{\"id\":\"doc:canvas:second\",\"kind\":\"art-doc\",\"title\":\"Canvas · second\"},{\"id\":\"doc:canvas:nozone\",\"kind\":\"art-doc\",\"title\":\"Canvas · nozone\"}],\"activeId\":\"doc:canvas:ghz-cliffs\",\"workspace\":{\"level:ghz:1\":{\"facet\":\"art\"}}}"}
+NOTE  [A-exit] live tab strip — ["Green Hill Zone Act 1","Canvas · entertest","Canvas · escapetest","Canvas · backdroptest","Canvas · gridtest","Canvas · ghz-cliffs","Canvas · second","Canvas · nozone"]
+NOTE  [A-exit] the canvas being handed to session B — hash 203401955, 61 drawn, dirty tabs []
+   flush check armed: profile /tmp/aurora-harness-profiles/canvas-cdp-harness-1375770-50983d5f/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session 728B, unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 101ms
+cleanup: tree under pid 1375831 (1 process(es)):
+           1375831 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (202B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (202B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (202B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (202B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.sonic-level-editor/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+
+=== session: B — restart with a canvas active (row 13, first half) (port 9364 verified free) ===
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+NOTE  [13a] restore settled — {"waited":3027,"proj":{"status":"open","zones":18},"lvl":{"status":"idle","zone":null,"act":null},"tabs":["Green Hill Zone Act 1","Canvas · entertest","Canvas · escapetest","Canvas · backdroptest","Canvas · gridtest","Canvas · ghz-cliffs","Canvas · second","Canvas · nozone"]}
+NOTE  [13a] stored session BEFORE the project was opened — {"aurora.session.v1:/tmp/claude-1000/-home-volence-sonic-hacks-aurora/fbc06905-e5e4-4182-8feb-47a899c7c7d0/scratchpad/s1copy-canvas-run1":"{\"tabs\":[{\"id\":\"home\",\"kind\":\"home\",\"title\":\"Home\"},{\"id\":\"level:ghz:1\",\"kind\":\"level\",\"title\":\"Green Hill Zone Act 1\"},{\"id\":\"doc:canvas:entertest\",\"kind\":\"art-doc\",\"title\":\"Canvas · entertest\"},{\"id\":\"doc:canvas:escapetest\",\"kind\":\"art-doc\",\"title\":\"Canvas · escapetest\"},{\"id\":\"doc:canvas:backdroptest\",\"kind\":\"art-doc\",\"title\":\"Canvas · backdroptest\"},{\"id\":\"doc:canvas:gridtest\",\"kind\":\"art-doc\",\"title\":\"Canvas · gridtest\"},{\"id\":\"doc:canvas:ghz-cliffs\",\"kind\":\"art-doc\",\"title\":\"Canvas · ghz-cliffs\"},{\"id\":\"doc:canvas:second\",\"kind\":\"art-doc\",\"title\":\"Canvas · second\"},{\"id\":\"doc:canvas:nozone\",\"kind\":\"art-doc\",\"title\":\"Canvas · nozone\"}],\"activeId\":\"doc:canvas:ghz-cliffs\",\"workspace\":{\"level:ghz:1\":{\"facet\":\"art\"}}}","aurora.session.v1:no-project":"{\"tabs\":[{\"id\":\"home\",\"kind\":\"home\",\"title\":\"Home\"}],\"activeId\":\"home\"}"}
+NOTE  [13a] stored session AFTER the restore ran (a faithful readout of the live sessionStore) — {"aurora.session.v1:/tmp/claude-1000/-home-volence-sonic-hacks-aurora/fbc06905-e5e4-4182-8feb-47a899c7c7d0/scratchpad/s1copy-canvas-run1":"{\"tabs\":[{\"id\":\"home\",\"kind\":\"home\",\"title\":\"Home\"},{\"id\":\"level:ghz:1\",\"kind\":\"level\",\"title\":\"Green Hill Zone Act 1\"},{\"id\":\"doc:canvas:entertest\",\"kind\":\"art-doc\",\"title\":\"Canvas · entertest\"},{\"id\":\"doc:canvas:escapetest\",\"kind\":\"art-doc\",\"title\":\"Canvas · escapetest\"},{\"id\":\"doc:canvas:backdroptest\",\"kind\":\"art-doc\",\"title\":\"Canvas · backdroptest\"},{\"id\":\"doc:canvas:gridtest\",\"kind\":\"art-doc\",\"title\":\"Canvas · gridtest\"},{\"id\":\"doc:canvas:ghz-cliffs\",\"kind\":\"art-doc\",\"title\":\"Canvas · ghz-cliffs\"},{\"id\":\"doc:canvas:second\",\"kind\":\"art-doc\",\"title\":\"Canvas · second\"},{\"id\":\"doc:canvas:nozone\",\"kind\":\"art-doc\",\"title\":\"Canvas · nozone\"}],\"activeId\":\"doc:canvas:ghz-cliffs\",\"workspace\":{\"level:ghz:1\":{\"facet\":\"art\"}}}","aurora.session.v1:no-project":"{\"tabs\":[{\"id\":\"home\",\"kind\":\"home\",\"title\":\"Home\"}],\"activeId\":\"home\"}"}
+   shot: 20-restart-canvas-restored.png
+PASS  [13a-tab] the canvas TAB survives a restart
+        tabs on screen after the restore: ["Green Hill Zone Act 1","Canvas · entertest","Canvas · escapetest","Canvas · backdroptest","Canvas · gridtest","Canvas · ghz-cliffs","Canvas · second","Canvas · nozone"]
+PASS  [13a-focus] the tab that was focused at exit is focused again after the restart
+        stored at exit: activeId=doc:canvas:ghz-cliffs with 9 tabs; after the restore: activeId=doc:canvas:ghz-cliffs with 9 tabs; open canvas documents=["doc:canvas:ghz-cliffs"]; activeDocId=doc:canvas:ghz-cliffs; a canvas element is mounted=true
+NOTE  [13a] toasts at boot — []
+   shot: 20b-restart-canvas-focused.png
+PASS  [13a-pixels] focusing the restored tab brings the pixels back exactly
+        pixel hash 203401955 → 203401955 (identical); drawn 61 → 61; a canvas element is mounted=true
+neg-ok  [13a-pixels] (planted) the restored document is empty — 61 drawn pixels
+   flush check armed: profile /tmp/aurora-harness-profiles/canvas-cdp-harness-1375770-50983d5f/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session 728B, unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 101ms
+cleanup: tree under pid 1666247 (1 process(es)):
+           1666247 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (202B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (202B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (202B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (202B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.sonic-level-editor/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+
+[setup] deleted /tmp/claude-1000/-home-volence-sonic-hacks-aurora/fbc06905-e5e4-4182-8feb-47a899c7c7d0/scratchpad/s1copy-canvas-run1/.aurora/canvas/ghz-cliffs.png (400 bytes backed up)
+
+=== session: C — restart with the PNG deleted (row 13, second half) (port 9364 verified free) ===
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+NOTE  [13b] restore settled — {"waited":3030,"tabs":["Green Hill Zone Act 1","Canvas · entertest","Canvas · escapetest","Canvas · backdroptest","Canvas · gridtest","Canvas · ghz-cliffs","Canvas · second","Canvas · nozone"]}
+   shot: 21-restart-png-deleted.png
+PASS  [13b-toast] with the PNG deleted, the boot restore raises NO toast
+        the stored session handed to the restore had activeId=doc:canvas:ghz-cliffs (so activateRestoredCanvasDocTarget did run and its load did fail); toasts in the store=[]; toasts in the DOM=0; open canvas documents=[]
+   shot: 21b-unloaded-pane.png
+PASS  [13b-pane] clicking the tab of a canvas whose PNG is gone shows the "could not be loaded" pane
+        card="Canvas · ghz-cliffsThis canvas could not be loaded, so the tab has no document. Its files are .aurora/canvas/ghz-cliffs.png and the sidecar beside them. Check they are still there and readable.RetryCl"; toasts raised by the click: ["Could not open the canvas \"ghz-cliffs\": ENOENT: no such file or directory, open '/tmp/claude-1000/-home-volence-sonic-hacks-aurora/fbc06905-e5e4-4182-8feb-47a899c7c7d0/scratchpad/s1copy-canvas-run1/.aurora/canvas/ghz-cliffs.png'"]; open documents=[]
+   shot: 22-retry-still-missing.png
+PASS  [13c] Retry re-runs the real load — it reports the failure and stays on the pane
+        Retry clicked=true; toasts after: ["Could not open the canvas \"ghz-cliffs\": ENOENT: no such file or directory, open '/tmp/claude-1000/-home-volence-sonic-hacks-aurora/fbc06905-e5e4-4182-8feb-47a899c7c7d0/scratchpad/s1copy-canvas-run1/.aurora/canvas/ghz-cliffs.png'"]; card still shown=true
+   shot: 23-retry-recovered.png
+PASS  [13d] restoring the file and pressing Retry recovers the document
+        documents=["doc:canvas:ghz-cliffs"]; unloaded card gone=true; drawn=61 (expected 61)
+   flush check armed: profile /tmp/aurora-harness-profiles/canvas-cdp-harness-1375770-50983d5f/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session 728B, unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 99ms
+cleanup: tree under pid 1697427 (1 process(es)):
+           1697427 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (202B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (202B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (202B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (202B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.sonic-level-editor/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+[setup] hand-edited /tmp/claude-1000/-home-volence-sonic-hacks-aurora/fbc06905-e5e4-4182-8feb-47a899c7c7d0/scratchpad/s1copy-canvas-run1/.aurora/canvas/ghz-cliffs.canvas.json into invalid JSON
+
+=== session: D — a rejected sidecar, read on screen (rows 11/14) (port 9364 verified free) ===
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+NOTE  [14] restore settled — {"waited":3030,"tabs":["Green Hill Zone Act 1","Canvas · entertest","Canvas · escapetest","Canvas · backdroptest","Canvas · gridtest","Canvas · ghz-cliffs","Canvas · second","Canvas · nozone"]}
+   shot: 24-load-with-rejected-sidecar.png
+NOTE  [14] toasts on screen after the restore loaded a canvas whose sidecar is invalid JSON — ["Canvas \"ghz-cliffs\": the sidecar could not be read (sidecar is not valid JSON: Expected double-quoted property name in JSON at position 141 (line 1 column 142)); opening the art without it: the canvas is unconstrained until this is fixed, and the sidecar file will not be overwritten on save"]
+PASS  [14a] a canvas with an unreadable sidecar still OPENS, with the rejection recorded on its source
+        state={"name":"ghz-cliffs","width":64,"height":64,"profileId":"none","gridOrigin":{"originX":0,"originY":0},"dirty":false,"source":{"pngPath":".aurora/canvas/ghz-cliffs.png","sidecarPath":".aurora/canvas/ghz-cliffs.canvas.json","sidecarRejected":true}}
+PASS  [14a2] the LOAD itself warns about the rejected sidecar (R12) — before any save
+        the document was already loaded by the restore; toasts: ["Canvas \"ghz-cliffs\": the sidecar could not be read (sidecar is not valid JSON: Expected double-quoted property name in JSON at position 141 (line 1 column 142)); opening the art without it: the canvas is unconstrained until this is fixed, and the sidecar file will not be overwritten on save"]
+   shot: 25-sidecar-rejected-toast.png
+PASS  [14b] the save raises the sidecar-rejection toast, with the recovery instruction in it
+        "Saved the pixels of "ghz-cliffs", but not its settings: .aurora/canvas/ghz-cliffs.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them."
+PASS  [14c] it WRAPS instead of running off the edges of a normal window
+        window 1400px wide; toast box 560x82px at x 420..980; white-space=normal; overflow-wrap=anywhere; line-height=normal → about 5 lines
+PASS  [14d] nothing is clipped — the whole message is inside the box
+        scrollWidth 558 vs clientWidth 558; scrollHeight 80 vs clientHeight 80
+NOTE  [14] container — maxWidth=100%, pointerEvents=none (strip) / auto (toast)
+PASS  [14e] the error toast stays on screen long enough to read (>8s)
+        still on screen after ~3.5s: true; after ~8.5s: true
+neg-ok  [14e] (planted) the toast vanished within 3.5 seconds — 1 toasts at t+3.5s
+PASS  [14f] clicking the toast dismisses it
+        0 toasts remain after a real click at (700,789)
+PASS  [14g] the unreadable sidecar was left ALONE, not replaced
+        on disk now: "{ \"version\": 1, \"profile\": \"genesis-level-art\", \"DELIBERATELY BROKEN\": \"trailing comma below\", \"gridOrigin\": { \"originX\": 0, \"originY\": 0 },"
+   flush check armed: profile /tmp/aurora-harness-profiles/canvas-cdp-harness-1375770-50983d5f/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session 728B, unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 100ms
+cleanup: tree under pid 1787047 (1 process(es)):
+           1787047 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (202B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (202B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (202B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (202B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.sonic-level-editor/mcp.json 202B [pid 395334 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 395334,\n  \"aether\": \"http://127.0.0.1
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+
+================ SUMMARY ================
+checks: 52, fails: 0, unexercised: 0
+all negative controls correctly reported FAIL
+CANVAS-END EXIT=0
