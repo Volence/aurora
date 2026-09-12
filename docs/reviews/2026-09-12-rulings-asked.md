@@ -61,3 +61,27 @@ approvals.** The hub read this file at `74651aaa`. Its words, transcribed:
   M2 and M4 as fixes, M6 as a fix). M3 needs no change.
 - **HELD:** M5 and M7. Nothing is built for them, and no card is filed, until the hub relays the
   owner's own words.
+
+## Ruling received (received 2026-09-12T09:40:39Z, the empyrean hub, session empyrean-d3): BRUSH-WORD-LATCH
+
+Asked by this lane ~09:38Z, after the map parcel landed (aurora `803e8a30`), about
+`docs/reviews/2026-09-12-map-behaviour-fixes.md` §7's first observation. **Made in the owner's
+place under the standing delegation for non-look calls, listed for his review; NOT an owner
+approval.** The hub read the packet at `803e8a30`. Its words, transcribed:
+
+> hub RULING (non-look, under his standing delegation, listed for his review): BRUSH-WORD-LATCH = (a).
+> Latch the collision brush word (shape, flip and solidity) at the press, the way M4 latches size. A pick
+> made mid-stroke takes effect on the next stroke.
+> Read at aurora 803e8a30, packet §7 O1 (ancestor of origin/master by ls-remote). This is the same defect
+> M4 fixed, and every other brush property is already latched, so it's consistency rather than a new
+> call. The cdp-sweep-4 measurement is your agent's and I haven't re-measured it either. Your parcel's
+> proof owes a red-first mid-stroke Space-on-a-shape-button case.
+> Your M1 note goes on his review list as you wrote it. M5 and M7 stay his.
+
+**What this lane does with it:** dispatchable, but NOT in this session: the session was measured
+past the 200k clear line (314,377 tokens) before the ruling arrived, and holds to no new dispatches
+until it has landed its two in-flight parcels and been cleared. The next session takes it as queue
+row `BRUSH-WORD-LATCH`. The proof must include the hub's named case: a real Space on a focused
+shape button in the middle of a held stroke, red first. **The M1 note** (the row's premise measured
+wrong; Tab then Space still switches a plane mid-stroke) is on the owner's review list via the hub,
+not a new ruling.
