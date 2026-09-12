@@ -249,6 +249,14 @@ const WHAT_PASTES: Readonly<Record<PasteLayers, string>> = {
  * write (`effectivePasteLayers`), over the layers `pasteClickLayers` gives that
  * gesture. So the line cannot offer a gesture the buttons show as refused.
  *
+ * A gesture the click does not refuse but that has nothing to write (Shift+click
+ * over an art-only copy, and a plain click with Layers on Collision) is named as
+ * pasting nothing: never offered, and never called refused, because the click
+ * does not refuse it, it toasts that the clipboard carries no collision
+ * (PASTE-SAME-ZONE-ART-ONLY-SHIFT). So the landed line is kept only where every
+ * GESTURE lands: every choice's verdict null is not enough, since that holds in
+ * the zone an art-only copy was made in.
+ *
  * Every surface that says what a paste click does is built from this one
  * string (`PasteLayerOffer.hint` and `.statusHint`), so no two can name
  * different gestures.
@@ -256,21 +264,23 @@ const WHAT_PASTES: Readonly<Record<PasteLayers, string>> = {
 function pasteGestureLine(
   clip: MapClipboard, refusals: Readonly<Record<PasteLayers, string | null>>, sticky: PasteLayers,
 ): string {
-  if (PASTE_LAYER_ORDER.every((v) => refusals[v] === null)) return EVERY_GESTURE_LANDS;
   const lands = new Map<PasteLayers, string[]>();
   const refused: string[] = [];
+  const nothing: string[] = [];
   for (const { mods, lead, listed } of PASTE_GESTURES) {
     const layers = pasteClickLayers(mods, sticky);
     const writes = effectivePasteLayers(clip, layers);
-    if (refusals[layers] === null && writes !== null) lands.set(writes, [...(lands.get(writes) ?? []), lead]);
-    else refused.push(listed);
+    if (refusals[layers] !== null) refused.push(listed);
+    else if (writes === null) nothing.push(listed);
+    else lands.set(writes, [...(lands.get(writes) ?? []), lead]);
   }
+  if (refused.length === 0 && nothing.length === 0) return EVERY_GESTURE_LANDS;
   if (lands.size === 0) return 'Nothing can be pasted here';
   const parts = [...lands].map(([writes, leads]) => `${leads.join(' or ')} to paste ${WHAT_PASTES[writes]}`);
-  if (refused.length > 0) {
-    const names = refused.length === 1 ? refused[0] : `${refused.slice(0, -1).join(', ')} and ${refused[refused.length - 1]}`;
-    parts.push(`${names} ${refused.length === 1 ? 'is' : 'are'} refused here`);
-  }
+  const names = (list: string[]) =>
+    list.length === 1 ? list[0] : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+  if (refused.length > 0) parts.push(`${names(refused)} ${refused.length === 1 ? 'is' : 'are'} refused here`);
+  if (nothing.length > 0) parts.push(`${names(nothing)} ${nothing.length === 1 ? 'pastes' : 'paste'} nothing`);
   return parts.join(' · ');
 }
 
