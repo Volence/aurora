@@ -1,0 +1,2035 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > buildAeonSavePlan > omits a file the load could not understand, and still writes the rest
+[load] data/ojz/act1/section_0.objects.json exists but could not be read: Expected double-quoted property name in JSON at position 12 (line 1 column 13)
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > buildAeonSavePlan > leaves a file it could not even PROBE byte-identical, placements and all
+[load] data/ojz/act1/section_0.objects.json exists but could not be read: EACCES: permission denied, open 'data/ojz/act1/section_0.objects.json'
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > buildAeonSavePlan > leaves a file it could not even PROBE byte-identical, placements and all
+[load] data/ojz/act1/section_0.objects.json exists but could not be read: EACCES: permission denied, open 'data/ojz/act1/section_0.objects.json'
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > buildAeonSavePlan > leaves an unreadable meta sidecar byte-identical, as a well-formed one is
+[load] data/ojz/act1/section_0.meta.json exists but could not be read: Expected ',' or '}' after property value in JSON at position 98 (line 6 column 1)
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > buildAeonSavePlan > omits an unparseable meta sidecar from the plan, and still writes the rest
+[load] data/ojz/act1/section_0.meta.json exists but could not be read: Expected ',' or '}' after property value in JSON at position 98 (line 6 column 1)
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > buildAeonSavePlan > leaves an unreadable sidecar carrying a sceneRef byte-identical
+[load] data/ojz/act1/section_0.meta.json exists but could not be read: Expected ',' or '}' after property value in JSON at position 106 (line 4 column 31)
+
+ ✓ test/support/harness-guard-profile.test.ts (19 tests) 71ms
+stderr | src/renderer/components/art/__tests__/art-discard-guard.test.ts > §D Save is not promised over a chunk that has left the library > and the saver it is derived from agrees: it writes nothing and says so
+[toast] Chunk no longer exists. Cannot save
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > buildAeonSavePlan: editable collision planes > leaves a .collattr.bin it could not read byte-identical, as a well-formed one is
+[load] data/ojz/act1/section_0.collattr.bin exists but could not be read: EACCES: permission denied, open 'data/ojz/act1/section_0.collattr.bin'
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > buildAeonSavePlan: editable collision planes > leaves a .collattrb.bin it could not read byte-identical, as a well-formed one is
+[load] data/ojz/act1/section_0.collattrb.bin exists but could not be read: EACCES: permission denied, open 'data/ojz/act1/section_0.collattrb.bin'
+
+ ✓ test/config/failure-class-reporter.test.ts (17 tests) 2252ms
+ ✓ src/renderer/components/art/__tests__/art-discard-guard.test.ts (33 tests) 1789ms
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > buildAeonSavePlan: editable collision planes > does not shave a byte off an odd-length .collattr.bin on the way past
+[load] data/ojz/act1/section_0.collattr.bin exists but could not be read: collision plane is 130943 bytes; this section needs 131072
+
+ ✓ test/config/prose-constant-fold.test.ts (18 tests) 2468ms
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > buildAeonSavePlan: editable collision planes > never writes back a .collattr.bin that is not the section plane length
+[load] data/ojz/act1/section_0.collattr.bin exists but could not be read: collision plane is 130944 bytes; this section needs 131072
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > buildAeonSavePlan: editable collision planes > never writes back a .collattrb.bin that is not the section plane length
+[load] data/ojz/act1/section_0.collattrb.bin exists but could not be read: collision plane is 130944 bytes; this section needs 131072
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > a bglib manifest naming entries whose bodies are absent > load separates what it opened from what the manifest merely named
+[load] BG library entry ingame-forest-v15-1786630615596: ENOENT: no such file or directory, open 'data/editor/ojz_bg_ingame-forest-v15-1786630615596.bin'
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > a bglib manifest naming entries whose bodies are absent > a body that is THERE and cannot be read is unreadable, not absent
+[load] BG library entry ingame-forest-v15-1786630615596: 'data/editor/ojz_bg_ingame-forest-v15-1786630615596.bin' could not be read: EACCES: permission denied, open 'data/editor/ojz_bg_ingame-forest-v15-1786630615596.bin'
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > a bglib manifest naming entries whose bodies are absent > save keeps the names it could not open, and writes bodies only for the ones it has
+[load] BG library entry ingame-forest-v15-1786630615596: ENOENT: no such file or directory, open 'data/editor/ojz_bg_ingame-forest-v15-1786630615596.bin'
+
+stderr | src/core/project/aeon/__tests__/aeon-save.test.ts > a bglib manifest naming entries whose bodies are absent > a manifest whose entries ALL failed is still re-emitted whole
+[load] BG library entry ingame-forest-v15-1786630615596: ENOENT: no such file or directory, open 'data/editor/ojz_bg_ingame-forest-v15-1786630615596.bin'
+
+ ✓ src/core/project/aeon/__tests__/aeon-save.test.ts (32 tests) 3146ms
+     ✓ writes a well-formed pair back byte-identical, twice over  815ms
+     ✓ leaves a .collattr.bin it could not read byte-identical, as a well-formed one is  783ms
+     ✓ leaves a .collattrb.bin it could not read byte-identical, as a well-formed one is  738ms
+     ✓ does not shave a byte off an odd-length .collattr.bin on the way past  396ms
+ ✓ src/core/level-classic/__tests__/s1-io.test.ts (43 tests) 1355ms
+ ✓ test/formats/bg-override-section-ceiling.test.ts (33 tests) 1242ms
+     ✓ NO input refuses a size: the census behind the unreachable !ok arm  1023ms
+ ✓ test/config/reporter-visibility.test.ts (7 tests) 1710ms
+stdout | test/support/sibling-root.test.ts > sibling-root: step 3: derivation from this repo, via --git-common-dir > answers the MAIN checkout's parent, which is what --show-toplevel would get wrong
+step 3 measured from a LINKED worktree, built by this row at /tmp/aurora-step3-worktree-UtVJwe/wt
+    WRONG derivation  dirname(--show-toplevel)           = /tmp/aurora-step3-worktree-UtVJwe
+    RIGHT derivation  dirname(dirname(--git-common-dir)) = /home/volence/sonic_hacks
+    resolver answered → /home/volence/sonic_hacks
+    step 3: git rev-parse --git-common-dir from /tmp/aurora-step3-worktree-UtVJwe/wt → /home/volence/sonic_hacks/aurora/.git
+
+stdout | test/support/sibling-root.test.ts > sibling-root: step 3: derivation from this repo, via --git-common-dir > derives the suite root from a MAIN CHECKOUT ROOT, where git answers `.git`
+step 3 measured from a main-checkout ROOT, built by this row at /tmp/aurora-step3-main-3Ri3b5/suite/aurora
+    bed anchor, which is git's cwd and the subject's AURORA_DIR = /tmp/aurora-step3-main-3Ri3b5/suite/aurora
+    git rev-parse --git-common-dir                              = ".git"
+    …--path-format=absolute --git-common-dir                    = /tmp/aurora-step3-main-3Ri3b5/suite/aurora/.git
+    RIGHT derivation dirname(dirname(absolute))                 = /tmp/aurora-step3-main-3Ri3b5/suite
+    same derivation on git's DEFAULT output                     = "."
+    what the resolver answers from the REAL tree, ignoring this bed = /home/volence/sonic_hacks
+    resolver answered → /tmp/aurora-step3-main-3Ri3b5/suite
+    step 3: git rev-parse --git-common-dir from /tmp/aurora-step3-main-3Ri3b5/suite/aurora → /tmp/aurora-step3-main-3Ri3b5/suite/aurora/.git
+
+stdout | test/support/sibling-root.test.ts > sibling-root: step 3: derivation from this repo, via --git-common-dir > derives it from a MAIN-CHECKOUT SUBDIRECTORY, where git answers `../../.git`
+step 3 measured from a main-checkout SUBDIRECTORY two levels down, built by this row at /tmp/aurora-step3-main-n145yG/suite/aurora
+    bed anchor, which is git's cwd and the subject's AURORA_DIR = /tmp/aurora-step3-main-n145yG/suite/aurora/packages/editor
+    git rev-parse --git-common-dir                              = "../../.git"
+    …--path-format=absolute --git-common-dir                    = /tmp/aurora-step3-main-n145yG/suite/aurora/.git
+    RIGHT derivation dirname(dirname(absolute))                 = /tmp/aurora-step3-main-n145yG/suite
+    same derivation on git's DEFAULT output                     = ".."
+    what the resolver answers from the REAL tree, ignoring this bed = /home/volence/sonic_hacks
+    resolver answered → /tmp/aurora-step3-main-n145yG/suite
+    step 3: git rev-parse --git-common-dir from /tmp/aurora-step3-main-n145yG/suite/aurora/packages/editor → /tmp/aurora-step3-main-n145yG/suite/aurora/.git
+
+
+SWITCH-WINDOW aeon fixture: aeon origin/master @ 8947f93f0ad2, project.json + games/sonic4/data, 9973760 archive bytes, archived once and extracted twice in 32 ms (loadavg 7.42 6.32 5.48, uptime 191984 s)
+ ✓ src/renderer/providers/__tests__/map-status-classic.test.ts (11 tests) 1385ms
+     ✓ EVERY s1 map module mounts a ToolOptions hint line  1382ms
+ ✓ test/support/run-root.test.ts (23 tests) 673ms
+ ✓ test/support/sibling-root.test.ts (41 tests | 1 skipped) 1035ms
+stderr | src/core/project/aeon/__tests__/aeon-load.test.ts > loadAeonProject > flags a present-but-unparseable objects.json instead of loading it as empty
+[load] data/ojz/act1/section_0.objects.json exists but could not be read: Expected double-quoted property name in JSON at position 12 (line 1 column 13)
+
+stderr | src/core/project/aeon/__tests__/aeon-load.test.ts > loadAeonProject > a section file whose EXISTENCE cannot be determined is unreadable, not absent
+[load] data/ojz/act1/section_0.objects.json exists but could not be read: EACCES: permission denied, open 'data/ojz/act1/section_0.objects.json'
+
+stderr | src/core/project/aeon/__tests__/aeon-load.test.ts > loadAeonProject > flags a present-but-unparseable meta.json instead of loading it as defaults
+[load] data/ojz/act1/section_0.meta.json exists but could not be read: Expected ',' or '}' after property value in JSON at position 98 (line 6 column 1)
+
+stderr | src/core/project/aeon/__tests__/aeon-load.test.ts > loadAeonProject > flags an unreadable .tiles.bin rather than silently reseeding from strips
+[load] data/ojz/act1/section_0.tiles.bin exists but could not be read: nametable is 3 bytes; 256x256 needs 131072
+
+ ✓ src/renderer/state/__tests__/switch-window-edit.test.ts (101 tests) 866ms
+stderr | src/core/project/aeon/__tests__/aeon-load.test.ts > loadAeonProject: editable collision planes > flags a .collattr.bin it could not read instead of substituting the baseline
+[load] data/ojz/act1/section_0.collattr.bin exists but could not be read: EACCES: permission denied, open 'data/ojz/act1/section_0.collattr.bin'
+
+stderr | src/core/project/aeon/__tests__/aeon-load.test.ts > loadAeonProject: editable collision planes > flags a .collattrb.bin it could not read instead of substituting the baseline
+[load] data/ojz/act1/section_0.collattrb.bin exists but could not be read: EACCES: permission denied, open 'data/ojz/act1/section_0.collattrb.bin'
+
+stderr | src/core/project/aeon/__tests__/aeon-load.test.ts > loadAeonProject: editable collision planes > flags a truncated .collattr.bin rather than accepting a short plane
+[load] data/ojz/act1/section_0.collattr.bin exists but could not be read: collision plane is 130944 bytes; this section needs 131072
+
+ ✓ src/renderer/components/__tests__/map-viewport-mounted.test.ts (166 tests) 686ms
+stderr | src/core/project/aeon/__tests__/aeon-load.test.ts > loadAeonProject: editable collision planes > flags a truncated .collattrb.bin rather than accepting a short plane
+[load] data/ojz/act1/section_0.collattrb.bin exists but could not be read: collision plane is 130944 bytes; this section needs 131072
+
+stderr | src/core/project/aeon/__tests__/aeon-load.test.ts > loadAeonProject: editable collision planes > flags an odd-length .collattr.bin, whose trailing byte the word loop drops
+[load] data/ojz/act1/section_0.collattr.bin exists but could not be read: collision plane is 130943 bytes; this section needs 131072
+
+stderr | src/core/project/aeon/__tests__/aeon-load.test.ts > loadAeonProject: editable collision planes > flags an over-long .collattr.bin rather than silently dropping the tail
+[load] data/ojz/act1/section_0.collattr.bin exists but could not be read: collision plane is 131136 bytes; this section needs 131072
+
+ ✓ src/core/project/aeon/__tests__/aeon-load.test.ts (27 tests) 621ms
+ ✓ test/formats/tiles.test.ts (4 tests) 592ms
+     ✓ all pixel values are 0-15 (4bpp)  581ms
+ ✓ src/core/formats/classic/__tests__/s1-compression-goldens.test.ts (13 tests) 509ms
+     ✓ map256/*.kos decompresses, is chunk-aligned, and round-trips  366ms
+ ✓ test/formats/bg-anim-band.test.ts (76 tests) 470ms
+fixture: aeon
+  checkout          : /home/volence/sonic_hacks/aeon
+                      tracks: which aeon checkout this run opened. Resolved by: peerRepo('aeon')
+  read mode         : COMMITTED OBJECTS. git read the object database; the peer working tree was never opened
+                      tracks: how the bytes were obtained, which is what decides whether the revision below names them or only names what they were edited from
+  ref asked for     : 3a4712faa920100653669c1ec3fc26c2da71ef68
+                      tracks: the revision the caller pinned. A full SHA, so it cannot move under the caller
+  revision          : 3a4712faa920100653669c1ec3fc26c2da71ef68
+                      tracks: WHICH BYTES this run consumed. Compare it with an earlier run to answer "is this the same fixture I measured before". It is NOT evidence that any feature is present at that revision; only reading the file that carries the feature can say that
+  aeon working tree : DIRTY, 69 path(s) uncommitted
+                      tracks: that peer's DISK at 2026-09-12T19:57:48.683Z, not this fixture. Informational: any edits counted here are NOT in the bytes this run read, because the read went to the object database
+ ✓ src/core/art/__tests__/classic-commit-plan.test.ts (39 tests) 366ms
+ ✓ src/core/project/aeon/__tests__/grid-resize-roundtrip.test.ts (6 tests) 447ms
+ ✓ test/formats/bg-anim-band-axis-aeon-gate.test.ts (8 tests) 290ms
+ ✓ src/renderer/providers/__tests__/effects-preset-base-swap-control.test.ts (60 tests) 249ms
+ ✓ src/renderer/agent/__tests__/agent-handler.collision-plane-backstop.test.ts (19 tests) 234ms
+ ✓ src/main/__tests__/agent-road-schema-gate.test.ts (175 tests) 235ms
+ ✓ test/formats/aeon-curve-rate-drift.test.ts (8 tests) 235ms
+ ✓ src/core/formats/effects/__tests__/curve-rate.test.ts (18 tests) 216ms
+ ✓ test/build-flavour.test.ts (13 tests) 220ms
+stdout | src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts > [h1] paint_collision: words + plane:"both" > writes the per-cell picture to both planes, each merged against its OWN word
+[h1] reply painted=16 paintedOther=16 skipped=0
+    (0,0) A=$B001/to-b B=$7001/to-a
+    (1,0) A=$B002/to-b B=$7002/to-a
+    (0,1) A=$B003/to-b B=$7003/to-a
+    (1,1) A=$B004/to-b B=$7004/to-a
+
+stdout | src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts > [h1] paint_collision: words + plane:"both" > is ONE undo step, and undoing it restores BOTH planes in full
+[h1u] after ONE undo: (0,0) A=$B00B/to-b B=$7016/to-a
+
+stdout | src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts > [h1] paint_collision: words + plane:"both" > a null cell is skipped on BOTH planes; skipped counts cells once
+[h1n] words=[12289,null,null,12292] painted=8 paintedOther=8 skipped=2
+    (1,0) A=$B00B/to-b B=$7016/to-a
+
+stdout | src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts > [h2] paint_collision: words + crossover > an OMITTED crossover keeps every cell's own: never clears it
+[h2k] reply crossover=keep  (0,0) A=$B001/to-b B=$7016/to-a
+
+stdout | src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts > [h2] paint_collision: words + crossover > hand-off marks each WRITTEN cell and no skipped one, on the aimed plane
+[h2h] (0,0)=to-b (1,0)=to-b (0,1)=to-b (1,1)=to-b
+
+stdout | src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts > [h2] paint_collision: words + crossover > clear erases the written cells' crossover and spares the skipped one
+[h2c] (0,0)=none (1,0)=to-b (0,1)=none (1,1)=none
+
+stdout | src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts > [h2] paint_collision: words + crossover > aimed at plane B, hand-off writes B's legal value: never a self-mark
+[h2b] aimed at B: (0,0) A=$B00B/to-b B=$7001/to-a
+
+stdout | src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts > [h3] paint_collision: words + both + hand-off > gives each plane the OTHER plane's value, per written cell
+[h3] crossover=hand-off audit={"marksA":12,"marksB":12,"pairs":12,"oneWay":0,"selfMarks":0,"reserved":0,"severity":"warn","note":"2 TWO-WAY crossovers that NET TO NOTHING (first at section 0, cell (col 0, row 0), left half (8px column 0, index 0)): the pair is there on both planes, but it spans an even number of the 8px columns the engine triggers on, so the player is handed over and handed straight back and leaves on the path he arrived on. A 16px cell is TWO trigger columns, so a pair painted at the default mark width always does this. Set the crossover mark width to \"Half (8px)\" and paint the pair one sub-column wide, or use two spatially separated ONE-WAY marks, which is what the first working loop used."}
+    (0,0) A=$B001/to-b B=$7001/to-a
+    (1,0) A=$300B/none B=$3016/none
+    (0,1) A=$B003/to-b B=$7003/to-a
+    (1,1) A=$B004/to-b B=$7004/to-a
+
+stdout | src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts > [h3] paint_collision: words + both + hand-off > the CONTROL that makes the row above mean something: one plane only is ONE-WAY
+[h3c] one plane only → audit={"marksA":16,"marksB":0,"pairs":0,"oneWay":16,"selfMarks":0,"reserved":0,"severity":"warn","note":"16 ONE-WAY crossovers (first at section 0, cell (col 0, row 0), left half (8px column 0, index 0)): marked on one plane only. Legal and often correct: an entry or exit anchor looks like this, and so does a loop built from two separated one-way marks (each fires only when approached on the plane that carries it, and firing twice is the same as firing once). It is a MISTAKE only if you meant a single two-way handoff and marked one plane; then mark the other plane at the same place, at \"Half (8px)\" mark width."}
+
+stdout | src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts > [h4] the refusals > get_collision_region REFUSES plane:"both", in prose, and names paint_collision
+[h4] plane "a" on the same rect: words=[45067,45067,45067,45067] crossoverCells=4
+
+ ✓ test/formats/s4-strips.test.ts (7 tests) 222ms
+stdout | src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts > [h5] read → write over itself is exact, crossovers and all > restores the region byte for byte and needs no second call to do it
+[h5] restored painted=16  (0,0) A=$300B/none B=$7016/to-a
+
+stdout | src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts > [h5] read → write over itself is exact, crossovers and all > with the region left ALONE, the same round trip is a byte-exact no-op
+[h5=] over itself: painted=0 (0 means nothing needed changing)
+
+ ✓ src/renderer/agent/__tests__/agent-handler.collision-reconcile.test.ts (16 tests) 213ms
+ ✓ src/core/editing/__tests__/bg-override-art-injector-gate.test.ts (8 tests | 3 skipped) 204ms
+ ✓ test/formats/bg-override-contract-currency.test.ts (34 tests) 191ms
+ ✓ test/formats/effects-channel-bands-guard-residue.test.ts (43 tests) 205ms
+ ✓ src/renderer/providers/__tests__/band-strip-range.test.ts (42 tests) 188ms
+ ✓ src/renderer/agent/__tests__/agent-handler.art.test.ts (15 tests) 215ms
+stdout | test/handover/ojz-sec5-showcase.test.ts > OJZ section 5 showcase: authored through Aurora's writer
+[sec5-showcase] aeon 1cbb66603c0ffecab6b41a9a6e517dc17674f6a8 archived to /tmp/aurora-sec5-XSCHiV
+
+stdout | test/handover/ojz-sec5-showcase.test.ts > OJZ section 5 showcase: authored through Aurora's writer > adds exactly the two deliverables, moves no binary, and only reformats JSON
+[sec5-showcase] whole-act save also reformatted 0 JSON document(s) at 1cbb6660; none changed value, no binary moved
+
+ ✓ test/handover/ojz-sec5-showcase.test.ts (7 tests) 165ms
+ ✓ src/renderer/workspace/__tests__/facet-modules.test.ts (39 tests) 163ms
+ ✓ test/editing/section-ops.test.ts (31 tests) 152ms
+ ✓ src/core/editing/__tests__/region-flip.test.ts (28 tests) 159ms
+stdout | test/harness-effects-selectors.test.ts > harness selectors follow the app, not the other way round > no live line in scratchpad/ selects on a retired tile-animation label
+  DECLARED EXEMPTION: scratchpad/poisons-effects-usability.sh - a POISON: it writes the retired label into a copy of the source as its mutation, and the label is the mutation
+  DECLARED EXEMPTION: scratchpad/o55-new-band-door-probe.mjs - the probe that MEASURED the rename: its rows assert these labels are absent from the screen, so it has to name them
+
+ ✓ test/harness-effects-selectors.test.ts (5 tests) 151ms
+ ✓ src/core/project/aeon/__tests__/coalesced-notices.test.ts (9 tests) 163ms
+ ✓ src/renderer/components/sprite/__tests__/s1-saveback-roundtrip.test.ts (3 tests) 173ms
+ ✓ src/renderer/workspace/__tests__/classic-art-dock.test.ts (24 tests) 147ms
+ ✓ src/renderer/canvas/__tests__/section-renderer.test.ts (7 tests) 118ms
+ ✓ test/formats/aeon-fixture-currency.test.ts (9 tests) 135ms
+ ✓ src/core/art/__tests__/png-import.test.ts (13 tests) 122ms
+ ✓ test/main/classic-save-integration.test.ts (4 tests) 130ms
+ ✓ test/formats/engine-claim-register.test.ts (19 tests) 186ms
+ ✓ src/renderer/components/effects/__tests__/ramp-sign-lag-disclosure.test.ts (33 tests) 134ms
+ ✓ test/formats/bg-anim-band-axis.test.ts (21 tests) 110ms
+ ✓ src/renderer/components/effects/__tests__/band-vocabulary.test.ts (5 tests) 128ms
+ ✓ test/formats/bg-override-golden.test.ts (14 tests) 102ms
+ ✓ src/renderer/providers/__tests__/effects-aeon.test.ts (183 tests) 109ms
+ ✓ src/core/project/profiles/__tests__/s1-levelart-reservations.test.ts (22 tests) 108ms
+ ✓ test/support/fixture-provenance.test.ts (21 tests) 118ms
+ ✓ test/editing/chunk-links.test.ts (31 tests) 132ms
+ ✓ src/main/aether/__tests__/build-run.test.ts (58 tests) 120ms
+ ✓ src/core/editing/__tests__/chunk-links-cross-act.test.ts (10 tests) 92ms
+ ✓ src/renderer/components/__tests__/map-device-scale.test.ts (17 tests) 90ms
+ ✓ src/core/editing/__tests__/bg-override-art.test.ts (14 tests) 101ms
+ ✓ src/renderer/providers/__tests__/bg-anim-art.test.ts (16 tests) 75ms
+ ✓ src/core/project/aeon/__tests__/aeon-bg-override.test.ts (13 tests) 101ms
+ ✓ src/core/art/__tests__/canvas-resolve.test.ts (14 tests) 82ms
+ ✓ src/renderer/agent/__tests__/agent-handler.bganim.test.ts (18 tests) 85ms
+ ✓ src/renderer/providers/__tests__/bg-anim-aeon.test.ts (31 tests) 92ms
+ ✓ src/renderer/providers/__tests__/effects-preset-timeline.test.ts (36 tests) 82ms
+ ✓ test/support/harness-guard-globals.test.ts (3 tests) 76ms
+ ✓ test/formats/effects-preset-boundary.test.ts (36 tests) 67ms
+ ✓ src/renderer/workspace/__tests__/panel-gesture-order.test.ts (3 tests) 66ms
+ ✓ test/formats/effects-preset-guard-residue-schema.test.ts (30 tests) 82ms
+ ✓ test/formats/bg-override.test.ts (67 tests) 44ms
+ ✓ src/core/editing/__tests__/bg-override-band.test.ts (15 tests) 67ms
+stderr | src/renderer/state/__tests__/chunk-doc-commit.test.ts > when the chunk half cannot be built > [E1] the atlas edits it was handed still execute, alone
+[toast] The chunk "Chunk" is no longer in the chunk library, so this edit cannot be recorded on it
+
+stderr | src/renderer/state/__tests__/chunk-doc-commit.test.ts > when the chunk half cannot be built > [E2] and with no atlas edits to execute there is simply no step
+[toast] The chunk "Chunk" is no longer in the chunk library, so this edit cannot be recorded on it
+
+stderr | src/renderer/state/__tests__/chunk-doc-commit.test.ts > when the chunk half cannot be built > [E3] at the tileset ceiling the stroke stays in the document, unrecorded, not thrown away
+[toast] tileset would exceed 2048 tiles (11-bit index)
+
+ ✓ src/renderer/state/__tests__/chunk-doc-commit.test.ts (30 tests) 47ms
+ ✓ src/core/editing/__tests__/bg-override-layout.test.ts (6 tests) 71ms
+ ✓ src/renderer/components/classic/__tests__/classic-map-wheel.test.ts (6 tests) 51ms
+fixture: aeon
+  checkout          : /home/volence/sonic_hacks/aeon
+                      tracks: which aeon checkout this run opened. Resolved by: step 3: git rev-parse --git-common-dir from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a → /home/volence/sonic_hacks/aurora/.git
+  read mode         : COMMITTED OBJECTS. git read the object database; the peer working tree was never opened
+                      tracks: how the bytes were obtained, which is what decides whether the revision below names them or only names what they were edited from
+  ref asked for     : origin/master
+                      tracks: the revision the caller ASKED FOR. This is a MOVING name: it resolves to a different commit whenever that peer pushes, so it does not identify a fixture on its own
+  revision          : 8947f93f0ad25c08ed66b2a0df03648f9085deb8
+                      tracks: WHICH BYTES this run consumed. Compare it with an earlier run to answer "is this the same fixture I measured before". It is NOT evidence that any feature is present at that revision; only reading the file that carries the feature can say that
+  aeon working tree : DIRTY, 69 path(s) uncommitted
+                      tracks: that peer's DISK at 2026-09-12T19:57:54.050Z, not this fixture. Informational: any edits counted here are NOT in the bytes this run read, because the read went to the object database
+ ✓ src/core/formats/__tests__/raster-binding-threaded-set.test.ts (5 tests) 46ms
+ ✓ src/core/art/__tests__/indexed-png-decode.test.ts (48 tests) 54ms
+ ✓ test/formats/effects-fallback-census.test.ts (2 tests) 48ms
+ ✓ test/formats/bganim-preview.test.ts (22 tests) 66ms
+ ✓ src/core/art/__tests__/canvas-file-format.test.ts (27 tests) 48ms
+ ✓ src/renderer/agent/__tests__/agent-handler.bg-ceiling.test.ts (19 tests) 45ms
+ ✓ src/renderer/state/__tests__/classicLevelStore.test.ts (114 tests) 52ms
+stderr | test/formats/aeon-chunk-links-roundtrip.test.ts > chunk identity survives close-and-reopen > a sidecar Aurora CANNOT READ is reported and is NOT overwritten
+[load] games/sonic4/data/editor/ojz/act1/section_0.chunklinks.json exists but could not be read: runs cover 3 tiles; this section has 65536
+
+ ✓ test/formats/aeon-chunk-links-roundtrip.test.ts (6 tests) 42ms
+stdout | src/core/art/__tests__/canvas-constraints.test.ts > countUniqueTiles > cost: varied art reads each pixel about three times, not twelve
+[cost] varied art, reads per pixel: 3.00
+
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts (175 tests) 44ms
+stdout | src/core/art/__tests__/canvas-constraints.test.ts > countUniqueTiles > cost: even a fully symmetric canvas, the tie-break worst case, stays bounded
+[cost] symmetric art, reads per pixel: 3.00
+
+ ✓ test/formats/bg-anim-band-roomy-insert.test.ts (9 tests) 47ms
+ ✓ src/core/art/__tests__/canvas-constraints.test.ts (30 tests) 43ms
+ ✓ src/core/project/__tests__/reserved-tiles-real-act.test.ts (3 tests) 39ms
+ ✓ src/core/level-classic/__tests__/occlusion.test.ts (5 tests) 37ms
+stderr | src/renderer/state/__tests__/canvas-save-toast-bound.test.ts > Save All over canvas documents is bounded > does not produce one toast per dirty canvas
+[save] doc:canvas:c0: Saved the pixels of "c0", but not its settings: .aurora/canvas/c0.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c1: Saved the pixels of "c1", but not its settings: .aurora/canvas/c1.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c2: Saved the pixels of "c2", but not its settings: .aurora/canvas/c2.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c3: Saved the pixels of "c3", but not its settings: .aurora/canvas/c3.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c4: Saved the pixels of "c4", but not its settings: .aurora/canvas/c4.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c5: Saved the pixels of "c5", but not its settings: .aurora/canvas/c5.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c6: Saved the pixels of "c6", but not its settings: .aurora/canvas/c6.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c7: Saved the pixels of "c7", but not its settings: .aurora/canvas/c7.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c8: Saved the pixels of "c8", but not its settings: .aurora/canvas/c8.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[toast] 9 canvass could not be fully saved: doc:canvas:c0, doc:canvas:c1, doc:canvas:c2, +6 more. Each one and its own reason is in the developer console.
+
+stderr | src/renderer/state/__tests__/canvas-save-toast-bound.test.ts > Save All over canvas documents is bounded > names the real number, measured rather than asserted, on the same channel
+[save] doc:canvas:c0: Saved the pixels of "c0", but not its settings: .aurora/canvas/c0.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c1: Saved the pixels of "c1", but not its settings: .aurora/canvas/c1.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c2: Saved the pixels of "c2", but not its settings: .aurora/canvas/c2.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c3: Saved the pixels of "c3", but not its settings: .aurora/canvas/c3.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c4: Saved the pixels of "c4", but not its settings: .aurora/canvas/c4.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[save] doc:canvas:c5: Saved the pixels of "c5", but not its settings: .aurora/canvas/c5.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+[toast] 6 canvass could not be fully saved: doc:canvas:c0, doc:canvas:c1, doc:canvas:c2, +3 more. Each one and its own reason is in the developer console.
+
+stderr | src/renderer/state/__tests__/canvas-save-toast-bound.test.ts > Save All over canvas documents is bounded > keeps the exact message when exactly one canvas has something to report
+[toast] Saved the pixels of "c0", but not its settings: .aurora/canvas/c0.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+
+ ✓ src/renderer/state/__tests__/canvas-save-toast-bound.test.ts (3 tests) 35ms
+ ✓ src/renderer/components/__tests__/paste-status-bar-and-art-only.test.ts (8 tests) 47ms
+stderr | src/renderer/state/__tests__/canvas-save-routing.test.ts > saveCanvasDocument > when the sidecar was rejected at load (R15) > omits the sidecar, and says so with the recovery instruction
+[toast] Saved the pixels of "sky", but not its settings: .aurora/canvas/sky.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+
+stderr | src/renderer/state/__tests__/canvas-save-routing.test.ts > saveCanvasDocument > when the sidecar was rejected at load (R15) > keeps the sidecar baseline, so the NEXT save does not conflict on it
+[toast] Saved the pixels of "sky", but not its settings: .aurora/canvas/sky.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+
+stderr | src/renderer/state/__tests__/canvas-save-routing.test.ts > saveCanvasDocument > when the sidecar was rejected at load (R15) > a successful save does NOT clear sidecarRejected
+[toast] Saved the pixels of "sky", but not its settings: .aurora/canvas/sky.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+
+stderr | src/renderer/state/__tests__/canvas-save-routing.test.ts > saveCanvasDocument > when the sidecar was rejected at load (R15) > a successful save does NOT clear sidecarRejected
+[toast] Saved the pixels of "sky", but not its settings: .aurora/canvas/sky.canvas.json could not be read when this canvas was opened, so Aurora left it alone instead of overwriting it. The constraint profile and grid origin were NOT written. Fix that file by hand (it must be valid JSON) and reopen the canvas to recover them.
+
+stderr | src/renderer/state/__tests__/canvas-save-routing.test.ts > saveCanvasDocument > a failed Ctrl+S produces exactly ONE toast
+[toast] Save failed (canvas-doc): Save aborted; nothing was written. This changed on disk after Aurora read it: x. Reopen the canvas to pick up the external changes (your unsaved edits in this tab will be lost).
+
+ ✓ src/renderer/state/__tests__/canvas-save-routing.test.ts (20 tests) 42ms
+ ✓ src/renderer/shell/__tests__/create-canvas.test.ts (11 tests) 38ms
+ ✓ test/editing/e2e-chunk-collision-scenario.test.ts (1 test) 35ms
+fixture: aeon
+  checkout          : /home/volence/sonic_hacks/aeon
+                      tracks: which aeon checkout this run opened. Resolved by: step 3: git rev-parse --git-common-dir from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a → /home/volence/sonic_hacks/aurora/.git
+  read mode         : WORKING TREE. the bytes read are whatever was on disk in that checkout at the time
+                      tracks: how the bytes were obtained, which is what decides whether the revision below names them or only names what they were edited from
+  revision          : a38ce7c961ef83136ac2f7c35e09b2ded7a109ea
+                      tracks: the BASE this checkout sits on, and only that. It does NOT name the bytes this run read, because a working-tree read consumes uncommitted edits too
+  aeon working tree : DIRTY, 69 path(s) uncommitted
+                      tracks: THIS FIXTURE, measured at 2026-09-12T19:57:55.236Z. Dirty means no revision describes the bytes this run consumed, so the revision above is a base and not an identity
+ ✓ src/core/formats/effects/__tests__/section-wiring.test.ts (62 tests) 33ms
+ ✓ src/core/art/__tests__/rasterize.test.ts (28 tests) 45ms
+stdout | test/formats/effects-drift.test.ts > drift survives the load -> save round trip > round-trips the golden byte for byte, carrying both drift forms
+--- serializeEffectsScene(parseEffectsScene(canopy_dusk.json)) ---
+{
+  "anchor": {
+    "at": {
+      "channel": 2,
+      "dsa": 6,
+      "dsb": 7
+    }
+  },
+  "bob_period": 2,
+  "bob_shift": 5,
+  "budget_class": "ojz_heavy",
+  "deform_bg": {
+    "shared": {
+      "speed": 0,
+      "table": {
+        "generator": "zero"
+      }
+    }
+  },
+  "deform_fg": {
+    "shared": {
+      "speed": 2,
+      "table": {
+        "amplitude": 7,
+        "generator": "triangle",
+        "period": 128
+      }
+    }
+  },
+  "id": "canopy_dusk",
+  "layers": [
+    {
+      "fa": "FACTOR_LOCKED",
+      "fb": "FACTOR_0",
+      "world_y": 0
+    },
+    {
+      "curve": {
+        "to": "FACTOR_1_2"
+      },
+      "dsa": 3,
+      "dsb": 4,
+      "enabled": false,
+      "fa": {
+        "op": 1,
+        "s1": 2,
+        "s2": 4
+      },
+      "fb": "FACTOR_1_4",
+      "phase": 128,
+      "rowRemap": {
+        "height_shift": 4,
+        "plane_y": 101
+      },
+      "vsplit": {
+        "at": 192
+      },
+      "world_y": 96
+    },
+    {
+      "curve": {
+        "to": {
+          "op": 0,
+          "s1": 15,
+          "s2": 15
+        }
+      },
+      "deform": {
+        "own": {
+          "phase": 32,
+          "shift_a": 5,
+          "shift_b": 6,
+          "speed": -4,
+          "table": {
+            "amplitude": 12,
+            "generator": "sine",
+            "period": 64
+          }
+        }
+      },
+      "drift": {
+        "rate": 32
+      },
+      "fa": "FACTOR_3_8",
+      "fb": "FACTOR_3_16",
+      "world_y": 160
+    },
+    {
+      "deform": {
+        "own": {
+          "phase": 255,
+          "shift_a": 0,
+          "shift_b": 15,
+          "speed": 1,
+          "table": {
+            "bin": "tables/canopy_wind.bin"
+          }
+        }
+      },
+      "drift": "none",
+      "fa": "FACTOR_7_16",
+      "fb": "FACTOR_15_16",
+      "vsplit": "none",
+      "world_y": 224
+    },
+    {
+      "curve": "none",
+      "deform": {
+        "own": {
+          "phase": 8,
+          "shift_a": 2,
+          "shift_b": 2,
+          "speed": 0,
+          "table": {
+            "center": 112,
+            "generator": "v_column_floor",
+            "max_offset": 24
+          }
+        }
+      },
+      "dsa": 15,
+      "dsb": 15,
+      "enabled": true,
+      "fa": "FACTOR_1",
+      "fb": "FACTOR_1_32",
+      "phase": 0,
+      "world_y": 288
+    }
+  ],
+  "left_column_mask": "sprite_mask",
+  "name": "Canopy — dusk",
+  "reels": {
+    "rates": [
+      3,
+      -5,
+      2,
+      -4,
+      6
+    ]
+  },
+  "schema": 1,
+  "transition": "instant",
+  "v_center": 112,
+  "v_deform": {
+    "columns": {
+      "amp_shift": 3,
+      "speed": 1,
+      "table": {
+        "focal": 96,
+        "generator": "v_column_perspective",
+        "max_offset": 40
+      }
+    }
+  },
+  "v_factor": 1,
+  "v_factor_fg": 0,
+  "v_offset": -8
+}
+
+
+stdout | test/formats/effects-drift.test.ts > drift survives the load -> save round trip > survives a clone-and-edit of an unrelated field
+--- after an unrelated edit, layers[2] and layers[3] ---
+[
+  {
+    "curve": {
+      "to": {
+        "op": 0,
+        "s1": 15,
+        "s2": 15
+      }
+    },
+    "deform": {
+      "own": {
+        "phase": 32,
+        "shift_a": 5,
+        "shift_b": 6,
+        "speed": -4,
+        "table": {
+          "amplitude": 12,
+          "generator": "sine",
+          "period": 64
+        }
+      }
+    },
+    "drift": {
+      "rate": 32
+    },
+    "fa": "FACTOR_3_8",
+    "fb": "FACTOR_3_16",
+    "world_y": 160
+  },
+  {
+    "deform": {
+      "own": {
+        "phase": 255,
+        "shift_a": 0,
+        "shift_b": 15,
+        "speed": 1,
+        "table": {
+          "bin": "tables/canopy_wind.bin"
+        }
+      }
+    },
+    "drift": "none",
+    "fa": "FACTOR_7_16",
+    "fb": "FACTOR_15_16",
+    "vsplit": "none",
+    "world_y": 224
+  }
+]
+
+stdout | test/formats/effects-drift.test.ts > drift refusals match the contract rather than approximating it > the bounds and the refused value come from the schema, not from prose
+--- derived from the vendored schema ---
+{
+  "bounds": {
+    "min": -4096,
+    "max": 4096
+  },
+  "refused": 0,
+  "unitsPerPixel": 256
+}
+
+stdout | test/formats/effects-drift.test.ts > drift refusals match the contract rather than approximating it > refuses the excluded rate, naming it
+--- refusal for rate 0 ---
+canopy_dusk.json does not match the effects scene schema
+  - /layers/2/drift: matches none of the 2 allowed forms:
+  form 1: /layers/2/drift: expected the constant "none", got {"rate":0}
+  form 2: /layers/2/drift/rate: 0 is refused: the schema forbids the constant 0
+
+ ✓ test/formats/bg-anim-band-phase-shift.test.ts (13 tests) 26ms
+stdout | test/formats/effects-drift.test.ts > drift refusals match the contract rather than approximating it > the advisory refusal agrees with the validator on every case
+--- advisory vs validator ---
+[
+  {
+    "rate": -4097,
+    "advisory": true,
+    "validator": true
+  },
+  {
+    "rate": -4096,
+    "advisory": false,
+    "validator": false
+  },
+  {
+    "rate": -1,
+    "advisory": false,
+    "validator": false
+  },
+  {
+    "rate": 0,
+    "advisory": true,
+    "validator": true
+  },
+  {
+    "rate": 1,
+    "advisory": false,
+    "validator": false
+  },
+  {
+    "rate": 32,
+    "advisory": false,
+    "validator": false
+  },
+  {
+    "rate": 1536,
+    "advisory": false,
+    "validator": false
+  },
+  {
+    "rate": 4096,
+    "advisory": false,
+    "validator": false
+  },
+  {
+    "rate": 4097,
+    "advisory": true,
+    "validator": true
+  },
+  {
+    "rate": 0.5,
+    "advisory": true,
+    "validator": true
+  }
+]
+
+stdout | test/formats/effects-drift.test.ts > px/frame <-> wire rate: the 256x hazard > no second copy of the factor exists in the effects source
+--- bare 256 literals in effects source ---
+(none)
+
+stdout | test/formats/effects-drift.test.ts > the extras line no longer speaks for drift > prints nothing for a drifting layer that carries no other extra
+--- layerExtrasLine per layer ---
+0: drift=null extras=(no line)
+1: drift=null extras=phase 128 · disabled
+2: drift={"rate":32} extras=(no line)
+3: drift="none" extras=(no line)
+4: drift=null extras=(no line)
+
+stdout | test/formats/effects-drift.test.ts > the extras line no longer speaks for drift > leaves the other extras exactly as they were
+--- combined extras line ---
+phase 64 · disabled
+
+stdout | test/formats/effects-drift.test.ts > the drift row seeds, converts and refuses > seeds a legal, non-zero rate: the corpus's slowest
+--- seed --- rate=32 px=0.125 step=0.125
+
+stdout | test/formats/effects-drift.test.ts > the drift row seeds, converts and refuses > shows the file's wire rate as px/frame and nothing when there is no drift
+--- driftPxFieldValue ---
+{"rate":32} -> 0.125
+{"rate":1536} -> 6
+{"rate":-256} -> -1
+"none" -> null
+null -> null
+
+stdout | test/formats/effects-drift.test.ts > the drift row seeds, converts and refuses > round-trips a typed px/frame value through a real document, unchanged
+--- px/frame round trip through serialize + parse ---
+typed 0.125 px/frame -> wire 32 -> on disk 32 -> box shows 0.125
+typed 1 px/frame -> wire 256 -> on disk 256 -> box shows 1
+typed -1 px/frame -> wire -256 -> on disk -256 -> box shows -1
+typed 6 px/frame -> wire 1536 -> on disk 1536 -> box shows 6
+typed -6 px/frame -> wire -1536 -> on disk -1536 -> box shows -6
+typed 0.5 px/frame -> wire 128 -> on disk 128 -> box shows 0.5
+typed 2.25 px/frame -> wire 576 -> on disk 576 -> box shows 2.25
+typed 16 px/frame -> wire 4096 -> on disk 4096 -> box shows 16
+typed -16 px/frame -> wire -4096 -> on disk -4096 -> box shows -16
+
+stdout | test/formats/effects-drift.test.ts > the drift row seeds, converts and refuses > refuses zero, everything that rounds to zero, and everything out of range
+--- driftPxPerFrameRefusal ---
+0                      REFUSED  (zero: indistinguishable from none in ROM)
+    0 is not a drift rate. A layer that should not drift spells "none". It is indistinguishable from no drift at all in ROM, and aeon refuses it at build time.
+0.001                  REFUSED  (rounds to zero on the wire)
+    0.001 px/frame is 0 in wire units (1 px/frame = 256). 0 is not a drift rate. A layer that should not drift spells "none". It is indistinguishable from no drift at all in ROM, and aeon refuses it at build time.
+-0.001                 REFUSED  (rounds to zero, leftward)
+    -0.001 px/frame is 0 in wire units (1 px/frame = 256). 0 is not a drift rate. A layer that should not drift spells "none". It is indistinguishable from no drift at all in ROM, and aeon refuses it at build time.
+0.00390625             ACCEPTED (one wire unit: the slowest legal)
+    
+-16                    ACCEPTED (the bound itself)
+    
+16                     ACCEPTED (the bound itself)
+    
+-16.01                 REFUSED  (past the bound, leftward)
+    -16.01 px/frame is outside the contract's -16..16 px/frame. -16.01 px/frame is -4099 in wire units, against a -4096..4096 bound (1 px/frame = 256). That is a TASTE bound, not a correctness one; raise it in the contract rather than working around it.
+16.01                  REFUSED  (past the bound)
+    16.01 px/frame is outside the contract's -16..16 px/frame. 16.01 px/frame is 4099 in wire units, against a -4096..4096 bound (1 px/frame = 256). That is a TASTE bound, not a correctness one; raise it in the contract rather than working around it.
+35.15625               REFUSED  (the generator forwards Rate(9000))
+    35.15625 px/frame is outside the contract's -16..16 px/frame. In the file that is 9000, against a -4096..4096 bound (1 px/frame = 256). That is a TASTE bound, not a correctness one; raise it in the contract rather than working around it.
+NaN                    REFUSED  (not a number)
+    NaN is not a drift rate: type a signed number of pixels per frame.
+0.125                  ACCEPTED (AIZ1 clouds)
+    
+6                      ACCEPTED (the corpus maximum)
+    
+
+stdout | test/formats/effects-drift.test.ts > the drift row seeds, converts and refuses > says the wire value and the factor exactly when the conversion changed it
+--- refusal sentences ---
+0.001: 0.001 px/frame is 0 in wire units (1 px/frame = 256). 0 is not a drift rate. A layer that should not drift spells "none". It is indistinguishable from no drift at all in ROM, and aeon refuses it at build time.
+0: 0 is not a drift rate. A layer that should not drift spells "none". It is indistinguishable from no drift at all in ROM, and aeon refuses it at build time.
+17: 17 px/frame is outside the contract's -16..16 px/frame. In the file that is 4352, against a -4096..4096 bound (1 px/frame = 256). That is a TASTE bound, not a correctness one; raise it in the contract rather than working around it.
+
+stdout | test/formats/effects-drift.test.ts > the drift row seeds, converts and refuses > the panel hands the box the refusal and the conversion (SOURCE ONLY: see the harness)
+--- the drift NumberField, comments stripped ---
+<NumberField title={`Layer ${i} ${LAYER_DRIFT_ROW.rateTitle}`}
+                          min={EFFECTS_DRIFT_PX_BOUNDS.min} max={EFFECTS_DRIFT_PX_BOUNDS.max}
+                          step={EFFECTS_DRIFT_PX_STEP} width={72} value={px}
+                          refuse={(n) => driftPxPerFrameRefusal(n)}
+                          onRefusal={(r, d) => setDriftRefusal(
+                            (s) => ({ ...s, [i]: r === null ? null : d ?? null }))}
+                          onChange={(n) => run(setLayerFieldCommand(
+                            library, selected.id, i, 'drift', driftFromPxPerFrame(n)))} />
+
+ ✓ test/formats/effects-drift.test.ts (27 tests) 42ms
+stderr | src/renderer/shell/__tests__/canvas-doc-activation.test.ts > activateCanvasDocTarget > a failed load leaves NO half-open document behind
+[toast] Could not open the canvas "sky": ENOENT
+
+stderr | src/renderer/shell/__tests__/canvas-doc-activation.test.ts > activateCanvasDocTarget > a failed load does not move the focus off the document already showing
+[toast] Could not open the canvas "sky": ENOENT
+
+stderr | src/renderer/shell/__tests__/canvas-doc-activation.test.ts > load-time warnings (R16) > surfaces every warning the load reported, naming the canvas
+[toast] Canvas "sky": the sidecar could not be read (Unexpected token }); opening the art without it
+[toast] Canvas "sky": this PNG's colours no longer match its sidecar, as if another tool recoloured it
+
+stderr | src/renderer/shell/__tests__/canvas-doc-activation.test.ts > canvas focus follows the tab strip > routes a canvas tab through the canvas activation
+[toast] Could not open the canvas "sky": no project is open
+
+stderr | src/renderer/shell/__tests__/canvas-doc-activation.test.ts > canvas focus follows the tab strip > a canvas tab ALREADY IN THE STRIP still takes focus when its file will not load
+[toast] Could not open the canvas "sky": no project is open
+
+stderr | src/renderer/shell/__tests__/canvas-doc-activation.test.ts > canvas focus follows the tab strip > a failed load clears the canvas focus rather than leaving the last one named
+[toast] Could not open the canvas "sky": no project is open
+
+stderr | src/renderer/shell/__tests__/canvas-doc-activation.test.ts > confirmCloseCanvasDoc > a FAILED save cancels the close and says why
+[toast] Close cancelled: Save aborted; nothing was written. This changed on disk after Aurora read it: .aurora/canvas/sky.png. Reopen the canvas to pick up the external changes (your unsaved edits in this tab will be lost).
+
+stderr | src/renderer/shell/__tests__/canvas-doc-activation.test.ts > closing a canvas tab > a tab whose file never loaded is still closable
+[toast] Could not open the canvas "sky": ENOENT
+
+ ✓ src/renderer/shell/__tests__/canvas-doc-activation.test.ts (28 tests) 39ms
+stdout | test/formats/effects-row-remap.test.ts > rowRemap survives the load -> save round trip > round-trips the golden byte for byte, carrying the remap
+--- serializeEffectsScene(parseEffectsScene(canopy_dusk.json)) ---
+{
+  "anchor": {
+    "at": {
+      "channel": 2,
+      "dsa": 6,
+      "dsb": 7
+    }
+  },
+  "bob_period": 2,
+  "bob_shift": 5,
+  "budget_class": "ojz_heavy",
+  "deform_bg": {
+    "shared": {
+      "speed": 0,
+      "table": {
+        "generator": "zero"
+      }
+    }
+  },
+  "deform_fg": {
+    "shared": {
+      "speed": 2,
+      "table": {
+        "amplitude": 7,
+        "generator": "triangle",
+        "period": 128
+      }
+    }
+  },
+  "id": "canopy_dusk",
+  "layers": [
+    {
+      "fa": "FACTOR_LOCKED",
+      "fb": "FACTOR_0",
+      "world_y": 0
+    },
+    {
+      "curve": {
+        "to": "FACTOR_1_2"
+      },
+      "dsa": 3,
+      "dsb": 4,
+      "enabled": false,
+      "fa": {
+        "op": 1,
+        "s1": 2,
+        "s2": 4
+      },
+      "fb": "FACTOR_1_4",
+      "phase": 128,
+      "rowRemap": {
+        "height_shift": 4,
+        "plane_y": 101
+      },
+      "vsplit": {
+        "at": 192
+      },
+      "world_y": 96
+    },
+    {
+      "curve": {
+        "to": {
+          "op": 0,
+          "s1": 15,
+          "s2": 15
+        }
+      },
+      "deform": {
+        "own": {
+          "phase": 32,
+          "shift_a": 5,
+          "shift_b": 6,
+          "speed": -4,
+          "table": {
+            "amplitude": 12,
+            "generator": "sine",
+            "period": 64
+          }
+        }
+      },
+      "drift": {
+        "rate": 32
+      },
+      "fa": "FACTOR_3_8",
+      "fb": "FACTOR_3_16",
+      "world_y": 160
+    },
+    {
+      "deform": {
+        "own": {
+          "phase": 255,
+          "shift_a": 0,
+          "shift_b": 15,
+          "speed": 1,
+          "table": {
+            "bin": "tables/canopy_wind.bin"
+          }
+        }
+      },
+      "drift": "none",
+      "fa": "FACTOR_7_16",
+      "fb": "FACTOR_15_16",
+      "vsplit": "none",
+      "world_y": 224
+    },
+    {
+      "curve": "none",
+      "deform": {
+        "own": {
+          "phase": 8,
+          "shift_a": 2,
+          "shift_b": 2,
+          "speed": 0,
+          "table": {
+            "center": 112,
+            "generator": "v_column_floor",
+            "max_offset": 24
+          }
+        }
+      },
+      "dsa": 15,
+      "dsb": 15,
+      "enabled": true,
+      "fa": "FACTOR_1",
+      "fb": "FACTOR_1_32",
+      "phase": 0,
+      "world_y": 288
+    }
+  ],
+  "left_column_mask": "sprite_mask",
+  "name": "Canopy — dusk",
+  "reels": {
+    "rates": [
+      3,
+      -5,
+      2,
+      -4,
+      6
+    ]
+  },
+  "schema": 1,
+  "transition": "instant",
+  "v_center": 112,
+  "v_deform": {
+    "columns": {
+      "amp_shift": 3,
+      "speed": 1,
+      "table": {
+        "focal": 96,
+        "generator": "v_column_perspective",
+        "max_offset": 40
+      }
+    }
+  },
+  "v_factor": 1,
+  "v_factor_fg": 0,
+  "v_offset": -8
+}
+
+
+stdout | test/formats/effects-row-remap.test.ts > the payload the schema accepts > refuses every reserved name by name, through the `not: {}` idiom
+--- rowRemap carrying reserved "ladder" ---
+/layers/1/rowRemap: matches none of the 2 allowed forms:
+  form 1: /layers/1/rowRemap: expected the constant "none", got {"plane_y":101,"height_shift":4,"ladder":"waterline16"}
+  form 2: /layers/1/rowRemap/ladder: "waterline16" is refused by "not": {}
+--- rowRemap carrying reserved "table" ---
+/layers/1/rowRemap: matches none of the 2 allowed forms:
+  form 1: /layers/1/rowRemap: expected the constant "none", got {"plane_y":101,"height_shift":4,"table":"waterline16"}
+  form 2: /layers/1/rowRemap/table: "waterline16" is refused by "not": {}
+
+stdout | test/formats/effects-row-remap.test.ts > height_shift is a shift and the editor must export the shift > agrees with every worked shift/line pair the contract writes down
+--- worked shift/line pairs the contract states ---
+[{"shift":4,"lines":16},{"shift":6,"lines":64},{"shift":7,"lines":128}]
+
+stdout | test/formats/effects-row-remap.test.ts > height_shift is a shift and the editor must export the shift > refuses a shift the contract does not admit and says which unit it is
+--- typing the line count into the shift ---
+16 is not the contract's one legal shift, 4. THIS IS A SHIFT, NOT A LINE COUNT: the band is 1 << shift lines tall, so 4 is 16 lines. If you meant 16 lines, you want 4.
+
+stdout | test/formats/effects-row-remap.test.ts > plane_y, whose ceiling this schema is one of two enforcements of > refuses past the ceiling and says the engine will not catch it
+--- one past the ceiling ---
+512 is outside the Plane-B line range 0..511. This bound is ONE OF TWO ENFORCEMENTS of the ceiling, with the engine-side guard aeon landed alongside it; before that guard existed aeon checked the floor and not the ceiling, and a larger value built clean and emitted a window pointing nowhere.
+
+stdout | test/formats/effects-row-remap.test.ts > the height picker derives from whatever shape the contract uses > GROWS: a widened copy of the contract own node yields the wider list, no edit here
+--- the picker if the hub amends the enum to [4, 6] ---
+16 lines (shift 4)
+64 lines (shift 6)
+
+stdout | test/formats/effects-row-remap.test.ts > the height picker derives from whatever shape the contract uses > refuses every integer the contract does not admit, and the codec agrees
+--- swept 1..7; contract admits 4; control and codec agree on every one ---
+
+stdout | test/formats/effects-row-remap.test.ts > schema-legal is not buildable, and today the contract makes them the same set > marks exactly one option buildable while the contract names one
+--- the height picker as an author sees it ---
+* 16 lines (shift 4)
+
+stdout | test/formats/effects-row-remap.test.ts > the three scene() preconditions, answered from the open document > reports a scene with no anchor, in the contract's own words
+--- no anchor ---
+this scene declares no anchor, and the remap takes its channel from the scene's own anchor rather than from the strip. The contract: "the scene MUST declare anchor"
+
+stdout | test/formats/effects-row-remap.test.ts > the three scene() preconditions, answered from the open document > reports a SECOND remapped strip and names it
+--- two remapped strips ---
+strip 3 also carries a row remap. The contract: "at most ONE layer per scene may carry rowRemap"
+
+stdout | test/formats/effects-row-remap.test.ts > the three scene() preconditions, answered from the open document > reports a strip with nothing to vary once all three sources are gone
+--- nothing to vary ---
+nothing for the remap to vary: no curve on this strip; its dsb is 4 but the scene has no deform_bg table; the anchor's dsb is live but the scene has no deform_bg table. The contract: "a remapped layer needs something to vary (its own curve, or a live dsb with a deform_bg table, or the scene anchor's live dsb with a deform_bg table), else the remap is the identity and the effect is ABSENT"
+
+stdout | test/formats/effects-row-remap.test.ts > the three scene() preconditions, answered from the open document > reports every unmet condition, not the first
+--- all three unmet ---
+nothing for the remap to vary: no curve on this strip; its dsb is 4 but the scene has no deform_bg table; no scene anchor. The contract: "a remapped layer needs something to vary (its own curve, or a live dsb with a deform_bg table, or the scene anchor's live dsb with a deform_bg table), else the remap is the identity and the effect is ABSENT"
+this scene declares no anchor, and the remap takes its channel from the scene's own anchor rather than from the strip. The contract: "the scene MUST declare anchor"
+strip 4 also carries a row remap. The contract: "at most ONE layer per scene may carry rowRemap"
+
+ ✓ test/formats/effects-row-remap.test.ts (39 tests) 40ms
+ ✓ src/core/level-classic/__tests__/s1-art-save-width.test.ts (10 tests) 38ms
+ ✓ src/core/formats/games/__tests__/s1-art-write-delta.test.ts (5 tests) 35ms
+stderr | src/renderer/agent/__tests__/agent-handler.classic.test.ts > classic-save-project > reports a conflict as a tool ERROR, not a result
+[toast] Save aborted; nothing was written. This was deleted on disk after Aurora read it: map16/b.eni. Reloading will not bring back a file that was deleted.
+
+stderr | src/renderer/agent/__tests__/agent-handler.classic.test.ts > classic-save-project > reports a partial write as a tool ERROR, not a result
+[toast] Save incomplete: write failed at map16/b.eni; 0 file(s) saved, 1 not. Fix the error and save again.
+
+ ✓ src/renderer/agent/__tests__/agent-handler.classic.test.ts (65 tests) 38ms
+stderr | src/renderer/providers/__tests__/chunk-import-collision-answer.test.ts > chunk import: the author is told WHICH answer the collision lookup gave > NO PROFILES LOADED: the import is REFUSED, and no chunk arrives at all
+[toast] Import refused: this project's collision shape tables did not load, so nothing could be marked solid and every chunk would have come in as air. Nothing was imported and the project is unchanged. Aurora needs heightmaps.bin, angles.bin and solidity.bin together in one directory. It cannot list where it looked, because no project configuration is loaded.
+
+ ✓ src/renderer/providers/__tests__/chunk-import-collision-answer.test.ts (4 tests) 47ms
+ ✓ test/formats/aeon-build-path-currency.test.ts (3 tests) 24ms
+stderr | src/renderer/providers/__tests__/chunk-import-refuses-when-blind.test.ts > CASE A: the collision tables never loaded, so Import refuses > PREDICATE READ: collisionProfiles === null. Nothing is written and nothing is dirty
+[toast] Import refused: this project's collision shape tables did not load, so nothing could be marked solid and every chunk would have come in as air. Nothing was imported and the project is unchanged. Aurora needs heightmaps.bin, angles.bin and solidity.bin together in one directory. It looked in: games/sonic4/data/collision/base/, games/sonic4/data/collision/, data/collision/base/, data/collision/.
+
+stderr | src/renderer/providers/__tests__/chunk-import-refuses-when-blind.test.ts > CASE A: the collision tables never loaded, so Import refuses > PREDICATE READ: collisionProfiles === null. It does not even ask for the three files
+[toast] Import refused: this project's collision shape tables did not load, so nothing could be marked solid and every chunk would have come in as air. Nothing was imported and the project is unchanged. Aurora needs heightmaps.bin, angles.bin and solidity.bin together in one directory. It looked in: games/sonic4/data/collision/base/, games/sonic4/data/collision/, data/collision/base/, data/collision/.
+
+stderr | src/renderer/providers/__tests__/chunk-import-refuses-when-blind.test.ts > CASE A: the collision tables never loaded, so Import refuses > PREDICATE READ: collisionProfiles === null. The message names the tables and where it looked
+[toast] Import refused: this project's collision shape tables did not load, so nothing could be marked solid and every chunk would have come in as air. Nothing was imported and the project is unchanged. Aurora needs heightmaps.bin, angles.bin and solidity.bin together in one directory. It looked in: games/sonic4/data/collision/base/, games/sonic4/data/collision/, data/collision/base/, data/collision/.
+
+ ✓ src/renderer/providers/__tests__/chunk-import-refuses-when-blind.test.ts (5 tests) 47ms
+ ✓ test/sprite/s1-nonlevel-families.test.ts (51 tests) 38ms
+  [currency] sonic.asm @ f6ece657c1cf253404312137dfcb8ec15fa42318 blob 87a048e3f4a76e3dd44ab3fddc97855ef0cbfc0c (223962 chars)
+  [currency] _incObj/25, 37 Rings.asm @ f6ece657c1cf253404312137dfcb8ec15fa42318 blob faf451922c94b0259f7832bb0bb56eda67f0d6e2 (16777 chars)
+  [currency] _incObj/4B, 7C Giant Ring and Flash.asm @ f6ece657c1cf253404312137dfcb8ec15fa42318 blob 0e918d1cfb4b0e24c2cf7a7fc1f21591505da411 (6413 chars)
+  [currency] _incObj/17 GHZ Spiked Pole Helix.asm @ f6ece657c1cf253404312137dfcb8ec15fa42318 blob becca831fa34b51bee5d4ff417af1fd47af46f40 (7348 chars)
+  [currency] v_ani[0-9]_frame in _incObj @ s1disasm f6ece657c1cf253404312137dfcb8ec15fa42318: 3 file(s): 17 GHZ Spiked Pole Helix.asm | 25, 37 Rings.asm | 4B, 7C Giant Ring and Flash.asm
+ ✓ src/core/project/profiles/__tests__/s1-sync-anims.test.ts (12 tests) 39ms
+ ✓ src/renderer/components/art/__tests__/composer-collision-paste-mounted.test.ts (4 tests) 33ms
+ ✓ src/renderer/state/__tests__/canvas-file.test.ts (20 tests) 39ms
+ ✓ src/core/editing/__tests__/map-clipboard.test.ts (38 tests) 31ms
+ ✓ src/renderer/components/home/__tests__/typed-path-field-classic-resident.test.ts (7 tests) 31ms
+ ✓ test/compress/kosinski-encode.test.ts (11 tests) 45ms
+ ✓ test/sprite/s1-anim-sweep.test.ts (111 tests) 41ms
+ ✓ src/main/__tests__/mcp-routes.test.ts (8 tests) 24ms
+stderr | src/renderer/state/__tests__/aeon-save.test.ts > saveAeonProject > a write the main process refuses > does not report saved, keeps the act dirty, and reports the failure
+[file-io] refused write to unsafe project-relative path (escapes root): '../outside.bin'
+
+stderr | src/renderer/state/__tests__/aeon-save.test.ts > saveAeonProject > a write the main process refuses > does not report saved, keeps the act dirty, and reports the failure
+[file-io] refused write to unsafe project-relative path (escapes root): '../data/ojz/act1/section_0.objects.json'
+
+stderr | src/renderer/state/__tests__/aeon-save.test.ts > saveAeonProject > a write the main process refuses > does not report saved, keeps the act dirty, and reports the failure
+[toast] Save failed
+
+ ✓ src/renderer/state/__tests__/aeon-save.test.ts (12 tests) 29ms
+ ✓ test/formats/vsplit-two-writer-currency.test.ts (3 tests) 29ms
+ ✓ src/renderer/components/__tests__/paste-layers-grey-out.test.ts (12 tests) 24ms
+ ✓ src/core/project/__tests__/s1-adapter.test.ts (20 tests) 32ms
+stderr | test/collision/collision-cell-resolve.test.ts > resolvePlaneWords length contract > pads a short editable plane to the requested length instead of returning it as-is
+[COLLISION_PLANE_LENGTH] edit plane has 3 cell words; this section addresses 8: words 3..7 are missing and render as air. A producer wrote a plane of the wrong size.
+
+ ✓ test/collision/collision-cell-resolve.test.ts (22 tests) 31ms
+ ✓ src/core/formats/effects/__tests__/scene-ui.test.ts (29 tests) 27ms
+ ✓ src/renderer/components/__tests__/paste-hint-and-chosen.test.ts (11 tests) 32ms
+ ✓ test/formats/effects-preset-vectors.test.ts (50 tests) 29ms
+stderr | test/formats/aeon-json-trailing-newline.test.ts > F2: parse → serialize of aeon's on-disk files > section_4.meta.json round-trips with no byte lost: only contracted nulls added
+DISCREPANCY: /home/volence/sonic_hacks/aeon/games/sonic4/data/editor/ojz/act1/section_4.meta.json predates rasterRef; Aurora's next write adds exactly 1 explicit null(s) and changes nothing else
+
+stderr | test/formats/aeon-json-trailing-newline.test.ts > F2: parse → serialize of aeon's on-disk files > editor_bg_override.json round-trips up to the ruled trailer, and reports the on-disk state
+DISCREPANCY: /home/volence/sonic_hacks/aeon/games/sonic4/data/editor_bg_override.json does not end in "\n"; Aurora's next write adds exactly that byte
+
+ ✓ test/formats/aeon-json-trailing-newline.test.ts (11 tests) 26ms
+ ✓ test/art/atlas-migration.test.ts (4 tests) 24ms
+ ✓ src/core/level-classic/__tests__/render.test.ts (17 tests) 26ms
+ ✓ src/renderer/state/__tests__/bg-override-writeback.test.ts (4 tests) 33ms
+ ✓ test/editing/collision-word.test.ts (23 tests) 19ms
+stderr | src/renderer/state/__tests__/classic-save-art-width.test.ts > §1 a GHZ-shaped tile save writes one art file and still clears `tiles` > CONTROL: when A FAILS to land, `tiles` stays dirty even though B is unchanged
+[toast] Save incomplete: write failed at artnem/split-a.nem; 0 file(s) saved, 1 not. Fix the error and save again.
+
+ ✓ src/renderer/state/__tests__/classic-save-art-width.test.ts (13 tests) 21ms
+stdout | test/renderer/no-raw-hex.test.ts > design-token guardrail > has no more than 0 raw hex literals in src/renderer
+[guardrail] raw hex literals in src/renderer = 0 (ceiling 0)
+
+ ✓ test/renderer/no-raw-hex.test.ts (1 test) 24ms
+ ✓ src/core/formats/classic/__tests__/s1-binary.test.ts (24 tests) 21ms
+ ✓ test/formats/fg-page-frame-currency.test.ts (6 tests) 24ms
+ ✓ src/core/art/__tests__/sheet-import.test.ts (7 tests) 26ms
+ ✓ src/main/aether/__tests__/socket-dead-link.test.ts (7 tests) 31ms
+ ✓ src/renderer/providers/__tests__/effects-preset-ramp-control.test.ts (36 tests) 25ms
+ ✓ src/renderer/components/__tests__/type-scale.test.ts (4 tests) 23ms
+ ✓ src/core/art/__tests__/classic-surface-plan.test.ts (22 tests) 23ms
+ ✓ src/core/level-classic/__tests__/object-sprite.test.ts (19 tests) 31ms
+ ✓ src/core/model/__tests__/screen.test.ts (3 tests) 23ms
+ ✓ test/collision/crossover-span.test.ts (15 tests) 26ms
+ ✓ src/renderer/components/effects/__tests__/preset-lag-disclosure.test.ts (29 tests) 33ms
+ ✓ src/core/level-classic/__tests__/s1-anim-cells.test.ts (11 tests) 29ms
+ ✓ src/core/art/__tests__/indexed-png-encode.test.ts (11 tests) 27ms
+ ✓ src/core/level-classic/__tests__/s1-object-anim.test.ts (11 tests) 25ms
+stderr | test/config/editor-dest-fields.test.ts > legacy-atlas truncation guard > spares the atlas when a zone pointer still names it
+[load] chunks_tiles.bin is non-empty but the chunk library is empty: skipping atlas migration (nothing references those tiles)
+
+ ✓ test/config/editor-dest-fields.test.ts (20 tests) 25ms
+stderr | src/renderer/components/sprite/__tests__/edit-art-handoff.test.ts > editObjectArtCheckout > with no level open, a ZONE-SCOPED id is a no-op (nothing to resolve against)
+[toast] Open a classic level before editing object art
+
+ ✓ src/renderer/components/sprite/__tests__/edit-art-handoff.test.ts (34 tests) 24ms
+ ✓ test/formats/effects-reels-panel.test.ts (36 tests) 26ms
+stderr | src/renderer/state/__tests__/object-art-failure-notice.test.ts > an art file the author cannot read produces a notice, not a silent hex box > END TO END: the real builder, a failed batch read, and a notice carrying the errno
+[object-art] Crabmeat ($1F) in ghz could not be drawn: 'artnem/Enemy Crabmeat.nem' could not be read: EACCES: permission denied, open 'artnem/Enemy Crabmeat.nem'
+
+stderr | src/renderer/state/__tests__/object-art-failure-notice.test.ts > an art file the author cannot read produces a notice, not a silent hex box > END TO END: the real builder, a failed batch read, and a notice carrying the errno
+[toast] 1 object sprite could not be drawn and show as their id box instead of their art: Crabmeat ($1F). 'artnem/Enemy Crabmeat.nem' could not be read: EACCES: permission denied, open 'artnem/Enemy Crabmeat.nem'
+
+stderr | src/renderer/state/__tests__/object-art-failure-notice.test.ts > an art file the author cannot read produces a notice, not a silent hex box > a whole refresh of failures is ONE notice, naming some and counting the rest
+[object-art] $02 in ghz could not be drawn: disk on fire
+[object-art] $03 in ghz could not be drawn: disk on fire
+[object-art] $04 in ghz could not be drawn: disk on fire
+
+stderr | src/renderer/state/__tests__/object-art-failure-notice.test.ts > an art file the author cannot read produces a notice, not a silent hex box > a whole refresh of failures is ONE notice, naming some and counting the rest
+[toast] 3 object sprites could not be drawn and show as their id box instead of their art: $02, $03, $04. disk on fire
+
+stderr | src/renderer/state/__tests__/object-art-failure-notice.test.ts > an art file the author cannot read produces a notice, not a silent hex box > STILL one notice when the failures arrive at different times
+[object-art] $02 in ghz could not be drawn: build 2 broke
+
+stderr | src/renderer/state/__tests__/object-art-failure-notice.test.ts > an art file the author cannot read produces a notice, not a silent hex box > STILL one notice when the failures arrive at different times
+[object-art] $03 in ghz could not be drawn: build 3 broke
+
+stderr | src/renderer/state/__tests__/object-art-failure-notice.test.ts > an art file the author cannot read produces a notice, not a silent hex box > STILL one notice when the failures arrive at different times
+[object-art] $04 in ghz could not be drawn: build 4 broke
+
+stderr | src/renderer/state/__tests__/object-art-failure-notice.test.ts > an art file the author cannot read produces a notice, not a silent hex box > STILL one notice when the failures arrive at different times
+[toast] 3 object sprites could not be drawn and show as their id box instead of their art: $02, $03, $04. build 2 broke
+
+stderr | src/renderer/state/__tests__/object-art-failure-notice.test.ts > an art file the author cannot read produces a notice, not a silent hex box > the DIRECT path (a thumbnail, a preview) notices too
+[object-art] $02 in ghz could not be drawn: thumb build broke
+
+stderr | src/renderer/state/__tests__/object-art-failure-notice.test.ts > an art file the author cannot read produces a notice, not a silent hex box > the DIRECT path (a thumbnail, a preview) notices too
+[toast] 1 object sprite could not be drawn and show as their id box instead of their art: $02. thumb build broke
+
+ ✓ src/renderer/state/__tests__/object-art-failure-notice.test.ts (5 tests) 21ms
+stderr | src/renderer/components/sprite/__tests__/s1-open-refusal.test.ts > openDiscoveredSet: Spring per-frame art swap > frames 3-5 draw Nem_VSpring (hand-derived pixels); frames 0-2 keep Nem_HSpring; save refuses honestly
+[toast] Spring can't save back in place: some of its frames draw from a different art file than the primary save target (the object swaps its art base per frame), so a single-file write would corrupt one of the two files. Editing and Export still work.
+
+ ✓ src/renderer/components/sprite/__tests__/s1-open-refusal.test.ts (4 tests) 28ms
+ ✓ src/renderer/state/__tests__/band-art-undo-stack.test.ts (6 tests) 29ms
+ ✓ test/formats/effects-schema-drift.test.ts (16 tests) 22ms
+ ✓ src/core/project/profiles/__tests__/s1-object-art.test.ts (21 tests) 23ms
+ ✓ test/art/composer-buffer.test.ts (23 tests) 29ms
+ ✓ test/collision/layer-transition.test.ts (22 tests) 27ms
+ ✓ src/renderer/agent/__tests__/agent-handler.chunk-links.test.ts (7 tests) 21ms
+ ✓ src/renderer/canvas/__tests__/raster-timeline.test.ts (48 tests) 23ms
+ ✓ src/renderer/canvas/__tests__/bg-wrap.test.ts (21 tests) 30ms
+ ✓ src/renderer/state/__tests__/import-sheet.test.ts (4 tests) 23ms
+stderr | src/renderer/components/sprite/__tests__/s1-raw-grid-open.test.ts > openDiscoveredSet: raw tile grids (Parcel C) > HUD Digits: read-only by design, a SPECIFIC refusal is recorded, and save surfaces it
+[toast] HUD_Digits can't save back in place: its frames are synthesized cells of a raw tile grid (the engine blits this art with no mappings file), and grid save-back isn't wired. Editing and Export still work.
+
+ ✓ src/renderer/components/sprite/__tests__/s1-raw-grid-open.test.ts (4 tests) 22ms
+ ✓ test/formats/effects-preset-schema-drift.test.ts (16 tests) 24ms
+ ✓ src/core/formats/classic/__tests__/enigma.test.ts (12 tests) 27ms
+stderr | src/core/project/aeon/__tests__/save-removals.test.ts > the load records WHICH files it actually read > keeps a file it could NOT parse out of loadedPaths: the loader will not overwrite it and the save must not delete it either
+[effects] data/editor/effects/broken.json could not be read as an effects scene: broken.json is not valid JSON: Expected ',' or '}' after property value in JSON at position 29 (line 1 column 30)
+
+stderr | src/core/project/aeon/__tests__/save-removals.test.ts > the refused subtraction is load-bearing at the effects call sites > SCENES: a loader that admitted a refused path to loadedPaths still does not get it deleted
+[effects] data/editor/effects/broken.json could not be read as an effects scene: broken.json is not valid JSON: Unterminated string in JSON at position 73 (line 4 column 39)
+
+stderr | src/core/project/aeon/__tests__/save-removals.test.ts > the refused subtraction is load-bearing at the effects call sites > RASTER PRESETS: a loader that admitted a refused path to loadedPaths still does not get it deleted
+[effects] data/editor/effects/presets/broken_p.json could not be read as a raster preset: broken_p.json is not valid JSON: Unterminated string in JSON at position 129 (line 8 column 6)
+
+ ✓ src/core/project/aeon/__tests__/save-removals.test.ts (17 tests) 22ms
+ ✓ src/renderer/state/__tests__/classic-placement.test.ts (9 tests) 21ms
+stderr | src/renderer/state/__tests__/aeon-save-removals.test.ts > saveAeonProject: the removal step > unlinks the dropped scene, and only it
+[aeon-save] removed scene "victim": data/editor/effects/victim.json
+
+stderr | src/renderer/state/__tests__/aeon-save-removals.test.ts > saveAeonProject: the removal step > performs every WRITE before any DELETE
+[aeon-save] removed scene "victim": data/editor/effects/victim.json
+
+stderr | src/renderer/state/__tests__/aeon-save-removals.test.ts > saveAeonProject: the removal step > SAYS what it removed, on the line that says the save happened
+[aeon-save] removed scene "victim": data/editor/effects/victim.json
+
+stderr | src/renderer/state/__tests__/aeon-save-removals.test.ts > saveAeonProject: the removal step > adopts the plan ledger, so a scene written THIS session becomes removable
+[aeon-save] removed scene "born": data/editor/effects/born.json
+
+stderr | src/renderer/state/__tests__/aeon-save-removals.test.ts > saveAeonProject: the removal step > keeps a removal that FAILED in the ledger, reports it on the error channel, and retries it on the next save
+[aeon-save] could NOT remove scene "victim" at data/editor/effects/victim.json: EPERM: not permitted
+[toast] Project saved, but 1 deleted document could not be removed from disk: data/editor/effects/victim.json. They will be retried on the next save; each reason is in the developer console.
+
+stderr | src/renderer/state/__tests__/aeon-save-removals.test.ts > saveAeonProject: the removal step > keeps a removal that FAILED in the ledger, reports it on the error channel, and retries it on the next save
+[aeon-save] removed scene "victim": data/editor/effects/victim.json
+
+stderr | src/renderer/state/__tests__/aeon-save-removals.test.ts > saveAeonProject: the removal step > treats an ALREADY-ABSENT file as a success: somebody else reached the same end state
+[aeon-save] removed scene "victim": data/editor/effects/victim.json (it was already gone)
+
+ ✓ src/renderer/state/__tests__/aeon-save-removals.test.ts (7 tests) 21ms
+ ✓ src/core/level-classic/__tests__/model.test.ts (42 tests) 29ms
+ ✓ src/core/art/__tests__/zlib-stream.test.ts (2 tests) 21ms
+stdout | test/agent/paint-collision-reconcile.test.ts > [m1] words + plane:"both": per-cell words, each plane merged against ITS OWN word > writes the same per-cell picture to both planes and keeps each plane's own crossover
+[m1] words+both+keep, after:
+    A: $B001/to-b $B002/to-b $B003/to-b $B004/to-b
+    B: $7001/to-a $7002/to-a $7003/to-a $7004/to-a
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m1] words + plane:"both": per-cell words, each plane merged against ITS OWN word > a null cell is skipped on BOTH planes, and skipped counts CELLS once
+[m1n] words=[12289,null,null,12292]  skipped=2
+     after:
+    A: $B001/to-b $B00B/to-b $B00B/to-b $B004/to-b
+    B: $7001/to-a $7016/to-a $7016/to-a $7004/to-a
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m2] words + crossover: per cell, and only on the cells it writes > hand-off on plane A marks every WRITTEN cell with to-b, and no skipped one
+[m2-a] hand-off, words=[12289,null,12291,12292]
+    (0,0)=to-b (1,0)=to-b (0,1)=to-b (1,1)=to-b
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m2] words + crossover: per cell, and only on the cells it writes > hand-off on plane B marks every WRITTEN cell with to-a, and no skipped one
+[m2-b] hand-off, words=[12289,null,12291,12292]
+    (0,0)=to-a (1,0)=to-a (0,1)=to-a (1,1)=to-a
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m2] words + crossover: per cell, and only on the cells it writes > clear erases the crossover of every WRITTEN cell and of no skipped one
+[m2c] clear, words=[12289,null,12291,12292]
+    (0,0)=none (1,0)=to-b (0,1)=none (1,1)=none
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m3] words + both + hand-off: one call, both halves of a two-way loop > writes the OTHER plane's value on the other plane, per cell, and never a self-mark
+[m3] words+both+hand-off, after:
+    A: $B001/to-b $300B/none $B003/to-b $B004/to-b
+    B: $7001/to-a $3016/none $7003/to-a $7004/to-a
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m3] words + both + hand-off: one call, both halves of a two-way loop > the per-cell form and the fill form agree wherever the words are uniform
+[m3=] fill form:
+    A: $B007/to-b $B007/to-b $B007/to-b $B007/to-b
+    B: $7007/to-a $7007/to-a $7007/to-a $7007/to-a
+[m3=] cell form:
+    A: $B007/to-b $B007/to-b $B007/to-b $B007/to-b
+    B: $7007/to-a $7007/to-a $7007/to-a $7007/to-a
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m4] bits 15:14 inside a words[] value are IGNORED > a words value carrying to-b does not put to-b in a destination that had none
+[m4] words[i]=$B005 (to-b) → dest $3005 (none)
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m4] bits 15:14 inside a words[] value are IGNORED > so a read → write OVER ITSELF is exact even with crossovers present
+[m4=] round trip over itself: words=[45059,12292,45061,0] entries=0 crossoverCells=2
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m4] bits 15:14 inside a words[] value are IGNORED > but a read → write SOMEWHERE ELSE moves the picture and not the crossover
+[m4x] copied to (2,2): $3003 (none) from $B003 (to-b)
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m5] get_collision_region refuses plane:"both", in prose > refuses "both" and SAYS WHY: the asymmetry with paint_collision is named
+[m5] refusal: get_collision_region reads ONE plane: pass plane "a" or "b", not "both". paint_collision accepts "both" because a WRITE can touch two planes in one undo step, but a read of "both" would have to merge the two planes into one grid (the same flattening this method already refuses for a cell whose four 8px sub-tiles disagree, where it reports null rather than sampling one of them) or return two grids, which would make the reply shape depend on a parameter and leave "words" (the array paint_collision takes straight back) with no single value. Call it twice.
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m7] the wire schema admits exactly the combinations this parcel decided > accepts every legal FORM x PLANE x CROSSOVER combination
+[m7] paint_collision schema accepted 24 form x plane x crossover combinations
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m7] the wire schema admits exactly the combinations this parcel decided > the read's plane param EXPLAINS the asymmetry, because a schema error will not
+[m7d] plane.describe(): collision plane to read: "a" or "b". NOT "both": paint_collision accepts "both" because a write can touch two planes in one undo step, but a READ of "both" has no honest single answer: it would have to merge the two planes into one grid (the same flattening this method already refuses one level down, where a cell whose four 8px sub-tiles disagree reports null instead of a sampled guess) or return two grids, which would make the reply shape depend on a parameter and leave "words" ambiguous. Call it twice; the two replies say it exactly.
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m7] the wire schema admits exactly the combinations this parcel decided > paint_collision's description STATES what each combination means
+[m7p] paint_collision description (2278 chars)
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m8] get_collision_region reports the crossover by name > names none / to-a / to-b / reserved, and counts them
+[m8] 0:none 1:to-b 2:to-a 3:reserved crossoverCells=3 cellsWithUnownedBits=3
+
+stdout | test/agent/paint-collision-reconcile.test.ts > [m8] get_collision_region reports the crossover by name > a mixed cell has no crossover field, and is still counted when a sub-tile carries one
+[m8m] mixed cell: {"word":null,"mixed":true,"sub":[12291,12291,12291,45059]} crossoverCells=1
+
+ ✓ test/agent/paint-collision-reconcile.test.ts (25 tests) 16ms
+stderr | test/formats/effects-preset.test.ts > the preset library > an UNREADABLE file is loud, is not a preset, and is never overwritten
+[effects] games/sonic4/data/editor/effects/presets/broken.json could not be read as a raster preset: broken.json is not valid JSON: Expected property name or '}' in JSON at position 2 (line 1 column 3)
+
+stderr | test/formats/effects-preset.test.ts > the preset library > a preset whose id disagrees with its filename lands in unreadable, not presets
+[effects] games/sonic4/data/editor/effects/presets/renamed.json could not be read as a raster preset: renamed.json declares "id": "minimal"; the filename stem and the id must match. The id becomes an .emp label component and the filename is how a human finds the file, so aeon's loader refuses a mismatch.
+
+ ✓ test/formats/effects-preset.test.ts (60 tests) 27ms
+ ✓ src/core/formats/effects/__tests__/layer-shift-derivation.test.ts (7 tests) 26ms
+stderr | src/core/project/aeon/__tests__/aeon-effects-scenes.test.ts > loadAeonProject: the effects-scene library > records an unreadable scene file loudly and does NOT return it as a scene
+[effects] data/editor/effects/broken.json could not be read as an effects scene: broken.json is not valid JSON: Expected ',' or '}' after property value in JSON at position 29 (line 1 column 30)
+
+stderr | src/core/project/aeon/__tests__/aeon-effects-scenes.test.ts > buildAeonSavePlan: the effects-scene library > plans no write for an unreadable scene file, and still saves the good one beside it
+[effects] data/editor/effects/broken.json could not be read as an effects scene: broken.json is not valid JSON: Expected ',' or '}' after property value in JSON at position 29 (line 1 column 30)
+
+stderr | src/core/project/aeon/__tests__/aeon-effects-scenes.test.ts > buildAeonSavePlan: the effects-scene library > refuses the whole save when an authored scene id collides with an unreadable file
+[effects] data/editor/effects/broken.json could not be read as an effects scene: broken.json is not valid JSON: Expected ',' or '}' after property value in JSON at position 29 (line 1 column 30)
+
+ ✓ src/core/project/aeon/__tests__/aeon-effects-scenes.test.ts (11 tests) 19ms
+ ✓ src/renderer/providers/__tests__/bg-anim-aeon.ship-silent.test.ts (24 tests) 18ms
+ ✓ test/formats/effects-scene-bob.test.ts (28 tests) 18ms
+ ✓ test/agent/budget.test.ts (11 tests) 22ms
+ ✓ test/formats/bg-override-view.test.ts (10 tests) 18ms
+ ✓ src/renderer/components/classic/__tests__/classic-surface.test.ts (24 tests) 23ms
+ ✓ src/renderer/providers/__tests__/bg-anim-aeon.section-budget.test.ts (17 tests) 18ms
+stderr | src/main/__tests__/file-io-guards.test.ts > writeProjectFile applies the guard > refuses a `..` path whose target really exists, and does not touch it
+[file-io] refused write to unsafe project-relative path (escapes root): '../outside.bin'
+
+stderr | src/main/__tests__/file-io-guards.test.ts > writeProjectFile applies the guard > refuses an absolute path
+[file-io] refused write to unsafe project-relative path (escapes root): '/tmp/aurora-fileio-guard-P3ra1u/outside.bin'
+
+stderr | src/main/__tests__/file-io-guards.test.ts > readBinaryFile applies the guard > refuses a `..` path whose target really exists, and returns no bytes
+[file-io] refused read of unsafe project-relative path (escapes root): '../outside.bin'
+
+stderr | src/main/__tests__/file-io-guards.test.ts > readBinaryFile applies the guard > refuses an absolute path to a file that really exists
+[file-io] refused read of unsafe project-relative path (escapes root): '/tmp/aurora-fileio-guard-gmlpBs/outside.bin'
+
+stderr | src/main/__tests__/file-io-guards.test.ts > readBinaryFile applies the guard > the refusal is not an ENOENT, in code or in wording
+[file-io] refused read of unsafe project-relative path (escapes root): '../outside.bin'
+
+ ✓ src/main/__tests__/file-io-guards.test.ts (32 tests) 21ms
+ ✓ test/collision/crossover-locus.test.ts (21 tests) 17ms
+ ✓ test/formats/aeon-ramp-sign-drift.test.ts (6 tests) 18ms
+stderr | test/formats/effects-scene.test.ts > effects scene library > reports an unreadable scene loudly and still loads its neighbours
+[effects] games/sonic4/data/editor/effects/broken.json could not be read as an effects scene: broken.json is not valid JSON: Expected double-quoted property name in JSON at position 29 (line 1 column 30)
+
+stderr | test/formats/effects-scene.test.ts > effects scene library > treats an id/filename mismatch as unreadable rather than silently renaming
+[effects] games/sonic4/data/editor/effects/canopy_dawn.json could not be read as an effects scene: canopy_dawn.json declares "id": "canopy_dusk"; the filename stem and the id must match (AURORA_EFFECTS_SCHEMA.md §2, Identity; the generator refuses a mismatch).
+
+ ✓ test/formats/effects-scene.test.ts (36 tests) 17ms
+ ✓ src/renderer/providers/__tests__/band-verbs.test.ts (13 tests) 18ms
+ ✓ test/support/aeon-shipped-preset.test.ts (19 tests) 21ms
+ ✓ src/renderer/canvas/__tests__/label-fit.test.ts (26 tests) 19ms
+ ✓ src/renderer/providers/__tests__/effects-preset-channels.test.ts (32 tests) 24ms
+ ✓ src/renderer/shell/__tests__/close-guard-seam.test.ts (10 tests) 17ms
+stderr | src/renderer/shell/__tests__/project-open-guard.test.ts > confirmProjectOpen > 'save' that leaves something still dirty resolves false and toasts an abort (no silent abort)
+[toast] Open cancelled: unsaved changes remain (save or discard them first). Unsaved aeon project edits are resident with no aeon project open, so Save cannot write them. Use Discard & open to drop them.
+
+stderr | src/renderer/shell/__tests__/project-open-guard.test.ts > confirmProjectOpen: SAVE over an aeon composer document > CONTROL: neuter the composer saver and the SAME flow aborts
+[toast] Open cancelled: unsaved changes remain (save or discard them first).
+
+stderr | src/renderer/shell/__tests__/project-open-guard.test.ts > confirmProjectOpen: SAVE over an aeon composer document > MIXED: Save is offered, and the abort names the part Save could not write
+[toast] Open cancelled: unsaved changes remain (save or discard them first). A tile document writes straight to the tileset, so the document-local changes stacked on top of it have nowhere to be saved. Use Discard & open to drop them.
+
+stderr | src/renderer/shell/__tests__/project-open-guard.test.ts > confirmProjectOpen over a dirty canvas > a canvas with NO file target blocks the open and gets its own sentence
+[toast] Open cancelled: unsaved changes remain (save or discard them first). 1 canvas(es) have no file yet, so Save cannot write them. Use Discard & open to drop them.
+
+stderr | src/renderer/shell/__tests__/project-open-guard.test.ts > confirmProjectOpen over a dirty canvas > a SAVEABLE canvas that failed to save gets the generic copy only
+[toast] Open cancelled: unsaved changes remain (save or discard them first).
+
+ ✓ src/renderer/shell/__tests__/project-open-guard.test.ts (30 tests) 17ms
+ ✓ src/renderer/shell/__tests__/confirm-before-destroying.test.ts (11 tests) 16ms
+ ✓ src/core/formats/games/__tests__/s1-art-write.test.ts (8 tests) 17ms
+ ✓ src/renderer/providers/__tests__/effects-preset-anchors.test.ts (43 tests) 18ms
+ ✓ src/core/collision/__tests__/collision-angle-mark.test.ts (44 tests) 21ms
+ ✓ src/renderer/providers/__tests__/effects-scene-anchor.test.ts (22 tests) 19ms
+ ✓ src/core/project/aeon/__tests__/palette-write-target.test.ts (9 tests) 17ms
+ ✓ src/renderer/canvas/__tests__/compose-nametable.test.ts (6 tests) 17ms
+ ✓ src/renderer/components/ui/__tests__/number-field-empty.test.ts (36 tests) 15ms
+ ✓ src/renderer/canvas/__tests__/loop-lens-wiring.test.ts (12 tests) 15ms
+ ✓ src/core/level-classic/__tests__/collision-write.test.ts (62 tests) 17ms
+ ✓ src/core/project/__tests__/editable-tiles.test.ts (6 tests) 14ms
+ ✓ test/formats/bg-override-default-off-switch.test.ts (17 tests) 16ms
+stderr | src/renderer/state/__tests__/project-runtime.test.ts > project runtime > a failing saver is reported but does not block the others
+[toast] Save failed (classic-level): disk on fire
+
+ ✓ src/renderer/state/__tests__/project-runtime.test.ts (26 tests) 14ms
+stderr | src/renderer/shell/__tests__/tab-activation.test.ts > activateLevelTarget aeon viewport snapshot/restore > refuses an act id the project does not have, and touches nothing
+[toast] Level not found in this project (ehz __none__)
+
+stderr | src/renderer/shell/__tests__/tab-activation.test.ts > activateLevelTarget aeon viewport snapshot/restore > refuses a zone the project does not have
+[toast] Level not found in this project (__gone__ act1)
+
+stderr | src/renderer/shell/__tests__/tab-activation.test.ts > requestCloseTab: sprite-doc documents > a FAILED save aborts the close instead of discarding the edits
+[toast] Close cancelled: the sprite art could not be saved.
+
+ ✓ src/renderer/shell/__tests__/tab-activation.test.ts (33 tests) 14ms
+ ✓ src/renderer/providers/__tests__/tile-picker-source.test.ts (27 tests) 16ms
+ ✓ src/renderer/components/__tests__/panel-headings.test.ts (55 tests) 15ms
+ ✓ test/formats/effects-preset-base-swap.test.ts (28 tests) 15ms
+ ✓ src/renderer/agent/__tests__/agent-handler.effects-preset.test.ts (17 tests) 16ms
+stderr | src/core/project/aeon/__tests__/aeon-load.plane-bound.test.ts > PLANE-BOUND-FROM-OWN-DATA: the plane bound is independent of the baseline > a SHORT baseline still yields a plane the consumers can index (no file present)
+[COLLISION_PLANE_LENGTH] engine plane has 65280 cell words; this section addresses 65536: words 65280..65535 are missing and render as air. A producer wrote a plane of the wrong size.
+
+stderr | src/core/project/aeon/__tests__/aeon-load.plane-bound.test.ts > PLANE-BOUND-FROM-OWN-DATA: the plane bound is independent of the baseline > a file sized for the SHORT BASELINE is still refused, and the reason names the section figure
+[load] data/z/a/section_0.collattr.bin exists but could not be read: collision plane is 130560 bytes; this section needs 131072
+
+stderr | src/core/project/aeon/__tests__/aeon-load.plane-bound.test.ts > PLANE-BOUND-FROM-OWN-DATA: the plane bound is independent of the baseline > a file sized for the SHORT BASELINE is still refused, and the reason names the section figure
+[COLLISION_PLANE_LENGTH] engine plane has 65280 cell words; this section addresses 65536: words 65280..65535 are missing and render as air. A producer wrote a plane of the wrong size.
+
+ ✓ src/core/project/aeon/__tests__/aeon-load.plane-bound.test.ts (7 tests) 14ms
+ ✓ src/core/art/__tests__/classic-surface-buffer.test.ts (15 tests) 12ms
+ ✓ src/core/project/profiles/__tests__/object-subtype-rules.test.ts (48 tests) 14ms
+ ✓ test/main/aether-adapter.test.ts (10 tests) 7ms
+ ✓ src/renderer/canvas/__tests__/camera-preview.test.ts (38 tests) 15ms
+ ✓ src/renderer/agent/__tests__/agent-handler.paint-priority.test.ts (11 tests) 14ms
+ ✓ src/renderer/state/__tests__/canvasStore.test.ts (46 tests) 14ms
+ ✓ test/sprite/s1-sonic-dplc.test.ts (7 tests) 14ms
+ ✓ test/formats/effects-channel-bands-drift.test.ts (7 tests) 15ms
+ ✓ src/renderer/components/__tests__/d27-act-and-drop-focus.test.ts (12 tests) 14ms
+ ✓ src/renderer/shell/__tests__/sprite-doc-activation.test.ts (40 tests) 16ms
+ ✓ src/core/art/__tests__/sheet-slice.test.ts (15 tests) 12ms
+ ✓ src/core/project/aeon/__tests__/section-file-ledger.test.ts (6 tests) 12ms
+ ✓ src/renderer/shell/__tests__/explorer-data.test.ts (29 tests) 9ms
+ ✓ src/renderer/providers/__tests__/effects-layer-shift.test.ts (22 tests) 12ms
+ ✓ test/main/guarded-write.test.ts (12 tests) 11ms
+ ✓ test/formats/fg-pool-ceiling-currency.test.ts (3 tests) 12ms
+ ✓ src/renderer/state/__tests__/history-routing.test.ts (26 tests) 15ms
+ ✓ src/core/anim/__tests__/sonic-animate.test.ts (15 tests) 8ms
+ ✓ src/renderer/providers/__tests__/bganim-band-status.test.ts (22 tests) 13ms
+ ✓ src/renderer/agent/__tests__/agent-handler.assign-section-preset.test.ts (22 tests) 15ms
+ ✓ src/renderer/providers/__tests__/effects-preset-boundary-control.test.ts (23 tests) 9ms
+ ✓ src/renderer/agent/__tests__/agent-handler.effects.test.ts (15 tests) 13ms
+stderr | src/main/__tests__/recent-projects.test.ts > a store Aurora could not read is not a store with nothing in it > a syntax error in the store survives the next project open
+[recents] /tmp/aurora-recents-TzbgOl/recent-projects.json exists but could not be read: invalid JSON: Unexpected token ']', ..."": 200 },
+]" is not valid JSON
+
+stderr | src/main/__tests__/recent-projects.test.ts > a store Aurora could not read is not a store with nothing in it > a JSON root that is not an array survives the next project open
+[recents] /tmp/aurora-recents-WGRLEX/recent-projects.json exists but could not be read: the root of the store is not a JSON array
+
+stderr | src/main/__tests__/recent-projects.test.ts > a store Aurora could not read is not a store with nothing in it > a store that cannot be READ but can be WRITTEN survives the next project open
+[recents] /tmp/aurora-recents-D9ViUf/recent-projects.json exists but could not be read: EACCES: permission denied, open '/tmp/aurora-recents-D9ViUf/recent-projects.json'
+
+stderr | src/main/__tests__/recent-projects.test.ts > a store Aurora could not read is not a store with nothing in it > removeRecentProject removes NOTHING when it cannot read the store
+[recents] /tmp/aurora-recents-lkIt4s/recent-projects.json exists but could not be read: invalid JSON: Unexpected token ']', ..."": 200 }, ]" is not valid JSON
+
+stderr | src/main/__tests__/recent-projects.test.ts > a store Aurora could not read is not a store with nothing in it > CONTROL: a readable store carrying one junk row is still written, and the good row survives
+[recents] /tmp/aurora-recents-Uctkhi/recent-projects.json: 1 row(s) named no project and were ignored
+
+stderr | src/main/__tests__/recent-projects.test.ts > a store Aurora could not read is not a store with nothing in it > says WHICH of the three answers it was, and an empty list is two different facts
+[recents] /tmp/aurora-recents-GSDkqt/recent-projects.json exists but could not be read: the root of the store is not a JSON array
+
+stderr | src/main/__tests__/recent-projects.test.ts > a store Aurora could not read is not a store with nothing in it > the refusal names the file, says the list is intact, and says what to do
+[recents] /tmp/aurora-recents-tGiqW5/recent-projects.json exists but could not be read: invalid JSON: Unexpected token 'o', "nonsense" is not valid JSON
+
+ ✓ src/main/__tests__/recent-projects.test.ts (18 tests) 11ms
+ ✓ src/renderer/state/__tests__/classic-failed-open.test.ts (10 tests) 12ms
+ ✓ src/renderer/components/__tests__/panel-scrollers.test.ts (110 tests) 14ms
+stderr | src/renderer/shell/__tests__/save-surface-vocabulary.test.ts > §2 a save that wrote something leaves a receipt; one that wrote nothing does not > a save that FAILED leaves no receipt, however much else ran
+[toast] Save failed (aeon-project): disk on fire
+
+ ✓ src/renderer/shell/__tests__/save-surface-vocabulary.test.ts (24 tests) 11ms
+ ✓ src/renderer/components/effects/__tests__/band-preset-wording.test.ts (32 tests) 11ms
+ ✓ test/harness-effects-control-aims.test.ts (7 tests) 10ms
+ ✓ test/formats/bg-override-contract-drift.test.ts (23 tests) 12ms
+ ✓ src/renderer/canvas/__tests__/row-remap-span.test.ts (21 tests) 11ms
+ ✓ src/renderer/components/guide/__tests__/guides.test.ts (11 tests) 8ms
+stdout | src/main/aether/__tests__/bridge-socket-path.test.ts > the status payload carries the socket it dialled > puts the resolved path on the connect handler’s return AND on the push
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.4.1 protocol 1 · 2 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/bridge-socket-path.test.ts > the status payload carries the socket it dialled > reports two different machines differently, on a field that is not implementation
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.4.1 protocol 1 · 2 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/bridge-socket-path.test.ts > the status payload carries the socket it dialled > reports two different machines differently, on a field that is not implementation
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.4.1 protocol 1 · 2 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/bridge-socket-path.test.ts > the status payload carries the socket it dialled > reports no socket at all once the link is deliberately torn down
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.4.1 protocol 1 · 2 methods served · build fb72abe+profile=release (vcs)
+
+ ✓ src/main/aether/__tests__/bridge-socket-path.test.ts (3 tests) 5ms
+  [pin] test/fixtures/s1disasm @ s1disasm f6ece657c1cf253404312137dfcb8ec15fa42318: 595 file(s), 0.993 MB, 0 drifted; subtrees: _Constants.asm _anim _maps Utility Project Files/SonLVL INI Files artnem artunc collide levels map16 map256 objpos palette sonic.asm startpos
+ ✓ test/formats/s1disasm-pin-currency.test.ts (3 tests) 12ms
+ ✓ test/formats/effects-preset-ramp.test.ts (25 tests) 11ms
+ ✓ src/renderer/components/__tests__/map-chords.test.ts (11 tests) 12ms
+ ✓ src/renderer/shell/__tests__/commands.test.ts (14 tests) 7ms
+ ✓ src/main/__tests__/registry-conformance.test.ts (10 tests) 9ms
+ ✓ src/core/project/aeon/__tests__/aeon-adapter.test.ts (17 tests) 11ms
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient handshake > sends initialize advertising events, THEN an initialized notification
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient handshake > records the raw limits and capabilities objects the server sent
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient framing > reads two messages arriving in one chunk
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient framing > reads one message split across chunks
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient calls > surfaces a JSON-RPC error as a rejection carrying the code
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient calls > rejects in-flight calls when the socket closes, instead of hanging forever
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient feature detection > answers hasMethod from the advertised list, never from a version guess
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient feature detection > reports no methods when disconnected instead of stale ones
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient events > delivers server notifications to subscribers
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient symbol resolution > resolves through lookup_symbol and caches the answer
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient symbol resolution > refuses an inexact hit rather than warping to a nearby label
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient symbol resolution > drops the cache on romReloaded
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient symbol resolution > offers resolve+displacement as arithmetic, not as a server param
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient status notification > announces a disconnect nobody asked for
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient status notification > announces reaching connected
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient status notification > does not announce a second disconnect for an already-dead client
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/client.test.ts > AetherClient status notification > unsubscribes cleanly
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.1.0 protocol 1 · 5 methods served · build fb72abe+profile=release (vcs)
+
+ ✓ src/main/aether/__tests__/client.test.ts (20 tests) 11ms
+ ✓ src/renderer/canvas/__tests__/priority-lens.test.ts (10 tests) 8ms
+ ✓ test/formats/effects-reels.test.ts (16 tests) 11ms
+stderr | src/core/project/aeon/__tests__/aeon-effects-presets.test.ts > buildAeonSavePlan: the raster-preset write-side refusal > refuses the save when an authored preset id collides with an unreadable preset file, and it is the RASTER PRESET guard that answers
+[effects] data/editor/effects/presets/broken_p.json could not be read as a raster preset: broken_p.json is not valid JSON: Unterminated string in JSON at position 129 (line 8 column 6)
+
+stderr | src/core/project/aeon/__tests__/aeon-effects-presets.test.ts > buildAeonSavePlan: the raster-preset write-side refusal > CONTROL: the same unreadable preset file plans a normal save when no authored id collides with it, so the refusal above is caused by the COLLISION
+[effects] data/editor/effects/presets/broken_p.json could not be read as a raster preset: broken_p.json is not valid JSON: Unterminated string in JSON at position 129 (line 8 column 6)
+
+ ✓ src/core/project/aeon/__tests__/aeon-effects-presets.test.ts (2 tests) 10ms
+ ✓ src/renderer/shell/__tests__/confirm-dialog-focus.test.ts (16 tests) 9ms
+ ✓ src/renderer/components/guide/__tests__/guide-route-claims.test.ts (31 tests) 11ms
+ ✓ src/renderer/components/__tests__/map-surface-listeners.test.ts (10 tests) 13ms
+ ✓ src/core/level-classic/__tests__/object-sprite-pri.test.ts (7 tests) 9ms
+ ✓ src/renderer/components/__tests__/map-gesture-witness.test.ts (17 tests) 13ms
+ ✓ src/renderer/providers/__tests__/effects-preset-colours.test.ts (31 tests) 10ms
+ ✓ test/formats/effects-scene-golden.test.ts (9 tests) 8ms
+ ✓ src/renderer/agent/__tests__/agent-handler.bg-binding.test.ts (14 tests) 8ms
+stderr | src/renderer/shell/__tests__/project-open-guard.dirty-domains.test.ts > DIRTY-DOMAINS-ASSUMED-SAVABLE: a dirty aeon project under an open classic one > MIXED: Save is still offered for the savable half, and the abort NAMES the aeon half
+[toast] Open cancelled: unsaved changes remain (save or discard them first). Unsaved aeon project edits are resident while a CLASSIC project is open, so the aeon saver skips them and Save cannot write them. Use Discard & open to drop them.
+
+ ✓ src/renderer/shell/__tests__/project-open-guard.dirty-domains.test.ts (8 tests) 9ms
+ ✓ test/config/failure-class-wiring.test.ts (11 tests) 4ms
+ ✓ test/sprite/adapters/asm-data.test.ts (4 tests) 6ms
+ ✓ test/formats/effects-scene-curve-vsplit.test.ts (9 tests) 10ms
+ ✓ src/renderer/providers/__tests__/parallax-preview.test.ts (22 tests) 6ms
+ ✓ src/renderer/state/__tests__/classicProjectStore.test.ts (15 tests) 11ms
+ ✓ src/core/level-classic/__tests__/s1-anim-art.test.ts (20 tests) 11ms
+ ✓ test/sprite/s1-multi-source-pool.test.ts (5 tests) 9ms
+ ✓ src/core/project/aeon/__tests__/save-compare-tags.test.ts (5 tests) 12ms
+ ✓ src/core/project/aeon/__tests__/aeon-save.rasterref-absent.test.ts (4 tests) 8ms
+ ✓ test/formats/aeon-vsram-mode-drift.test.ts (7 tests) 10ms
+ ✓ test/editing/map-stamp.test.ts (7 tests) 6ms
+ ✓ src/core/project/aeon/__tests__/chunk-library-clear-save.test.ts (2 tests) 7ms
+stderr | src/renderer/state/__tests__/classic-save.test.ts > saveClassicProject orchestrator > on partial batch: refreshes the landed mtimes, toasts the failed path, returns partial
+[toast] Save incomplete: write failed at b.bin; 1 file(s) saved, 1 not. Fix the error and save again.
+
+stderr | src/renderer/state/__tests__/classic-save.test.ts > saveClassicProject orchestrator > on conflict: posts the conflict notice and does not refresh mtimes
+[toast] Save aborted; nothing was written. This was deleted on disk after Aurora read it: a.bin. Reloading will not bring back a file that was deleted.
+
+stderr | src/renderer/state/__tests__/classic-save.test.ts > saveClassicProject orchestrator > CONTROL: a genuinely CHANGED file still gets the reload advice, so the row above is not just 'advice deleted'
+[toast] Save aborted; nothing was written. This changed on disk after Aurora read it: a.bin. Reload the project to pick up the external changes.
+
+ ✓ src/renderer/state/__tests__/classic-save.test.ts (22 tests) 11ms
+ ✓ src/renderer/__tests__/debug-level-edit.test.ts (20 tests) 9ms
+ ✓ src/renderer/shell/__tests__/save-contract.test.ts (12 tests) 9ms
+ ✓ src/main/aether/__tests__/s1-warp.test.ts (29 tests) 7ms
+ ✓ src/renderer/providers/__tests__/band-coverage.test.ts (40 tests) 9ms
+stdout | test/support/s1-checkout.test.ts > S1_GLOBAL_REQUIRED_KEYS is measured against read(), not asserted > is exactly the set of GLOBAL entries whose absence makes read() refuse BY NAME
+[O45] global entry → read() refusal:
+  collision.normal: the shared collision table 'collision.normal', which EVERY act needs: 1 required file(s) not in this s1disasm checkout under /nonexistent/o45-fake-s1disasm: collide/Collision Array (Normal).bin (entry 'collision.normal'). This tree opened as an s1disasm project and then did not hold this data, so it is an INCOMPLETE checkout rather than a defect in what reads it.
+  collision.rotated: Nemesis input too short for a header
+  collision.angleMap: the shared collision table 'collision.angleMap', which EVERY act needs: 1 required file(s) not in this s1disasm checkout under /nonexistent/o45-fake-s1disasm: collide/Angle Map.bin (entry 'collision.angleMap'). This tree opened as an s1disasm project and then did not hold this data, so it is an INCOMPLETE checkout rather than a defect in what reads it.
+
+stdout | test/support/s1-checkout.test.ts > the act guard covers what read() needs, not only what gates the act > s1ActRequiredFiles includes every globally required file
+[O45] s1ActRequiredFiles('ghz',1) = 13 file(s): artnem/8x8 - GHZ1.nem, artnem/8x8 - GHZ2.nem, map16/GHZ.eni, map256/GHZ.kos, collide/GHZ.bin, levels/ghz1.bin, levels/ghzbg.bin, objpos/ghz1.bin, startpos/ghz1.bin, palette/Sonic.bin, palette/Green Hill Zone.bin, collide/Collision Array (Normal).bin, collide/Angle Map.bin
+
+ ✓ test/support/s1-checkout.test.ts (7 tests) 7ms
+ ✓ src/renderer/shell/__tests__/unsaved-after-close.test.ts (15 tests) 7ms
+ ✓ src/core/art/__tests__/canvas-default-palette.test.ts (13 tests) 6ms
+ ✓ test/editing/map-paste.test.ts (8 tests) 6ms
+stderr | test/formats/effects-preset-guard-residue.test.ts > the preset library, at the two places the plants got through > PLANT PR49: an UNREADABLE path is never recorded as loaded
+[effects] games/sonic4/data/editor/effects/presets/broken.json could not be read as a raster preset: broken.json is not valid JSON: Expected property name or '}' in JSON at position 2 (line 1 column 3)
+
+ ✓ test/formats/effects-preset-guard-residue.test.ts (19 tests) 9ms
+ ✓ src/renderer/components/effects/__tests__/band-static-base-bound.test.ts (9 tests) 9ms
+ ✓ src/renderer/canvas/__tests__/effects-guides.test.ts (38 tests) 10ms
+stderr | src/core/project/aeon/__tests__/notice-severity.test.ts > load notices carry a producer-assigned severity > markUnreadable: a section file that exists and will not read is NOT a success
+[load] data/ojz/act1/section_0.objects.json exists but could not be read: Expected ',' or '}' after property value in JSON at position 18 (line 1 column 19)
+
+stderr | src/core/project/aeon/__tests__/notice-severity.test.ts > the format libraries classify their own notices > an effects scene that will not parse is an error, not a success
+[effects] data/editor/effects/broken.json could not be read as an effects scene: broken.json is not valid JSON: Expected property name or '}' in JSON at position 2 (line 1 column 3)
+
+stderr | src/core/project/aeon/__tests__/notice-severity.test.ts > the format libraries classify their own notices > a raster preset that will not parse is an error, not a success
+[effects] data/editor/effects/presets/broken.json could not be read as a raster preset: broken.json is not valid JSON: Expected property name or '}' in JSON at position 2 (line 1 column 3)
+
+ ✓ src/core/project/aeon/__tests__/notice-severity.test.ts (6 tests) 8ms
+ ✓ src/core/aether/__tests__/build-plan.test.ts (23 tests) 5ms
+ ✓ src/renderer/state/__tests__/collision-dispatch.test.ts (16 tests) 10ms
+ ✓ src/renderer/workspace/__tests__/facet-tools.test.ts (27 tests) 7ms
+ ✓ src/renderer/agent/__tests__/agent-handler.chunk-stamp-zones.test.ts (2 tests) 7ms
+ ✓ src/renderer/components/home/__tests__/typed-path-field-after-open.test.ts (14 tests) 6ms
+ ✓ src/main/aether/__tests__/warp.test.ts (19 tests) 7ms
+ ✓ src/renderer/state/__tests__/priority-lens-surface.test.ts (11 tests) 6ms
+ ✓ src/renderer/shell/__tests__/session-storage.test.ts (16 tests) 6ms
+ ✓ test/formats/section-chunk-links.test.ts (19 tests) 7ms
+ ✓ src/renderer/providers/__tests__/palette-aeon.test.ts (27 tests) 6ms
+ ✓ src/core/project/aeon/__tests__/aeon-load.fullblock-blindness.test.ts (2 tests) 6ms
+ ✓ test/formats/bg-tiles.test.ts (13 tests) 7ms
+ ✓ src/renderer/components/__tests__/map-teardown.test.ts (4 tests) 9ms
+ ✓ test/renderer/bganim-preview-overlay.test.ts (10 tests) 7ms
+ ✓ test/art/pixel-edit-controller.test.ts (19 tests) 5ms
+ ✓ test/collision/collision-region-read.test.ts (21 tests) 7ms
+stderr | src/renderer/state/__tests__/classic-sidecar-seed.test.ts > the open-time build-field seed refuses an unreadable sidecar > unreadable ⇒ writeSidecar is never called
+[toast] .aurora/project.json could not be read, so Aurora left it alone instead of overwriting it. the Build & Run settings were NOT written. Fix that file by hand (it must be a valid JSON object) and reopen the project.
+
+stderr | src/renderer/state/__tests__/classic-sidecar-seed.test.ts > the open-time build-field seed refuses an unreadable sidecar > invalid JSON ⇒ writeSidecar is never called
+[toast] .aurora/project.json could not be read, so Aurora left it alone instead of overwriting it. the Build & Run settings were NOT written. Fix that file by hand (it must be a valid JSON object) and reopen the project.
+
+stderr | src/renderer/state/__tests__/classic-sidecar-seed.test.ts > the open-time build-field seed refuses an unreadable sidecar > a non-object JSON root ⇒ writeSidecar is never called
+[toast] .aurora/project.json could not be read, so Aurora left it alone instead of overwriting it. the Build & Run settings were NOT written. Fix that file by hand (it must be a valid JSON object) and reopen the project.
+
+stderr | src/renderer/state/__tests__/classic-sidecar-seed.test.ts > the open-time build-field seed refuses an unreadable sidecar > unreadable ⇒ the user is told, in the session, not only on a tab they may never open
+[toast] .aurora/project.json could not be read, so Aurora left it alone instead of overwriting it. the Build & Run settings were NOT written. Fix that file by hand (it must be a valid JSON object) and reopen the project.
+
+stderr | src/renderer/state/__tests__/classic-sidecar-seed.test.ts > ipcClassicBridge.writeSidecar surfaces a write main refused > a refused path is reported, not swallowed
+[file-io] refused write to unsafe project-relative path (escapes root): '../project.json'
+
+ ✓ src/renderer/state/__tests__/classic-sidecar-seed.test.ts (11 tests) 9ms
+ ✓ test/support/storage-flush.test.ts (29 tests) 6ms
+ ✓ src/core/art/__tests__/palette-copy.test.ts (12 tests) 6ms
+ ✓ test/sprite/adapters/export-target-format.test.ts (3 tests) 7ms
+ ✓ test/docs/lane-records-are-strict-jsonl.test.ts (6 tests) 8ms
+ ✓ test/harness-classic-gated-rows.test.ts (7 tests) 10ms
+ ✓ src/renderer/components/classic/__tests__/classic-overlays.test.ts (16 tests) 9ms
+ ✓ src/renderer/providers/__tests__/properties-aeon.test.ts (25 tests) 8ms
+ ✓ test/sprite/sprite-decompose.test.ts (16 tests) 7ms
+stderr | src/renderer/state/__tests__/recents-notice.test.ts > the renderer says so when the recents store could not be read > an unreadable store produces an error toast naming the file and the repair
+[toast] Aurora could not read your recent-projects list (invalid JSON: Unexpected token }). Your list is still on disk and has NOT been changed, and Aurora will not record the projects you open until it can read it again. Fix or delete /home/u/.config/aurora/recent-projects.json, then restart Aurora.
+
+stderr | src/renderer/state/__tests__/recents-notice.test.ts > the renderer says so when the recents store could not be read > the open path says it too, because that is the write that used to destroy the file
+[toast] Aurora could not read your recent-projects list (EACCES: permission denied). Your list is still on disk and has NOT been changed, and Aurora will not record the projects you open until it can read it again. Fix or delete /home/u/.config/aurora/recent-projects.json, then restart Aurora.
+
+stderr | src/renderer/state/__tests__/recents-notice.test.ts > the renderer says so when the recents store could not be read > three surfaces listing the same store produce ONE toast, not three
+[toast] Aurora could not read your recent-projects list (EIO). Your list is still on disk and has NOT been changed, and Aurora will not record the projects you open until it can read it again. Fix or delete /home/u/.config/aurora/recent-projects.json, then restart Aurora.
+
+ ✓ src/renderer/state/__tests__/recents-notice.test.ts (5 tests) 6ms
+ ✓ src/core/project/profiles/__tests__/s1-object-presentation.test.ts (26 tests) 7ms
+ ✓ src/renderer/components/art-shared/__tests__/zoom-anchor.test.ts (27 tests) 7ms
+ ✓ src/core/art/__tests__/classic-tile-transform.test.ts (22 tests) 5ms
+ ✓ src/core/project/__tests__/mapping.test.ts (24 tests) 7ms
+ ✓ src/renderer/canvas/__tests__/raster-timeline-non-bands-preset.test.ts (44 tests) 11ms
+stderr | src/renderer/components/sprite/__tests__/save-all-toast-bound.test.ts > saveAllSpriteArt toast production is bounded > does not produce one toast per dirty document
+[save] doc:sprite:s1:11: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:0: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:1: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:2: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:3: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:4: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:5: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:6: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:7: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:8: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:9: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:10: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[toast] 12 sprite documents could not be fully saved: doc:sprite:s1:11, doc:sprite:s1:0, doc:sprite:s1:1, +9 more. Each one and its own reason is in the developer console.
+
+stderr | src/renderer/components/sprite/__tests__/save-all-toast-bound.test.ts > saveAllSpriteArt toast production is bounded > names the real number of failures, measured rather than asserted
+[save] doc:sprite:s1:6: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:0: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:1: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:2: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:3: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:4: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[save] doc:sprite:s1:5: Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+[toast] 7 sprite documents could not be fully saved: doc:sprite:s1:6, doc:sprite:s1:0, doc:sprite:s1:1, +4 more. Each one and its own reason is in the developer console.
+
+stderr | src/renderer/components/sprite/__tests__/save-all-toast-bound.test.ts > saveAllSpriteArt toast production is bounded > folds the COUNT and keeps every document its own reason
+[toast] 5 sprite documents could not be fully saved: doc:sprite:s1:4, doc:sprite:s1:0, doc:sprite:s1:1, +2 more. Each one and its own reason is in the developer console.
+
+stderr | src/renderer/components/sprite/__tests__/save-all-toast-bound.test.ts > saveAllSpriteArt toast production is bounded > keeps the exact message when exactly one document fails
+[toast] Frame add/remove isn't writable for S1 (opened undefined, now 1); revert frame changes to save art
+
+ ✓ src/renderer/components/sprite/__tests__/save-all-toast-bound.test.ts (4 tests) 7ms
+ ✓ src/renderer/state/__tests__/toast-stack.test.ts (14 tests) 6ms
+ ✓ src/renderer/canvas/__tests__/object-label-draw.test.ts (12 tests) 6ms
+ ✓ src/renderer/components/effects/__tests__/effects-wording.test.ts (24 tests) 8ms
+ ✓ test/formats/effects-factor-decode.test.ts (37 tests) 9ms
+ ✓ src/renderer/state/__tests__/aeon-doc-history.test.ts (9 tests) 7ms
+ ✓ test/formats/section-meta.test.ts (16 tests) 4ms
+ ✓ src/core/import/__tests__/sonic-anim-import.test.ts (7 tests) 8ms
+ ✓ src/core/art/__tests__/palette-suggest.test.ts (11 tests) 7ms
+ ✓ src/renderer/providers/__tests__/palette-classic.test.ts (18 tests) 5ms
+ ✓ test/sprite/sprite-anim-export.test.ts (19 tests) 6ms
+stderr | src/renderer/shell/__tests__/close-guard.test.ts > confirmAppClose > save that fails keeps the window open and says why
+[toast] Close cancelled: unsaved changes remain (save or discard them first).
+
+stderr | src/renderer/shell/__tests__/close-guard.test.ts > confirmAppClose > a MIXED save that leaves the unsavable drawing behind names it in the toast
+[toast] Close cancelled: unsaved changes remain (save or discard them first). A tile document writes straight to the tileset, so the document-local changes stacked on top of it have nowhere to be saved. Use Discard & close to drop them.
+
+ ✓ src/renderer/shell/__tests__/close-guard.test.ts (8 tests) 8ms
+ ✓ src/renderer/state/__tests__/spriteStore.test.ts (14 tests) 6ms
+ ✓ src/renderer/providers/__tests__/effects-preset-ramp-scroll-mode.test.ts (21 tests) 7ms
+ ✓ src/renderer/components/__tests__/map-flip.test.ts (17 tests) 8ms
+ ✓ src/renderer/shell/__tests__/project-open-door-census.test.ts (8 tests) 5ms
+ ✓ test/sprite/sprite-import.test.ts (8 tests | 1 skipped) 6ms
+ ✓ src/renderer/agent/__tests__/art-commit.test.ts (23 tests) 7ms
+ ✓ test/sprite/adapters/sprite-discovery.test.ts (4 tests) 7ms
+ ✓ src/renderer/components/canvas/__tests__/canvas-commit-model.test.ts (20 tests) 7ms
+ ✓ src/test/__tests__/render-harness-refusals.test.ts (7 tests) 4ms
+ ✓ src/renderer/components/classic/__tests__/composer-math.test.ts (19 tests) 5ms
+ ✓ src/main/aether/__tests__/server-identity.test.ts (14 tests) 5ms
+ ✓ src/renderer/components/__tests__/aether-badge-identity.test.ts (11 tests) 5ms
+ ✓ src/renderer/providers/__tests__/bg-display-resolution.test.ts (10 tests) 5ms
+ ✓ src/core/level-classic/__tests__/priority-mask.test.ts (10 tests) 6ms
+ ✓ test/sprite/sprite-export.test.ts (6 tests) 6ms
+ ✓ src/renderer/shell/__tests__/new-canvas.test.ts (26 tests) 6ms
+stderr | src/renderer/state/__tests__/aether-connect-refusal-visible.test.ts > F4 · a refused connect produces a response a person can see > the badge state is UNCHANGED across the refusal, which is why a toast is needed
+[toast] Aether: could not connect. Aether socket error: connect ENOENT /tmp/uxb-dead.sock
+
+stderr | src/renderer/state/__tests__/aether-connect-refusal-visible.test.ts > F4 · a refused connect produces a response a person can see > so the refusal reaches the toast channel, carrying the producer reason verbatim
+[toast] Aether: could not connect. Aether socket error: connect ENOENT /tmp/uxb-dead.sock
+
+stderr | src/renderer/state/__tests__/aether-connect-refusal-visible.test.ts > F4 · a refused connect produces a response a person can see > the OTHER refusal text seat B provoked reaches it identically
+[toast] Aether: could not connect. Aether socket path is 111 bytes; a unix socket path must be under 104. Set ORACLE_SOCKET to something shorter. Path: <the offending path, verbatim>
+
+stderr | src/renderer/state/__tests__/aether-connect-refusal-visible.test.ts > F4 · a refused connect produces a response a person can see > a refusal with no reason still speaks, and says the reason is missing
+[toast] Aether: could not connect. the main process reported no reason
+
+stderr | src/renderer/state/__tests__/aether-connect-refusal-visible.test.ts > F4 · a refused connect produces a response a person can see > a SECOND refused press speaks again rather than going quiet
+[toast] Aether: could not connect. Aether socket error: connect ENOENT /tmp/uxb-dead.sock
+
+stderr | src/renderer/state/__tests__/aether-connect-refusal-visible.test.ts > F4 · a refused connect produces a response a person can see > a SECOND refused press speaks again rather than going quiet
+[toast] Aether: could not connect. Aether socket error: connect ENOENT /tmp/uxb-dead.sock
+
+ ✓ src/renderer/state/__tests__/aether-connect-refusal-visible.test.ts (6 tests) 5ms
+ ✓ src/main/aether/__tests__/unserved.test.ts (10 tests) 7ms
+ ✓ src/main/aether/__tests__/push-palette.test.ts (21 tests) 7ms
+ ✓ test/collision/crossover-audit-bounds.test.ts (16 tests) 4ms
+ ✓ src/renderer/agent/__tests__/agent-handler.aeon-routing.test.ts (4 tests) 5ms
+ ✓ src/renderer/components/effects/__tests__/authoring-refusals.test.ts (22 tests) 6ms
+ ✓ src/renderer/components/art-shared/__tests__/zoom-cap.test.ts (8 tests) 7ms
+ ✓ src/renderer/providers/__tests__/object-inspector-classic.test.ts (14 tests) 6ms
+ ✓ src/core/project/__tests__/adapter.test.ts (12 tests) 5ms
+ ✓ test/editing/zone-commands.test.ts (15 tests) 6ms
+ ✓ src/renderer/shell/__tests__/tabs.test.ts (13 tests) 4ms
+ ✓ src/renderer/state/__tests__/classicObjectArtStore.test.ts (10 tests) 6ms
+ ✓ src/renderer/canvas/__tests__/region-preview.test.ts (5 tests) 5ms
+ ✓ src/renderer/workspace/__tests__/facet-chrome.test.ts (21 tests) 4ms
+ ✓ src/renderer/state/__tests__/aeon-open-over-classic.test.ts (7 tests) 6ms
+ ✓ src/core/editing/__tests__/band-stamp.test.ts (10 tests) 7ms
+ ✓ src/renderer/providers/__tests__/effects-preset-vdeform-ramp.test.ts (19 tests) 5ms
+ ✓ src/renderer/components/classic/__tests__/viewport-math.test.ts (49 tests) 7ms
+ ✓ test/sprite/s1-derived-frames.test.ts (6 tests) 6ms
+ ✓ src/renderer/components/effects/__tests__/base-swap-control-wording.test.ts (16 tests) 5ms
+ ✓ src/renderer/providers/__tests__/effects-sub-tabs.test.ts (12 tests) 7ms
+ ✓ src/main/__tests__/discovery-file.test.ts (9 tests) 5ms
+ ✓ src/renderer/shell/__tests__/agent-open-refusal.test.ts (5 tests) 7ms
+ ✓ test/art/usage.test.ts (4 tests) 5ms
+stdout | src/main/aether/__tests__/bridge-payload-census.test.ts > every field the status payload promises arrives ON THE PUSH > carries paletteUnservedMethod, so "never asked" cannot read as "no symbols in this ROM"
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.4.1 protocol 1 · 3 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/bridge-payload-census.test.ts > every field the status payload promises arrives ON THE PUSH > carries paletteUnservedMethod from the CLASSIC probe arm too
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.4.1 protocol 1 · 3 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/bridge-payload-census.test.ts > every field the status payload promises arrives ON THE PUSH > carries the server version
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.4.1 protocol 1 · 3 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/bridge-payload-census.test.ts > every field the status payload promises arrives ON THE PUSH > carries the advertised method list and the count measured at the wire
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.4.1 protocol 1 · 3 methods served · build fb72abe+profile=release (vcs)
+
+stdout | src/main/aether/__tests__/bridge-payload-census.test.ts > every field the status payload promises arrives ON THE PUSH > carries the identity warning for a lineage this build does not know
+[aether] handshake: oracle-zig (deployment name oracle-next) 0.4.1 protocol 1 · 3 methods served · build fb72abe+profile=release (vcs)
+[aether] WARNING: The Aether server reports implementation "oracle-zig", which this build of Aurora does not know (it drives "oracle-rs"). That is either a protocol.md §2.1 registry amendment newer than this client (legitimate, and not a reason to refuse a session) or a server that is not what it claims. Proceeding, loudly. Build: fb72abe+profile=release (vcs).
+
+stdout | src/main/aether/__tests__/bridge-payload-census.test.ts > a link that dies on its own takes the palette capability with it > stops claiming a palette family once the socket is gone
+[aether] handshake: oracle-rs (deployment name oracle-next) 0.4.1 protocol 1 · 3 methods served · build fb72abe+profile=release (vcs)
+
+ ✓ src/main/aether/__tests__/bridge-payload-census.test.ts (7 tests) 8ms
+ ✓ test/formats/effects-scene-writer-originated.test.ts (5 tests) 7ms
+stderr | src/renderer/shell/__tests__/canvas-session-restore.test.ts > activateRestoredCanvasDocTarget > loads and focuses a canvas that reads fine, warnings included
+[toast] Canvas "cliffs": its palette disagrees with its sidecar
+
+ ✓ src/renderer/shell/__tests__/canvas-session-restore.test.ts (6 tests) 4ms
+ ✓ src/renderer/canvas/__tests__/tile-lens.test.ts (13 tests) 5ms
+ ✓ src/renderer/components/classic/__tests__/composer-linkage-banner.test.ts (21 tests) 3ms
+ ✓ src/renderer/providers/__tests__/palette-canvas.test.ts (15 tests) 6ms
+ ✓ src/renderer/components/setup/__tests__/setup-model.test.ts (18 tests) 5ms
+ ✓ src/renderer/state/__tests__/effects-scene-follow.test.ts (22 tests) 8ms
+ ✓ src/renderer/components/effects/__tests__/ramp-control-wording.test.ts (18 tests) 5ms
+ ✓ src/core/shell/__tests__/session-persistence.test.ts (11 tests) 7ms
+ ✓ test/model/chunk-collision-planes.test.ts (7 tests) 3ms
+ ✓ src/renderer/components/art-shared/__tests__/palette-grid-wiring.test.ts (21 tests) 8ms
+ ✓ src/renderer/state/__tests__/aeon-open-bg-cause.test.ts (8 tests) 6ms
+ ✓ src/renderer/providers/__tests__/band-follow.test.ts (11 tests) 5ms
+ ✓ src/renderer/components/__tests__/map-band-stamp.test.ts (6 tests) 7ms
+ ✓ src/renderer/providers/__tests__/object-list-classic.test.ts (5 tests) 6ms
+ ✓ src/renderer/state/__tests__/viewStore-overlays.test.ts (16 tests) 6ms
+ ✓ src/renderer/providers/__tests__/chunk-grid-aeon.test.ts (12 tests) 4ms
+ ✓ src/renderer/components/effects/__tests__/field-group-message-placement.test.ts (17 tests) 4ms
+ ✓ src/core/aether/__tests__/palette-push.test.ts (23 tests) 7ms
+ ✓ src/renderer/components/art-shared/__tests__/palette-grid-model.test.ts (26 tests) 7ms
+ ✓ src/renderer/state/__tests__/chunk-version-clocks.test.ts (5 tests) 5ms
+ ✓ src/core/editing/__tests__/brush-word.test.ts (27 tests) 6ms
+ ✓ src/renderer/canvas/__tests__/vsplit-vdeform-surfaces.test.ts (18 tests) 5ms
+ ✓ test/formats/canonical-json.test.ts (14 tests) 4ms
+ ✓ src/core/project/__tests__/art-tiers.test.ts (13 tests) 8ms
+ ✓ test/sprite/adapters/reconstruct-adapter.test.ts (3 tests) 5ms
+ ✓ src/renderer/components/canvas/__tests__/canvas-pane-model.test.ts (24 tests) 4ms
+ ✓ src/renderer/state/__tests__/object-sprite-cache.test.ts (11 tests) 7ms
+ ✓ test/collision/crossover-audit.test.ts (15 tests) 5ms
+stderr | src/renderer/state/__tests__/aeon-open-notice-severity.test.ts > openAeonProject routes each notice on its own channel > an error notice does NOT arrive green
+[toast] x.json exists but could not be read. Fix it by hand and reopen.
+
+stderr | src/renderer/state/__tests__/aeon-open-notice-severity.test.ts > openAeonProject routes each notice on its own channel > carries all three severities through unflattened, in order
+[toast] N-err
+
+stderr | src/renderer/state/__tests__/aeon-open-notice-severity.test.ts > openAeonProject routes each notice on its own channel > still ends on the green "Opened <project>" line
+[toast] N-err
+
+ ✓ src/renderer/state/__tests__/aeon-open-notice-severity.test.ts (3 tests) 5ms
+ ✓ test/art/composer-collision-paint.test.ts (12 tests) 4ms
+ ✓ src/renderer/workspace/__tests__/facet-visibility.test.ts (21 tests) 4ms
+ ✓ src/renderer/state/__tests__/thumbnail-invalidation.test.ts (4 tests) 4ms
+ ✓ src/main/aether/__tests__/warp-route.test.ts (6 tests) 6ms
+ ✓ test/sprite/adapters/s2-adapter.test.ts (11 tests) 6ms
+ ✓ test/compress/nemesis-encode.test.ts (7 tests) 6ms
+ ✓ test/compress/kosinski-moduled.test.ts (3 tests) 7ms
+ ✓ test/formats/palette.test.ts (10 tests) 4ms
+ ✓ src/renderer/shell/__tests__/effects-delete-guard.test.ts (9 tests) 6ms
+ ✓ src/core/project/profiles/__tests__/s1-objects.test.ts (7 tests) 6ms
+ ✓ src/renderer/shell/__tests__/command-palette-discovery.test.ts (13 tests) 5ms
+ ✓ test/compress/registry.test.ts (4 tests) 4ms
+ ✓ src/core/level-classic/__tests__/collision-probe.test.ts (15 tests) 5ms
+ ✓ test/formats/effects-schema-support-gate.test.ts (12 tests) 6ms
+ ✓ src/core/art/__tests__/canvas-doc.test.ts (10 tests) 4ms
+ ✓ src/renderer/components/effects/__tests__/preset-rebind-orphan.test.ts (8 tests) 6ms
+ ✓ test/collision/both-planes-paint.test.ts (23 tests) 5ms
+ ✓ test/formats/effects-channel-bands-prose-repin.test.ts (9 tests) 5ms
+ ✓ src/renderer/components/effects/__tests__/section-raster-select.test.ts (19 tests) 7ms
+ ✓ src/renderer/hooks/__tests__/useHistoryVersion.test.ts (4 tests) 5ms
+ ✓ test/sprite/adapters/s3k-adapter.test.ts (11 tests) 6ms
+ ✓ src/core/art/__tests__/commit-collision.test.ts (9 tests) 3ms
+ ✓ src/renderer/state/__tests__/composer-doc-undo.test.ts (12 tests) 6ms
+ ✓ test/sprite/adapters/asm-mappings.test.ts (6 tests) 5ms
+ ✓ test/agent/paint-collision-cells.test.ts (15 tests) 6ms
+ ✓ src/core/art/__tests__/classic-tile-gesture.test.ts (11 tests) 5ms
+ ✓ test/compress/nemesis.test.ts (7 tests) 4ms
+ ✓ src/core/editing/__tests__/set-effects-scene.test.ts (7 tests) 4ms
+ ✓ test/sprite/adapters/cross-format.test.ts (4 tests) 4ms
+ ✓ src/renderer/components/classic/__tests__/classic-overlays-occlusion.test.ts (7 tests) 4ms
+ ✓ src/renderer/components/effects/__tests__/boundary-control-wording.test.ts (16 tests) 5ms
+ ✓ src/core/shell/__tests__/explorer-empty-state.test.ts (17 tests) 4ms
+ ✓ test/formats/effects-scene-ui-guard-residue.test.ts (13 tests) 5ms
+ ✓ test/sprite/adapters/reconstruct-from-frames.test.ts (2 tests) 4ms
+ ✓ src/renderer/state/__tests__/spriteStore-multidoc.test.ts (6 tests) 4ms
+ ✓ src/renderer/providers/__tests__/object-inspector-aeon.test.ts (22 tests) 7ms
+ ✓ src/renderer/components/classic/__tests__/collision-needle.test.ts (7 tests) 5ms
+ ✓ src/renderer/canvas/__tests__/composer-priority-lens.test.ts (9 tests) 4ms
+ ✓ src/renderer/canvas/__tests__/overlay-priority-wiring.test.ts (4 tests) 5ms
+ ✓ src/renderer/providers/__tests__/effects-preset-ramp-scroll-guard-residue.test.ts (13 tests) 4ms
+stderr | src/renderer/components/sprite/__tests__/sprite-doc-save.test.ts > saveSpriteDocArt > writes the TARGET document, not whichever one happens to be checked out
+[toast] This sprite has no S1 art source to save back to
+
+stderr | src/renderer/components/sprite/__tests__/sprite-doc-save.test.ts > saveSpriteDocArt > leaves the checked-out document exactly where it was
+[toast] This sprite has no S1 art source to save back to
+
+ ✓ src/renderer/components/sprite/__tests__/sprite-doc-save.test.ts (4 tests) 4ms
+ ✓ src/renderer/providers/__tests__/chunk-grid-classic.test.ts (7 tests) 4ms
+ ✓ src/renderer/components/sprite/__tests__/save-art-dirty-window.test.ts (4 tests) 4ms
+ ✓ test/sprite/sprite-mappings-export.test.ts (13 tests) 4ms
+ ✓ src/core/project/__tests__/conflict-message.test.ts (19 tests) 5ms
+ ✓ test/collision/collision-palette-organize.test.ts (9 tests) 4ms
+ ✓ src/renderer/canvas/__tests__/composer-priority-wiring.test.ts (14 tests) 4ms
+ ✓ src/renderer/components/__tests__/map-bg-stroke-witness.test.ts (20 tests) 3ms
+ ✓ src/renderer/components/classic/__tests__/classic-camera.test.ts (3 tests) 3ms
+ ✓ test/collision/collision-ascii-ruler.test.ts (10 tests) 4ms
+ ✓ test/sprite/sprite-mappings-import.test.ts (4 tests) 5ms
+ ✓ test/agent/validation.test.ts (15 tests) 4ms
+ ✓ test/sprite/adapters/s4-adapter.test.ts (8 tests) 4ms
+ ✓ src/core/level-classic/__tests__/collision-choices.test.ts (4 tests) 4ms
+ ✓ src/renderer/components/home/__tests__/typed-path-open.test.ts (8 tests) 4ms
+ ✓ src/core/formats/effects/__tests__/ramp-sign-lag.test.ts (17 tests) 5ms
+ ✓ src/core/formats/__tests__/cram-geometry.test.ts (7 tests) 5ms
+ ✓ src/renderer/state/__tests__/canvas-constraints-cache.test.ts (7 tests) 6ms
+ ✓ src/core/formats/__tests__/kosinski-malformed.test.ts (7 tests) 5ms
+ ✓ src/renderer/shell/__tests__/canvas-doc-routing.test.ts (7 tests) 4ms
+ ✓ src/core/project/aeon/__tests__/save-skip.test.ts (18 tests) 4ms
+ ✓ src/main/__tests__/loopback-guard.test.ts (14 tests) 4ms
+ ✓ src/core/editing/__tests__/document-history.test.ts (10 tests) 5ms
+ ✓ test/sprite/adapters/s3k-kosm-e2e.test.ts (2 tests) 4ms
+ ✓ test/formats/bg-override-binding.test.ts (8 tests) 3ms
+ ✓ test/main/path-probe.test.ts (6 tests) 4ms
+ ✓ src/renderer/components/classic/__tests__/composer-layout.test.ts (13 tests) 5ms
+ ✓ src/core/art/__tests__/tile-pool-match.test.ts (8 tests) 5ms
+ ✓ test/agent/paint-collision.test.ts (6 tests) 4ms
+ ✓ src/core/art/__tests__/canvas-profiles.test.ts (9 tests) 3ms
+ ✓ src/core/import/__tests__/raw-grid.test.ts (5 tests) 5ms
+ ✓ test/formats/chunk-mappings-collision.test.ts (7 tests) 4ms
+ ✓ src/core/shell/__tests__/facets.test.ts (9 tests) 3ms
+ ✓ src/renderer/shell/__tests__/dirty-snapshot-subscriptions.test.ts (5 tests) 3ms
+ ✓ test/collision/collision-paint.test.ts (5 tests) 3ms
+ ✓ src/renderer/canvas/__tests__/screen-frame.test.ts (10 tests) 4ms
+ ✓ src/renderer/canvas/__tests__/crossover-preview.test.ts (6 tests) 3ms
+ ✓ test/config/s4-config.test.ts (6 tests) 3ms
+ ✓ src/main/aether/__tests__/boot-restore.test.ts (14 tests) 5ms
+ ✓ test/art/palette-copy.test.ts (6 tests) 4ms
+ ✓ src/core/model/__tests__/nametable-priority.test.ts (5 tests) 6ms
+ ✓ test/sprite/adapters/s1-adapter.test.ts (6 tests) 5ms
+ ✓ src/core/aether/__tests__/s1-object-offsets.test.ts (11 tests) 4ms
+ ✓ src/renderer/components/__tests__/collision-overlay-scope.test.ts (6 tests) 3ms
+ ✓ test/art/pixel-ops.test.ts (19 tests) 6ms
+ ✓ src/renderer/components/__tests__/panel-columns.test.ts (13 tests) 5ms
+ ✓ src/renderer/components/classic/__tests__/block-paint-mode.test.ts (13 tests) 3ms
+ ✓ test/formats/bg-library.test.ts (9 tests) 3ms
+ ✓ src/core/shell/__tests__/session.test.ts (11 tests) 4ms
+ ✓ src/core/project/__tests__/save-guard.test.ts (13 tests) 4ms
+ ✓ src/renderer/state/__tests__/object-bindings.test.ts (7 tests) 4ms
+ ✓ src/core/editing/__tests__/save-coordinator.test.ts (11 tests) 5ms
+ ✓ src/core/level-classic/__tests__/tile-pick.test.ts (18 tests) 5ms
+ ✓ src/renderer/components/classic/__tests__/diverge-vocabulary.test.ts (9 tests) 3ms
+ ✓ src/renderer/components/shared/__tests__/object-inspector-field-bounds.test.ts (8 tests) 4ms
+ ✓ src/core/editing/__tests__/selection-to-chunk.test.ts (6 tests) 3ms
+ ✓ src/renderer/components/shared/__tests__/object-inspector-model.test.ts (15 tests) 4ms
+ ✓ src/renderer/state/__tests__/aether-warp-message.test.ts (10 tests) 4ms
+ ✓ test/art/pixel-clipboard.test.ts (6 tests) 3ms
+ ✓ src/core/art/__tests__/classic-tile-buffer.test.ts (8 tests) 3ms
+ ✓ test/editing/map-clipboard.test.ts (7 tests) 4ms
+ ✓ src/renderer/components/classic/__tests__/chunk-paint-mode.test.ts (12 tests) 4ms
+ ✓ src/core/editing/__tests__/canvas-history.test.ts (6 tests) 3ms
+ ✓ src/core/art/__tests__/tool-config.test.ts (5 tests) 3ms
+ ✓ src/renderer/components/__tests__/section-claim.test.ts (9 tests) 3ms
+ ✓ src/shared/__tests__/typed-project-path.test.ts (15 tests) 5ms
+ ✓ src/core/art/__tests__/chunk-pick.test.ts (11 tests) 3ms
+ ✓ test/collision/full-block-shape.test.ts (5 tests) 4ms
+ ✓ src/renderer/state/__tests__/band-lens-clear.test.ts (4 tests) 3ms
+ ✓ src/renderer/shell/__tests__/dirty-tabs.test.ts (14 tests) 3ms
+ ✓ src/renderer/components/classic/__tests__/collision-gesture-report.test.ts (6 tests) 3ms
+ ✓ src/core/level-classic/__tests__/usage-index.test.ts (11 tests) 4ms
+ ✓ src/core/level-classic/__tests__/colind-append.test.ts (10 tests) 5ms
+ ✓ src/renderer/providers/__tests__/object-list-aeon.test.ts (8 tests) 3ms
+ ✓ src/renderer/components/classic/__tests__/collision-probe-click.test.ts (3 tests) 3ms
+ ✓ src/renderer/components/art-shared/__tests__/tool-column-parts.test.ts (5 tests) 2ms
+ ✓ src/renderer/state/__tests__/object-art-read-failure.test.ts (5 tests) 3ms
+ ✓ src/core/shell/__tests__/explorer.test.ts (5 tests) 3ms
+ ✓ test/collision/collision-model.test.ts (7 tests) 3ms
+ ✓ test/sprite/sprite-render.test.ts (5 tests) 3ms
+ ✓ src/renderer/agent/__tests__/agent-handler.aether-identity.test.ts (3 tests) 4ms
+ ✓ test/export/tile-dedup.test.ts (7 tests) 4ms
+ ✓ test/art/sprite-palette.test.ts (4 tests) 3ms
+ ✓ src/main/aether/__tests__/socket-path.test.ts (9 tests) 3ms
+ ✓ src/renderer/components/shared/__tests__/shared-purity.test.ts (14 tests) 4ms
+ ✓ src/main/__tests__/close-handshake.test.ts (14 tests) 5ms
+ ✓ src/shared/__tests__/project-path.test.ts (11 tests) 3ms
+ ✓ src/renderer/workspace/__tests__/undo-keys.test.ts (3 tests) 3ms
+ ✓ src/renderer/components/canvas/__tests__/canvas-readout.test.ts (7 tests) 3ms
+ ✓ test/art/camera.test.ts (7 tests) 3ms
+ ✓ src/renderer/components/canvas/__tests__/canvas-budget.test.ts (8 tests) 3ms
+ ✓ src/core/editing/__tests__/bound-edit-history.test.ts (7 tests) 4ms
+ ✓ src/core/aether/__tests__/warp-math.test.ts (7 tests) 3ms
+ ✓ test/config/skip-report-reporter.test.ts (11 tests) 4ms
+ ✓ test/sprite/anim-import.test.ts (3 tests | 1 skipped) 4ms
+ ✓ test/config/peer-path-literal-wiring.test.ts (4 tests) 2ms
+ ✓ src/core/project/__tests__/join-path.test.ts (4 tests) 2ms
+ ✓ test/collision/classify.test.ts (12 tests) 3ms
+ ✓ src/renderer/components/art-shared/__tests__/pixel-viewport-wiring.test.ts (8 tests) 3ms
+ ✓ src/renderer/state/__tests__/sessionStore.test.ts (4 tests) 3ms
+ ✓ test/editing/sprite-history.test.ts (8 tests) 4ms
+ ✓ test/collision/collision-cell-word.test.ts (6 tests) 3ms
+ ✓ test/sprite/adapters/sonic-anim.test.ts (8 tests) 4ms
+ ✓ src/renderer/workspace/__tests__/level-keys.test.ts (5 tests) 3ms
+ ✓ src/renderer/components/__tests__/collision-destructive-wording.test.ts (5 tests) 3ms
+ ✓ test/collision/collision-render.test.ts (5 tests) 4ms
+ ✓ src/renderer/state/__tests__/open-project.test.ts (8 tests) 3ms
+ ✓ test/config/skip-report-wiring.test.ts (9 tests) 3ms
+ ✓ test/collision/collision-block.test.ts (4 tests) 3ms
+ ✓ src/main/aether/__tests__/bridge-probe.test.ts (4 tests) 2ms
+ ✓ src/core/editing/__tests__/set-bg-tiles.test.ts (5 tests) 3ms
+ ✓ src/core/editing/__tests__/chunk-invalidation.test.ts (9 tests) 3ms
+ ✓ src/shared/__tests__/canvas-name.test.ts (4 tests) 4ms
+ ✓ test/sprite/sprite-asm-export.test.ts (4 tests) 4ms
+ ✓ src/renderer/state/__tests__/confirmStore.test.ts (3 tests) 3ms
+ ✓ test/model/s4-types.test.ts (7 tests) 3ms
+ ✓ src/renderer/workspace/__tests__/undo-double-consume.test.ts (3 tests) 3ms
+ ✓ test/formats/s4-objects.test.ts (8 tests) 3ms
+ ✓ test/config/collision-path-candidates.test.ts (7 tests) 3ms
+ ✓ src/renderer/workspace/__tests__/section-ids.test.ts (4 tests) 3ms
+ ✓ src/renderer/components/shared/__tests__/map-status-model.test.ts (12 tests) 3ms
+ ✓ src/core/shell/__tests__/registry.test.ts (5 tests) 4ms
+ ✓ src/core/art/__tests__/pixel-edit-controller.test.ts (5 tests) 3ms
+ ✓ src/core/art/__tests__/tile-canon.test.ts (6 tests) 5ms
+ ✓ src/renderer/state/__tests__/aether-handshake-record.test.ts (4 tests) 3ms
+ ✓ src/renderer/components/effects/__tests__/colour-tab-arrival.test.ts (10 tests) 3ms
+ ✓ test/editing/set-collision-edit.test.ts (2 tests) 3ms
+ ✓ src/renderer/shell/__tests__/typing-target.test.ts (15 tests) 2ms
+ ✓ src/renderer/components/__tests__/toast-container-cap.test.ts (4 tests) 2ms
+ ✓ src/renderer/shell/__tests__/sprite-doc-header.test.ts (7 tests) 3ms
+ ✓ src/renderer/components/ui/__tests__/focus-trap.test.ts (7 tests) 3ms
+ ✓ test/collision/s4-collision-adapter.test.ts (6 tests) 3ms
+ ✓ src/renderer/state/__tests__/aether-build-names-the-rom.test.ts (4 tests) 3ms
+ ✓ src/renderer/components/classic/__tests__/collision-panel.test.ts (11 tests) 3ms
+ ✓ src/core/editing/__tests__/classic-domain-history.test.ts (8 tests) 4ms
+ ✓ src/renderer/components/canvas/__tests__/canvas-tool-keys.test.ts (8 tests) 3ms
+ ✓ test/formats/s4-nametable.test.ts (3 tests) 4ms
+ ✓ test/art/viewport-coords.test.ts (4 tests) 2ms
+ ✓ src/core/art/__tests__/palette-drag.test.ts (5 tests) 3ms
+ ✓ src/renderer/components/classic/__tests__/report-grouping.test.ts (3 tests) 3ms
+ ✓ src/renderer/providers/__tests__/map-status-aeon.test.ts (6 tests) 3ms
+ ✓ src/renderer/components/shared/__tests__/object-list-model.test.ts (7 tests) 3ms
+ ✓ test/main/write-outcome.test.ts (3 tests) 2ms
+ ✓ test/renderer/panel-state.test.ts (4 tests) 4ms
+ ✓ src/renderer/components/effects/__tests__/label-column-align.test.ts (5 tests) 3ms
+ ✓ src/renderer/components/sprite/__tests__/save-art-refusal.test.ts (2 tests) 2ms
+ ✓ test/collision/collision-flip.test.ts (4 tests) 3ms
+ ✓ src/renderer/components/canvas/__tests__/canvas-clash-overlay.test.ts (5 tests) 3ms
+ ✓ src/core/art/__tests__/free-tile-slots.test.ts (5 tests) 3ms
+ ✓ test/formats/s4-collattr.test.ts (4 tests) 2ms
+ ✓ test/editing/set-sections-command.test.ts (2 tests) 3ms
+ ✓ test/main/missing-file-marker.test.ts (2 tests) 2ms
+ ✓ test/collision/shape-draw.test.ts (4 tests) 2ms
+ ✓ src/renderer/components/effects/__tests__/preset-delete-guard.test.ts (7 tests) 6ms
+ ✓ src/core/art/__tests__/composer-palette-apply.test.ts (8 tests) 3ms
+ ✓ src/core/project/__tests__/adapter-contract.test.ts (5 tests) 3ms
+ ✓ src/renderer/components/effects/__tests__/ship-silent-label-scope.test.ts (3 tests) 3ms
+ ✓ test/renderer/tool-store.test.ts (4 tests) 2ms
+ ✓ src/renderer/state/__tests__/projectStore-open.test.ts (2 tests) 2ms
+ ✓ src/core/formats/effects/__tests__/preset-lag.test.ts (4 tests) 2ms
+ ✓ src/shared/__tests__/rel-path.test.ts (3 tests) 2ms
+ ✓ src/renderer/state/__tests__/toast-dwell.test.ts (3 tests) 2ms
+ ✓ src/renderer/components/__tests__/map-escape.test.ts (4 tests) 2ms
+ ✓ src/renderer/state/__tests__/art-zoom-tier.test.ts (5 tests) 2ms
+ ✓ src/renderer/components/__tests__/map-band-mark.test.ts (5 tests) 2ms
+ ✓ test/sprite/sprite-types.test.ts (2 tests) 3ms
+ ✓ test/editing/set-chunk-planes.test.ts (2 tests) 2ms
+ ✓ src/core/level-classic/__tests__/object-sprite-clock.test.ts (8 tests) 2ms
+ ✓ test/editing/tile-commands.test.ts (3 tests) 2ms
+ ✓ test/export/vram-coloring.test.ts (2 tests) 2ms
+ ✓ src/renderer/components/ui/__tests__/safe-focus.test.ts (7 tests) 4ms
+ ✓ test/collision/collision-cell.test.ts (1 test) 3ms
+ ✓ test/formats/s4-rings.test.ts (3 tests) 2ms
+ ✓ src/renderer/workspace/__tests__/workspaceStore.test.ts (3 tests) 3ms
+ ✓ test/editing/history-returns.test.ts (3 tests) 2ms
+ ✓ src/core/project/__tests__/read-failure.test.ts (6 tests) 3ms
+ ✓ src/renderer/components/classic/__tests__/tile-tab-seam-preview.test.ts (5 tests) 2ms
+ ✓ test/sprite/play-order.test.ts (4 tests) 2ms
+ ✓ src/renderer/components/canvas/__tests__/new-canvas-dialog-wiring.test.ts (4 tests) 2ms
+ ✓ src/renderer/components/canvas/__tests__/canvas-mode-wiring.test.ts (4 tests) 3ms
+ ✓ test/config/pseudo-skip-wiring.test.ts (4 tests) 2ms
+ ✓ src/renderer/components/__tests__/toast-colors.test.ts (2 tests) 2ms
+ ✓ src/renderer/components/canvas/__tests__/commit-plan-collision-wiring.test.ts (2 tests) 2ms
+ ↓ test/live/aeon-warp-correspondence.test.ts (1 test | 1 skipped)
+ ↓ test/live/s1-warp-live.test.ts (1 test | 1 skipped)
+ ↓ src/renderer/canvas/__tests__/compose-bench.test.ts (1 test | 1 skipped)
+
+ Test Files  615 passed | 3 skipped (618)
+      Tests  9553 passed | 9 skipped (9562)
+   Start at  15:57:41
+   Duration  40.52s (transform 7.54s, setup 64.57s, import 15.56s, tests 35.09s, environment 35ms)
+
+
+skip-report: 9 SKIPPED test(s) in 7 file(s). A SKIP IS NOT A PASS:
+  each of these contributed zero to the totals above.
+
+  src/core/editing/__tests__/bg-override-art-injector-gate.test.ts
+    ↓ the file the REAL APP saved after a band-art stroke > ANTI-VACUOUS: it really carries bands with a non-empty animated prefix, so the coherence assert has something to check
+        [meta] AURORA_FG_GATE_FILE is not set: these rows only run when scratchpad/band-art-foreground-harness.mjs drives the real app and hands back what it saved
+    ↓ the file the REAL APP saved after a band-art stroke > is ACCEPTED by aeon validate_band_coherence
+        [meta] AURORA_FG_GATE_FILE is not set: these rows only run when scratchpad/band-art-foreground-harness.mjs drives the real app and hands back what it saved
+    ↓ the file the REAL APP saved after a band-art stroke > RED FIRST, on the app's own file: the same file with phases[0][0] perturbed is REFUSED, naming the band
+        [meta] AURORA_FG_GATE_FILE is not set: these rows only run when scratchpad/band-art-foreground-harness.mjs drives the real app and hands back what it saved
+
+  src/renderer/canvas/__tests__/compose-bench.test.ts
+    ↓ bench > composition throughput
+        [meta] AURORA_BENCH is not set: this row is an opt-in measurement harness that PRINTS rather than asserts, so it is off by default; see the file header to run it
+
+  test/live/aeon-warp-correspondence.test.ts
+    ↓ aeon world pixels: the editor and the engine mean the same thing > warps to two known editor pixels and reads the player out of RAM (SKIPPED: AURORA_LIVE_AEON_WARP=1 not set)
+        [name] aeon world pixels: the editor and the engine mean the same thing > warps to two known editor pixels and reads the player out of RAM (SKIPPED: AURORA_LIVE_AEON_WARP=1 not set)
+
+  test/live/s1-warp-live.test.ts
+    ↓ play-from-cursor moves Sonic in a real S1 > pokes, settles, and reports where he actually landed (SKIPPED: AURORA_LIVE_S1_WARP=1 not set)
+        [name] play-from-cursor moves Sonic in a real S1 > pokes, settles, and reports where he actually landed (SKIPPED: AURORA_LIVE_S1_WARP=1 not set)
+
+  test/sprite/anim-import.test.ts
+    ↓ real sonic_anims.asm > parses all 11 named animations with sane frame indices
+        [note] SKIPPED, NOT PASSED: /home/volence/sonic_hacks/s4_engine/data/animations/sonic_anims.asm is absent: the s4_engine tree is gone from this machine, so this row measures nothing at all and has not for some time
+
+  test/sprite/sprite-import.test.ts
+    ↓ real Sonic data (s4_engine) > parses 224 frames and reconstructs sane, non-empty character bitmaps
+        [note] SKIPPED, NOT PASSED: /home/volence/sonic_hacks/s4_engine/data/mappings/sonic.bin is absent: the s4_engine tree is gone from this machine, so this row measures nothing at all and has not for some time
+
+  test/support/sibling-root.test.ts
+    ↓ sibling-root: step 3: derivation from this repo, via --git-common-dir > and THIS checkout, when it is a main one: the configuration production runs in
+        [note] SKIPPED, NOT PASSED: step 3 was NOT measured in this repo's real MAIN CHECKOUT by this run: the production configuration. This run is standing in a LINKED WORKTREE (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a), where `git rev-parse --git-common-dir` answers the absolute /home/volence/sonic_hacks/aurora/.git whether it is asked to or not, so the relative output shape production consumes does not exist here to be measured. The two rows above measured that shape on a repository they built; this row is the one that would have measured it where the code actually lives, and it measured nothing. Run the suite from the main checkout to close this.
+
+skip-report: OK. Every skip named its reason.
+
+failure-class: no failures in this run (618 module(s) reported).
