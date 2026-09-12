@@ -56,7 +56,7 @@ so each row scores the app and not the instrument.
 | `fe8c2b21` (master) | the reported state | **FAIL** (`before=0 after=0`) | 2 (1 rig + 1 instrumented probe; the probe agrees) |
 | `209acd5d` | d-37, the re-sync effect lands | **FAIL** (`before=0 after=0`) | 2 |
 | `c1826b29` | its parent | **PASS** (`before=0 after=16385`) | 2 |
-| `fix/chunklinks-row9-regression` tip | this branch | **PASS** (`before=0 after=16385`) | 2 |
+| `fix/chunklinks-row9-regression` tip | this branch | **PASS** (`before=0 after=16385`) | 3 |
 
 No blind `git bisect` was run: the mechanism was measured first (§3), which named
 `209acd5d` by inspection, and the two boundary revisions were then built and run
@@ -163,6 +163,7 @@ After each restore, `git diff --stat` was empty before the next step.
 | boundary `209acd5d` ×2 | `/tmp/bisect-209acd5d` | **10/12, FAILED: 4b, 9** |
 | fixed 1 | this worktree @ branch tip | **11/12, FAILED: 4b** |
 | fixed 2 | same | **11/12, FAILED: 4b** |
+| fixed 3 | same, after the LAST write on the branch (`14994f0a`) | **11/12, FAILED: 4b** |
 
 `4b` is **red on purpose** (CHIP-FONT-13PX, owner card d-36) and is left red. It is
 red at `c1826b29` too, so it predates this window entirely.
@@ -216,6 +217,16 @@ node proves React calls `chunkDocSyncKey`, that a real pointer gesture reaches
 `applyTileCell`, or that the commit really happens at `up`. `harness:chunk-links`
 row 9 is still the only instrument that sees the whole path, and `[K0]`'s source
 read is a thin proxy for it.
+
+## 7b. Node suite
+
+`VITEST_MAX_WORKERS=4 npm test` at the branch tip: **618 files passed, 3 skipped;
+9594 tests passed, 9 skipped; exit 0**, every skip naming its reason, no
+failure-class records. `check-harness-guards` is part of that run and it failed
+the first time (G6: `chunk-row9-probe.mjs` was committed with no `package.json`
+script able to reach it — "nobody can run it by name, so nothing sweeps it and a
+red row in it is invisible"); it is registered as `harness:chunk-row9` and the
+guard is now 282 clean / 283 classified, 0 failures.
 
 ## 8. Open / tagged
 
