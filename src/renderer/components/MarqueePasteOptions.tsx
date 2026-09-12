@@ -5,7 +5,7 @@ import { useToastStore } from '../state/toastStore';
 import type { PasteLayers, MarqueeGranularity } from '../../core/editing/map-clipboard';
 import {
   isBlockAligned, selectionSizeLabel, artOnlyReason, copyFromSection,
-  effectiveGranularity, pasteFit, pasteLayerOffer, PASTE_LAYER_LABEL,
+  effectiveGranularity, pasteFit, pasteLayerOffer, PASTE_LAYER_LABEL, PASTE_HINT,
 } from '../../core/editing/map-clipboard';
 import { selectionToChunk } from '../../core/editing/selection-to-chunk';
 import { regionPreviewCanvas } from '../canvas/region-preview';
@@ -261,7 +261,12 @@ export default function MarqueePasteOptions() {
                 ...styles.planeBtn,
                 ...(pasteLayers === value && !dead ? styles.planeSel : {}),
                 ...(dead ? styles.planeDead : {}),
-                ...(refusal !== null && pasteLayers === value ? styles.planeChosenDead : {}),
+                // The author's own setting, unavailable for EITHER reason: the
+                // click refuses it, or it has nothing to write (Collision over
+                // an art-only source, whose verdict is not a refusal).
+                // Keyed on the refusal alone, the second case showed no
+                // choice as chosen (ART-ONLY-COLLISION-NO-CHOSEN).
+                ...(dead && pasteLayers === value ? styles.planeChosenDead : {}),
               }}>{label}</button>
           );
         })}
@@ -332,9 +337,11 @@ export default function MarqueePasteOptions() {
           engine's own word (collision-cell-word.ts bit 10, "mirror
           horizontally") is the one this follows. */}
       <div style={styles.hint}>
+        {/* While pasting, the offer's hint: each click gesture said as the
+            click will take it here, from the verdicts the Layers buttons are
+            greyed from (PASTE-HINT-LINE-MISLEADS). */}
         {pasting
-          ? 'Click to paste · hold Alt for art only, Shift for collision only · '
-            + 'X flips it left↔right, Y top↕bottom · Esc to stop'
+          ? (offer?.hint ?? PASTE_HINT)
           : 'Drag to select (hold Ctrl to snap the other way) · Ctrl+C copy · Ctrl+V paste · '
             + 'X flips the selection left↔right, Y top↕bottom'}
       </div>
