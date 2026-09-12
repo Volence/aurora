@@ -1289,6 +1289,13 @@ export default function MapViewport() {
     // (not `scale`) because sizing the backing store resets the context, so this
     // is an absolute base transform rather than a compounding one -- and every
     // line below it goes on drawing in CSS pixels, unchanged.
+    //
+    // ⚠ THE CHROME DRAWN AT THE END OF THIS PASS IS HANDED THIS SAME `dpr`: the
+    // camera preview, the screen frame, the band lens caption, the layer guides and
+    // the `plane_y` rules each restate this transform themselves. They used to reset
+    // to IDENTITY for crisp lines and draw CSS coordinates, which on this backing
+    // store put them at 1/dpr of their hit tests (cdp-sweep-4 OBS.DPR). They keep the
+    // crispness by snapping in device space instead: canvas/device-grid.ts.
     const dpr = deviceScale();
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
@@ -1385,7 +1392,7 @@ export default function MapViewport() {
       if (overlay) sources.push(overlay);
       const plan = cameraPreviewPlan(guideScene, frameAnchor.x, frameAnchor.y);
       const rect = screenFrameRect(frameAnchor, viewport);
-      const blits = drawCameraPreview(ctx, rect, viewport.zoom, plan, sources);
+      const blits = drawCameraPreview(ctx, dpr, rect, viewport.zoom, plan, sources);
       publishCameraPreviewReport({
         active: true, sceneId: guideScene.id, camX: plan.camX, camY: plan.camY,
         vscrollBase: plan.vscrollBase, vLocked: plan.vLocked, bands: plan.bands,
@@ -1538,7 +1545,7 @@ export default function MapViewport() {
       const caption = frameYIsVOffset(guideScene)
         ? `camera x=${frameAnchor.x} · v_offset=${frameAnchor.y} · arrows move ±1, shift ±16`
         : `camera ${SCREEN_WIDTH}x${SCREEN_HEIGHT} @ ${frameAnchor.x},${frameAnchor.y}`;
-      const rect = drawScreenFrame(ctx, viewport, frameAnchor,
+      const rect = drawScreenFrame(ctx, dpr, viewport, frameAnchor,
         { active: fd !== null || frameHoverRef.current, caption });
       publishScreenFrameReport({ active: true, anchor: frameAnchor, rect, dragging: fd !== null });
     } else {
@@ -1562,7 +1569,7 @@ export default function MapViewport() {
       // rate line makes, so the canvas cannot say something the card does not
       // (parcel D). The lines are composed in the provider, where the suite can
       // see them.
-      drawBandLensLabel(ctx, viewport, bandLensCaptionLines({ ...lens, range: lens.range }),
+      drawBandLensLabel(ctx, dpr, viewport, bandLensCaptionLines({ ...lens, range: lens.range }),
         bandLensAnchor(viewport, coverageBounds(cells)));
       publishBandLensReport({
         active: true, kind: lens.kind, bandIndex: lens.bandIndex,
@@ -1658,7 +1665,7 @@ export default function MapViewport() {
         space: guideSpace ?? 'act',
         notices,
       };
-      drawLayerGuides(ctx, viewport, guideScene.layers, opts);
+      drawLayerGuides(ctx, dpr, viewport, guideScene.layers, opts);
       // AFTER the guides, and the order is not cosmetic: the rowRemap parcel
       // seeds `plane_y` from the strip's own top, so on a fresh document the
       // white rule sits exactly on a cyan one. Drawn first it would be the half
@@ -1669,7 +1676,7 @@ export default function MapViewport() {
       // referent the author aims at is not a handle, and making it one would put
       // two draggable lines on one pixel row.
       const surfaces = surfaceGeometry(guideScene.layers, viewport);
-      drawSurfaceMarks(ctx, viewport, surfaces);
+      drawSurfaceMarks(ctx, dpr, viewport, surfaces);
       publishGuideReport({
         active: true, sceneId: guideScene.id, space: opts.space,
         rows: layerGuideGeometry(guideScene.layers, viewport, opts),

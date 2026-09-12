@@ -1,0 +1,19 @@
+{
+ "tag": "fixed-real1",
+ "head": "d8675a46b43eee5478acb17a9a4ad413e0f83088",
+ "root": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6",
+ "captures": {
+  "probe": {
+   "w": 661,
+   "h": 620,
+   "hash": "a12aa4a58b096dcc",
+   "path": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6/scratchpad/shots-dpr-guides-offset/identity-probe-a-fixed-real1.png"
+  },
+  "floor": {
+   "w": 661,
+   "h": 620,
+   "hash": "e005f27e5abeeb35",
+   "path": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6/scratchpad/shots-dpr-guides-offset/identity-floor-a-fixed-real1.png"
+  }
+ }
+}

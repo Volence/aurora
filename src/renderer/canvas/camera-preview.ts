@@ -531,9 +531,15 @@ export interface CameraPreviewDrawOptions {
  * Sources are drawn in the order given, source-over, so the caller passes the
  * plane first and the BgAnim band overlay second — the same order
  * `MapViewport` paints them in on the map itself.
+ *
+ * `dpr` is the canvas's, required. `frame` is `screenFrameRect`, in CSS px, so the
+ * composite has to be drawn in the canvas's CSS frame to land inside the frame the
+ * screen-frame module strokes. It used to reset to identity, which at a scale factor
+ * above 1 drew it into a 1/dpr corner of that frame (docs/reviews/2026-09-12-dpr-guides-offset.md).
  */
 export function drawCameraPreview(
   ctx: CanvasRenderingContext2D,
+  dpr: number,
   frame: FrameRect,
   zoom: number,
   plan: CameraPreviewPlan,
@@ -543,7 +549,8 @@ export function drawCameraPreview(
   if (sources.length === 0) return 0;
   let blits = 0;
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // The map canvas's own CSS transform, restated absolutely.
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
   ctx.beginPath();
   ctx.rect(frame.x, frame.y, frame.w, frame.h);

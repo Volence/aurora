@@ -1,0 +1,19 @@
+{
+ "tag": "master-run4",
+ "head": "5a09df4aaa79867d7013afc330da14ea13d42723",
+ "root": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6",
+ "captures": {
+  "probe": {
+   "w": 816,
+   "h": 742,
+   "hash": "a55232571f3233f4",
+   "path": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6/scratchpad/shots-dpr-guides-offset/identity-probe-a-master-run4.png"
+  },
+  "floor": {
+   "w": 816,
+   "h": 742,
+   "hash": "81860e4ef2e51081",
+   "path": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6/scratchpad/shots-dpr-guides-offset/identity-floor-a-master-run4.png"
+  }
+ }
+}

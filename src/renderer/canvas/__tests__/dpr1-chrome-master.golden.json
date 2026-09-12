@@ -1,0 +1,5462 @@
+{
+ "generatedFrom": "master 803e8a301895709142cad70cc15763bd33a40ae2, signatures without a dpr argument",
+ "cases": {
+  "guides: act space, three layers, one disabled, fractional pan and zoom": [
+   {
+    "op": "save",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setTransform",
+    "args": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:font",
+    "args": [
+     "10px system-ui, sans-serif"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:textBaseline",
+    "args": [
+     "middle"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     49.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     811,
+     49.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     1
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(80, 220, 240, 0.75)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L0 y=40"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.78)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     4,
+     34.5,
+     43,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(190, 245, 255, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L0 y=40",
+     8,
+     41.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     186.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     811,
+     186.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     1
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(80, 220, 240, 0.32)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     [
+      5,
+      4
+     ]
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L1 y=131 (off)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.78)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     4,
+     171.5,
+     78,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(190, 245, 255, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L1 y=131 (off)",
+     8,
+     178.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     375.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     811,
+     375.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     1
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(80, 220, 240, 0.75)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 y=257"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.78)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     4,
+     360.5,
+     48,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(190, 245, 255, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L2 y=257",
+     8,
+     367.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "restore",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   }
+  ],
+  "guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)": [
+   {
+    "op": "save",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setTransform",
+    "args": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:font",
+    "args": [
+     "10px system-ui, sans-serif"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:textBaseline",
+    "args": [
+     "middle"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     60.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     912,
+     60.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     1
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(80, 220, 240, 0.75)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L0 y=60"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.78)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     4,
+     45.5,
+     43,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(190, 245, 255, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L0 y=60",
+     8,
+     52.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     200.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     912,
+     200.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     2
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(150, 245, 255, 1)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L1 y=200"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.78)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     4,
+     185.5,
+     48,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(150, 245, 255, 1)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L1 y=200",
+     8,
+     192.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     221.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     912,
+     221.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     2
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(255, 96, 96, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 y=221"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(40, 10, 12, 0.90)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     4,
+     206.5,
+     48,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 96, 96, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L2 y=221",
+     8,
+     213.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221,"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit fire"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit fire must"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit fire must land"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit fire must land inside"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit fire must land inside 3..223"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit fire must land inside 3..223 with"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit fire must land inside 3..223 with room"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit fire must land inside 3..223 with room for"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit fire must land inside 3..223 with room for the"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit fire must land inside 3..223 with room for the next"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "next one"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit fire must land inside 3..223 with room for the"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "next one"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(40, 10, 12, 0.90)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     8,
+     229,
+     452,
+     34
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 96, 96, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     8,
+     229,
+     2,
+     34
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 205, 200, 0.97)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L2 fires on screen line 221, and a vsplit fire must land inside 3..223 with room for the",
+     16,
+     239.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "next one",
+     16,
+     252.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "plane rows: fixed on the background, not on the frame"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.78)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     635,
+     623,
+     273,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(190, 245, 255, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "plane rows: fixed on the background, not on the frame",
+     639,
+     630
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "restore",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   }
+  ],
+  "guides: a drag in flight on 0, zoom 2.5, a guide near the top edge": [
+   {
+    "op": "save",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setTransform",
+    "args": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:font",
+    "args": [
+     "10px system-ui, sans-serif"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:textBaseline",
+    "args": [
+     "middle"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     31.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     1097.6,
+     31.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     2
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(150, 245, 255, 1)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L0 y=12"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.78)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     4,
+     16.5,
+     43,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(150, 245, 255, 1)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L0 y=12",
+     8,
+     23.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     225.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     1097.6,
+     225.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     1
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(80, 220, 240, 0.75)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L1 y=90"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.78)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     4,
+     210.5,
+     43,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(190, 245, 255, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L1 y=90",
+     8,
+     217.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "restore",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   }
+  ],
+  "surfaces: two remapped layers, one rule near the top edge": [
+   {
+    "op": "save",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setTransform",
+    "args": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:font",
+    "args": [
+     "10px system-ui, sans-serif"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:textBaseline",
+    "args": [
+     "middle"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     7.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     811,
+     7.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     3
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(0, 0, 0, 0.55)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     7.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     811,
+     7.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     1
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(255, 255, 255, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     [
+      12,
+      6
+     ]
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L0 plane_y=12 (surface, H=16)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(12, 14, 20, 0.85)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     650,
+     9.5,
+     153,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 255, 255, 0.97)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L0 plane_y=12 (surface, H=16)",
+     654,
+     16.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     441.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     811,
+     441.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     3
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(0, 0, 0, 0.55)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     441.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     811,
+     441.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     1
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(255, 255, 255, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     [
+      12,
+      6
+     ]
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 plane_y=301 (surface, H=8)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(12, 14, 20, 0.85)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     650,
+     426.5,
+     153,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 255, 255, 0.97)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L2 plane_y=301 (surface, H=8)",
+     654,
+     433.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "white rule = plane_y, the BG art row the remap treats as the surface"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(12, 14, 20, 0.85)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     459,
+     571,
+     348,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 255, 255, 0.97)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "white rule = plane_y, the BG art row the remap treats as the surface",
+     463,
+     578
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "restore",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   }
+  ],
+  "surfaces: zoom 2.5, one rule": [
+   {
+    "op": "save",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setTransform",
+    "args": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:font",
+    "args": [
+     "10px system-ui, sans-serif"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:textBaseline",
+    "args": [
+     "middle"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     243.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     1097.6,
+     243.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     3
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(0, 0, 0, 0.55)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "moveTo",
+    "args": [
+     0,
+     243.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "lineTo",
+    "args": [
+     1097.6,
+     243.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     1
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(255, 255, 255, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     [
+      12,
+      6
+     ]
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "stroke",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L0 plane_y=97 (surface, H=32)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(12, 14, 20, 0.85)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     936.5999999999999,
+     228.5,
+     153,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 255, 255, 0.97)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L0 plane_y=97 (surface, H=32)",
+     940.5999999999999,
+     235.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "white rule = plane_y, the BG art row the remap treats as the surface"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(12, 14, 20, 0.85)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     745.5999999999999,
+     656.4,
+     348,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 255, 255, 0.97)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "white rule = plane_y, the BG art row the remap treats as the surface",
+     749.5999999999999,
+     663.4
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "restore",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   }
+  ],
+  "frame: at rest, fractional pan, zoom 1.5": [
+   {
+    "op": "save",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setTransform",
+    "args": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     1
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(255, 170, 60, 0.85)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "strokeRect",
+    "args": [
+     51.5,
+     9.5,
+     480,
+     336
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:font",
+    "args": [
+     "10px system-ui, sans-serif"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:textBaseline",
+    "args": [
+     "middle"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "screen 320x224 @ 37,13"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.78)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     53.5,
+     11.5,
+     118,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 220, 160, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "screen 320x224 @ 37,13",
+     57.5,
+     18.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "restore",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   }
+  ],
+  "frame: active, zoom 2.5, caption override": [
+   {
+    "op": "save",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setTransform",
+    "args": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     2
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(255, 210, 120, 1)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "strokeRect",
+    "args": [
+     60.5,
+     80.5,
+     800,
+     560
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:font",
+    "args": [
+     "10px system-ui, sans-serif"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:textBaseline",
+    "args": [
+     "middle"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "camera x=64 · v_offset=32"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.78)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     62.5,
+     82.5,
+     133,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 210, 120, 1)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "camera x=64 · v_offset=32",
+     66.5,
+     89.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "restore",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   }
+  ],
+  "frame: half off the top edge": [
+   {
+    "op": "save",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setTransform",
+    "args": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     1
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(255, 170, 60, 0.85)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setLineDash",
+    "args": [
+     []
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "strokeRect",
+    "args": [
+     0.5,
+     0.5,
+     320,
+     224
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:font",
+    "args": [
+     "10px system-ui, sans-serif"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:textBaseline",
+    "args": [
+     "middle"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "screen 320x224 @ 0,0"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.78)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     2.5,
+     2.5,
+     108,
+     13
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 220, 160, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "screen 320x224 @ 0,0",
+     6.5,
+     9.5
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "restore",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   }
+  ],
+  "camera: four bands, camera 320, fractional frame": [
+   {
+    "op": "save",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setTransform",
+    "args": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:imageSmoothingEnabled",
+    "args": [
+     false
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "rect",
+    "args": [
+     51,
+     8.625,
+     480,
+     336
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "clip",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "plane",
+     0,
+     0,
+     320,
+     32,
+     51,
+     8.625,
+     480,
+     48
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "overlay",
+     0,
+     0,
+     320,
+     32,
+     51,
+     8.625,
+     480,
+     48
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "plane",
+     20,
+     32,
+     320,
+     80,
+     51,
+     56.625,
+     480,
+     120
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "overlay",
+     20,
+     32,
+     320,
+     80,
+     51,
+     56.625,
+     480,
+     120
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "plane",
+     80,
+     112,
+     320,
+     48,
+     51,
+     176.625,
+     480,
+     72
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "overlay",
+     80,
+     112,
+     320,
+     48,
+     51,
+     176.625,
+     480,
+     72
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "plane",
+     160,
+     160,
+     320,
+     64,
+     51,
+     248.625,
+     480,
+     96
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "overlay",
+     160,
+     160,
+     320,
+     64,
+     51,
+     248.625,
+     480,
+     96
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:font",
+    "args": [
+     "9px system-ui, sans-serif"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:textBaseline",
+    "args": [
+     "middle"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L0 FACTOR_LOCKED (locked) x=+0"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(12, 14, 18, 0.82)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     53,
+     9.625,
+     156,
+     12
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(240, 198, 116, 0.98)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L0 FACTOR_LOCKED (locked) x=+0",
+     56,
+     15.625
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L1 FACTOR_1_16 (1/16) x=+20"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(12, 14, 18, 0.82)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     53,
+     57.625,
+     141,
+     12
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(215, 226, 238, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L1 FACTOR_1_16 (1/16) x=+20",
+     56,
+     63.625
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L2 FACTOR_1_4 (1/4) x=+80"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(12, 14, 18, 0.82)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     53,
+     177.625,
+     131,
+     12
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(215, 226, 238, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L2 FACTOR_1_4 (1/4) x=+80",
+     56,
+     183.625
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "L3 FACTOR_1_2 (1/2) x=+160"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(12, 14, 18, 0.82)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     53,
+     249.625,
+     136,
+     12
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(215, 226, 238, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "L3 FACTOR_1_2 (1/2) x=+160",
+     56,
+     255.625
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "preview: Plane B only; no foreground factors, sprites, priority"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(12, 14, 18, 0.82)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     53,
+     330.625,
+     321,
+     12
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(240, 198, 116, 0.98)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "preview: Plane B only; no foreground factors, sprites, priority",
+     56,
+     336.625
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "restore",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   }
+  ],
+  "camera: four bands, camera 900 (wraps), zoom 2.5, no captions": [
+   {
+    "op": "save",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setTransform",
+    "args": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:imageSmoothingEnabled",
+    "args": [
+     false
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "beginPath",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "rect",
+    "args": [
+     60,
+     80,
+     800,
+     560
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "clip",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "plane",
+     0,
+     0,
+     320,
+     32,
+     60,
+     80,
+     800,
+     80
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "overlay",
+     0,
+     0,
+     320,
+     32,
+     60,
+     80,
+     800,
+     80
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "plane",
+     56,
+     32,
+     320,
+     80,
+     60,
+     160,
+     800,
+     200
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "overlay",
+     56,
+     32,
+     320,
+     80,
+     60,
+     160,
+     800,
+     200
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "plane",
+     225,
+     112,
+     287,
+     48,
+     60,
+     360,
+     717.5,
+     120
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "plane",
+     0,
+     112,
+     33,
+     48,
+     777.5,
+     360,
+     82.5,
+     120
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "overlay",
+     225,
+     112,
+     287,
+     48,
+     60,
+     360,
+     717.5,
+     120
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "overlay",
+     0,
+     112,
+     33,
+     48,
+     777.5,
+     360,
+     82.5,
+     120
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "plane",
+     450,
+     160,
+     62,
+     64,
+     60,
+     480,
+     155,
+     160
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "plane",
+     0,
+     160,
+     258,
+     64,
+     215,
+     480,
+     645,
+     160
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "overlay",
+     450,
+     160,
+     62,
+     64,
+     60,
+     480,
+     155,
+     160
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "drawImage",
+    "args": [
+     "overlay",
+     0,
+     160,
+     258,
+     64,
+     215,
+     480,
+     645,
+     160
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "restore",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   }
+  ],
+  "lens label: anchored to coverage, fractional anchor": [
+   {
+    "op": "save",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setTransform",
+    "args": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:font",
+    "args": [
+     "10px system-ui, sans-serif"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:textBaseline",
+    "args": [
+     "middle"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "highlighted: the cells band 0 animates"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "steps every 8 frames"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "band 0 · slots 0..32"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.82)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     117.4,
+     36.8,
+     216,
+     48
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 90, 200, 0.34)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     123.4,
+     40.3,
+     9,
+     9
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(255, 150, 220, 0.85)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     1
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "strokeRect",
+    "args": [
+     123.9,
+     40.8,
+     8,
+     8
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 200, 235, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "highlighted: the cells band 0 animates",
+     137.4,
+     44.8
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "steps every 8 frames",
+     123.4,
+     58.8
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "band 0 · slots 0..32",
+     123.4,
+     72.8
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "restore",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   }
+  ],
+  "lens label: no coverage on screen: the corner": [
+   {
+    "op": "save",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "setTransform",
+    "args": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:font",
+    "args": [
+     "10px system-ui, sans-serif"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:textBaseline",
+    "args": [
+     "middle"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "measureText",
+    "args": [
+     "highlighted: the cells band 1 animates"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(10, 12, 18, 0.82)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     875.5999999999999,
+     6,
+     216,
+     20
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 90, 200, 0.34)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillRect",
+    "args": [
+     881.5999999999999,
+     9.5,
+     9,
+     9
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:strokeStyle",
+    "args": [
+     "rgba(255, 150, 220, 0.85)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:lineWidth",
+    "args": [
+     1
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "strokeRect",
+    "args": [
+     882.0999999999999,
+     10,
+     8,
+     8
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "set:fillStyle",
+    "args": [
+     "rgba(255, 200, 235, 0.95)"
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "fillText",
+    "args": [
+     "highlighted: the cells band 1 animates",
+     895.5999999999999,
+     14
+    ],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   {
+    "op": "restore",
+    "args": [],
+    "m": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "tag": "master-real3",
+ "head": "5a09df4aaa79867d7013afc330da14ea13d42723",
+ "root": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6",
+ "captures": {
+  "probe": {
+   "w": 661,
+   "h": 620,
+   "hash": "a12aa4a58b096dcc",
+   "path": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6/scratchpad/shots-dpr-guides-offset/identity-probe-a-master-real3.png"
+  },
+  "floor": {
+   "w": 661,
+   "h": 620,
+   "hash": "e005f27e5abeeb35",
+   "path": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6/scratchpad/shots-dpr-guides-offset/identity-floor-a-master-real3.png"
+  }
+ }
+}
