@@ -1,0 +1,13 @@
+diff --git a/src/renderer/providers/effects-aeon.ts b/src/renderer/providers/effects-aeon.ts
+index 2ecd0da3..960afb77 100644
+--- a/src/renderer/providers/effects-aeon.ts
++++ b/src/renderer/providers/effects-aeon.ts
+@@ -3606,7 +3606,7 @@ export interface SectionIdentity {
+ export function sameSectionIdentity(a: SectionIdentity, b: SectionIdentity): boolean {
+   return a.projectPath === b.projectPath
+     && a.zoneId === b.zoneId
+-    && a.actId === b.actId
++    // PLANTED: the act dropped from the identity (same section NUMBER = same section)
+     && a.sectionIndex === b.sectionIndex
+     && a.sceneRef === b.sceneRef;
+ }

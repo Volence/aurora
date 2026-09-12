@@ -1,0 +1,14 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+
+ ✓ src/renderer/state/__tests__/effects-scene-follow.test.ts (22 tests) 5ms
+
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+   Start at  10:06:13
+   Duration  433ms (transform 277ms, setup 303ms, import 64ms, tests 5ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: no failures in this run (1 module(s) reported).

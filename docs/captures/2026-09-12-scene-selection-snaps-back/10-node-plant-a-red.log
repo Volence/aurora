@@ -1,0 +1,93 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+
+ ❯ src/renderer/state/__tests__/effects-scene-follow.test.ts (22 tests | 2 failed) 16ms
+     ✓ the first step ever is an arrival and follows 2ms
+     ✓ the SAME identity never moves the selection, whatever is selected 0ms
+     ✓ a different projectPath is a different section and follows 0ms
+     ✓ a different zoneId is a different section and follows 0ms
+     × a different actId is a different section and follows 5ms
+     ✓ a different sectionIndex is a different section and follows 0ms
+     ✓ a different sceneRef is a different section and follows 0ms
+     ✓ nothing to follow to: the act default, an unreadable ref, no library 0ms
+     ✓ already on the section's scene: no write 0ms
+     ✓ arrival: a project already open when it installs is followed 1ms
+     ✓ arrival: opening a project after it installs is followed 0ms
+     ✓ changing the active section follows, from a scene the author picked 0ms
+     ✓ a section change that comes BACK to where it started still follows (A -> B -> A) 0ms
+     ✓ SECTION ASSIGNMENT follows: an in-place sceneRef edit is seen through the history hub 0ms
+     ✓ a section bound to nothing leaves the selection where it is 0ms
+     ✓ sub-tab round trips, a scene edit and unrelated editor traffic keep the pick 0ms
+     × another act, same section index, same sceneRef: follows 1ms
+     ✓ another zone, same act id, same index, same sceneRef: follows 0ms
+     ✓ another checkout with the same zone, act and refs: follows 0ms
+     ✓ a same-directory reopen (a fresh project object, the same scenes) keeps the pick 0ms
+     ✓ an edit that replaces the project object (addChunks) keeps the pick 0ms
+     ✓ installing twice is one follower, and uninstalling stops it 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/state/__tests__/effects-scene-follow.test.ts > sceneSelectionFollowStep: follow a CHANGE of section, never a repeat of one > a different actId is a different section and follows
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/renderer/state/__tests__/effects-scene-follow.test.ts:113:45
+    111|     it(`a different ${field} is a different section and follows`, () =…
+    112|       const next = { ...ID, [field]: value } as SectionIdentity;
+    113|       expect(sameSectionIdentity(ID, next)).toBe(false);
+       |                                             ^
+    114|       expect(sceneSelectionFollowStep(ID, next, library(), 'water')).t…
+    115|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/renderer/state/__tests__/effects-scene-follow.test.ts > installEffectsSceneFollow: P3, the same NUMBER elsewhere is a different section > another act, same section index, same sceneRef: follows
+AssertionError: expected 'water' to be 'start' // Object.is equality
+
+Expected: "start"
+Received: "water"
+
+ ❯ src/renderer/state/__tests__/effects-scene-follow.test.ts:210:24
+    208|     pick('water');
+    209|     useProjectStore.getState().setCurrentAct('ojz', 'act2');
+    210|     expect(selected()).toBe('start');
+       |                        ^
+    211|   });
+    212|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 20 passed (22)
+   Start at  10:05:23
+   Duration  647ms (transform 446ms, setup 459ms, import 112ms, tests 16ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 2 failure record(s) in 1 file(s) (2 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        2   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/state/__tests__/effects-scene-follow.test.ts
+    [ASSERTION] sceneSelectionFollowStep: follow a CHANGE of section, never a repeat of one > a different actId is a different section and follows
+        AssertionError: expected true to be false // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] installEffectsSceneFollow: P3, the same NUMBER elsewhere is a different section > another act, same section index, same sceneRef: follows
+        AssertionError: expected 'water' to be 'start' // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 2 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
