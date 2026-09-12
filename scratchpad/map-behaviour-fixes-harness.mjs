@@ -20,6 +20,14 @@
 //   m4  M4.*  the collision brush SIZE is latched at the press: a size picked
 //            mid-drag (Tab to the next Brush button, a real Space) does not
 //            change the stroke, and the NEXT stroke uses it.
+//   bw  BW.*  BRUSH-WORD-LATCH (hub ruling, empyrean OVERSEER-LOG
+//            2026-09-12T09:39:48Z): the collision brush WORD is latched at
+//            the press. The shape button the setup clicked keeps focus; with
+//            the stroke held, a real Tab to the next shape button and a real
+//            Space pick another word, and cells 3 and 4 of the stroke must
+//            still carry the pressed word (cdp-sweep-4 section 5.4 O2 measured
+//            them taking the new one). BW.b, BW.c, BW.d are controls that hold
+//            with or without the latch; BW.a is the discriminating row.
 //   m6  M6.*  a real stamp press under a still pointer names the placement it
 //            made, in the store and in the Chunk links readout, with no move.
 //
@@ -28,6 +36,10 @@
 //     (collision-cell.ts) and SECTION_TILES_WIDE/HIGH (s4-types.ts) are bundled
 //     from the tree under test with esbuild and CALLED. The red-first mutations
 //     are reverts of the four fixes and never touch these three files.
+//     PART bw adds `collisionPaintWord` (core/editing/collision-word.ts) and
+//     `unpackCollisionCell` (core/collision/collision-cell-word.ts), bundled
+//     and called the same way; its red-first mutation reverts
+//     MapViewport.tsx only and never touches either file.
 //   * The Brush sizes and the Chunk links "no chunk link" text are read from
 //     the COMMITTED HEAD (`git show HEAD:<path>`), each by a regex that must
 //     match exactly once.
@@ -83,7 +95,7 @@ assertDebugBuild(RUN);
 const ELECTRON = RUN.electron;
 const MAIN = RUN.main;
 const PORT = Number(process.env.PORT ?? 9433);
-const ALL_PARTS = ['m1', 'm2', 'm4', 'm6'];
+const ALL_PARTS = ['m1', 'm2', 'm4', 'bw', 'm6'];
 const PARTS = (process.env.PART ?? 'all') === 'all' ? ALL_PARTS : String(process.env.PART).split(',');
 for (const p of PARTS) if (!ALL_PARTS.includes(p)) throw new Error(`PART ${p} is not one of ${ALL_PARTS.join(', ')}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -172,7 +184,14 @@ async function loadOracle() {
     nametable: new Uint16Array(W * H), width: W, cellsW: W / 2, cellsH: H / 2,
   }).all;
   const footprint = (cellsList) => [...new Set(cellsList.flatMap((t) => sub(t.cellCol, t.cellRow)))].sort((a, b) => a - b);
-  return { W, H, brushSizes, noLink, sub, targets, footprint };
+  // PART bw's expected words: the tree's own merge rule ("the brush owns its
+  // fields; each cell keeps the rest") and its decoder, never a typed mask.
+  const cw = await bundle('src/core/editing/collision-word.ts');
+  const ccw = await bundle('src/core/collision/collision-cell-word.ts');
+  if (typeof cw.collisionPaintWord !== 'function') throw new Error('ORACLE: no collisionPaintWord');
+  if (typeof ccw.unpackCollisionCell !== 'function') throw new Error('ORACLE: no unpackCollisionCell');
+  const paintWord = (brushWord, oldWord) => cw.collisionPaintWord(brushWord, oldWord, 'keep', 'a');
+  return { W, H, brushSizes, noLink, sub, targets, footprint, paintWord, unpack: ccw.unpackCollisionCell };
 }
 
 // ═══ CDP ═══════════════════════════════════════════════════════════════════
@@ -293,7 +312,7 @@ const CLICK_LOG = String.raw`(() => { if (window.__clicklog) return 'already'; w
   window.addEventListener('click', (e) => {
     const b = e.target && e.target.closest ? e.target.closest('button') : null;
     const row = b && b.parentElement && b.parentElement.firstElementChild ? (b.parentElement.firstElementChild.textContent || '').trim() : null;
-    window.__clicklog.push({ target: e.target && e.target.tagName, text: b ? (b.textContent || '').trim() : null, row, detail: e.detail }); }, true);
+    window.__clicklog.push({ target: e.target && e.target.tagName, text: b ? (b.textContent || '').trim() : null, row, title: b ? (b.title || null) : null, detail: e.detail }); }, true);
   return 'installed'; })()`;
 
 async function main() {
@@ -308,7 +327,7 @@ async function main() {
   console.log(`    profile      : ${RUN_PROFILE_DIR}`);
   console.log(`    PORT         : ${PORT}   DISPLAY: xvfb-run -a (never :0)`);
   const O = await loadOracle();
-  console.log(`    oracle       : literals from HEAD ${HEAD_SHA}; collision-paint, collision-cell, s4-types bundled from ${RUN.root}/src; brush sizes ${J(O.brushSizes)}; section ${O.W}x${O.H} tiles`);
+  console.log(`    oracle       : literals from HEAD ${HEAD_SHA}; collision-paint, collision-cell, s4-types, collision-word, collision-cell-word bundled from ${RUN.root}/src; brush sizes ${J(O.brushSizes)}; section ${O.W}x${O.H} tiles`);
   const selfPath = 'scratchpad/map-behaviour-fixes-harness.mjs';
   const selfHash = git('hash-object', selfPath).stdout.trim();
   const selfHead = git('rev-parse', `HEAD:${selfPath}`).stdout.trim();
@@ -357,7 +376,7 @@ async function main() {
     await setup(d, A);
     const st0 = await d.strays();
     if (st0.length) check('SETUP.STRAY', 'no mouse event reached the page at a position this harness never sent', 'UNMEASURABLE', J(st0.slice(0, 10)));
-    const parts = { m1: m1Part, m2: m2Part, m4: m4Part, m6: m6Part };
+    const parts = { m1: m1Part, m2: m2Part, m4: m4Part, bw: bwPart, m6: m6Part };
     for (const p of ALL_PARTS) {
       if (!PARTS.includes(p)) continue;
       console.log(`\n════════ PART ${p} ════════`);
@@ -800,6 +819,99 @@ async function m4Part(d, O) {
   const w4 = await readWin();
   note('M4.cleanup', `after the control's Ctrl+Z ${changed(w4, w0).length} sub-tiles differ from the start`);
   await d.realClick(d.BTN_IN('Brush', String(small)), { scroll: true });
+  await d.blur();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PART bw. BRUSH-WORD-LATCH: the collision brush WORD is latched at the press.
+// The hub's ruling (empyrean docs/OVERSEER-LOG.md 2026-09-12T09:39:48Z, option
+// (a)): shape, flip and solidity latch at the press as M4 latches size. The
+// route is the one cdp-sweep-4 section 5.4 O2 measured: collisionSetup's LAST
+// click is a shape button, which KEEPS focus (the ruling leaves palette focus
+// alone), so with the stroke held a real Tab moves focus to the next shape
+// button and a real Space presses it. Before the fix, cells 3 and 4 of the
+// stroke took the new word. The expected cell words are the tree's own
+// `collisionPaintWord` over each sub-tile's word before the stroke.
+// ═══════════════════════════════════════════════════════════════════════════
+/** The focused element, and whether it is one of SHAPE_N's shape buttons (a
+ *  visible button titled `#<n> ...`), with its index in that list. */
+const focusShape = (d) => d.c.json(String.raw`(() => { const a = document.activeElement;
+  if (!a || a === document.body) return { body: true, shape: false, index: -1 };
+  const list = [...document.querySelectorAll('button')].filter((b) => /^#\d+/.test(b.title || '') && b.getBoundingClientRect().width > 0);
+  return { body: false, tag: a.tagName, title: (a.title || '').slice(0, 40) || null, shape: list.includes(a), index: list.indexOf(a) }; })()`);
+async function bwPart(d, O) {
+  const S = await collisionSetup(d, 'bw');
+  const found = await findAir(d, O, S.G, 4, 1, ['a']);
+  const cells = found ? [0, 1, 2, 3].map((k) => ({ cc: found.cc + k, cr: found.cr })) : [];
+  const aims = [];
+  for (const q of cells) aims.push(await aimAt(d, S.G, q.cc * 16 + 8, q.cr * 16 + 8));
+  const aimsOk = aims.length === 4 && aims.every((p, k) => same(p.cell, cells[k]) && p.onMap);
+  if (!(S.ok && found && aimsOk)) {
+    check('BW.0', 'PREMISE: the collision setup and four cells in a row that are air on plane A, each aimed at an integer client pixel on that cell', 'UNMEASURABLE',
+      `dpr ${S.G.R.dpr}; rect ${J(S.G.R)}; hits ${J(S.hits)}; brush ${J(S.brush)}; found ${J(found)}; aims ${J(aims)}`);
+    return;
+  }
+  const words = () => cellWords(d, O, cells);
+  const w0 = await words();
+  /** What each sub-tile of the four cells carries if brush word W painted it. */
+  const expectA = (W) => w0.a.map((row) => row.map((old) => O.paintWord(W, old)));
+  const W1 = (await brushRead(d)).word;
+  const f0 = await focusShape(d);
+  const unmoved0 = await rectUnmoved(d, S.G);
+  await d.clicksDrain();
+  await d.mouse('mouseMoved', aims[0].x, aims[0].y);
+  await d.mouse('mousePressed', aims[0].x, aims[0].y, 'left', 1); await sleep(80);
+  await d.mouse('mouseMoved', aims[1].x, aims[1].y, 'left', 1); await sleep(150);
+  const w1 = await words();
+  const fHeld = await focusShape(d);
+  await d.tab();
+  const fTab = await focusShape(d);
+  await d.clicksDrain();
+  await d.space();
+  const spaceClicks = await d.clicksDrain();
+  const W2 = (await brushRead(d)).word;
+  const unmoved1 = await rectUnmoved(d, S.G);
+  const u1 = O.unpack(W1); const u2 = O.unpack(W2);
+  const differs = Object.keys(u1).filter((k) => u1[k] !== u2[k]);
+  const shapeClick = spaceClicks.some((k) => /^#\d+/.test(k.title || ''));
+  const premise = unmoved0 && unmoved1 && f0.shape && fHeld.shape && fHeld.index === f0.index
+    && fTab.shape && fTab.index !== f0.index && shapeClick && W2 !== W1
+    && !same(expectA(W2), expectA(W1))
+    && same(w1.a.slice(0, 2), expectA(W1).slice(0, 2));
+  check('BW.0', 'PREMISE: the shape button the setup clicked keeps focus through the press; with the stroke HELD (cells 1 and 2 painted with the pressed word W1), a real Tab moved focus to ANOTHER shape button and a real Space pressed it (a click reached a shape button), so the store now selects a word W2 that paints differently (ANTI-VACUOUS); the canvas did not move',
+    premise, `dpr ${S.G.R.dpr}; rect ${J(S.G.R)}; view ${J(S.G.V)}; cells ${J(cells)}; aims ${J(aims.map((p) => ({ x: p.x, y: p.y, world: p.world, cell: p.cell })))}; `
+    + `focus after setup ${J(f0)}, while held ${J(fHeld)}, after Tab ${J(fTab)}; clicks the Space produced ${J(spaceClicks)}; `
+    + `W1 ${W1} ${J(u1)} -> W2 ${W2} ${J(u2)} (fields that differ ${J(differs)}); A cells 1,2 after the press ${J(w1.a.slice(0, 2))}; canvas unmoved ${unmoved0}/${unmoved1}`);
+  await d.mouse('mouseMoved', aims[2].x, aims[2].y, 'left', 1); await sleep(150);
+  await d.mouse('mouseMoved', aims[3].x, aims[3].y, 'left', 1); await sleep(150);
+  await d.mouse('mouseReleased', aims[3].x, aims[3].y, 'left', 0); await sleep(300);
+  const w2 = await words();
+  if (premise) {
+    check('BW.a', 'the word picked MID-DRAG does not change the stroke: cells 3 and 4, painted AFTER the Space, carry the word LATCHED at the press (W1) like cells 1 and 2, not W2',
+      same(w2.a, expectA(W1)),
+      `A cells 1..4 ${J(w2.a)}; W1 paints ${J(expectA(W1)[0])} per cell; the live word W2 would paint ${J(expectA(W2)[0])}`);
+    check('BW.b', 'CONTROL (green with or without the latch): cells 1 and 2, painted BEFORE the Space, carry W1, and plane B is untouched',
+      same(w2.a.slice(0, 2), expectA(W1).slice(0, 2)) && same(w2.b, w0.b),
+      `A cells 1,2 ${J(w2.a.slice(0, 2))}; B ${J(w2.b)}; B before ${J(w0.b)}`);
+  }
+  await d.chord('z', CTRL);
+  const w3 = await words();
+  if (premise) {
+    check('BW.c', 'CONTROL: the stroke is ONE undo step: one Ctrl+Z puts both planes back exactly',
+      same(w3.a, w0.a) && same(w3.b, w0.b), `after one Ctrl+Z ${J(w3)}; before ${J(w0)}`);
+  }
+  await d.mouse('mouseMoved', aims[0].x, aims[0].y);
+  await d.mouse('mousePressed', aims[0].x, aims[0].y, 'left', 1); await sleep(80);
+  await d.mouse('mouseReleased', aims[0].x, aims[0].y, 'left', 0); await sleep(300);
+  const w4 = await words();
+  if (premise) {
+    check('BW.d', 'CONTROL: the NEXT press takes the word picked during the last stroke: a click on cell 1 paints it with W2, and cells 2 to 4 stay as they were',
+      same(w4.a[0], expectA(W2)[0]) && same(w4.a.slice(1), w0.a.slice(1)),
+      `A cells 1..4 ${J(w4.a)}; W2 paints ${J(expectA(W2)[0])} on cell 1`);
+  }
+  await d.chord('z', CTRL);
+  const w5 = await words();
+  note('BW.cleanup', `after the control's Ctrl+Z the four cells ${same(w5, w0) ? 'match' : 'DIFFER FROM'} the start`);
   await d.blur();
 }
 
