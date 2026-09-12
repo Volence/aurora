@@ -1,0 +1,154 @@
+
+> aurora@0.1.0 harness:ramp-control
+> node scratchpad/ramp-control-harness.mjs
+
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0 — dist/main/index.mjs is 313s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0/src/test/element-stub.ts)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T06:39:05.383Z), so window.__dbg is in this bundle
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/ramp-control-harness-3646783-3aedf150 — see HAZARD 6
+
+=== BOOT: the real aeon project (READ-ONLY — no save is ever issued) ===
+NOTE       aeon open threw
+        Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  [b1] the aeon project is open, with sections
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+=== FIXTURE: a fresh BANDS preset, created through the panel ===
+NOTE       presets list
+        already-open
+NOTE       preset card
+        clicked
+NOTE       run geometry
+        {"dpr":1,"viewport":[1400,872],"stripCanvas":{"x":1109,"y":2477.90625,"w":258,"h":279.828125}}
+PASS  [f0] ANTI-VACUOUS FIXTURE: the probe preset exists and is a BANDS document, the raster switch is on screen, and `Add raster band` is PRESENT, VISIBLE, IN ITS SCROLLER and ENABLED — every [dc] row below is about that chip going dead, so a chip that was already dead (or already off screen) would make them green for a reason that has nothing to do with the ramp
+        document = {"schema":1,"id":"aurora_local_rampctl_probe","bands":[{"top":112,"bot":128,"sh":false,"on":{"cram":{"addr":74,"colours":[0]}}}]}; Add chip = {"dpr":1,"left":1109,"top":467.90625,"w":268,"h":19,"disabled":false,"visible":true,"scroller":"DIV","inScroller":true,"text":"Add raster band","title":null,"value":""}; raster select = {"dpr":1,"left":1177,"top":464.40625,"w":200,"h":26,"disabled":false,"visible":true,"scroller":"DIV","inScroller":true,"text":"bands: a sparse fire listbase swap: one ","title":"The bands of this program, lowered to one compose([...]). Absent or empty: refused (aeon load_preset; engine backstop raster_dsl.emp compose). The engine's program-buffer ceiling, not this schema, caps the count (three one-colour bands measured at 55 words).","value":"bands"}
+
+=== [cv] the raster-program switch: bands → ramp, and back in one undo ===
+PASS  [cv-a] the switch REALLY CONVERTED THE DOCUMENT — `ramp` is present with all five keys, and the `bands` key is GONE, not emptied. ⚠ THE CLAIM IS ABOUT THE DOCUMENT, read back through the model, not about a handler having run or a select showing a new label
+        driven by: native value setter + real `change` event (focus: focused; a real ArrowDown did NOT move a closed <select> under Xvfb, so the popup-free path was used — see the header for why this is SETUP-class here and what [f0] covers instead); document = {"schema":1,"id":"aurora_local_rampctl_probe","ramp":{"top":64,"lines":128,"target":{"vsram":{"addr":0}},"start":{"whole":0,"frac256":0},"step":{"whole":0,"frac256":64}}} (was {"schema":1,"id":"aurora_local_rampctl_probe","bands":[{"top":112,"bot":128,"sh":false,"on":{"cram":{"addr":74,"colours":[0]}}}]})
+PASS  [cv-b] and it never authored the BOTH-KEYS document the schema refuses — exactly one raster program at every instant
+        keys = ["id","ramp","schema"]
+PASS  [cv-z] ⚠ ONE Ctrl+Z RESTORES EXACTLY WHAT WAS THERE, byte for byte — the condition on building a destructive conversion at all (decision cards d-29/d-30). The comparison is a full JSON equality against the document as it stood BEFORE the switch, not a shape check
+        before = {"schema":1,"id":"aurora_local_rampctl_probe","bands":[{"top":112,"bot":128,"sh":false,"on":{"cram":{"addr":74,"colours":[0]}}}]}
+        after one undo = {"schema":1,"id":"aurora_local_rampctl_probe","bands":[{"top":112,"bot":128,"sh":false,"on":{"cram":{"addr":74,"colours":[0]}}}]}
+NOTE       [cv] re-converting for the rows below
+        native value setter + real `change` event (focus: focused; a real ArrowDown did NOT move a closed <select> under Xvfb, so the popup-free path was used — see the header for why this is SETUP-class here and what [f0] covers instead)
+NOTE       [cv] the ramp under test
+        {"top":64,"lines":128,"target":{"vsram":{"addr":0}},"start":{"whole":0,"frac256":0},"step":{"whole":0,"frac256":64}}
+
+=== [dc] the band controls on a ramp document ===
+PASS  [dc-a] the `Add raster band` chip is DISABLED on a ramp document
+        chip = {"dpr":1,"left":1109,"top":467.40625,"w":268,"h":19,"disabled":true,"visible":true,"scroller":"DIV","inScroller":true,"text":"Add raster band","title":"preset \"aurora_local_rampctl_probe\" carries a ramp, not bands. A preset holds EXACTLY ONE program: the schema's top-level oneOf refuses a document carrying two, and the engine has no combinator that mixes them, which means the band controls cannot write here at all. Set the Program row above back to bands to author bands; that discards the ramp, and it is one undo step.","value":""}
+FAIL  [dc-b] ⚠ AND IT CARRIES A SENTENCE, WHICH IS THE ROW THAT MATTERS — the refusal is PAINTED in a real element whose rect lands inside its own scroller (not merely present in the DOM, and not hover-only), and it SAYS THE THING: which document, the exactly-one-raster-program rule, and the way out. A row that asserted only the disabled flag would pass for a control that had greyed out for an unrelated reason — this repo has been bitten by that three times
+        painted refusal = {"tag":"DIV","w":268,"h":132,"inScroller":true,"scroller":"DIV","length":372,"has":{"carries a ramp, not bands":true,"EXACTLY ONE raster program":false,"no combinator":true,"one undo step":true},"allPresent":false,"text":"preset \"aurora_local_rampctl_probe\" carries a ramp, not bands. A preset holds EXACTLY ONE program: the schema's top-level oneOf refuses a document carrying two, and the engine has no combinator that mixes them, which means the band controls cannot write here a …[truncated for the console only]"}
+PASS  [dc-c] the same sentence is on the chip's own title, so a pointer finds it too
+        chip title = "preset \"aurora_local_rampctl_probe\" carries a ramp, not bands. A preset holds EXACTLY ONE program: the schema's top-level oneOf refuses a document carrying two, and the engine has no combinator that mixes them, which means the band controls cannot write here at all. Set the Program row above back to bands to author bands; that discards the ramp, and it is one undo step."
+NOTE       [dc] NO "I CLICKED THE DISABLED CHIP" ROW IS SHIPPED, and that is deliberate
+        A disabled <button> fires no onClick, so "I pressed it and the document did not move" is green however the code behaves — the green-by-construction shape the nine-parcel refused for `Remove layer`. What an author can actually perceive is measured instead: the flag, the painted sentence, and the title.
+
+=== [sp] the top + lines pair, refused at the control ===
+NOTE       focus: dropped <SELECT> before typing into Lines
+        so the press below is a real focus change and the box select-on-focus runs
+NOTE       aim: Lines [lines]
+        dpr=1 rect=(1182,465.40625,72x24) → integer client (1218,477) · disabled=false visible=true inScroller=true (scroller=DIV) · elementFromPoint = <INPUT> "" insideTarget=true
+PASS  [sp-a] a `lines` that makes top + lines exceed the interlock is REFUSED AT TYPING TIME and the DOCUMENT DOES NOT MOVE — the two halves in one condition, because a refusal that only paints is decoration and a silent withhold is the defect this parcel exists to remove
+        lines 128 → 128 (unchanged=true); typed 200 against top 64, which would have spanned to 264; painted refusal = {"tag":"DIV","w":190,"h":231,"inScroller":true,"scroller":"DIV","length":467,"has":{"top + lines must be at most":true,"THE PER-FIELD MAXIMA ARE NOT":true,"the largest top is":true},"allPresent":true,"text":"preset \"aurora_local_rampctl_probe\" ramp lines: 200 with top 64 spans to 264, and top + lines must be at most 223, the frame-rewind interlock. ⚠ THE PER-FIELD MAXIMA ARE NOT THE PAIR'S CONTRACT: top 222 and lines 220 each satisfy the schema and the pair is sti …[truncated for the console only]"}
+PASS  [sp-b] the refusal carries the SCHEMA'S OWN number for the bound — read off the screen and checked against the arithmetic the author would do, so a retyped or drifted constant shows up here
+        the sentence on screen says the bound is 223; the typed pair spans to 264. ⚠ The number is READ FROM THE APP, never asserted against a literal in this file — the constant is derived from the contract's prose and a hardcoded 223 here would survive a contract change that moved it.
+NOTE       focus: dropped <INPUT> before typing into Lines (a value that fits)
+        so the press below is a real focus change and the box select-on-focus runs
+NOTE       aim: Lines (a value that fits) [lines]
+        dpr=1 rect=(1182,465.40625,72x24) → integer client (1218,477) · disabled=false visible=true inScroller=true (scroller=DIV) · elementFromPoint = <INPUT> "" insideTarget=true
+PASS  [sp-c] ANTI-VACUOUS: the very same field accepts the largest value the pair admits, so [sp-a] measured a REFUSAL and not a dead box
+        typed 159 (= 223 - top 64); lines is now 159
+
+=== [rt] -0.5 has no spelling: refused, named, and NOT snapped ===
+NOTE       focus: dropped <INPUT> before typing into Step
+        so the press below is a real focus change and the box select-on-focus runs
+NOTE       aim: Step [step]
+        dpr=1 rect=(1182,465.40625,88x24) → integer client (1226,477) · disabled=false visible=true inScroller=true (scroller=DIV) · elementFromPoint = <INPUT> "" insideTarget=true
+PASS  [rt-a] ⚠ -0.5 IS REFUSED AND NOTHING SNAPPED: the document's `step` is BYTE-IDENTICAL to what it was — not rounded to 0, not rounded to -1, not written as {whole: 0, frac256: 128} (which would be +0.5 and is the sign bug this encoding invites)
+        step {"whole":0,"frac256":64} → {"whole":0,"frac256":64}
+PASS  [rt-b] and the refusal NAMES WHAT THE AUTHOR CAN HAVE — the two nearest representable rates — rather than only saying no. A refusal without them sends the author hunting for a nearby value that does not exist either, because the whole interval between -1 and 0 is unreachable in this encoding
+        painted refusal = {"tag":"DIV","w":190,"h":231,"inScroller":true,"scroller":"DIV","length":451,"has":{"HAS NO SPELLING":true,"The nearest rates you CAN have are -1 and 0":true,"not rounded to either":true,"frac256 is a MAGNITUDE":true},"allPresent":true,"text":"preset \"aurora_local_rampctl_probe\" ramp step: -0.5 px per scanline HAS NO SPELLING in this encoding. frac256 is a MAGNITUDE and the sign lives on whole alone, so a negative value needs a negative whole and there is none between -1 and 0: {whole: 0, frac256: 1 …[truncated for the console only]"}
+NOTE       focus: dropped <INPUT> before typing into Step (a rate that DOES have a spelling)
+        so the press below is a real focus change and the box select-on-focus runs
+NOTE       aim: Step (a rate that DOES have a spelling) [step]
+        dpr=1 rect=(1182,465.40625,88x24) → integer client (1226,477) · disabled=false visible=true inScroller=true (scroller=DIV) · elementFromPoint = <INPUT> "" insideTarget=true
+PASS  [rt-c] ANTI-VACUOUS, and the sign rule end to end: -1.5 IS representable and lands as {whole: -1, frac256: 128} — the frac is a MAGNITUDE and the sign is the whole part's, so the naive reading of that pair (-0.5) is a whole pixel out with both numbers still in range. Typed in the real box, read back out of the real document
+        step is now {"whole":-1,"frac256":128} after typing -1.5
+
+=== [ns] the SIGN: negative does not build, positive does ===
+NOTE       focus: dropped <INPUT> before typing into Step (the unrepresentable rate, again)
+        so the press below is a real focus change and the box select-on-focus runs
+NOTE       aim: Step (the unrepresentable rate, again) [step]
+        dpr=1 rect=(1182,465.40625,88x24) → integer client (1226,477) · disabled=false visible=true inScroller=true (scroller=DIV) · elementFromPoint = <INPUT> "" insideTarget=true
+PASS  [ns-a] ⚠ THE REFUSAL STILL NAMES -1 AND 0 — THE ARITHMETIC SURVIVED THE RETIREMENT — AND THE "WILL NOT BUILD" CAVEAT IS GONE (premise empty in ramp-sign-lag.ts). aeon encodes the two's complement now, so -1 builds and the recommendation IS a fix; a clause still saying otherwise would be a false warning stapled to a correct sentence. And the document did not move
+        premise = []; painted refusal = {"tag":"DIV","w":190,"h":231,"inScroller":true,"scroller":"DIV","length":451,"has":{"The nearest rates you CAN have are -1 and 0":true},"allPresent":true,"text":"preset \"aurora_local_rampctl_probe\" ramp step: -0.5 px per scanline HAS NO SPELLING in this encoding. frac256 is a MAGNITUDE and the sign lives on whole alone, so a negative value needs a negative whole and there is none between -1 and 0: {whole: 0, frac256: 1 …[truncated for the console only]"}; painted caveat = {"tag":"DIV","w":190,"h":231,"inScroller":true,"scroller":"DIV","length":451,"has":{"A NEGATIVE ONE WILL NOT BUILD TODAY":false,"does not fit u32":false,"still the nearest value this ENCODING can spell":false},"allPresent":false,"text":"preset \"aurora_local_rampctl_probe\" ramp step: -0.5 px per scanline HAS NO SPELLING in this encoding. frac256 is a MAGNITUDE and the sign lives on whole alone, so a negative value needs a negative whole and there is none between -1 and 0: {whole: 0, frac256: 1 …[truncated for the console only]"}; step {"whole":-1,"frac256":128} → {"whole":-1,"frac256":128} (unchanged=true)
+NOTE       focus: dropped <INPUT> before typing into Start (positive, so only `step` is named)
+        so the press below is a real focus change and the box select-on-focus runs
+NOTE       aim: Start (positive, so only `step` is named) [start]
+        dpr=1 rect=(1182,465.40625,88x24) → integer client (1226,477) · disabled=false visible=true inScroller=true (scroller=DIV) · elementFromPoint = <INPUT> "" insideTarget=true
+NOTE       focus: dropped <INPUT> before typing into Step (a representable NEGATIVE)
+        so the press below is a real focus change and the box select-on-focus runs
+NOTE       aim: Step (a representable NEGATIVE) [step]
+        dpr=1 rect=(1182,465.40625,88x24) → integer client (1226,477) · disabled=false visible=true inScroller=true (scroller=DIV) · elementFromPoint = <INPUT> "" insideTarget=true
+PASS  [ns-b] ⚠ A REPRESENTABLE NEGATIVE LANDS IN THE DOCUMENT AND THE PANEL SAYS NOTHING ABOUT IT (premise empty in ramp-sign-lag.ts). `step` really is {whole: -1, frac256: 128} in the model — so the surface was DRIVEN to the exact document that used to be disclosed, not merely left alone — and no element on it still claims the value cannot build. aeon encodes; this one ships
+        premise = []; step = {"whole":-1,"frac256":128}; start = {"whole":0,"frac256":0}; painted disclosure = null; painted lead = null
+NOTE       focus: dropped <INPUT> before typing into Start (also NEGATIVE)
+        so the press below is a real focus change and the box select-on-focus runs
+NOTE       aim: Start (also NEGATIVE) [start]
+        dpr=1 rect=(1182,465.40625,88x24) → integer client (1226,477) · disabled=false visible=true inScroller=true (scroller=DIV) · elementFromPoint = <INPUT> "" insideTarget=true
+PASS  [ns-c] `start` is silent too, and that is the half a partial retirement would miss. `rrp_start` took the same encode as `rrp_step`, so a run that BEGINS below the rest position builds exactly as a downward ramp does — a disclosure left armed on `start` alone would be a false warning nobody was looking for
+        premise = []; start = {"whole":-2,"frac256":0}; painted = null; painted lead = null
+NOTE       focus: dropped <INPUT> before typing into Start (back to a positive document)
+        so the press below is a real focus change and the box select-on-focus runs
+NOTE       aim: Start (back to a positive document) [start]
+        dpr=1 rect=(1182,465.40625,88x24) → integer client (1226,477) · disabled=false visible=true inScroller=true (scroller=DIV) · elementFromPoint = <INPUT> "" insideTarget=true
+NOTE       focus: dropped <INPUT> before typing into Step (POSITIVE — this one builds)
+        so the press below is a real focus change and the box select-on-focus runs
+NOTE       aim: Step (POSITIVE — this one builds) [step]
+        dpr=1 rect=(1182,465.40625,88x24) → integer client (1226,477) · disabled=false visible=true inScroller=true (scroller=DIV) · elementFromPoint = <INPUT> "" insideTarget=true
+PASS  [ns-d] ⚠ AND ON A POSITIVE DOCUMENT THE SENTENCE IS GONE. This is the direction the parcel exists for: "ramp does not reach the game" RETIRED earlier the same day, and a disclosure that spoke on every ramp would be a FALSE WARNING — the same defect as the recommendation that opened this row, wearing the other hat. The document really is positive (so the surface was driven, not merely left alone) and nothing on screen says a negative word
+        start = {"whole":0,"frac256":0}, step = {"whole":1,"frac256":128}; paintedRect(lead) = null, paintedRect(body) = null (both must be null)
+
+=== [ds] the display readout: the write span AND the screen span ===
+PASS  [ds-a] the readout paints BOTH spans, and the numbers agree with the DOCUMENT — the write span is the document's own `top`..`top + lines - 1`
+        document top=64 lines=159 (write span 64-222); readout = {"tag":"SPAN","w":167,"h":31.5,"inScroller":true,"scroller":"DIV","length":52,"has":{},"allPresent":true,"text":"writes on lines 64-222, shows on screen lines 66-224"}
+PASS  [ds-b] ⚠ AND THE SCREEN SPAN IS EXACTLY 2 LINE(S) LATER, at BOTH ends. This is the judgement made visible: the Top field and the file are in the ENGINE's numbers, and this readout — the only screen-line claim on the surface — adds the offset. No stage of the engine path compensates (engine lane, 2026-09-03), so a readout that did not add it would be one line high everywhere AND WOULD LOOK CORRECT. ⚠ THE EXPECTED DELTA IS THE FIRST-LINE OFFSET AND NOT THE PER-INDEX LAG — they are different quantities that differ by one (j starts at 1), and this run PARSED both out of the vendored schema: offset 2 from the top sentence, per-index lag 1 from the ramp description. Neither number is typed here
+        writes writes on lines 64-222 · shows on screen lines 66-224 · delta at first=2 at last=2 · expected 2 (schema-derived)
+PASS  [ds-c] the reason is reachable on the readout itself, not only in a docblock
+        the readout's own `title` carries RAMP_DISPLAY_LAG_NOTE, which states the latency and that no stage of the engine path compensates.
+PASS  [ds-d] the painted numbers name the INSTRUMENT that read them
+        the readout's title must carry the contract's own verdict (top+2 is the instrument's reading today and not a ratified hardware fact) and its instrument clause, and must NOT carry the withdrawn 2026-08-19 engine-move attribution. title was: A VSRAM run's value for index j DISPLAYS on screen line top + j + 1, the N+1 VSRAM latency (raster.emp:602-609). AND j STARTS AT 1: the interpreter adds the step before it writes, so `start` itself is never emitted and the FIRST value an author sees lands on top + 2, not top + 1. A run of lines values therefore occupies screen lines top + 2 .. top + lines + 1, so a run at the very bottom (top + li
+PASS  [z] the probe preset is walked back out of the model by the app's own history, so this run leaves nothing behind (and nothing was ever written to disk — no save is issued and the app has no autosave)
+        probe preset after the undo walk = null
+
+═══════════════════════════════════════════════════════════════════════════
+RESULT  22/23 rows passed
+FAILED:
+  [dc-b] ⚠ AND IT CARRIES A SENTENCE, WHICH IS THE ROW THAT MATTERS — the refusal is PAINTED in a real element whose rect lands inside its own scroller (not merely present in the DOM, and not hover-only), and it SAYS THE THING: which document, the exactly-one-raster-program rule, and the way out. A row that asserted only the disabled flag would pass for a control that had greyed out for an unrelated reason — this repo has been bitten by that three times
+shots → /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0/scratchpad/shots-ramp-control
+═══════════════════════════════════════════════════════════════════════════
+cleanup: tree under pid 3646807 (11 process(es)):
+           3646807 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           3646825 Xvfb :184 -screen 0 1680x1050x24 -nolisten tcp
+           3649647 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           3649655 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           3649672 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3649673 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3649710 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3650167 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3650206 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3650249 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           3650331 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 51 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 351 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
