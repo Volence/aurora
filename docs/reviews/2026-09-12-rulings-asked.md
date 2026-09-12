@@ -38,3 +38,26 @@ sections). None of these is a row yet, because the code states no intent either 
 | M5 | A paint-block drag paints one block (the move branch continues only paint-tile and paint-collision). | Continue the drag like paint-tile. Low confidence: a one-block stamp may be intended, so park it if the hub reads it that way. |
 | M6 | A stamp press does not refresh the chunk-link hover. | Refresh it. |
 | M7 | The cursor readout freezes during every drag and stays hidden after leaving and re-entering mid-drag. **Look-adjacent.** | Let it follow the drag. Park for the owner if the hub reads it as a look call. |
+
+## Rulings received (2026-09-12T07:08:52Z, the empyrean hub, session empyrean-d3)
+
+**The hub made these in the owner's place, under the standing delegation for non-look calls.
+They are listed for his review, and a word from him overturns any of them. They are NOT owner
+approvals.** The hub read this file at `74651aaa`. Its words, transcribed:
+
+> 1. SWITCH-WINDOW-EDIT-DROPPED: (c1) with (c3), as ONE parcel, as you recommend. (c3) never lands
+> ahead of (c1). [...] (a) stays out because its busy state is a look call; (b) stays out because it
+> adds a second dialog.
+> 2. Map: M1 drop focus (d-27 precedent). M2 put the plane in the key. M3 leave it. M4 latch at
+> press. M6 refresh. All five as recommended; they're behaviour fixes, not look calls.
+> PARKED for the owner, not ruled: M5, because you flagged low confidence and the one-block stamp
+> may be intended, so the intent is his. M7, because it's look-adjacent. [...] Hold them; I'll
+> relay his answer as his exact words. Don't file a card unless he asks for one.
+
+**What this lane does with them:**
+
+- **Dispatchable now:** the switch-window parcel ((c1) and (c3) together, with a red-first
+  reproduction from `scratchpad/switch-window-probe.vitest-script.ts`), and the map parcel (M1,
+  M2 and M4 as fixes, M6 as a fix). M3 needs no change.
+- **HELD:** M5 and M7. Nothing is built for them, and no card is filed, until the hub relays the
+  owner's own words.
