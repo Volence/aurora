@@ -1,0 +1,82 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a — dist/main/index.mjs is 0s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src/renderer/components/MapViewport.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T08:14:50.918Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T08:14:50.918Z), so window.__dbg is in this bundle
+=== cdp-sweep-4 2026-09-12 harness ===
+    PARTS        : effects
+    node         : v24.15.0
+    loadavg      : 16.19 9.39 7.13
+    ORACLE_SOCKET: /tmp/cdps4-sock-BTkzG3/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-2310448-cf057f62
+    PORT         : 9431   DISPLAY: xvfb-run -a (never :0)
+    captures     : docs/captures/2026-09-12-cdp-sweep-4   tag red-sf-gate
+    aeon tarball : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/e7b24bf1-afc7-4de1-b841-c92c59c89418/scratchpad/aeon-a38ce7c9.tar   commit a38ce7c961ef83136ac2f7c35e09b2ded7a109ea
+    oracle       : literals from HEAD e2dfd6b0811b359d22e8b3895c11e746ca3b7edf; four modules bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src
+    harness      : blob c0943d5a25d80990884b01198255bdd2a2312dc6 (as committed at HEAD)
+    src on disk  : DIFFERS FROM HEAD (a plant?):
+                   M src/renderer/components/MapViewport.tsx
+    copy         : /tmp/cdps4-aeon-zjW5yc   name "Sonic 4 (sweep4)"   bg-override bands 1
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-2310448-cf057f62 — see HAZARD 6
+    X pointer    : PARKED outside the window: display :184 (Xvfb pid 2314821); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1 by a real Explorer click, and its scene library carries the three locked scenes and the unlocked control   [load 15.86/9.56/7.21]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}; scenes ["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start","sweep4_unlocked"]
+
+════════ PART effects ════════
+   GEOMETRY [effects] dpr 1; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/gd-before-red-sf-gate.png  (clip {"x":544,"y":146,"width":120,"height":160,"scale":1})
+PASS  [GD.0] PREMISE: the Effects facet by a real click, the locked scene picked by a real click in the scene list, and the last repaint drew one guide per layer (layer 2 at its world_y, on screen as a cyan line)   [load 14.91/9.46/7.19]
+        dpr 1; guides {"active":true,"id":"ojz_act1_start","space":"screen","rows":[[0,0,0],[1,32,32],[2,80,80],[3,112,112],[4,160,160]]}; press row 186 pixel rgb(60,165,180); capture docs/captures/2026-09-12-cdp-sweep-4/gd-before-red-sf-gate.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/gd-dragging-red-sf-gate.png  (clip {"x":544,"y":146,"width":120,"height":160,"scale":1})
+PASS  [GD.a] the press on layer 2 (within GUIDE_GRAB_PX 6) takes a DRAG that previews: the drawn guide sits at world_y 120 (vpY + canvasY/zoom of the integer cursor), EFFECTS_GUIDE_ACTIVE on screen there, while the document still holds 80   [load 14.91/9.46/7.19]
+        guides {"dragIndex":2,"row":{"index":2,"worldY":120,"canvasY":120,"enabled":true,"onScreen":true,"notice":null}}; document 80; pixel at the new row 226: rgb(150,245,255) (want rgb(150,245,255)); capture docs/captures/2026-09-12-cdp-sweep-4/gd-dragging-red-sf-gate.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/gd-released-red-sf-gate.png  (clip {"x":544,"y":146,"width":120,"height":160,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/gd-undone-red-sf-gate.png  (clip {"x":544,"y":146,"width":120,"height":160,"scale":1})
+PASS  [GD.b] RELEASE commits ONE undo step: the document holds the dragged world_y, the line is on screen at its new row and not at the old one; one Ctrl+Z puts the old world_y and the old line back   [load 14.91/9.46/7.19]
+        layers after release [0,32,120,112,160]; after release 120; after Ctrl+Z 80; pixels: released new rgb(78,174,189) old rgb(0,0,0); undone old rgb(60,165,180) new rgb(73,36,36); captures docs/captures/2026-09-12-cdp-sweep-4/gd-released-red-sf-gate.png, docs/captures/2026-09-12-cdp-sweep-4/gd-undone-red-sf-gate.png
+   GEOMETRY [frame] dpr 1; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":200,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/sf-ref-unlocked-no-frame-red-sf-gate.png  (clip {"x":284,"y":106,"width":420,"height":380,"scale":1})
+PASS  [SF.0] CONTROL: the UNLOCKED scene (v_factor 0) picked by a real click, the frame toggle OFF: no frame is drawn   [load 13.15/9.27/7.15]
+        dpr 1; toggle false; guides space act; frame {"active":false,"anchor":null,"rect":null,"dragging":false,"paints":17}; capture docs/captures/2026-09-12-cdp-sweep-4/sf-ref-unlocked-no-frame-red-sf-gate.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/sf-locked-frame-red-sf-gate.png  (clip {"x":284,"y":106,"width":420,"height":380,"scale":1})
+FAIL  [SF.a] LOCKED scene, toggle still OFF: the frame is drawn (showFrame's guideSpace === 'screen' arm) at the rect derived from frameAnchorFor: x from the session anchor, y from the scene's v_offset 288; on screen its right and bottom edges are SCREEN_FRAME_LINE over the reference, and 3 px outside is untouched   [load 13.15/9.27/7.15]
+        scene v_offset 288; frame report {"active":false,"anchor":null,"rect":null,"dragging":false,"paints":18}; want x 0 y 88; view {"x":0,"y":200,"zoom":1}; edge null; captures docs/captures/2026-09-12-cdp-sweep-4/sf-ref-unlocked-no-frame-red-sf-gate.png, docs/captures/2026-09-12-cdp-sweep-4/sf-locked-frame-red-sf-gate.png
+   shot: docs/captures/2026-09-12-cdp-sweep-4/effects-aborted-red-sf-gate.png
+UNMS  [EFFECTS.ABORT] the effects part stopped early: rows after this point did NOT run (Cannot read properties of null (reading 'x'))   [load 13.15/9.27/7.15]
+        TypeError: Cannot read properties of null (reading 'x')
+    at Object.effectsPart [as effects] (file:///home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/scratchpad/cdp-sweep-4-0912-harness.mjs:1489:43)
+    at async main (file:///home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/scratchpad/cdp-sweep-4-0912-harness.mjs:489:13)
+NOTE  [effects.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 2314709 (11 process(es)):
+           2314709 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           2314821 Xvfb :184 -screen 0 1680x1050x24 -nolisten tcp
+           2368444 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           2368817 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           2369417 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2369430 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2369767 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2373259 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2373344 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2373456 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           2373680 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 350 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=effects: 5/7 rows PASS · 1 FAIL · 1 UNMEASURABLE · 0 FINDING (not counted) · 26.0s ════
+     loadavg at end 13.15 9.27 7.15
+FAILING:
+  [SF.a] LOCKED scene, toggle still OFF: the frame is drawn (showFrame's guideSpace === 'screen' arm) at the rect derived from frameAnchorFor: x from the session anchor, y from the scene's v_offset 288; on screen its right and bottom edges are SCREEN_FRAME_LINE over the reference, and 3 px outside is untouched
+UNMEASURABLE:
+  [EFFECTS.ABORT] the effects part stopped early: rows after this point did NOT run (Cannot read properties of null (reading 'x'))
+END-OF-RUN

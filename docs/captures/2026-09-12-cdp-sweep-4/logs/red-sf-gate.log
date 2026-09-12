@@ -1,0 +1,117 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a — dist/main/index.mjs is 0s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src/renderer/components/MapViewport.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T08:16:04.200Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T08:16:04.200Z), so window.__dbg is in this bundle
+=== cdp-sweep-4 2026-09-12 harness ===
+    PARTS        : effects
+    node         : v24.15.0
+    loadavg      : 8.31 8.56 7.02
+    ORACLE_SOCKET: /tmp/cdps4-sock-P3TPY7/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-2975020-022f5aa4
+    PORT         : 9431   DISPLAY: xvfb-run -a (never :0)
+    captures     : docs/captures/2026-09-12-cdp-sweep-4   tag red-sf-gate
+    aeon tarball : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/e7b24bf1-afc7-4de1-b841-c92c59c89418/scratchpad/aeon-a38ce7c9.tar   commit a38ce7c961ef83136ac2f7c35e09b2ded7a109ea
+    oracle       : literals from HEAD 8cf19e56e52f7b13431d2caa326ceb03fba4640b; four modules bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src
+    harness      : blob b766afa8511d6134d27f34959adc617e76005567 (as committed at HEAD)
+    src on disk  : DIFFERS FROM HEAD (a plant?):
+                   M src/renderer/components/MapViewport.tsx
+    copy         : /tmp/cdps4-aeon-K5g5UM   name "Sonic 4 (sweep4)"   bg-override bands 1
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-2975020-022f5aa4 — see HAZARD 6
+    X pointer    : PARKED outside the window: display :184 (Xvfb pid 2977404); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1 by a real Explorer click, and its scene library carries the three locked scenes and the unlocked control   [load 7.87/8.46/7.01]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}; scenes ["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start","sweep4_unlocked"]
+
+════════ PART effects ════════
+   GEOMETRY [effects] dpr 1; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/gd-before-red-sf-gate.png  (clip {"x":544,"y":146,"width":120,"height":160,"scale":1})
+PASS  [GD.0] PREMISE: the Effects facet by a real click, the locked scene picked by a real click in the scene list, and the last repaint drew one guide per layer (layer 2 at its world_y, on screen as a cyan line)   [load 7.56/8.38/6.99]
+        dpr 1; guides {"active":true,"id":"ojz_act1_start","space":"screen","rows":[[0,0,0],[1,32,32],[2,80,80],[3,112,112],[4,160,160]]}; press row 186 pixel rgb(60,165,180); capture docs/captures/2026-09-12-cdp-sweep-4/gd-before-red-sf-gate.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/gd-dragging-red-sf-gate.png  (clip {"x":544,"y":146,"width":120,"height":160,"scale":1})
+PASS  [GD.a] the press on layer 2 (within GUIDE_GRAB_PX 6) takes a DRAG that previews: the drawn guide sits at world_y 120 (vpY + canvasY/zoom of the integer cursor), EFFECTS_GUIDE_ACTIVE on screen there, while the document still holds 80   [load 7.56/8.38/6.99]
+        guides {"dragIndex":2,"row":{"index":2,"worldY":120,"canvasY":120,"enabled":true,"onScreen":true,"notice":null}}; document 80; pixel at the new row 226: rgb(150,245,255) (want rgb(150,245,255)); capture docs/captures/2026-09-12-cdp-sweep-4/gd-dragging-red-sf-gate.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/gd-released-red-sf-gate.png  (clip {"x":544,"y":146,"width":120,"height":160,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/gd-undone-red-sf-gate.png  (clip {"x":544,"y":146,"width":120,"height":160,"scale":1})
+PASS  [GD.b] RELEASE commits ONE undo step: the document holds the dragged world_y, the line is on screen at its new row and not at the old one; one Ctrl+Z puts the old world_y and the old line back   [load 7.56/8.38/6.99]
+        layers after release [0,32,120,112,160]; after release 120; after Ctrl+Z 80; pixels: released new rgb(78,174,189) old rgb(0,0,0); undone old rgb(60,165,180) new rgb(73,36,36); captures docs/captures/2026-09-12-cdp-sweep-4/gd-released-red-sf-gate.png, docs/captures/2026-09-12-cdp-sweep-4/gd-undone-red-sf-gate.png
+   GEOMETRY [frame] dpr 1; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":200,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/sf-ref-unlocked-no-frame-red-sf-gate.png  (clip {"x":284,"y":106,"width":420,"height":380,"scale":1})
+PASS  [SF.0] CONTROL: the UNLOCKED scene (v_factor 0) picked by a real click, the frame toggle OFF: no frame is drawn   [load 7.39/8.32/6.98]
+        dpr 1; toggle false; guides space act; frame {"active":false,"anchor":null,"rect":null,"dragging":false,"paints":17}; capture docs/captures/2026-09-12-cdp-sweep-4/sf-ref-unlocked-no-frame-red-sf-gate.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/sf-locked-frame-red-sf-gate.png  (clip {"x":284,"y":106,"width":420,"height":380,"scale":1})
+FAIL  [SF.a] LOCKED scene, toggle still OFF: the frame is drawn (showFrame's guideSpace === 'screen' arm) at the rect derived from frameAnchorFor: x from the session anchor, y from the scene's v_offset 288; on screen its right and bottom edges are SCREEN_FRAME_LINE over the reference, and 3 px outside is untouched   [load 7.39/8.32/6.98]
+        scene v_offset 288; frame report {"active":false,"anchor":null,"rect":null,"dragging":false,"paints":18}; want x 0 y 88; view {"x":0,"y":200,"zoom":1}; edge null; captures docs/captures/2026-09-12-cdp-sweep-4/sf-ref-unlocked-no-frame-red-sf-gate.png, docs/captures/2026-09-12-cdp-sweep-4/sf-locked-frame-red-sf-gate.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/sf-locked-frame-after-drag-red-sf-gate.png  (clip {"x":284,"y":106,"width":420,"height":380,"scale":1})
+FAIL  [SF.b] the LOCKED frame's Y IS the document: a real drag of its edge by (+24, +16) writes v_offset 288 -> 304 (endFrameDrag -> commitVOffset), the frame is redrawn there (its bottom edge on screen at row 434), and ONE Ctrl+Z puts v_offset back   [load 7.39/8.32/6.98]
+        press {"x":604,"y":336}; mid-drag {"active":false,"anchor":null,"rect":null,"dragging":false,"paints":21}; after release v_offset 304, frame {"active":false,"anchor":null,"rect":null,"dragging":false,"paints":22}; bottom-edge pixel rgb(0,0,0); after Ctrl+Z v_offset 288, frame {"active":false,"anchor":null,"rect":null,"dragging":false,"paints":24}; capture docs/captures/2026-09-12-cdp-sweep-4/sf-locked-frame-after-drag-red-sf-gate.png
+NOTE  [SF.obs] the SESSION anchor (read as the unlocked scene's frame with the toggle on): before the locked drag {"anchor":{"x":0,"y":0},"active":true,"toggles":[{"menu":true,"row":true,"closed":true},{"menu":true,"row":true,"closed":true}],"toggleAfter":false}; after it (and its Ctrl+Z) {"anchor":{"x":24,"y":288},"active":true,"toggles":[{"menu":true,"row":true,"closed":true},{"menu":true,"row":true,"closed":true}],"toggleAfter":false}. Locked frame report before the drag null (view {"x":0,"y":200,"zoom":1}), after release null. endFrameDrag writes setScreenFrame(anchor.x, frameYIsVOffset(scene) ? startAnchor.y : anchor.y); startAnchor is the RESOLVED anchor, i.e. the v_offset at the press; its comment reads "X always, and Y too when it is not the document's". Observed, not judged.
+   GEOMETRY [escape] dpr 1; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/esc-lens-lit-red-sf-gate.png  (clip {"x":356,"y":86,"width":160,"height":80,"scale":1})
+PASS  [ESC.0] PREMISE: in the Effects facet the mark-band tool (a real `n`) and a REAL click on an animated BG cell light the lens on a band, and the clicked cell is washed on screen   [load 7.01/8.21/6.96]
+        dpr 1; cell {"cell":144,"col":16,"row":2,"slot":25,"x":416,"y":126}; lens {"active":true,"kind":"band","bandIndex":0,"range":{"base":0,"count":32},"cells":1220,"drawn":1220,"largestSlotCells":940,"reason":null,"paints":30}; target {"kind":"band","index":0}; pixel off rgb(0,73,36) lit rgb(87,73,88); capture docs/captures/2026-09-12-cdp-sweep-4/esc-lens-lit-red-sf-gate.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/esc-after-escape-red-sf-gate.png  (clip {"x":356,"y":86,"width":160,"height":80,"scale":1})
+PASS  [ESC.a] ESCAPE in the Effects facet (no paste, no marquee): resolveEscape answers 'lens', the target is cleared, the lens stops drawing, and the cell is byte-identical to its lens-off pixel   [load 7.01/8.21/6.96]
+        target null; lens {"active":false}; pixel rgb(0,73,36) vs off rgb(0,73,36); capture docs/captures/2026-09-12-cdp-sweep-4/esc-after-escape-red-sf-gate.png
+PASS  [ESC.b] CONTROL: re-lit, then Escape pressed in the LAYOUT facet leaves the target standing (inEffectsFacet is false there), and back in Effects the lens is still drawn   [load 7.01/8.21/6.96]
+        re-lit {"kind":"band","index":0}; after Escape in Layout {"kind":"band","index":0}; lens back in Effects {"active":true}
+   GEOMETRY [band] dpr 1; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/band-off-pan0-red-sf-gate.png  (clip {"x":284,"y":336,"width":816,"height":462,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/band-off-pan16-red-sf-gate.png  (clip {"x":284,"y":336,"width":816,"height":462,"scale":1})
+PASS  [BAND.0] PREMISE: Effects facet on the tile-animation sub-tab (the parallax composite is off there), the BG plane from the OVERRIDE, the preview OFF, band 0's cells and static cells on screen at every pan used, and bandPreviewStates gives pan 0 and pan c2 different step keys and pan c3 the same one   [load 6.77/8.14/6.95]
+        dpr 1; scene "sweep4_unlocked" (pick true); parallaxPreview {"on":false,"choice":null,"facet":"parallax","subTab":"tileAnim"}; band 0 {"index":0,"cols":8,"rows":4,"tileCount":32,"driver":"camera_x","driverIsExplicit":true,"rateShift":4,"rateShiftIsExplicit":true,"slotBase":0,"phaseBanks":8}; keys pan0 "0" c2=16 "1" c3=8 "0"; band cells 233, static cells 1467
+PASS  [BAND.c] CONTROL, preview OFF: the band cells are pixel-identical at pan 0 and pan c2 (the plane alone is static in the world)   [load 6.77/8.14/6.95]
+        changed band cells 0/233, static 0/1467; captures docs/captures/2026-09-12-cdp-sweep-4/band-off-pan0-red-sf-gate.png, docs/captures/2026-09-12-cdp-sweep-4/band-off-pan16-red-sf-gate.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/band-on-pan0-red-sf-gate.png  (clip {"x":284,"y":336,"width":816,"height":462,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/band-on-pan16-red-sf-gate.png  (clip {"x":284,"y":336,"width":816,"height":462,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/band-on-pan8-red-sf-gate.png  (clip {"x":284,"y":336,"width":816,"height":462,"scale":1})
+PASS  [BAND.a] preview ON (View > Play animations, real clicks): between pan 0 and pan c2 the band cells whose phase art differs CHANGE on screen, no other band cell changes, and the static cells stay identical   [load 6.38/8.04/6.92]
+        states pan0 {"step":0,"bank":0,"coarse":0} pan c2 {"step":1,"bank":1,"coarse":0}; cells whose phase art differs 233/233; changed on screen 233; changed without a phase difference 0; static changed 0; captures docs/captures/2026-09-12-cdp-sweep-4/band-on-pan0-red-sf-gate.png, docs/captures/2026-09-12-cdp-sweep-4/band-on-pan16-red-sf-gate.png
+PASS  [BAND.b] preview ON: pan 0 and pan c3 share a step key, and every band cell is identical between them   [load 6.38/8.04/6.92]
+        changed band cells 0; static 0; capture docs/captures/2026-09-12-cdp-sweep-4/band-on-pan8-red-sf-gate.png
+   GEOMETRY [OBS.DPR control (native 1)] dpr 1; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/obs-dpr-native-guides-red-sf-gate.png  (clip {"x":564,"y":126,"width":40,"height":170,"scale":1})
+   GEOMETRY [OBS.DPR (EMULATED deviceScaleFactor 1.35; native 1)] dpr 1.350000023841858; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1.350000023841858}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/obs-dpr-emulated-guides-red-sf-gate.png  (clip {"x":564,"y":126,"width":40,"height":170,"scale":1})
+   GEOMETRY [OBS.DPR frame (EMULATED)] dpr 1.350000023841858; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1.350000023841858}; view {"x":0,"y":200,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/obs-dpr-emulated-frame-ref-red-sf-gate.png  (clip {"x":284,"y":304,"width":420,"height":5,"scale":1})
+NOTE  [OBS.DPR.frame.setup] picks {"unlocked":true,"floor":true}; scene for the reference "sweep4_unlocked", for the frame "ojz_act1_floor"; composite {"on":false,"choice":null,"facet":"parallax","subTab":"tileAnim"}; canvas then {"x":284,"y":106,"w":816,"h":742,"dpr":1.350000023841858} now {"x":284,"y":106,"w":816,"h":742,"dpr":1.350000023841858}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/obs-dpr-emulated-frame-red-sf-gate.png  (clip {"x":284,"y":304,"width":420,"height":5,"scale":1})
+NOTE  [OBS.DPR.frame] EMULATED: the frame report rect null (left CSS x null, right null); columns of canvas row 200 that differ between the unlocked and the locked scene: []; identity-transform prediction left n/a, right n/a; captures docs/captures/2026-09-12-cdp-sweep-4/obs-dpr-emulated-frame-ref-red-sf-gate.png, docs/captures/2026-09-12-cdp-sweep-4/obs-dpr-emulated-frame-red-sf-gate.png
+FINDING  [OBS.DPR] at an EMULATED scale factor of 1.35 the guides and the screen frame are drawn where their hit tests measure (layerGuideGeometry canvasY, screenFrameRect, both in CSS pixels); redraw's docblock says "every line below it goes on drawing in CSS pixels", while drawLayerGuides and drawScreenFrame reset the transform to identity
+        CONTROL at dpr 1: guide rows (report) [0,32,80,112,160], lit cyan [32.5,80.5,112.5,160.5] (docs/captures/2026-09-12-cdp-sweep-4/obs-dpr-native-guides-red-sf-gate.png), a press on layer 2's row {"at":{"x":584,"y":186,"cssY":80},"dragIndex":2,"hoverIndex":2,"paints":52}. EMULATED dpr 1.350000023841858: guide rows (report) [0,32,80,112,160], lit cyan [24.07,59.63,83.33,118.89] (identity-transform prediction for layer 2 59.26) (docs/captures/2026-09-12-cdp-sweep-4/obs-dpr-emulated-guides-red-sf-gate.png); a press on the DRAWN line {"at":{"x":584,"y":166,"cssY":59.63},"dragIndex":null,"hoverIndex":null,"paints":57}, a press on the row the hit test measures {"at":{"x":584,"y":186,"cssY":80},"dragIndex":2,"hoverIndex":2,"paints":60}; frame right edge (report) CSS x null, orange columns found [] (identity prediction n/a) (docs/captures/2026-09-12-cdp-sweep-4/obs-dpr-emulated-frame-red-sf-gate.png)
+NOTE  [OBS.DPR.restore] emulation cleared: devicePixelRatio 1 (native 1); canvas {"x":284,"y":106,"w":816,"h":742,"dpr":1}
+NOTE  [effects.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 2977319 (11 process(es)):
+           2977319 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           2977404 Xvfb :184 -screen 0 1680x1050x24 -nolisten tcp
+           3006033 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           3006265 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           3006624 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3006636 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3006959 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3009379 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3009402 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3009476 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           3009672 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 350 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=effects: 12/14 rows PASS · 2 FAIL · 0 UNMEASURABLE · 1 FINDING (not counted) · 64.6s ════
+     loadavg at end 5.87 7.81 6.87
+FAILING:
+  [SF.a] LOCKED scene, toggle still OFF: the frame is drawn (showFrame's guideSpace === 'screen' arm) at the rect derived from frameAnchorFor: x from the session anchor, y from the scene's v_offset 288; on screen its right and bottom edges are SCREEN_FRAME_LINE over the reference, and 3 px outside is untouched
+  [SF.b] the LOCKED frame's Y IS the document: a real drag of its edge by (+24, +16) writes v_offset 288 -> 304 (endFrameDrag -> commitVOffset), the frame is redrawn there (its bottom edge on screen at row 434), and ONE Ctrl+Z puts v_offset back
+FINDINGS:
+  [OBS.DPR] at an EMULATED scale factor of 1.35 the guides and the screen frame are drawn where their hit tests measure (layerGuideGeometry canvasY, screenFrameRect, both in CSS pixels); redraw's docblock says "every line below it goes on drawing in CSS pixels", while drawLayerGuides and drawScreenFrame reset the transform to identity
+END-OF-RUN

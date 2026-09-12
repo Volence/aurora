@@ -1,0 +1,69 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a — dist/main/index.mjs is 0s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src/renderer/components/MapViewport.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T08:05:23.176Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T08:05:23.176Z), so window.__dbg is in this bundle
+=== cdp-sweep-4 2026-09-12 harness ===
+    PARTS        : hover
+    node         : v24.15.0
+    loadavg      : 7.85 6.25 6.21
+    ORACLE_SOCKET: /tmp/cdps4-sock-QGcw3z/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-3654776-e8d0ca40
+    PORT         : 9431   DISPLAY: xvfb-run -a (never :0)
+    captures     : docs/captures/2026-09-12-cdp-sweep-4   tag red-hb-display
+    aeon tarball : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/e7b24bf1-afc7-4de1-b841-c92c59c89418/scratchpad/aeon-a38ce7c9.tar   commit a38ce7c961ef83136ac2f7c35e09b2ded7a109ea
+    oracle       : literals from HEAD ffc3b1804223f4c541333a208bcc36d3820612b0; four modules bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src
+    src on disk  : DIFFERS FROM HEAD (a plant?):
+                   M src/renderer/components/MapViewport.tsx
+    copy         : /tmp/cdps4-aeon-EyERuB   name "Sonic 4 (sweep4)"   bg-override bands 1
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-3654776-e8d0ca40 — see HAZARD 6
+    X pointer    : PARKED outside the window: display :184 (Xvfb pid 3654943); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1 by a real Explorer click, and its scene library carries the three locked scenes and the unlocked control   [load 8.77/6.51/6.29]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}; scenes ["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start","sweep4_unlocked"]
+
+════════ PART hover ════════
+   GEOMETRY [hover] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/hb-ref-no-bar-red-hb-display.png  (clip {"x":284,"y":761,"width":876,"height":34,"scale":1})
+PASS  [HB.0] CONTROL: with the pointer off the map the hover bar is display:none (onMouseLeave), so a painted bar below is the hover's doing   [load 8.77/6.51/6.29]
+        {"found":true,"display":"none","text":"Sec 0 | Tile (54, 5) | Pos 438, 40","rect":{"x":0,"y":0,"w":0,"h":0,"bottom":0,"right":0},"container":{"x":284,"y":74,"w":876,"h":721,"bottom":795},"fontSize":"11px","color":"rgb(184, 190, 206)","background":"rgba(17, 17, 27, 0.9)","fontFamily":"\"JetBrains Mono\", ui-monospace, \"SF Mono\", \"Cascadia Code\", monospace","paddingLeft":"12px","borderTop":"1px","scrollW":0,"clientW":0}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/hb-bar-red-hb-display.png  (clip {"x":284,"y":761,"width":876,"height":34,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-4/hb-full-red-hb-display.png
+FAIL  [HB.a] the hover bar is ON SCREEN after a real hover: display flex, the container's bottom strip, the readout for the INTEGER aim (writeHoverReadout's template), and its padding is styles.hoverBar's background composited over the map in 95%+ of pixels   [load 8.77/6.51/6.29]
+        aim {"x":385,"y":135} world {"x":101,"y":61}; text "Sec 0 | Tile (12, 7) | Pos 101, 61" want "Sec 0 | Tile (12, 7) | Pos 101, 61"; bar rect {"x":0,"y":0,"w":0,"h":0,"bottom":0,"right":0} container {"x":284,"y":74,"w":876,"h":721,"bottom":795}; padding pixels 0/0 match over({"r":17,"g":17,"b":27,"a":0.9}, ref) (first misses []); captures docs/captures/2026-09-12-cdp-sweep-4/hb-ref-no-bar-red-hb-display.png, docs/captures/2026-09-12-cdp-sweep-4/hb-bar-red-hb-display.png
+FAIL  [HB.b] LEGIBILITY, the code's half: the text is the textBase token and the tXs size (styles.hoverBar, HEAD), and glyph pixels of that colour are painted in the bar   [load 8.77/6.51/6.29]
+        MEASURED: font-size 11px (token tXs = 11px); colour rgb(184, 190, 206) (token textBase = rgb(184, 190, 206)); font "\"JetBrains Mono\", ui-monospace, \"SF Mono\", \"Cascadia Code\", monospace"; glyph pixels within 24 of the text colour: 0; composited background (median of the padding column) null; WCAG contrast text/background null; bar height 0px; text box scrollWidth 0 clientWidth 0 (fits: true). LOOK CALL FOR THE OWNER: capture docs/captures/2026-09-12-cdp-sweep-4/hb-bar-red-hb-display.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/hb-bar-collision-line-red-hb-display.png  (clip {"x":284,"y":761,"width":876,"height":34,"scale":1})
+NOTE  [HB.c] MEASURED, the longest readout (collision overlay on): "Sec 0 | Tile (12, 7) | Pos 101, 61 | Coll A: air"; bar {"x":0,"y":0,"w":0,"h":0,"bottom":0,"right":0}; scrollWidth 0 clientWidth 0 (fits on one row: true); capture docs/captures/2026-09-12-cdp-sweep-4/hb-bar-collision-line-red-hb-display.png
+NOTE  [hover.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 3654933 (11 process(es)):
+           3654933 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           3654943 Xvfb :184 -screen 0 1680x1050x24 -nolisten tcp
+           3666456 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           3666533 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           3666622 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3666632 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3666722 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3667261 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3667267 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3667272 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           3667284 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 51 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 351 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=hover: 2/4 rows PASS · 2 FAIL · 0 UNMEASURABLE · 0 FINDING (not counted) · 15.1s ════
+     loadavg at end 8.31 6.45 6.27
+FAILING:
+  [HB.a] the hover bar is ON SCREEN after a real hover: display flex, the container's bottom strip, the readout for the INTEGER aim (writeHoverReadout's template), and its padding is styles.hoverBar's background composited over the map in 95%+ of pixels
+  [HB.b] LEGIBILITY, the code's half: the text is the textBase token and the tXs size (styles.hoverBar, HEAD), and glyph pixels of that colour are painted in the bar
+END-OF-RUN

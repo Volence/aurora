@@ -1,0 +1,200 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a — dist/main/index.mjs is 448s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src/test/element-stub.ts)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T07:12:49.720Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T07:12:49.720Z), so window.__dbg is in this bundle
+=== cdp-sweep-4 2026-09-12 harness ===
+    PARTS        : hover,stamp,paste,collision,plane,effects
+    node         : v24.15.0
+    loadavg      : 2.09 2.66 3.96
+    ORACLE_SOCKET: /tmp/cdps4-sock-nqcHEi/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-3856095-3af76e2f
+    PORT         : 9431   DISPLAY: xvfb-run -a (never :0)
+    captures     : docs/captures/2026-09-12-cdp-sweep-4   tag dev2
+    aeon tarball : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/e7b24bf1-afc7-4de1-b841-c92c59c89418/scratchpad/aeon-a38ce7c9.tar   commit a38ce7c961ef83136ac2f7c35e09b2ded7a109ea
+    oracle       : literals from HEAD ae81532571b83cfc7c7e0065129b7d0a362c6074; four modules bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src
+    src on disk  : identical to HEAD
+    copy         : /tmp/cdps4-aeon-I0VOUn   name "Sonic 4 (sweep4)"   bg-override bands 1
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-3856095-3af76e2f — see HAZARD 6
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872}
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1 by a real Explorer click, and its scene library carries the three locked scenes and the unlocked control   [load 2.00/2.62/3.93]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}; scenes ["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start","sweep4_unlocked"]
+
+════════ PART hover ════════
+   GEOMETRY [hover] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/hb-ref-no-bar-dev2.png  (clip {"x":284,"y":761,"width":876,"height":34,"scale":1})
+PASS  [HB.0] CONTROL: with the pointer off the map the hover bar is display:none (onMouseLeave), so a painted bar below is the hover's doing   [load 2.00/2.62/3.93]
+        {"found":true,"display":"none","text":"Sec 0 | Tile (54, 5) | Pos 438, 40","rect":{"x":0,"y":0,"w":0,"h":0,"bottom":0,"right":0},"container":{"x":284,"y":74,"w":876,"h":721,"bottom":795},"fontSize":"11px","color":"rgb(184, 190, 206)","background":"rgba(17, 17, 27, 0.9)","fontFamily":"\"JetBrains Mono\", ui-monospace, \"SF Mono\", \"Cascadia Code\", monospace","paddingLeft":"12px","borderTop":"1px","scrollW":0,"clientW":0}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/hb-bar-dev2.png  (clip {"x":284,"y":761,"width":876,"height":34,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-4/hb-full-dev2.png
+FAIL  [HB.a] the hover bar is ON SCREEN after a real hover: display flex, the container's bottom strip, the readout for the INTEGER aim (writeHoverReadout's template), and its padding is styles.hoverBar's background composited over the map in 95%+ of pixels   [load 1.92/2.59/3.92]
+        aim {"x":385,"y":135} world {"x":101,"y":61}; text "Sec 0 | Tile (12, 7) | Pos 101, 61" want "Sec 0 | Tile (12, 7) | Pos 101, 61"; bar rect {"x":284,"y":770,"w":876,"h":25,"bottom":795,"right":1160} container {"x":284,"y":74,"w":876,"h":721,"bottom":795}; padding pixels 0/220 match over({"r":17,"g":17,"b":27,"a":0.9}, ref) (first misses [{"x":285,"y":772,"ref":"rgb(0,0,0)","want":"rgb(15,15,24)","got":"rgb(0,0,0)"},{"x":286,"y":772,"ref":"rgb(0,0,0)","want":"rgb(15,15,24)","got":"rgb(0,0,0)"},{"x":287,"y":772,"ref":"rgb(0,0,0)","want":"rgb(15,15,24)","got":"rgb(0,0,0)"},{"x":288,"y":772,"ref":"rgb(0,0,0)","want":"rgb(15,15,24)","got":"rgb(0,0,0)"}]); captures docs/captures/2026-09-12-cdp-sweep-4/hb-ref-no-bar-dev2.png, docs/captures/2026-09-12-cdp-sweep-4/hb-bar-dev2.png
+FAIL  [HB.b] LEGIBILITY, the code's half: the text is the textBase token and the tXs size (styles.hoverBar, HEAD), and glyph pixels of that colour are painted in the bar   [load 1.92/2.59/3.92]
+        MEASURED: font-size 11px (token tXs = 11px); colour rgb(184, 190, 206) (token textBase = rgb(184, 190, 206)); font "\"JetBrains Mono\", ui-monospace, \"SF Mono\", \"Cascadia Code\", monospace"; glyph pixels within 24 of the text colour: 0; composited background (median of the padding column) rgb(0,0,0); WCAG contrast text/background 11.29; bar height 25px; text box scrollWidth 876 clientWidth 876 (fits: true). LOOK CALL FOR THE OWNER: capture docs/captures/2026-09-12-cdp-sweep-4/hb-bar-dev2.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/hb-bar-collision-line-dev2.png  (clip {"x":284,"y":761,"width":876,"height":34,"scale":1})
+NOTE  [HB.c] MEASURED, the longest readout (collision overlay on): "Sec 0 | Tile (12, 7) | Pos 101, 61 | Coll A: air"; bar {"x":284,"y":770,"w":876,"h":25,"bottom":795,"right":1160}; scrollWidth 876 clientWidth 876 (fits on one row: true); capture docs/captures/2026-09-12-cdp-sweep-4/hb-bar-collision-line-dev2.png
+
+════════ PART stamp ════════
+   GEOMETRY [stamp] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/sg-ref-no-ghost-dev2.png  (clip {"x":524,"y":186,"width":160,"height":160,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/sg-ghost-during-link-hover-dev2.png  (clip {"x":524,"y":186,"width":160,"height":160,"scale":1})
+PASS  [SG.0] PREMISE: the stamp tool armed; a REAL click stamped chunk X (a new placement in section 0); chunk Y picked by a real click in the grid; and the link hover NAMES the new placement of X   [load 1.92/2.58/3.91]
+        dpr 1; X {"aim":{"x":1301,"y":434,"hitOk":true,"dpr":1,"rect":{"x":1257,"y":390,"w":88,"h":88}},"id":"OJZ_01"} ({"name":"OJZ $01","widthTiles":16,"heightTiles":16,"nonzeroTiles":211}); spot {"bc":32,"br":16,"linked":0} of [{"bc":32,"br":16,"linked":0},{"bc":48,"br":16,"linked":0},{"bc":32,"br":32,"linked":0},{"bc":16,"br":16,"linked":0}]; added [{"id":1,"chunkId":"OJZ_01","baseCol":32,"baseRow":16,"collision":true}]; Y {"id":"OJZ_02","aim":{"x":1209,"y":434,"hitOk":true,"dpr":1,"rect":{"x":1165,"y":390,"w":88,"h":88}},"info":{"name":"OJZ $02","widthTiles":16,"heightTiles":16,"nonzeroTiles":256}}; linkHover {"sectionIndex":0,"placementId":1,"chunkId":"OJZ_01"}; selected "OJZ_02"
+PASS  [SG.a] DURING THE LINK HOVER the stamp ghost is drawn: its layer holds chunk Y's art at the ghost alpha (0.55 = 140/255, HEAD) inside the snapped rect, the SELECTION_MARQUEE outline on its edge, nothing outside; and on screen the rect changed against the no-ghost reference while the ring around it did not   [load 1.92/2.58/3.91]
+        ghost rect (derived: base {"col":32,"row":16} of Y 16x16 from the integer aim {"x":640,"y":238}) {"x":540,"y":202,"w":128,"h":128}; layer: inside 9246/14884 at alpha 140; edge 976/976 SELECTION_MARQUEE; ring 0/7104 inked; screen vs reference: changed inside 9176, changed in the ring 0; captures docs/captures/2026-09-12-cdp-sweep-4/sg-ref-no-ghost-dev2.png, docs/captures/2026-09-12-cdp-sweep-4/sg-ghost-during-link-hover-dev2.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/cl-readout-and-detach-hovered-dev2.png  (clip {"x":1165,"y":599,"width":152,"height":24,"scale":1})
+FAIL  [CL.a] the readout is ON SCREEN naming the hovered placement ("Under cursor: <X's name> (#id)"), in the textBase token (ChunkLinkOptions: hovered ? T.textBase : T.textLo) at the tXs size, unclipped   [load 1.92/2.58/3.91]
+        MEASURED: {"found":true,"text":"Under cursor: no chunk link","title":null,"disabled":false,"rect":{"x":1169,"y":603.34,"w":143.19,"h":15},"fontSize":"11px","color":"rgb(110, 117, 137)","background":"rgba(0, 0, 0, 0)","opacity":"1","scrollW":143,"clientW":143,"hitInside":true,"inScroller":true,"scroller":{"x":1160,"w":240,"y":74,"h":721},"inViewport":true}; want "Under cursor: OJZ $01 (#1)"; colour token textBase = rgb(184, 190, 206); size token = 11px; panel background under it rgb(10,12,18); WCAG contrast 4.25. LOOK CALL FOR THE OWNER: capture docs/captures/2026-09-12-cdp-sweep-4/cl-readout-and-detach-hovered-dev2.png
+FAIL  [CL.b] the Detach chip is ON SCREEN and ENABLED while a placement is named, its title naming that placement (disabled={!hovered}, the title template, HEAD)   [load 1.92/2.58/3.91]
+        MEASURED: {"found":false}; want title "Detach placement #1: its tiles stay exactly as they are, but stop following the chunk"; chip background (screen) null; WCAG contrast text/chip n/a. LOOK CALL FOR THE OWNER: capture docs/captures/2026-09-12-cdp-sweep-4/cl-readout-and-detach-hovered-dev2.png
+PASS  [SG.b] CONTROL, NOT during a link hover: over an unlinked tile the hover writes null and the ghost is drawn at ITS snapped rect all the same (so SG.a is about the link-hover arm)   [load 1.85/2.55/3.89]
+        tile {"col":67,"row":18} aim {"x":824,"y":222}; linkHover null; ghost rect {"x":796,"y":202,"w":128,"h":128}; ghost-alpha pixels 9246/14884
+   clip: docs/captures/2026-09-12-cdp-sweep-4/cl-readout-and-detach-unlinked-dev2.png  (clip {"x":1165,"y":599,"width":152,"height":24,"scale":1})
+FAIL  [CL.c] CONTROL: over the unlinked tile the readout says "Under cursor: no chunk link" in the textLo token and Detach is disabled   [load 1.85/2.55/3.89]
+        readout {"found":true,"text":"Under cursor: no chunk link","title":null,"disabled":false,"rect":{"x":1169,"y":603.34,"w":143.19,"h":15},"fontSize":"11px","color":"rgb(110, 117, 137)","background":"rgba(0, 0, 0, 0)","opacity":"1","scrollW":143,"clientW":143,"hitInside":true,"inScroller":true,"scroller":{"x":1160,"w":240,"y":74,"h":721},"inViewport":true}; chip {}; capture docs/captures/2026-09-12-cdp-sweep-4/cl-readout-and-detach-unlinked-dev2.png
+NOTE  [SG.cleanup] Ctrl+Z after the part: placements in section 0 1 -> 0
+
+════════ PART paste ════════
+   GEOMETRY [paste] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/pg-ref-home-dev2.png  (clip {"x":560,"y":270,"width":56,"height":56,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/pg-ghost-home-dev2.png  (clip {"x":560,"y":270,"width":56,"height":56,"scale":1})
+PASS  [PG.0] PREMISE: a block-aligned 4x4 copy carrying collision; Ctrl+V armed; the published hover is the base derived from the INTEGER aim through pasteBaseStep   [load 2.10/2.59/3.89]
+        dpr 1; clipboard {"widthTiles":4,"heightTiles":4,"artOnly":false,"collisionALen":4,"collisionBLen":4,"nonzeroTiles":16}; step 2; aim {"x":583,"y":293} world {"x":299,"y":219}; base {"col":36,"row":26}; report {"pasting":true,"hover":{"sectionIndex":0,"baseCol":36,"baseRow":26},"paints":2}
+FAIL  [PG.a] HOME ZONE: the ghost's layer holds the clipboard's ART (alpha 152/255 = ghost 0.55 under the 0.1 fill) inside the derived rect, a SELECTION_MARQUEE dashed edge, nothing outside; on screen the rect changed and the ring did not   [load 2.10/2.59/3.89]
+        rect {"x":572,"y":282,"w":32,"h":32}; {"inN":676,"art":0,"fillOnly":0,"over1":0,"ringN":1536,"ringInk":0,"ringChanged":0,"inChanged":0,"edgeN":120,"edgeOk":0,"fillFormulaN":676,"fillFormulaOk":0,"alphaTop":[[0,676]]}; captures docs/captures/2026-09-12-cdp-sweep-4/pg-ref-home-dev2.png, docs/captures/2026-09-12-cdp-sweep-4/pg-ghost-home-dev2.png
+   GEOMETRY [paste zone B] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/pg-ref-zone-b-dev2.png  (clip {"x":560,"y":270,"width":56,"height":56,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/pg-ghost-zone-b-dev2.png  (clip {"x":560,"y":270,"width":56,"height":56,"scale":1})
+FAIL  [PG.b] ANOTHER TILE SET: the ghost draws its footprint, the 0.1 fill and the edge but NO ART (the showArt gate): every interior pixel of its layer is the fill alpha 26, and on screen the interior is exactly the fill over the reference   [load 2.10/2.59/3.89]
+        zone "zb"; report {"pasting":true,"hover":{"sectionIndex":0,"baseCol":36,"baseRow":26},"paints":5}; {"inN":676,"art":0,"fillOnly":0,"over1":0,"ringN":1536,"ringInk":0,"ringChanged":0,"inChanged":0,"edgeN":120,"edgeOk":0,"fillFormulaN":676,"fillFormulaOk":0,"alphaTop":[[0,676]]}; captures docs/captures/2026-09-12-cdp-sweep-4/pg-ref-zone-b-dev2.png, docs/captures/2026-09-12-cdp-sweep-4/pg-ghost-zone-b-dev2.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/pg-ghost-zone-b-collision-shading-dev2.png  (clip {"x":560,"y":270,"width":56,"height":56,"scale":1})
+PASS  [PG.c] COLLISION SHADING (overlay on): each 16px cell of the ghost is shaded (alpha 140) exactly where the clipboard's plane A word is nonzero, and fill-only (26) where it is zero   [load 2.33/2.63/3.89]
+        cells [{"cx":0,"cy":0,"word":4306,"alpha":141,"want":140,"ok":true},{"cx":1,"cy":0,"word":4307,"alpha":141,"want":140,"ok":true},{"cx":0,"cy":1,"word":4351,"alpha":141,"want":140,"ok":true},{"cx":1,"cy":1,"word":4351,"alpha":141,"want":140,"ok":true}]; capture docs/captures/2026-09-12-cdp-sweep-4/pg-ghost-zone-b-collision-shading-dev2.png
+
+════════ PART collision ════════
+   GEOMETRY [collision] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":4}
+PASS  [XO.0] PREMISE: the Collision facet by a real click, paint-collision armed, a shape picked, the Loop brush on Hand-off and the Mark width on Half, all by real clicks (the Mark row renders only while the brush authors)   [load 2.39/2.63/3.89]
+        dpr 1; brush {"plane":"a","bothPlanes":false,"crossover":"hand-off","crossoverSpanMode":"half","word":12289}; aims {"fc":{"x":522,"y":54,"hitOk":true,"dpr":1,"rect":{"x":488.92,"y":44.5,"w":65.58,"h":18}},"shapeBtn":{"x":1293,"y":461,"hitOk":true,"dpr":1,"rect":{"x":1279,"y":442,"w":28,"h":37}},"loopHand":{"x":1279,"y":148,"hitOk":true,"dpr":1,"rect":{"x":1248.7,"y":139,"w":60.75,"h":18}},"half":{"x":1305,"y":170,"hitOk":true,"dpr":1,"rect":{"x":1276.19,"y":161,"w":57.69,"h":18}}}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/xo-ref-other-cell-dev2.png  (clip {"x":466,"y":192,"width":84,"height":84,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/xo-hover-left-half-dev2.png  (clip {"x":466,"y":192,"width":84,"height":84,"scale":1})
+FAIL  [XO.a] LEFT HALF hovered: crossoverSpanForCursor('half', col 6) = "left"; the CROSSOVER_FILL is painted over exactly crossoverPreviewRects' box and not over the other half, on the layer and on screen   [load 2.39/2.63/3.89]
+        aim {"x":492,"y":234}; derived rects [{"x":476,"y":202,"w":32,"h":32},{"x":476,"y":234,"w":32,"h":32}] (union {"x":476,"y":202,"w":32,"h":64}); orange box on the layer {"x":474,"y":200,"w":68,"h":68}; halves {"left":{"n":1508,"or":1508,"dor":0},"right":{"n":1508,"or":0,"dor":0}}; captures docs/captures/2026-09-12-cdp-sweep-4/xo-ref-other-cell-dev2.png, docs/captures/2026-09-12-cdp-sweep-4/xo-hover-left-half-dev2.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/xo-hover-right-half-dev2.png  (clip {"x":466,"y":192,"width":84,"height":84,"scale":1})
+FAIL  [XO.b] RIGHT HALF hovered: the span is "right" and the fill moves to the right half   [load 2.39/2.63/3.89]
+        aim {"x":524,"y":234}; derived rects [{"x":508,"y":202,"w":32,"h":32},{"x":508,"y":234,"w":32,"h":32}] (union {"x":508,"y":202,"w":32,"h":64}); orange box {"x":474,"y":200,"w":68,"h":68}; halves {"left":{"n":1508,"or":0,"dor":0},"right":{"n":1508,"or":1508,"dor":0}}; capture docs/captures/2026-09-12-cdp-sweep-4/xo-hover-right-half-dev2.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/xo-hover-keep-dev2.png  (clip {"x":466,"y":192,"width":84,"height":84,"scale":1})
+PASS  [XO.c] CONTROL: Loop on Keep (crossoverBrushAuthors false): no crossover fill anywhere in the hovered cell   [load 2.28/2.61/3.87]
+        brush {"plane":"a","bothPlanes":false,"crossover":"keep","crossoverSpanMode":"half","word":12289}; halves {"left":{"n":1508,"or":0,"dor":0},"right":{"n":1508,"or":0,"dor":0}}; capture docs/captures/2026-09-12-cdp-sweep-4/xo-hover-keep-dev2.png
+FAIL  [XO.p] the collision hover preview itself is drawn at the hovered cell: the COLLISION_PREVIEW_PRIMARY outline on its four edges (HEAD colour)   [load 2.28/2.61/3.87]
+        cell {"x":476,"y":202,"w":64,"h":64}; primary edge pixels 0/76; first misses [{"xx":480,"yy":202,"q":{"r":127,"g":188,"b":245,"a":255}},{"xx":480,"yy":265,"q":{"r":127,"g":188,"b":245,"a":255}},{"xx":483,"yy":202,"q":{"r":127,"g":188,"b":245,"a":255}},{"xx":483,"yy":265,"q":{"r":127,"g":188,"b":245,"a":255}}]
+
+════════ PART plane ════════
+   GEOMETRY [plane] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}
+FAIL  [F1.a] after a REAL click on Plane A, focus is on that button (the Plane buttons do not call actAndDropFocus) and the plane is A   [load 4.74/3.11/4.03]
+        dpr 1; facet true; shape true; aim {"x":1222,"y":13,"hitOk":false,"dpr":1,"rect":{"x":1209,"y":4,"w":26,"h":18}}; activeElement {"tag":"BUTTON","text":"--","row":"∅air","isBody":false}; plane a; cells from {"cc":3,"cr":3}
+FAIL  [F1.b] with the press HELD on the map (and the stroke painting cells 1 and 2 on A) focus is STILL on Plane A: the collision press calls preventDefault   [load 4.74/3.11/4.03]
+        activeElement {"tag":"BUTTON","text":"--","row":"∅air","isBody":false}; plane A cells 1,2 [[12290,12290,12290,12290],[12290,12290,12290,12290]]
+FAIL  [F1.c] Tab, with the button still held: focus moves to Plane B   [load 4.74/3.11/4.03]
+        activeElement {"tag":"BUTTON","text":"--","row":"∅air","isBody":false}
+FAIL  [F1.d] Space fires B (pickPlane: the store's plane is B) WITHOUT ending the drag: moving on with the button held paints cells 3 and 4 on plane B   [load 4.74/3.11/4.03]
+        plane a; activeElement {"tag":"BUTTON","text":"--","row":"∅air","isBody":false}; plane B cells 3,4 [[0,0,0,0],[0,0,0,0]]
+FAIL  [F1.e] the stroke landed as TWO commands, newest first (recordPaint's plane clause): A holds cells 1,2 and B cells 3,4; the first Ctrl+Z takes back only the B run; the second takes back the A run   [load 4.74/3.11/4.03]
+        after release {"a":[[12290,12290,12290,12290],[12290,12290,12290,12290],[12291,12291,12291,12291],[12291,12291,12291,12291]],"b":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]}; after one undo {"a":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]}; after two {"a":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]}; before {"a":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]}
+
+════════ PART effects ════════
+   GEOMETRY [effects] dpr 1; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/gd-before-dev2.png  (clip {"x":544,"y":146,"width":120,"height":160,"scale":1})
+PASS  [GD.0] PREMISE: the Effects facet by a real click, the locked scene picked by a real click in the scene list, and the last repaint drew one guide per layer (layer 2 at its world_y, on screen as a cyan line)   [load 6.44/3.49/4.15]
+        dpr 1; guides {"active":true,"id":"ojz_act1_start","space":"screen","rows":[[0,0,0],[1,32,32],[2,80,80],[3,112,112],[4,160,160]]}; press row 186 pixel rgb(60,165,180); capture docs/captures/2026-09-12-cdp-sweep-4/gd-before-dev2.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/gd-dragging-dev2.png  (clip {"x":544,"y":146,"width":120,"height":160,"scale":1})
+PASS  [GD.a] the press on layer 2 (within GUIDE_GRAB_PX 6) takes a DRAG that previews: the drawn guide sits at world_y 120 (vpY + canvasY/zoom of the integer cursor), EFFECTS_GUIDE_ACTIVE on screen there, while the document still holds 80   [load 6.44/3.49/4.15]
+        guides {"dragIndex":2,"row":{"index":2,"worldY":120,"canvasY":120,"enabled":true,"onScreen":true,"notice":null}}; document 80; pixel at the new row 226: rgb(150,245,255) (want rgb(150,245,255)); capture docs/captures/2026-09-12-cdp-sweep-4/gd-dragging-dev2.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/gd-released-dev2.png  (clip {"x":544,"y":146,"width":120,"height":160,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/gd-undone-dev2.png  (clip {"x":544,"y":146,"width":120,"height":160,"scale":1})
+FAIL  [GD.b] RELEASE commits ONE undo step: the document holds the dragged world_y, the line is on screen at its new row and not at the old one; one Ctrl+Z puts the old world_y and the old line back   [load 6.44/3.49/4.15]
+        after release 316; after Ctrl+Z 80; pixels: released new rgb(73,36,36) old rgb(0,0,0); undone old rgb(60,165,180) new rgb(73,36,36); captures docs/captures/2026-09-12-cdp-sweep-4/gd-released-dev2.png, docs/captures/2026-09-12-cdp-sweep-4/gd-undone-dev2.png
+   GEOMETRY [frame] dpr 1; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":200,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/sf-ref-unlocked-no-frame-dev2.png  (clip {"x":284,"y":106,"width":420,"height":380,"scale":1})
+PASS  [SF.0] CONTROL: the UNLOCKED scene (v_factor 0) picked by a real click, the frame toggle OFF: no frame is drawn   [load 7.85/3.83/4.26]
+        dpr 1; toggle false; guides space act; frame {"active":false,"anchor":null,"rect":null,"dragging":false,"paints":49}; capture docs/captures/2026-09-12-cdp-sweep-4/sf-ref-unlocked-no-frame-dev2.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/sf-locked-frame-dev2.png  (clip {"x":284,"y":106,"width":420,"height":380,"scale":1})
+PASS  [SF.a] LOCKED scene, toggle still OFF: the frame is drawn (showFrame's guideSpace === 'screen' arm) at the rect derived from frameAnchorFor: x from the session anchor, y from the scene's v_offset 288; on screen its right and bottom edges are SCREEN_FRAME_LINE over the reference, and 3 px outside is untouched   [load 7.85/3.83/4.26]
+        scene v_offset 288; frame report {"active":true,"anchor":{"x":0,"y":288},"rect":{"x":0,"y":88,"w":320,"h":224},"dragging":false,"paints":50}; want x 0 y 88; view {"x":0,"y":200,"zoom":1}; edge {"n":122,"ok":122,"outN":122,"outSame":122,"bad":[],"rx":320,"by":312}; captures docs/captures/2026-09-12-cdp-sweep-4/sf-ref-unlocked-no-frame-dev2.png, docs/captures/2026-09-12-cdp-sweep-4/sf-locked-frame-dev2.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/sf-locked-frame-after-drag-dev2.png  (clip {"x":284,"y":106,"width":420,"height":380,"scale":1})
+PASS  [SF.b] the LOCKED frame's Y IS the document: a real drag of its edge by (+24, +16) writes v_offset 288 -> 304 (endFrameDrag -> commitVOffset), the frame is redrawn there (its bottom edge on screen at row 434), and ONE Ctrl+Z puts v_offset back   [load 7.85/3.83/4.26]
+        press {"x":604,"y":336}; mid-drag {"active":true,"anchor":{"x":24,"y":304},"rect":{"x":24,"y":104,"w":320,"h":224},"dragging":true,"paints":53}; after release v_offset 304, frame {"active":true,"anchor":{"x":24,"y":304},"rect":{"x":24,"y":104,"w":320,"h":224},"dragging":false,"paints":54}; bottom-edge pixel rgb(217,145,51); after Ctrl+Z v_offset 288, frame {"active":true,"anchor":{"x":24,"y":288},"rect":{"x":24,"y":88,"w":320,"h":224},"dragging":false,"paints":56}; capture docs/captures/2026-09-12-cdp-sweep-4/sf-locked-frame-after-drag-dev2.png
+NOTE  [SF.obs] the SESSION anchor around the drag: before {"x":0,"y":288} (view {"x":0,"y":200,"zoom":1}); after release the frame anchor {"x":24,"y":304}; endFrameDrag writes setScreenFrame(anchor.x, frameYIsVOffset ? startAnchor.y : anchor.y), and startAnchor is the RESOLVED anchor (v_offset at the press). Observed, not judged.
+   GEOMETRY [escape] dpr 1; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/esc-lens-lit-dev2.png  (clip {"x":356,"y":86,"width":160,"height":80,"scale":1})
+PASS  [ESC.0] PREMISE: in the Effects facet the mark-band tool (a real `n`) and a REAL click on an animated BG cell light the lens on a band, and the clicked cell is washed on screen   [load 9.14/4.17/4.36]
+        dpr 1; cell {"cell":144,"col":16,"row":2,"slot":25,"x":416,"y":126}; lens {"active":true,"kind":"band","bandIndex":0,"range":{"base":0,"count":32},"cells":1220,"drawn":1220,"largestSlotCells":940,"reason":null,"paints":59}; target {"kind":"band","index":0}; pixel off rgb(0,73,36) lit rgb(87,73,88); capture docs/captures/2026-09-12-cdp-sweep-4/esc-lens-lit-dev2.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/esc-after-escape-dev2.png  (clip {"x":356,"y":86,"width":160,"height":80,"scale":1})
+PASS  [ESC.a] ESCAPE in the Effects facet (no paste, no marquee): resolveEscape answers 'lens', the target is cleared, the lens stops drawing, and the cell is byte-identical to its lens-off pixel   [load 9.14/4.17/4.36]
+        target null; lens {"active":false}; pixel rgb(0,73,36) vs off rgb(0,73,36); capture docs/captures/2026-09-12-cdp-sweep-4/esc-after-escape-dev2.png
+PASS  [ESC.b] CONTROL: re-lit, then Escape pressed in the LAYOUT facet leaves the target standing (inEffectsFacet is false there), and back in Effects the lens is still drawn   [load 10.65/4.56/4.49]
+        re-lit {"kind":"band","index":0}; after Escape in Layout {"kind":"band","index":0}; lens back in Effects {"active":true}
+   GEOMETRY [band] dpr 1; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/band-off-pan0-dev2.png  (clip {"x":284,"y":336,"width":816,"height":462,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/band-off-pan16-dev2.png  (clip {"x":284,"y":336,"width":816,"height":462,"scale":1})
+PASS  [BAND.0] PREMISE: Effects facet on the tile-animation sub-tab (the parallax composite is off there), the BG plane from the OVERRIDE, the preview OFF, band 0's cells and static cells on screen at every pan used, and bandPreviewStates gives pan 0 and pan c2 different step keys and pan c3 the same one   [load 10.65/4.56/4.49]
+        dpr 1; parallaxPreview {"on":false,"choice":null,"facet":"parallax","subTab":"tileAnim"}; band 0 {"index":0,"cols":8,"rows":4,"tileCount":32,"driver":"camera_x","driverIsExplicit":true,"rateShift":4,"rateShiftIsExplicit":true,"slotBase":0,"phaseBanks":8}; keys pan0 "0" c2=16 "1" c3=8 "0"; band cells 233, static cells 1467
+PASS  [BAND.c] CONTROL, preview OFF: the band cells are pixel-identical at pan 0 and pan c2 (the plane alone is static in the world)   [load 10.65/4.56/4.49]
+        changed band cells 0/233, static 0/1467; captures docs/captures/2026-09-12-cdp-sweep-4/band-off-pan0-dev2.png, docs/captures/2026-09-12-cdp-sweep-4/band-off-pan16-dev2.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/band-on-pan0-dev2.png  (clip {"x":284,"y":336,"width":816,"height":462,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/band-on-pan16-dev2.png  (clip {"x":284,"y":336,"width":816,"height":462,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/band-on-pan8-dev2.png  (clip {"x":284,"y":336,"width":816,"height":462,"scale":1})
+PASS  [BAND.a] preview ON (View > Play animations, real clicks): between pan 0 and pan c2 the band cells whose phase art differs CHANGE on screen, no other band cell changes, and the static cells stay identical   [load 14.36/5.43/4.77]
+        states pan0 {"step":0,"bank":0,"coarse":0} pan c2 {"step":1,"bank":1,"coarse":0}; cells whose phase art differs 233/233; changed on screen 233; changed without a phase difference 0; static changed 0; captures docs/captures/2026-09-12-cdp-sweep-4/band-on-pan0-dev2.png, docs/captures/2026-09-12-cdp-sweep-4/band-on-pan16-dev2.png
+PASS  [BAND.b] preview ON: pan 0 and pan c3 share a step key, and every band cell is identical between them   [load 14.36/5.43/4.77]
+        changed band cells 0; static 0; capture docs/captures/2026-09-12-cdp-sweep-4/band-on-pan8-dev2.png
+   GEOMETRY [OBS.DPR (EMULATED deviceScaleFactor 1.35; native 1)] dpr 1.350000023841858; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1.350000023841858}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/obs-dpr-emulated-guides-dev2.png  (clip {"x":564,"y":136,"width":40,"height":120,"scale":1})
+FINDING  [OBS.DPR] at an EMULATED scale factor of 1.35 the guide for layer 2 is drawn on the canvas row its hit test grabs (layerGuideGeometry canvasY 80, the CSS row guideAtCanvasY measures from); redraw's docblock says "every line below it goes on drawing in CSS pixels", while drawLayerGuides and drawScreenFrame reset the transform to identity
+        window.devicePixelRatio 1.350000023841858; canvas-relative CSS rows lit cyan in column x=300: [59.26,82.96,118.52]; expected about 80 (identity-transform prediction 59.26); capture docs/captures/2026-09-12-cdp-sweep-4/obs-dpr-emulated-guides-dev2.png
+NOTE  [OBS.DPR.restore] emulation cleared: devicePixelRatio 1 (native 1); canvas {"x":284,"y":106,"w":816,"h":742,"dpr":1}
+cleanup: tree under pid 3856152 (11 process(es)):
+           3856152 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           3856162 Xvfb :184 -screen 0 1680x1050x24 -nolisten tcp
+           3856323 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           3856330 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           3856333 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3856334 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3856336 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3856362 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3856368 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3856370 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           3856379 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 51 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 351 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=hover,stamp,paste,collision,plane,effects: 21/37 rows PASS · 16 FAIL · 0 UNMEASURABLE · 1 FINDING (not counted) · 87.8s ════
+     loadavg at end 14.89 5.69 4.86
+FAILING:
+  [HB.a] the hover bar is ON SCREEN after a real hover: display flex, the container's bottom strip, the readout for the INTEGER aim (writeHoverReadout's template), and its padding is styles.hoverBar's background composited over the map in 95%+ of pixels
+  [HB.b] LEGIBILITY, the code's half: the text is the textBase token and the tXs size (styles.hoverBar, HEAD), and glyph pixels of that colour are painted in the bar
+  [CL.a] the readout is ON SCREEN naming the hovered placement ("Under cursor: <X's name> (#id)"), in the textBase token (ChunkLinkOptions: hovered ? T.textBase : T.textLo) at the tXs size, unclipped
+  [CL.b] the Detach chip is ON SCREEN and ENABLED while a placement is named, its title naming that placement (disabled={!hovered}, the title template, HEAD)
+  [CL.c] CONTROL: over the unlinked tile the readout says "Under cursor: no chunk link" in the textLo token and Detach is disabled
+  [PG.a] HOME ZONE: the ghost's layer holds the clipboard's ART (alpha 152/255 = ghost 0.55 under the 0.1 fill) inside the derived rect, a SELECTION_MARQUEE dashed edge, nothing outside; on screen the rect changed and the ring did not
+  [PG.b] ANOTHER TILE SET: the ghost draws its footprint, the 0.1 fill and the edge but NO ART (the showArt gate): every interior pixel of its layer is the fill alpha 26, and on screen the interior is exactly the fill over the reference
+  [XO.a] LEFT HALF hovered: crossoverSpanForCursor('half', col 6) = "left"; the CROSSOVER_FILL is painted over exactly crossoverPreviewRects' box and not over the other half, on the layer and on screen
+  [XO.b] RIGHT HALF hovered: the span is "right" and the fill moves to the right half
+  [XO.p] the collision hover preview itself is drawn at the hovered cell: the COLLISION_PREVIEW_PRIMARY outline on its four edges (HEAD colour)
+  [F1.a] after a REAL click on Plane A, focus is on that button (the Plane buttons do not call actAndDropFocus) and the plane is A
+  [F1.b] with the press HELD on the map (and the stroke painting cells 1 and 2 on A) focus is STILL on Plane A: the collision press calls preventDefault
+  [F1.c] Tab, with the button still held: focus moves to Plane B
+  [F1.d] Space fires B (pickPlane: the store's plane is B) WITHOUT ending the drag: moving on with the button held paints cells 3 and 4 on plane B
+  [F1.e] the stroke landed as TWO commands, newest first (recordPaint's plane clause): A holds cells 1,2 and B cells 3,4; the first Ctrl+Z takes back only the B run; the second takes back the A run
+  [GD.b] RELEASE commits ONE undo step: the document holds the dragged world_y, the line is on screen at its new row and not at the old one; one Ctrl+Z puts the old world_y and the old line back
+FINDINGS:
+  [OBS.DPR] at an EMULATED scale factor of 1.35 the guide for layer 2 is drawn on the canvas row its hit test grabs (layerGuideGeometry canvasY 80, the CSS row guideAtCanvasY measures from); redraw's docblock says "every line below it goes on drawing in CSS pixels", while drawLayerGuides and drawScreenFrame reset the transform to identity
+END-OF-RUN
