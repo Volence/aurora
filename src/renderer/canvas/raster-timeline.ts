@@ -760,7 +760,18 @@ export function drawRasterTimeline(
   // empty states share the ruler's dim register, so "no bands" is not mistaken
   // for a heading over content.
   ctx.fillStyle = view.presetProgram === 'bands' ? PRESET_EDGE : RULER_TICK;
-  ctx.fillText(rasterTimelinePresetCaption(view), RASTER_TIMELINE_PRESET_X, 18);
+  // ⚠ RIGHT-ALIGNED TO THE COLUMN'S RIGHT EDGE, so the caption grows LEFT into
+  // the ruler gutter and never RIGHT into "layers". The slot between the two
+  // captions is `RASTER_TIMELINE_STRIP_X - RASTER_TIMELINE_PRESET_X` = 32px and
+  // a two-word caption is wider than that at 9px: left-aligned, "no bands"
+  // measured 37px on the 2026-09-11 capture and its last letters sat under
+  // "layers" (docs/captures/2026-09-11-raster-timeline-program). "no preset"
+  // is a character longer and had the same latent collision, unseen because a
+  // project with no preset at all is rare. Anchored at x=60 the widest caption
+  // starts at ~22px; the ruler's numerals end at ~17px.
+  ctx.textAlign = 'right';
+  ctx.fillText(rasterTimelinePresetCaption(view), RASTER_TIMELINE_PRESET_X + RASTER_TIMELINE_PRESET_W, 18);
+  ctx.textAlign = 'left';
   ctx.fillStyle = RULER_TEXT;
   ctx.fillText('layers', x, 18);
   for (let line = 0; line <= RASTER_TIMELINE_LINES; line += RULER_STEP) {

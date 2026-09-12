@@ -46,6 +46,7 @@ import {
   rasterTimelineView, rasterTimelineAbsences, rasterTimelinePresetRows,
   rasterTimelinePresetCaption, rasterTimelineGestures, RASTER_TIMELINE_GESTURES,
   drawRasterTimeline, inactiveRasterTimelineReport, RASTER_TIMELINE_PRESET_X,
+  RASTER_TIMELINE_PRESET_W,
 } from '../raster-timeline';
 import { cameraPreviewPlan } from '../camera-preview';
 import {
@@ -172,10 +173,16 @@ describe('a real non-bands preset on the strip', () => {
   }
 });
 
-/** A `fillText` recorder — the strip's own test file has the full stub; the caption needs only this. */
+/**
+ * A `fillText` recorder — the strip's own test file has the full stub; the
+ * caption needs only this. `textAlign` writes are recorded IN SEQUENCE with the
+ * texts, because the caption's alignment is part of what makes it true: a
+ * right-anchored x with a left alignment would put "no bands" over "layers".
+ */
 function textCtx(): CanvasRenderingContext2D & { texts: string[] } {
   const texts: string[] = [];
   const noop = () => { /* not measured here */ };
+  let align = 'left';
   const ctx = {
     texts,
     save: noop, restore: noop, setTransform: noop, beginPath: noop, moveTo: noop, lineTo: noop,
@@ -183,12 +190,15 @@ function textCtx(): CanvasRenderingContext2D & { texts: string[] } {
     setLineDash: noop,
     fillText: (t: string, x: number, y: number) => { texts.push(`${t}@${x},${y}`); },
     measureText: (t: string) => ({ width: t.length * 5 }),
+    get textAlign() { return align; },
+    set textAlign(v: string) { align = v; texts.push(`align=${v}`); },
     font: '', textBaseline: '', fillStyle: '', strokeStyle: '', lineWidth: 0,
   } as unknown as CanvasRenderingContext2D & { texts: string[] };
   return ctx;
 }
 
-const CAPTION_AT = `@${RASTER_TIMELINE_PRESET_X},18`;
+/** The caption's anchor: the preset column's RIGHT edge, right-aligned (see the draw). */
+const CAPTION_AT = `@${RASTER_TIMELINE_PRESET_X + RASTER_TIMELINE_PRESET_W},18`;
 
 describe('the preset column\'s caption: three states, and the third is no longer "bands"', () => {
   it('CONTROL: with no preset the caption is "no preset", and with a bands preset it is "bands"', () => {
@@ -220,13 +230,32 @@ describe('the preset column\'s caption: three states, and the third is no longer
   }
 
   it('the new caption is no longer than the "no preset" caption the same slot already carries', () => {
-    // The slot is RASTER_TIMELINE_STRIP_X - RASTER_TIMELINE_PRESET_X px and the
-    // strip already draws "no preset" in it; a third state that fits within
-    // that length cannot overflow anything the existing one does not. (Whether
-    // "no preset" itself clears "layers" is a pixel question for the harness.)
+    // The strip already draws "no preset" in this slot; a third state that fits
+    // within that length cannot overflow anything the existing one does not.
     const noPreset = rasterTimelinePresetCaption({ presetId: null, presetProgram: null });
     const noBands = rasterTimelinePresetCaption({ presetId: 'x', presetProgram: 'ramp' });
     expect(noBands.length).toBeLessThanOrEqual(noPreset.length);
+  });
+
+  it('the caption is RIGHT-aligned to the column\'s right edge, and the alignment is put back after it', () => {
+    // MEASURED, not estimated: left-aligned at x=34, "no bands" is 37px wide at
+    // 9px system-ui and ran under "layers" (x=66) on the 2026-09-11 capture. The
+    // slot is only RASTER_TIMELINE_STRIP_X - RASTER_TIMELINE_PRESET_X px, so the
+    // caption is anchored at the column's right edge and grows LEFT. This row
+    // pins the sequence: align right, the caption at the anchor, align left —
+    // so the caption cannot be right-anchored while still left-aligned (which
+    // would push it INTO "layers"), and nothing drawn after it inherits 'right'.
+    for (const v of [viewWith(NON_BANDS[0].preset), viewWith(BANDS.preset)]) {
+      const ctx = textCtx();
+      drawRasterTimeline(ctx, v);
+      const caption = rasterTimelinePresetCaption(v);
+      const at = ctx.texts.indexOf(`${caption}${CAPTION_AT}`);
+      expect(at, 'the caption was not drawn at the anchor').toBeGreaterThan(0);
+      expect(ctx.texts[at - 1]).toBe('align=right');
+      expect(ctx.texts[at + 1]).toBe('align=left');
+      // ...and the layer caption keeps its own place, unmoved.
+      expect(ctx.texts).toContain('layers@66,18');
+    }
   });
 
   it('a fifth arm, or a document with no arm at all, lands in the third state without a code change', () => {
