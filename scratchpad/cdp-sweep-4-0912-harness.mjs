@@ -436,6 +436,10 @@ async function main() {
   const O = await loadOracle();
   const dirty = git('status', '--porcelain', '--untracked-files=no', '--', 'src').stdout.trim();
   console.log(`    oracle       : literals from HEAD ${HEAD_SHA}; four modules bundled from ${RUN.root}/src`);
+  const selfPath = 'scratchpad/cdp-sweep-4-0912-harness.mjs';
+  const selfHash = git('hash-object', selfPath).stdout.trim();
+  const selfHead = git('rev-parse', `HEAD:${selfPath}`).stdout.trim();
+  console.log(`    harness      : blob ${selfHash} (${selfHash === selfHead ? 'as committed at HEAD' : `DIFFERS from HEAD's ${selfHead || 'none'}`})`);
   console.log(`    src on disk  : ${dirty ? `DIFFERS FROM HEAD (a plant?):\n${dirty.split('\n').map((l) => `                   ${l}`).join('\n')}` : 'identical to HEAD'}`);
   const A = makeAeonCopy();
   console.log(`    copy         : ${A.dir}   name ${J(A.name)}   bg-override bands ${A.anims.length}`);
@@ -959,6 +963,16 @@ async function stampPart(d, O) {
     onScr(chip) && chip.tag === 'BUTTON' && chip.disabled === false && chip.opacity === '1' && chip.title === O.detachTitle(lh ? lh.placementId : -1) && chip.scrollW <= chip.clientW,
     `MEASURED: ${J(chip)}; want title ${J(O.detachTitle(lh ? lh.placementId : -1))}; chip background (screen) ${fmt(chipBg)}; `
     + `WCAG contrast text/chip ${chipBg ? contrast(rgbOf(chip.color), chipBg) : 'n/a'}. LOOK CALL FOR THE OWNER: capture ${roCap && roCap.path}`);
+
+  // THE CHIP'S SIZE, measured against what Chip states (red run red-cl and dev
+  // run 3 both read 13px): the button's style ends `font: 'inherit', fontSize:
+  // T.tXs` and its comment promises "a chip in a 13px bar is still 11px".
+  const chipStyle = fromHead('src/renderer/components/ui/primitives.tsx',
+    /style=\{\{ \.\.\.style, font: 'inherit', fontSize: T\.([a-zA-Z0-9]+), lineHeight: 1, margin: 0, textAlign: 'left' \}\}/, 'Chip button style');
+  finding('CL.FONT', `the enabled Detach chip is at Chip's own ${chipStyle[1]} size (primitives.tsx Chip: style {...style, font: 'inherit', fontSize: T.${chipStyle[1]}}; "a chip in a 13px bar is still 11px")`,
+    chip.found && chip.tag === 'BUTTON' && chip.fontSize === tk[chipStyle[1]],
+    `MEASURED: Detach chip ${J({ tag: chip.tag, fontSize: chip.fontSize, disabled: chip.disabled })}; token ${chipStyle[1]} = ${tk[chipStyle[1]]}; the readout beside it ${ro.fontSize}. `
+    + 'Why, from the code (not measured here): the spread `style` already carries fontSize, so the later fontSize keeps that EARLIER key position and `font: inherit`, set after it, resets the size to the parent\'s.');
 
   // ── CONTROL: an UNLINKED tile, the same pick ──────────────────────────────
   const un = await c.json(String.raw`(() => { const a = window.__dbg.aeon;
