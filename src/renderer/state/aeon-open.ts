@@ -51,12 +51,17 @@ import { nameSome } from '../../core/project/notice';
  * this one, on a road this function cannot see. That is a safety property held
  * by an accident of call order, which is the same bet
  * `shell/project-open-guard.ts` records losing four times. It is cheap to stop
- * betting: on the user road this is a no-op (classic is already closed one
- * statement earlier), and on every other caller it is the difference between a
- * loaded project and an invisible one.
+ * betting: on every caller it is the difference between a loaded project and
+ * an invisible one.
  *
- * The classic LEVEL store goes too, exactly as `openDirectory` drops it at the
- * start of a switch: a surviving doc holds a handle into the project being left.
+ * AND ON THE USER ROAD IT IS NOW THE ONLY CLOSE. It used to be a no-op there,
+ * because `openDirectory`'s 'not-classic' branch had already closed classic.
+ * Since CLASSIC-FAILED-OPEN-CLOSES-PROJECT that branch closes nothing and this
+ * runs only after the aeon load has succeeded, so an aeon directory that fails
+ * to load leaves the Sonic 1 project open, as a failed open leaves an aeon one.
+ *
+ * The classic LEVEL store goes too, exactly as `openDirectory` drops it when a
+ * classic switch commits: a surviving doc holds a handle into the project being left.
  */
 function closeResidentClassicProject(): void {
   if (useClassicProjectStore.getState().status === 'closed') return;
@@ -68,7 +73,6 @@ export async function openAeonProject(dir: string): Promise<boolean> {
   const store = useProjectStore.getState();
   try {
     store.setLoading(true);
-    closeResidentClassicProject();
     const handle = await aeonAdapter.open(createIpcFileAccess(dir));
     const aeon = handle.aeon!;
     // Register in recents BEFORE the atomic commit: openLoaded flips the session
@@ -77,6 +81,12 @@ export async function openAeonProject(dir: string): Promise<boolean> {
     // strictly safer than the old ordering — if addRecentProject throws, nothing
     // has been committed (the old path could fail with config set, project null).
     await recordRecentProject(dir, aeon.config.name);
+    // The classic project goes only now, with the aeon project loaded and no
+    // await left before its commit. It used to go before the load, so an aeon
+    // directory that failed to load closed a resident Sonic 1 project for
+    // nothing (CLASSIC-FAILED-OPEN-CLOSES-PROJECT). Synchronous, so it cannot
+    // open the await gap the constraint below forbids.
+    closeResidentClassicProject();
     // Every aeon open starts fresh histories: the loaded project data is
     // fresh-from-disk, so pre-open histories must never be applied to it. Covers
     // the same-dir reopen case, where session-lifecycle's key-change reset never
