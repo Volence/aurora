@@ -143,8 +143,11 @@ async function loadOracle() {
     /`"\$\{dir\}"( is not a recognized project\.)\\n`/, 'the not-recognized sentence')[1];
   const zoneNoId = fromSource('src/core/config/s4-config.ts',
     /if \(!zone\.id\) throw new Error\('([^']+)'\)/, 'the loader reason for a zone with no id')[1];
+  // ⚠ The red-first build (846fcaf2 reverted) aborted here: before the fix the
+  // same `label: 'Paste'` sat in a multi-line block. Both shapes are accepted;
+  // still exactly one match, still loud on zero.
   const pasteLabel = fromSource('src/renderer/components/shared/map-status-model.ts',
-    /if \(s\.pasting\) return \{ label: '([^']+)'/, 'the bar label while pasting')[1];
+    /if \(s\.pasting\)\s*(?:\{\s*)?return \{\s*label: '([^']+)'/, 'the bar label while pasting')[1];
   const stampSuffix = fromSource('src/renderer/providers/map-status-aeon.ts',
     /return `Chunk: \$\{selectedChunkId\}([^`]*)`/, 'the stamp line')[1];
   const stampNone = fromSource('src/renderer/providers/map-status-aeon.ts',
