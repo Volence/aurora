@@ -124,6 +124,16 @@ export async function openAeonProject(
     // fires (different-dir switches get a second, idempotent clear from the
     // lifecycle).
     documentHistoryHub.clearAll();
+    // THE DIRTY FLAG GOES WITH THE HISTORIES, for the same reason
+    // (SWITCH-WINDOW-EDIT-DROPPED, remedy c3). The project committed below is
+    // fresh from disk, so no dirt from the project being left may ride onto it:
+    // its act tabs would show a dot, the next open would offer Save & open, and
+    // Save would write this project's unedited data. `markClean` had one
+    // production caller, the guard's Discard, so an aeon-to-aeon switch carried
+    // the old flag across. HERE, AFTER the edit-since-consent check above and
+    // never before it: cleared earlier, it would erase the one signal that an
+    // edit made while this project loaded was about to be lost.
+    useEditorStore.getState().markClean();
     // No await may sit between openLoaded and setCurrentAct: the atomic commit
     // flips the session projectKey, and an interleaved await lets the restore
     // effect run before the default-act selection — which would then clobber the

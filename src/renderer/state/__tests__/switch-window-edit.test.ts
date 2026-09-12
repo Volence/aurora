@@ -770,4 +770,66 @@ describe('SWITCH-WINDOW-EDIT-DROPPED · an edit made while a project switch load
         });
       });
   });
+
+  // ==== (c3): a committed aeon open never carries the previous project's dirt ======
+  //
+  // Ruled with (c1) and landed after it. `openAeonProject` cleared the histories
+  // at its commit and never the dirty flag, so dirt from the project being left
+  // rode onto one fresh from disk (the packet's aeon to aeon rows:
+  // `editorDirty true, dirtyActs {"ojz/act1":1}` on the NEW project).
+  //
+  // WHICH DOOR MEASURES IT. Under (c1) the user road cannot reach an aeon commit
+  // with dirt resident: the guard cleans or refuses before consent, and (c1)
+  // refuses anything edited after it. So the row that can tell (c3) is present
+  // drives the door that asks nothing, `__aurora.aeon.open` (debug-hooks.ts),
+  // which is `openAeonProject(dir)` with no guard. Dirt made BEFORE that call is
+  // not an edit after consent, so the switch commits, and what it commits must
+  // be clean. The user-road row below is the brief's "a clean aeon to aeon open
+  // ends clean", kept as a CONTROL: it is green with or without (c3).
+
+  describe('(c3) a committed aeon open never carries the previous project\'s dirty state', () => {
+    let before = { dirty: false, acts: 0 };
+    scenario('aeon to aeon through the debug door, over a project dirtied before the call', true,
+      {
+        engine: 'aeon', residentDir: AEON_COPY, target: AEON_TARGET, door: DEBUG_AEON_OPEN,
+        dirtyBefore: 'no-dialog',
+        inWindow: () => {
+          const e = useEditorStore.getState();
+          before = { dirty: e.dirty, acts: Object.keys(e.dirtyActs).length };
+        },
+      },
+      (run) => {
+        it('premise: the project being left was dirty, and the switch committed', () => {
+          const r = run();
+          expect(before.dirty).toBe(true);
+          expect(before.acts).toBeGreaterThan(0);
+          expect(r.after.aeonBase).toBe(AEON_TARGET());
+        });
+        it('the new project is not marked dirty', () => {
+          run();
+          expect(useEditorStore.getState().dirty).toBe(false);
+        });
+        it('no act of the new project carries an edit count', () => {
+          run();
+          expect(useEditorStore.getState().dirtyActs).toEqual({});
+        });
+        it('no act of the new project carries a hard-dirty mark', () => {
+          run();
+          expect(useEditorStore.getState().hardDirtyActs).toEqual({});
+        });
+      });
+
+    scenario('CONTROL: a clean aeon to aeon open on the user road ends clean', true,
+      { engine: 'aeon', residentDir: AEON_COPY, target: AEON_TARGET, inWindow: null },
+      (run) => {
+        it('the switch committed', () => {
+          expect(run().after.aeonBase).toBe(AEON_TARGET());
+        });
+        it('and the new project ends with dirty false and no dirty acts', () => {
+          run();
+          expect(useEditorStore.getState().dirty).toBe(false);
+          expect(useEditorStore.getState().dirtyActs).toEqual({});
+        });
+      });
+  });
 });
