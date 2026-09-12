@@ -100,8 +100,11 @@ export function recordingContext(): Recording {
   const images: DeviceImage[] = [];
   const clips: DeviceRect[] = [];
   let m: Mat = [...IDENTITY];
+  // The initial styles are placeholders, never logged (only a `set:` is): no colour
+  // literal here, because test/renderer/no-raw-hex.test.ts counts every raw hex in
+  // src/renderer, this directory included, and a recorder is no reason to spend one.
   const state: Record<string, unknown> = {
-    lineWidth: 1, strokeStyle: '#000', fillStyle: '#000', font: '10px sans-serif',
+    lineWidth: 1, strokeStyle: 'unset', fillStyle: 'unset', font: '10px sans-serif',
     textBaseline: 'alphabetic', textAlign: 'start', globalAlpha: 1, imageSmoothingEnabled: true,
   };
   let dash: number[] = [];
