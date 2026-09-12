@@ -20,7 +20,9 @@
 //   stamp      SG.*   the stamp ghost during a link hover; CL.* the Chunk links panel
 //   paste      PG.*   the paste ghost (art, the tile-set gate, collision shading)
 //   collision  XO.*   the collision hover preview and its crossover rects
-//   plane      F1.*   map-coverage-6 F-1
+//   plane      F1.*   map-coverage-6 F-1. RETIRED 2026-09-12 by hub ruling M1
+//              (the Plane buttons drop focus); see `planePart` below, which
+//              now prints F1.RETIRED and runs no row.
 //   effects    GD.* guide drag, SF.* screen frame LOCKED arm, ESC.* the lens
 //              arm of resolveEscape, BAND.* the band preview, OBS.DPR
 //
@@ -1274,7 +1276,25 @@ async function collisionPart(d, O) {
 // PART plane. map-coverage-6 F-1: focus stays on Plane A through the press;
 // Tab reaches B; Space fires B without ending the drag.
 // ═══════════════════════════════════════════════════════════════════════════
-async function planePart(d) {
+//
+// ⚠ RETIRED 2026-09-12 BY HUB RULING M1 (docs/reviews/2026-09-12-rulings-asked.md,
+// "Rulings received"): the Plane A and B buttons now act and then drop focus
+// (`ui/act-and-drop-focus.ts`). F1.a asserted the exact premise the ruling
+// consumes ("after a REAL click on Plane A, focus is on that button"), and this
+// file's own red plant `f1-drop` WAS that fix; F1.b to F1.e were measured from
+// that focus. So the part is retired explicitly rather than tuned green, the
+// way d-27 retired collision-destructive's [k2]. The rows as they ran are
+// `retiredPlanePartF1` below, NOT CALLED, kept as the record (the packet's
+// final runs used them at 8cf19e56). What watches the same ground now is
+// `npm run harness:map-behaviour-fixes`: M1.a/M1.b (focus drops; a bare Space
+// presses no Plane button) and M2.0 (the Tab-then-Space route F-1 took).
+async function planePart() {
+  note('F1.RETIRED', 'the F1 rows asserted that a Plane button KEEPS focus after a click; hub ruling M1 (2026-09-12) '
+    + 'made it drop focus. No row runs here; see npm run harness:map-behaviour-fixes (M1.*, M2.0).');
+}
+
+// eslint-disable-next-line no-unused-vars
+async function retiredPlanePartF1(d) {
   const { c } = d;
   await neutral(d);
   const fc = await d.realClick(d.FACET('Collision'));

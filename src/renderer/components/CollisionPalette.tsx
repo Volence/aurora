@@ -323,8 +323,20 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
     <div>
       <div style={styles.planes}>
         <span style={styles.planeLabel}>Plane</span>
-        <button onClick={() => pickPlane('a')} style={{ ...styles.planeBtn, ...(plane === 'a' ? styles.planeSel : {}) }}>A</button>
-        <button onClick={() => pickPlane('b')} style={{ ...styles.planeBtn, ...(plane === 'b' ? styles.planeSel : {}) }}>B</button>
+        {/*
+          BOTH ACT AND THEN DROP FOCUS: d-27's mechanism, hub ruling M1
+          (docs/reviews/2026-09-12-rulings-asked.md). Not destructive, but a
+          kept focus let a bare Space pressed MID-DRAG press the button again:
+          after a click on B, Space re-picks B (harmless); after Tab it picks
+          the other plane, and recordPaint's plane clause splits the held
+          stroke into two undo entries with nothing on screen saying so
+          (map-coverage-6 F-1, measured on screen in cdp-sweep-4). The collision
+          press calls preventDefault, so the map never takes focus back on its
+          own. `pickPlane` itself stays a plain function: the overlay claim
+          below calls it as `show` with no event to blur.
+        */}
+        <button onClick={(e) => actAndDropFocus(e, () => pickPlane('a'))} style={{ ...styles.planeBtn, ...(plane === 'a' ? styles.planeSel : {}) }}>A</button>
+        <button onClick={(e) => actAndDropFocus(e, () => pickPlane('b'))} style={{ ...styles.planeBtn, ...(plane === 'b' ? styles.planeSel : {}) }}>B</button>
         {/*
           A MODE ON TOP OF THE PLANE PICK, not a third plane. The stroke still
           has an aimed plane (which is what the overlay follows and what Reset

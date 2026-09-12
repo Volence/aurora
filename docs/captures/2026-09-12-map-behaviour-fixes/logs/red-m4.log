@@ -1,0 +1,68 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801 — dist/main/index.mjs is 0s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801/src/renderer/components/MapViewport.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T09:22:48.071Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T09:22:48.071Z), so window.__dbg is in this bundle
+=== map-behaviour-fixes 2026-09-12 harness ===
+    uptime       : 05:22:48 up 1 day, 18:44,  1 user,  load average: 4.31, 6.90, 6.55
+    PARTS        : m4
+    node         : v24.15.0
+    root         : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801
+    in-tree      : yes (the tree under test is /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801; this file lives in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801)
+    ORACLE_SOCKET: /tmp/mbfix-sock-1zAo17/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-4169605-dacbae92
+    PORT         : 9433   DISPLAY: xvfb-run -a (never :0)
+    oracle       : literals from HEAD 5947cd8189d8fee514b6d966015458a9277bd27c; collision-paint, collision-cell, s4-types bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801/src; brush sizes [1,7,15,25]; section 256x256 tiles
+    harness      : blob 61817b2ec3413e09dce79ecb9ebf9e19a9273ed8 (as committed at HEAD)
+    src on disk  : DIFFERS FROM HEAD (a mutation?):
+                   M src/renderer/components/MapViewport.tsx
+    aeon source  : AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8299620c-3035-4bfb-a837-5016aacc03ce/scratchpad/aeon-copy   (live sibling /home/volence/sonic_hacks/aeon: refused if equal)
+    copy         : /tmp/mbfix-aeon-XuIuQ3   project "Sonic 4"
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-4169605-dacbae92 — see HAZARD 6
+    X pointer    : PARKED outside the window: display :218 (Xvfb pid 4169700); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed   click log: installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1, by a real click on its Explorer row   [load 4.26/6.81/6.52]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row "Oracle Jungle Zone · act1" aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+════════ PART m4 ════════
+   GEOMETRY [m4] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}
+PASS  [M4.0] PREMISE: a real click on Brush 1 left focus on it (the Brush buttons keep focus; no ruling covers them); with the stroke pressed on cell P, Tab moved focus to Brush 7 and a real Space pressed it: the palette now draws 7 selected   [load 4.61/6.80/6.52]
+        dpr 1; rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}; window top-left {"cc":1,"cr":2,"searched":{"c0":1,"r0":2,"c1":26,"r1":22}} reach 3; P {"x":396,"y":250,"world":{"x":56,"y":88},"cell":{"cc":3,"cr":5},"tile":{"col":7,"row":11},"onMap":true} Q {"x":428,"y":250,"world":{"x":72,"y":88},"cell":{"cc":4,"cr":5},"tile":{"col":9,"row":11},"onMap":true}; focus after the click {"tag":"BUTTON","text":"1","row":"Brush","isBody":false}, drawn {"labels":["1","7","15","25"],"selected":"1"}; after Tab {"tag":"BUTTON","text":"7","row":"Brush","isBody":false}; clicks [{"target":"BUTTON","text":"7","row":"Brush","detail":0}]; drawn after Space {"labels":["1","7","15","25"],"selected":"7"}; canvas unmoved true
+FAIL  [M4.a] the size picked MID-DRAG does not change the stroke: moving on to cell Q paints exactly the 1x1 cells P and Q (collisionPaintTargets at the size LATCHED at the press), not the 7x7 area around Q   [load 4.61/6.80/6.52]
+        changed 196 sub-tiles; latched expects 8, the live size would give 196; first changes [1026,1027,1028,1029,1030,1031,1032,1033,1034,1035,1036,1037]
+PASS  [M4.b] CONTROL: the stroke is ONE undo step: one Ctrl+Z puts the whole window back exactly   [load 4.61/6.80/6.52]
+        after one Ctrl+Z 0 sub-tiles still differ
+PASS  [M4.c] CONTROL: the NEXT stroke is pressed with the new size: a click on Q paints the 7x7 area collisionPaintTargets gives for Q   [load 4.61/6.80/6.52]
+        changed 196 sub-tiles; expected 196
+NOTE  [M4.cleanup] after the control's Ctrl+Z 0 sub-tiles differ from the start
+NOTE  [m4.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 4169690 (11 process(es)):
+           4169690 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           4169700 Xvfb :218 -screen 0 1680x1050x24 -nolisten tcp
+           4176829 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           4176836 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           4176840 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           4176841 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           4176843 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           4177253 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           4177268 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           4177281 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           4177316 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 51 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 351 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=m4: 4/5 rows PASS · 1 FAIL · 0 UNMEASURABLE · 19.3s ════
+     uptime at end 05:23:07 up 1 day, 18:45,  1 user,  load average: 4.61, 6.80, 6.52
+FAILING:
+  [M4.a] the size picked MID-DRAG does not change the stroke: moving on to cell Q paints exactly the 1x1 cells P and Q (collisionPaintTargets at the size LATCHED at the press), not the 7x7 area around Q
+END-OF-RUN

@@ -70,8 +70,13 @@ const HELPER_REL = 'components/ui/act-and-drop-focus.ts';
 const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: string[] }> = [
   {
     rel: 'components/CollisionPalette.tsx', importFrom: './ui/act-and-drop-focus',
-    writer: 'resetToEngine / clearSection: the two wholesale collision wipes d-27 was ruled on',
-    calls: ['actAndDropFocus(e, resetToEngine)', 'actAndDropFocus(e, clearSection)'],
+    writer: 'resetToEngine / clearSection: the two wholesale collision wipes d-27 was ruled on; AND '
+      + 'pickPlane, the Plane A and B buttons (hub ruling M1, 2026-09-12): not destructive, but a kept '
+      + 'focus let a Space mid-drag switch the aimed plane and split the held stroke',
+    calls: [
+      'actAndDropFocus(e, resetToEngine)', 'actAndDropFocus(e, clearSection)',
+      "actAndDropFocus(e, () => pickPlane('a'))", "actAndDropFocus(e, () => pickPlane('b'))",
+    ],
   },
   {
     // ⚠ THE WRITER MOVED (d-29). Both chips now call `newSpriteGuarded` from

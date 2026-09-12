@@ -3440,6 +3440,36 @@ describe('collision paint: Alt propagates, a wide brush covers an area, and the 
     expect(painted(), 'the brush wrapped past the section edge, or stopped short of it').toEqual(asc(cells));
   });
 
+  it('M4: the brush SIZE is LATCHED at the press: a size picked mid-drag leaves the stroke alone, and the next press takes it', async () => {
+    // Hub ruling M4 (docs/reviews/2026-09-12-rulings-asked.md): "Latch it at the
+    // press, like its neighbours." map-coverage-4 found the size read live per
+    // cell while Alt, both planes and the crossover brush were latched at the press.
+    const N = 3;
+    const reach = (N - 1) / 2;
+    const P = { cc: 4, cr: 4 };
+    const Q = { cc: 5, cr: 4 };
+    const area = (at: { cc: number; cr: number }): number[] => {
+      const out: number[] = [];
+      for (let cr = at.cr - reach; cr <= at.cr + reach; cr++) {
+        for (let cc = at.cc - reach; cc <= at.cc + reach; cc++) out.push(...cellSubTiles(cc, cr));
+      }
+      return asc(out);
+    };
+    const twoCells = asc([...cellSubTiles(P.cc, P.cr), ...cellSubTiles(Q.cc, Q.cr)]);
+    expect(area(Q), 'ANTI-VACUOUS: the N by N area must be more than the two 1 by 1 cells').not.toEqual(twoCells);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(P.cc, P.cr));            // pressed with brush 1 (beforeEach)
+    useEditorStore.getState().setCollisionBrushSize(N);  // Tab to a Brush button, Space: the drag is held
+    s.on().onMouseMove(collCell(Q.cc, Q.cr));
+    expect(painted(), 'a size picked mid-drag changed the area for the rest of the stroke').toEqual(twoCells);
+    win!.dispatch('mouseup', {});
+    focusedHistory()!.undo();
+    expect(painted(), 'the premise of the second half: one undo took the stroke back').toHaveLength(0);
+    s.on().onMouseDown(collCell(Q.cc, Q.cr));
+    win!.dispatch('mouseup', {});
+    expect(painted(), 'the NEXT press did not take the size picked during the last stroke').toEqual(area(Q));
+  });
+
   it('HAND-OFF marks every sub-tile of the cell to leave the plane it is painted on: A hands to B, B to A', async () => {
     // layer-transition.ts: "`hand-off` ... the SAME armed brush does the right
     // thing on either plane" (handOffFrom).
@@ -4337,13 +4367,16 @@ describe('a stroke crossing a section boundary lands one command per section, un
 // writer of that field is the Collision palette's Plane A and B buttons
 // (`pickPlane`). A MOUSE click on one cannot land mid-drag: the release is
 // heard on the window and ends the stroke before the click exists. The
-// KEYBOARD can: a clicked palette button keeps focus (measured, O48b, recorded
-// in `ui/act-and-drop-focus.ts`; these two do not drop it), the collision press
-// calls `preventDefault` and MapViewport never takes focus, and no window key
-// handler claims Tab or Space. So Tab from A to B, then Space, presses B with
-// the drag still held. Space dispatches the button's `click`, and these rows run
-// that button's own `onClick`, found by type and label in the real panel. The
-// focus half is a browser fact and is not measured here.
+// KEYBOARD can: the collision press calls `preventDefault` and MapViewport never
+// takes focus, and no window key handler claims Tab or Space, so a focused Plane
+// button takes a Space with the drag still held. Until hub ruling M1
+// (docs/reviews/2026-09-12-rulings-asked.md) a plain CLICK left the button
+// focused, so a bare Space re-pressed it; the two buttons now act and drop
+// focus (`ui/act-and-drop-focus.ts`, the M1 row below). That closes the bare
+// Space, and leaves the deliberate route: Tab to B, then Space. Space
+// dispatches the button's `click`, and these rows run that button's own
+// `onClick`, found by type and label in the real panel. The focus half is a
+// browser fact and is measured by `harness:map-behaviour-fixes`, not here.
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('a collision stroke whose plane changes mid-drag lands one command per plane, undone newest first', () => {
@@ -4378,8 +4411,13 @@ describe('a collision stroke whose plane changes mid-drag lands one command per 
   }
 
   let panel: Hooked<{ variant: 'map' }> | null = null;
+  /** What the Plane buttons did, in order: `blur:<label>` when a handler blurred
+   *  the element it was pressed on, `plane:<id>` when the aimed plane moved. */
+  let log: string[] = [];
   /** The map variant of the Collision palette over the live stores, and its two
-   *  Plane buttons' own click handlers. */
+   *  Plane buttons' own click handlers, each handed a click event whose
+   *  `currentTarget` records a blur (a handler wired through `actAndDropFocus`
+   *  reads it; one that ignores its event never touches it). */
   function renderPalette(): { A: () => void; B: () => void } {
     panel?.unmount();
     panel = renderHooked(
@@ -4388,7 +4426,8 @@ describe('a collision stroke whose plane changes mid-drag lands one command per 
     const press = (label: 'A' | 'B') => {
       const found = buttons.filter((b) => b.props.children === label);
       expect(found, `HARNESS: the palette rendered no single Plane ${label} button`).toHaveLength(1);
-      return () => (found[0].props.onClick as () => void)();
+      const click = { currentTarget: { blur: () => { log.push(`blur:${label}`); } } };
+      return () => (found[0].props.onClick as (e: unknown) => void)(click);
     };
     return { A: press('A'), B: press('B') };
   }
@@ -4405,6 +4444,7 @@ describe('a collision stroke whose plane changes mid-drag lands one command per 
     ed.setCollisionBrushSize(1);
     ed.setCollisionCrossoverBrush('keep');
     ed.setCollisionCrossoverSpanMode('cell');
+    log = [];
   });
 
   afterEach(() => {
@@ -4413,6 +4453,49 @@ describe('a collision stroke whose plane changes mid-drag lands one command per 
     panel?.unmount();
     panel = null;
     useEditorStore.getState().setCollisionPaintPlane('a');
+  });
+
+  it('M1: each Plane button drops focus FIRST, then moves the plane, so a Space after the click has nothing to press', () => {
+    // Hub ruling M1 (docs/reviews/2026-09-12-rulings-asked.md): "Drop focus
+    // after the click, as d-27 did for Reset and Clear." `actAndDropFocus`
+    // blurs BEFORE it acts (its own header says why), so the order is part of
+    // the claim. Whether the blur lands in a browser is `harness:map-behaviour-fixes`
+    // row M1.a; this row is the half the suite can see: the handler reads its
+    // event and blurs the element it was pressed on.
+    const unsubscribe = useEditorStore.subscribe((st, prev) => {
+      if (st.collisionPaintPlane !== prev.collisionPaintPlane) log.push(`plane:${st.collisionPaintPlane}`);
+    });
+    try {
+      const plane = renderPalette();
+      plane.B();
+      plane.A();
+    } finally {
+      unsubscribe();
+    }
+    expect(log, 'a Plane button moved the plane without dropping its own focus, or dropped it after')
+      .toEqual(['blur:B', 'plane:b', 'blur:A', 'plane:a']);
+  });
+
+  it('M2: after a plane switch mid-drag, a move inside the SAME cell paints that cell on the new plane', async () => {
+    // Hub ruling M2: "Put the plane in the key." map-coverage-6 O2 measured the
+    // defect: with the key `section:col:row:span`, the cell under the pointer at
+    // the switch was "the same cursor cell, skip" for the new plane, and B stayed
+    // empty there until the pointer left the cell.
+    const first = { x: 1 * 16 + 4, y: CR * 16 + 4 };    // cell (1, CR), its top-left 8px tile
+    const second = { x: 1 * 16 + 12, y: CR * 16 + 12 }; // the SAME cell, its bottom-right tile
+    expect([Math.floor(first.x / 16), Math.floor(first.y / 16)],
+      'ANTI-VACUOUS: the two points must be in one 16px cell').toEqual([Math.floor(second.x / 16), Math.floor(second.y / 16)]);
+    expect(Math.floor(first.x / 8), 'ANTI-VACUOUS: and on two different 8px tiles of it, so the move is a real move')
+      .not.toBe(Math.floor(second.x / 8));
+    const s = await mountMap();
+    const plane = renderPalette();
+    s.on().onMouseDown(mouse(first.x, first.y));
+    expect(planes(), 'the premise: the press painted cell 1 on plane A only').toEqual({ a: cells(1), b: [] });
+    plane.B();                                   // Tab to B, Space: the drag is still held
+    expect(useEditorStore.getState().collisionPaintPlane, 'ANTI-VACUOUS: B did not move the aimed plane').toBe('b');
+    s.on().onMouseMove(mouse(second.x, second.y));
+    expect(planes(), 'the cell under the pointer at the switch was skipped for the new plane')
+      .toEqual({ a: cells(1), b: cells(1) });
   });
 
   it('a stroke whose plane changes from A to B mid-drag is two commands: the first undo takes back the plane-B run only', async () => {
@@ -4583,7 +4666,15 @@ describe('the stamp tool reports the placement under the pointer, and Detach act
 
   it('over a placement in section 1 it names section 1, that placement and its chunk, not section 0\'s at the same spot', async () => {
     const s = await stampBoth();
-    expect(hover(), 'the premise: a stamp click writes no hover of its own').toBeNull();
+    // ⚠ THIS PREMISE WAS "a stamp click writes no hover of its own" UNTIL HUB
+    // RULING M6, which is exactly the behaviour that ruling removed: the last
+    // stamp press now names its own placement (the M6 row below). So the move
+    // is made to CHANGE something: off onto an unlinked tile first, then back.
+    expect(hover(), 'the premise (M6): the last stamp press named its own placement')
+      .toEqual({ sectionIndex: 1, placementId: placedAt(1)!.id, chunkId: CHUNK.s1 });
+    expect(placedAt(1, AT.col + 2, AT.row), 'ANTI-VACUOUS: the tile beside the placement is unlinked').toBeNull();
+    s.on().onMouseMove(worldAt(tileCentre(1, AT.col + 2, AT.row)));
+    expect(hover(), 'the premise: beside the placement the hover is null').toBeNull();
     // The placement's LAST tile, (col + 1, row + 1): a read that dropped the
     // offset inside the chunk, or swapped row and column, lands elsewhere.
     s.on().onMouseMove(worldAt(tileCentre(1, AT.col + 1, AT.row + 1)));
@@ -4615,9 +4706,15 @@ describe('the stamp tool reports the placement under the pointer, and Detach act
 
   it('CONTROL: with another tool armed, hovering a placement writes nothing', async () => {
     const s = await stampBoth();
+    // Since hub ruling M6 the last stamp PRESS leaves its own placement in the
+    // hover, so "writes nothing" is "leaves that value alone": a write here
+    // would name section 0's placement, which is another section.
+    const before = hover();
+    expect(before, 'the premise (M6): the last stamp press named section 1\'s placement')
+      .toEqual({ sectionIndex: 1, placementId: placedAt(1)!.id, chunkId: CHUNK.s1 });
     ed().setTool('select');
     s.on().onMouseMove(worldAt(tileCentre(0, AT.col, AT.row)));
-    expect(hover(), 'a tool whose only click is not a stamp reported a placement').toBeNull();
+    expect(hover(), 'a tool whose only click is not a stamp reported a placement').toEqual(before);
   });
 
   it('a sweep across the four tiles of one placement is ONE store write, not four', async () => {
@@ -4668,5 +4765,25 @@ describe('the stamp tool reports the placement under the pointer, and Detach act
     expect.soft(placedAt(0), 'Detach left the placement the panel named linked').toBeNull();
     expect.soft(placedAt(1)?.chunkId, 'Detach unlinked the ACTIVE section\'s placement with the same number instead')
       .toBe(CHUNK.s1);
+  });
+
+  it('M6: a stamp press names the placement it just made, under a pointer that has not moved', async () => {
+    // Hub ruling M6 (docs/reviews/2026-09-12-rulings-asked.md): "Refresh it."
+    // map-coverage-5: "A click that creates a placement under a still pointer
+    // leaves the panel saying 'no chunk link' until the pointer moves."
+    const s = await mountMap();
+    expect(placedAt(0), 'the premise: nothing is placed at AT in section 0 yet').toBeNull();
+    expect(hover(), 'the premise: the hover starts empty').toBeNull();
+    ed().setSelectedChunkId(CHUNK.s0);
+    s.on().onMouseDown(worldAt(tileCentre(0, AT.col, AT.row)));   // the press, and NO move
+    win!.dispatch('mouseup', {});
+    ed().setSelectedChunkId(null);   // the panel reads no pick; see stampBoth
+    expect(placedAt(0)?.chunkId, 'the premise: the stamp landed').toBe(CHUNK.s0);
+    expect(hover(), 'the stamp press left the link hover stale under a still pointer')
+      .toEqual({ sectionIndex: 0, placementId: placedAt(0)!.id, chunkId: CHUNK.s0 });
+    const { readout, detach } = renderPanel();
+    expect(readout, 'the panel still says there is no chunk link over the chunk just stamped')
+      .toContain('Hover chunk in section 0');
+    expect(detach.props.disabled, 'Detach is not offered on the placement just stamped').toBe(false);
   });
 });

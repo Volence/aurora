@@ -436,6 +436,12 @@ export default function MapViewport() {
    *  the 8px sub-column under the cursor, which is the only width at which a
    *  two-way pair changes the player's path (core/collision/layer-transition.ts). */
   const paintCrossoverSpanMode = useRef<CrossoverSpanMode>('cell');
+  /** The collision brush SIZE, latched at mousedown with its neighbours (hub
+   *  ruling M4, docs/reviews/2026-09-12-rulings-asked.md). It used to be read
+   *  live per cell, so a size picked mid-drag (Tab to a Brush button, Space)
+   *  changed the area for the rest of the stroke while Alt, both planes and the
+   *  crossover brush held (map-coverage-4). The next stroke takes the new size. */
+  const paintBrushSize = useRef(1);
   // Marquee tool: the drag-start tile + section, fixed for the whole drag so the
   // marquee always resolves against the section the drag STARTED in even if the
   // cursor wanders over another section's world space.
@@ -2933,8 +2939,16 @@ export default function MapViewport() {
     // ⚠ THE DRAG CACHE IS KEYED ON THE SPAN TOO. Without it, dragging from one
     // half of a cell to the other inside a single stroke would be "the same
     // cursor cell — skip", and the second half could never be marked. In `cell`
-    // mode the span is constant, so this key is byte-for-byte what it was.
-    const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}:${crossoverSpan}`;
+    // mode the span is constant, so it never splits a cell on its own.
+    //
+    // ⚠ AND ON THE PLANE, for the same reason (hub ruling M2,
+    // docs/reviews/2026-09-12-rulings-asked.md). `plane` is read from the store
+    // per cell, above, so it can change under a held drag (Tab to the other
+    // Plane button, then Space). Left out of the key, the cell under the
+    // pointer at the switch was "the same cursor cell, skip" for the NEW
+    // plane: it stayed unpainted there until the pointer left it
+    // (map-coverage-6 O2). A key must name everything the write depends on.
+    const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}:${crossoverSpan}:${plane}`;
     if (lastPaintedCell.current === cellKey) return; // same cursor cell — skip
     lastPaintedCell.current = cellKey;
 
@@ -2945,7 +2959,11 @@ export default function MapViewport() {
       shape: est.selectedCollisionProfile, entryFlipX: est.selectedCollisionEntryFlipX,
       userXFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
     });
-    const brush = useEditorStore.getState().collisionBrushSize;
+    // The size LATCHED at the press (`paintBrushSize`, hub ruling M4), not the
+    // store's live value: a size picked mid-drag waits for the next stroke.
+    // The hover preview still reads the live size, because it previews the
+    // NEXT press; during a drag the move handler never reaches it.
+    const brush = paintBrushSize.current;
     const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
 
     // Cheap no-op guard for the expensive reuse scan: if the clicked block is
@@ -3013,6 +3031,26 @@ export default function MapViewport() {
       entries.map((e) => ({ index: e.index, oldValue: e.oldColl, newValue: e.newColl })),
       otherEntries.map((e) => ({ index: e.index, oldValue: e.oldColl, newValue: e.newColl })));
     useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
+  }
+
+  /**
+   * Tell the Chunk links panel which placement is under a tile (d-18): the ONE
+   * writer of `linkHover` on the map, called by the stamp tool's hover and by
+   * its press. Read through `chunkOriginAt`, never a second copy of the plane
+   * arithmetic; `setLinkHover` de-duplicates.
+   *
+   * THE PRESS CALLS IT TOO (hub ruling M6, docs/reviews/2026-09-12-rulings-asked.md).
+   * A stamp makes a placement under a pointer that has not moved, and the hover
+   * used to be written only on a move, so the panel said "no chunk link" over
+   * the chunk just stamped until the pointer moved (map-coverage-5).
+   */
+  function reportLinkHover(info: { sectionIndex: number; col: number; row: number }): void {
+    const hoverSection = getSectionByIndex(info.sectionIndex);
+    if (!hoverSection) return;
+    const origin = chunkOriginAt(hoverSection, info.row * SECTION_TILES_WIDE + info.col);
+    useEditorStore.getState().setLinkHover(origin
+      ? { sectionIndex: info.sectionIndex, placementId: origin.id, chunkId: origin.chunkId }
+      : null);
   }
 
   function getSectionByIndex(idx: number): Section | null {
@@ -3623,6 +3661,11 @@ export default function MapViewport() {
       // reaches into the command by hand. A stamp's undo was invisible for the
       // same reason a paste's was.
       if (cmd) executeCommand(cmd, level);
+      // The pointer has not moved, and the placement under it just changed:
+      // say so NOW, not on the next mousemove (hub ruling M6). Read AFTER the
+      // command, so a detached stamp (no placement) and a refused one report
+      // what is really there rather than what the stamp meant to make.
+      reportLinkHover(info);
       useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
       e.preventDefault();
       return;
@@ -3649,6 +3692,7 @@ export default function MapViewport() {
       paintBothPlanes.current = useEditorStore.getState().collisionPaintBothPlanes;
       paintCrossover.current = useEditorStore.getState().collisionCrossoverBrush;
       paintCrossoverSpanMode.current = useEditorStore.getState().collisionCrossoverSpanMode;
+      paintBrushSize.current = useEditorStore.getState().collisionBrushSize;
       paintCollisionCell(info, paintPropagate.current);
       isPaintDragging.current = true;
       e.preventDefault();
@@ -3962,13 +4006,7 @@ export default function MapViewport() {
     if (tool === 'stamp-chunk') {
       const world = screenToWorld(e.clientX, e.clientY);
       const info = worldToSectionTile(world.x, world.y);
-      const hoverSection = info ? getSectionByIndex(info.sectionIndex) : null;
-      if (info && hoverSection) {
-        const origin = chunkOriginAt(hoverSection, info.row * SECTION_TILES_WIDE + info.col);
-        useEditorStore.getState().setLinkHover(origin
-          ? { sectionIndex: info.sectionIndex, placementId: origin.id, chunkId: origin.chunkId }
-          : null);
-      }
+      if (info) reportLinkHover(info);
     }
 
     // Stamp ghost: track where the chunk would land, snapped to its own size.
