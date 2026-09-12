@@ -461,7 +461,13 @@ async function main() {
     const emuTarget = Math.abs(nativeDpr - EMULATE) < 1e-6 ? 1 : EMULATE;
 
     // ---- IDENTITY capture, at dpr 1 only, before any gesture ---------------
+    // THE TWO FIXED STATES, CAPTURED IN EVERY PHASE. At dpr 1 they are the identity
+    // check (hashed, and compared with a baseline build); at any other factor they
+    // are the LOOK: the same two pictures at 1.35, saved for a person to judge, with
+    // the same in-run determinism row. Only a dpr-1 phase writes IDENTITY_OUT.
     const identityCaptures = async (phaseId) => {
+      const dprNow = await c.evalExpr('window.devicePixelRatio');
+      const atOne = Math.abs(dprNow - 1) < 1e-6;
       // ⚠ ON THE PARALLAX SUB-TAB, EXPLICITLY. A phase ends on tileAnim, where the
       // composite is off; master-real's emulated-1 identity capture ran there and
       // its floor state had no composite in it at all.
@@ -470,18 +476,18 @@ async function main() {
       const lensSet = await c.evalExpr("(window.__dbg.aeon.setBandLensTarget({ kind: 'band', index: 0 }), true)").catch(() => false);
       await sleep(400); await repaint(); await park();
       const lens = await c.json('window.__dbg.aeon.bandLens()');
-      const a1 = await capture('identity-probe-a');
+      const a1 = await capture(`state-probe-a-${phaseId}`);
       await repaint(); await park();
-      const a2 = await capture('identity-probe-b');
+      const a2 = await capture(`state-probe-b-${phaseId}`);
       await c.evalExpr('window.__dbg.aeon.setBandLensTarget(null)').catch(() => null);
       await select(FIXTURE_SCENE);
       const xBefore = (await frame()).anchor.x;
       await cameraStep('ArrowRight', CAM_STEPS); await repaint(); await park();
       const fI = await frame();
       const cam = await c.json('window.__dbg.aeon.cameraPreview()');
-      const b1 = await capture('identity-floor-a');
+      const b1 = await capture(`state-floor-a-${phaseId}`);
       await repaint(); await park();
-      const b2 = await capture('identity-floor-b');
+      const b2 = await capture(`state-floor-b-${phaseId}`);
       await cameraStep('ArrowLeft', CAM_STEPS); await repaint();
       const xAfter = (await frame()).anchor.x;
       await select(SCENE_ID); await park();
@@ -490,9 +496,14 @@ async function main() {
         && fI.anchor.x === xBefore + CAM_STEPS * CAM_STEP_PX && xAfter === xBefore,
         `band lens ${J({ active: lens.active, cells: lens.cells, drawn: lens.drawn })}; camera preview ${J({ active: cam.active, sceneId: cam.sceneId, camX: cam.camX, blits: cam.blits })}; `
         + `frame x ${xBefore} -> ${fI.anchor.x} -> ${xAfter}`);
-      check(`${phaseId}.I1`, '[anti-vacuous] DETERMINISM: each identity state hashes the same on two repaints in one run',
+      check(`${phaseId}.I1`, `[anti-vacuous] DETERMINISM: each fixed state hashes the same on two repaints in one run (dpr ${dprNow})`,
         a1.hash === a2.hash && b1.hash === b2.hash,
         `probe ${a1.hash} / ${a2.hash} (${a1.w}x${a1.h}); floor ${b1.hash} / ${b2.hash}; ${a1.path}, ${b1.path}`);
+      if (!atOne) {
+        note(`${phaseId}.look`, `dpr ${dprNow}: the two fixed states saved for the eye, not compared: ${a1.path}, ${b1.path}`);
+        await select(SCENE_ID); await park();
+        return;
+      }
       identity.captures = { probe: a1, floor: b1 };
       if (IDENTITY_OUT) writeFileSync(IDENTITY_OUT, `${J(identity, null, 1)}\n`);
       if (IDENTITY_BASELINE) {
@@ -730,7 +741,7 @@ async function main() {
     };
 
     const phases = [];
-    if (nativeDpr === 1) await identityCaptures('N');
+    await identityCaptures('N');
     phases.push(await phase('N', nativeLabel));
     const iw = await c.json('({ w: innerWidth, h: innerHeight })');
     await c.send('Emulation.setDeviceMetricsOverride', { width: iw.w, height: iw.h, deviceScaleFactor: emuTarget, mobile: false });
@@ -739,7 +750,7 @@ async function main() {
     const emuDpr = await c.evalExpr('window.devicePixelRatio');
     const emuLabel = `EMULATED (Emulation.setDeviceMetricsOverride deviceScaleFactor ${emuTarget}): dpr ${emuDpr}`;
     check('3a', `[anti-vacuous] the emulation took: devicePixelRatio reads ${emuTarget}`, Math.abs(emuDpr - emuTarget) < 1e-6, `dpr ${emuDpr}`);
-    if (emuTarget === 1 && Math.abs(emuDpr - 1) < 1e-6) await identityCaptures('E');
+    await identityCaptures('E');
     phases.push(await phase('E', emuLabel));
     await c.send('Emulation.clearDeviceMetricsOverride');
     await sleep(500);
