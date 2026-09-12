@@ -300,9 +300,16 @@ function cdp(wsUrl) {
     if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
   });
   const ready = new Promise((res, rej) => { ws.addEventListener('open', res); ws.addEventListener('error', rej); });
+  // ⚠ RUN 1 HUNG for ten minutes inside one CDP call (a clip capture after two
+  // that had returned) and printed nothing. Every call now has a deadline, so a
+  // hang is a LOUD error naming the method, never a silent stall.
   const send = (method, params = {}) => new Promise((resolve, reject) => {
     const id = nextId++;
-    pending.set(id, (m) => (m.error ? reject(new Error(`${method}: ${JSON.stringify(m.error)}`)) : resolve(m.result)));
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      reject(new Error(`CDP ${method} gave no answer in 45s (params ${JSON.stringify(params).slice(0, 160)})`));
+    }, 45000);
+    pending.set(id, (m) => { clearTimeout(timer); if (m.error) reject(new Error(`${method}: ${JSON.stringify(m.error)}`)); else resolve(m.result); });
     ws.send(JSON.stringify({ id, method, params }));
   });
   const evalExpr = async (expr) => {
@@ -506,13 +513,25 @@ function driver(c, page) {
     return `${CAP_REL}/${name}-${TAG}.png`;
   };
   /** A capture of one element's box (integer clip, inside the viewport), decoded. */
+  // ⚠ RUN 1 (second attempt) ABORTED THE CLASSIC PART HERE: the Home path box
+  // sat BELOW the viewport (top 873 in an 872px window), the clip came out with
+  // height -1, and Chromium never answers a capture with a non-positive clip.
+  // So an element outside the viewport is scrolled into view first (DOM
+  // positioning for a picture, not a gesture: nothing is clicked), and a clip
+  // that is still not positive is refused out loud rather than sent.
   const grabEl = async (selectorExpr, name, pad = 2) => {
     const r = await c.json(String.raw`(() => { const el = ${selectorExpr}; if (!el) return null;
-      const b = el.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height, vw: innerWidth, vh: innerHeight }; })()`);
-    if (!r || r.w <= 0 || r.h <= 0) { console.log(`   capture ${name}: element absent or empty`); return null; }
+      let b = el.getBoundingClientRect(); let scrolled = false;
+      if (b.top < 0 || b.left < 0 || b.bottom > innerHeight || b.right > innerWidth) {
+        el.scrollIntoView({ block: 'center', inline: 'nearest' }); scrolled = true; b = el.getBoundingClientRect();
+      }
+      return { x: b.left, y: b.top, w: b.width, h: b.height, vw: innerWidth, vh: innerHeight, scrolled }; })()`);
+    if (!r || r.w <= 0 || r.h <= 0) { console.log(`   capture ${name}: element absent or empty ${J(r)}`); return null; }
     const x = Math.max(0, Math.floor(r.x) - pad); const y = Math.max(0, Math.floor(r.y) - pad);
     const x1 = Math.min(r.vw, Math.ceil(r.x + r.w) + pad); const y1 = Math.min(r.vh, Math.ceil(r.y + r.h) + pad);
     const clip = { x, y, width: x1 - x, height: y1 - y, scale: 1 };
+    if (clip.width <= 0 || clip.height <= 0) { console.log(`   capture ${name}: REFUSED, the clip is not positive after scrolling ${J({ r, clip })}`); return null; }
+    if (r.scrolled) console.log(`   capture ${name}: the element was outside the viewport and was scrolled into view for the picture`);
     const s = await c.send('Page.captureScreenshot', { format: 'png', clip });
     const buf = Buffer.from(s.data, 'base64');
     const path = `${CAP_REL}/${name}-${TAG}.png`;
@@ -1042,8 +1061,14 @@ async function pastePart(d, O, { A }) {
     const rg = document.createRange(); rg.selectNodeContents(ctx);
     const ctxLines = new Set([...rg.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size;
     const zin = f.querySelector('button[aria-label="Zoom in"]'); const zout = f.querySelector('button[aria-label="Zoom out"]');
-    const badge = right.lastElementChild;
-    return { found: true, innerWidth, innerHeight, dpr: window.devicePixelRatio,
+    // ⚠ RUN 1 read right.lastElementChild, which is the right half's own
+    // wrapper ("−100%+Aether ..."), not the badge. The badge is the LAST child
+    // of the right half's inner span (MapStatusBar: the marginLeft span around
+    // port.right), and its text must name Aether or the read is refused below.
+    const rInner = right.firstElementChild;
+    const badge = rInner && rInner.lastElementChild && /Aether/.test(rInner.lastElementChild.textContent || '') ? rInner.lastElementChild : null;
+    if (!badge) return { found: false, why: 'no Aether badge span as the last child of the right half' };
+    return { found: true, innerWidth, innerHeight, outerWidth, outerHeight, dpr: window.devicePixelRatio,
       footer: r(f), left: r(left), leftScrollW: left.scrollWidth, leftClientW: left.clientWidth,
       inner: r(inner), innerScrollW: inner.scrollWidth, innerClientW: inner.clientWidth,
       context: { ...r(ctx), text: ctx.textContent, lines: ctxLines, scrollW: ctx.scrollWidth, clientW: ctx.clientWidth },
@@ -1058,32 +1083,55 @@ async function pastePart(d, O, { A }) {
   const gW1 = await c.json(BAR_GEOM);
   const capW1 = [await d.grabEl(BAR_FOOTER, 'psb-W-harness-default-bar', 0)].map((x) => x && x.path);
   await d.shot('psb-W-harness-default-full');
-  let wc = null; let gW2 = null; let capW2 = null; let bounds0 = null; let wErr = null; let restored = null;
-  try {
-    wc = await windowControl(d);
-    bounds0 = wc.bounds;
-    await wc.send('Browser.setWindowBounds', { windowId: wc.windowId, bounds: { width: 1280 } });
-    for (let i = 0; i < 40; i++) { if ((await c.evalExpr('innerWidth')) !== gW1.innerWidth) break; await sleep(150); }
-    await sleep(900);
-    const b2 = await wc.send('Browser.getWindowBounds', { windowId: wc.windowId });
+  // ⚠ RUN 1: Electron answers `Browser.getWindowForTarget` with "wasn't found"
+  // on BOTH the page session and the browser endpoint, so the Browser domain
+  // cannot resize this window. Two methods, tried in order and NAMED in the
+  // row: (1) `window.resizeTo` from the page, a real window resize, accepted
+  // only if innerWidth actually moves to what the new outer width implies;
+  // (2) `Emulation.setDeviceMetricsOverride` at width 1280, an EMULATED
+  // viewport (the page lays out at 1280 inside the same window), cleared after.
+  let gW2 = null; let capW2 = null; let wErr = []; let restored = null; let via = null;
+  const outer0 = await c.json('({ w: outerWidth, h: outerHeight, iw: innerWidth, ih: innerHeight })');
+  try { const wc = await windowControl(d); wErr.push(`Browser domain answered: ${J(wc.bounds)}`); wc.close(); }
+  catch (e) { wErr.push(`Browser domain: ${e.message}`); }
+  const measureAt = async (label) => {
     gW2 = await c.json(BAR_GEOM);
-    gW2.windowBounds = b2.bounds;
-    capW2 = [await d.grabEl(BAR_FOOTER, 'psb-W-1280-bar', 0)].map((x) => x && x.path);
+    capW2 = [await d.grabEl(BAR_FOOTER, `psb-W-1280-bar`, 0)].map((x) => x && x.path);
     await d.shot('psb-W-1280-full');
-    await wc.send('Browser.setWindowBounds', { windowId: wc.windowId, bounds: { width: bounds0.width } });
-    for (let i = 0; i < 40; i++) { if ((await c.evalExpr('innerWidth')) === gW1.innerWidth) break; await sleep(150); }
-    await sleep(900);
-    restored = await c.evalExpr('innerWidth');
-  } catch (e) { wErr = e.message; }
-  finally { try { wc && wc.close(); } catch { /* */ } }
-  check('PSB.F1.W1', `F-1 / O-1 at the HARNESS's default window (bounds ${J(bounds0)}, innerWidth ${gW1.innerWidth}): the bar's left half is on one row, unclipped, and the zoom controls and Aether badge are inside the window`,
-    widthOk(gW1), `geometry ${J(gW1)}; captures ${J(capW1)}`);
-  if (gW2 === null) {
-    check('PSB.F1.W2', 'F-1 / O-1 at a 1280-wide window', 'UNMEASURABLE', `the window could not be resized: ${wErr}`);
+    via = label;
+  };
+  await c.evalExpr(`window.resizeTo(1280, ${outer0.h})`).catch((e) => wErr.push(`resizeTo threw: ${e.message}`));
+  let moved = false;
+  for (let i = 0; i < 30; i++) { const iw = await c.evalExpr('innerWidth'); if (iw !== outer0.iw) { moved = true; break; } await sleep(150); }
+  await sleep(700);
+  if (moved) {
+    await measureAt(`window.resizeTo(1280, ${outer0.h}): a real window resize`);
+    await c.evalExpr(`window.resizeTo(${outer0.w}, ${outer0.h})`).catch(() => {});
+    for (let i = 0; i < 30; i++) { if ((await c.evalExpr('innerWidth')) === outer0.iw) break; await sleep(150); }
+    await sleep(700);
   } else {
-    check('PSB.F1.W2', `F-1 / O-1 at a 1280-wide window (via ${wc.via}; innerWidth ${gW2.innerWidth}): one row, unclipped, zoom and badge inside the window`,
-      widthOk(gW2), `geometry ${J(gW2)}; captures ${J(capW2)}; restored innerWidth ${restored}`);
+    wErr.push(`window.resizeTo did not move innerWidth (still ${await c.evalExpr('innerWidth')})`);
+    try {
+      await c.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: outer0.ih, deviceScaleFactor: 0, mobile: false });
+      for (let i = 0; i < 30; i++) { if ((await c.evalExpr('innerWidth')) === 1280) break; await sleep(150); }
+      await sleep(700);
+      await measureAt(`Emulation.setDeviceMetricsOverride width 1280: an EMULATED 1280px viewport inside the ${outer0.w}px window, not a window resize`);
+    } catch (e) { wErr.push(`Emulation: ${e.message}`); }
+    await c.send('Emulation.clearDeviceMetricsOverride').catch(() => {});
+    for (let i = 0; i < 30; i++) { if ((await c.evalExpr('innerWidth')) === outer0.iw) break; await sleep(150); }
+    await sleep(700);
   }
+  restored = await c.evalExpr('innerWidth');
+  check('PSB.F1.W1', `F-1 / O-1 at the HARNESS's default window (outer ${outer0.w}x${outer0.h}, innerWidth ${gW1.innerWidth}): the bar's left half is on one row, unclipped, and the zoom controls and Aether badge are inside the window`,
+    gW1.found ? widthOk(gW1) : 'UNMEASURABLE', `geometry ${J(gW1)}; captures ${J(capW1)}`);
+  if (gW2 === null || !gW2.found) {
+    check('PSB.F1.W2', 'F-1 / O-1 at 1280 wide', 'UNMEASURABLE', `no method reached 1280: ${J(wErr)}; geometry ${J(gW2)}`);
+  } else {
+    check('PSB.F1.W2', `F-1 / O-1 at 1280 wide (via ${via}; innerWidth ${gW2.innerWidth}): one row, unclipped, zoom and badge inside the window`,
+      gW2.innerWidth === 1280 || moved ? widthOk(gW2) : 'UNMEASURABLE',
+      `geometry ${J(gW2)}; captures ${J(capW2)}; attempts ${J(wErr)}; restored innerWidth ${restored} (was ${outer0.iw})`);
+  }
+  if (restored !== outer0.iw) throw new Error(`the window width was not restored: innerWidth ${restored}, was ${outer0.iw}; every later aim would be off`);
   await sameGeometry('F-1 clicks (after the resize and restore)');
 
   // ── the click agrees with the line, zone B, Layers Both ──────────────────
