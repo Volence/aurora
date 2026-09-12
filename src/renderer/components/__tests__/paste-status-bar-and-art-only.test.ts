@@ -1,6 +1,7 @@
 // PASTE-STATUS-BAR-HINT and PASTE-SAME-ZONE-ART-ONLY-SHIFT, the two items left
 // open (O-1, O-2) by docs/reviews/2026-09-12-paste-hint-and-chosen.md, whose
-// rows sit beside this file in paste-hint-and-chosen.test.ts.
+// rows sit beside this file in paste-hint-and-chosen.test.ts. This parcel's
+// packet is docs/reviews/2026-09-12-paste-status-bar-and-art-only.md.
 //
 // ═══ THE ORACLE ═══
 //
