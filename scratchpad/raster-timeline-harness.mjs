@@ -71,6 +71,18 @@
 //   node scratchpad/raster-timeline-harness.mjs   # or: npm run harness:raster-timeline
 //
 // Screenshots land in scratchpad/shots-raster-timeline/.
+//
+// From a linked worktree:  ELECTRON_BIN=<main checkout>/node_modules/.bin/electron
+//                          AURORA_BUILT_TREE=<this worktree>
+//                          AEON_DIR=<a fresh COPY of aeon, one per run>
+//
+// ═══ AN AIM THAT MISSES STOPS THE RUN (2026-09-12) ═══
+//
+// Every control this run types into or clicks is found through
+// `lib/strict-aim.mjs`: exactly one element, or a stop reading
+// `aim missed: <what>; looked in <where>`. The vsplit controls' titles are read
+// from the app's source (`lib/effects-control-aims.mjs`). Lookups whose ABSENCE
+// a row measures (row 1b's pill) still return a value for the row to judge.
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
@@ -80,6 +92,10 @@ import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import {
+  AIM_MISSED, aimOne, aimOneByTitle, clickOneByText, showSubTabOrThrow, openSectionOrThrow,
+} from './lib/strict-aim.mjs';
+import { vsplitAims } from './lib/effects-control-aims.mjs';
 
 const PORT = Number(process.env.PORT ?? 9401);
 // SELF-LOCATING, never a pinned path: run from the main clone this must serve
@@ -99,6 +115,16 @@ const SHOTS = `${ROOT}/scratchpad/shots-raster-timeline`;
 mkdirSync(SHOTS, { recursive: true });
 
 const SCENE_ID = 'raster_strip_probe';
+
+// ── THE VSPLIT ROW'S TWO CONTROLS, READ FROM THE SOURCE THAT TITLES THEM ────
+//
+// Aimed until 2026-09-12 by the copied prefix `Layer N vsplit.at <dash>`, which
+// the app had retired: the select was never found, no split was ever set, and
+// the run reported 4a/5b/5b2/5cA/5cB as if the STRIP were broken, then threw a
+// TypeError in section 6. `lib/effects-control-aims.mjs` reads both prefixes
+// out of `LAYER_VSPLIT_ROW` and the panel's composition, from the BUILT tree
+// this run drives (`RUN.root`), because that is the source the app rendered.
+const VSPLIT = vsplitAims(RUN.root);
 
 // ── THE FIXTURE, AND WHY EVERY NUMBER IS THAT NUMBER ───────────────────────
 //
@@ -222,37 +248,44 @@ const clickByText = (re, tag = 'button') => String.raw`
   return true;
 })()`;
 
-/** The control whose `title` starts with this text — the panel's own labelling. */
-const byTitle = (tag, prefix) =>
-  `[...document.querySelectorAll(${JSON.stringify(tag)})].find(e => (e.title||'').startsWith(${JSON.stringify(prefix)}))`;
+/**
+ * THE ONE control whose `title` starts with this text, or a STOP naming it.
+ *
+ * It used to be `.find(...)`, which answers `undefined` on a miss; SET_INPUT
+ * turned that into 'no-element' and the run went on measuring a fixture that
+ * had never been authored. Zero hits, or two, now throw `aim missed: ...` in
+ * the page (`lib/strict-aim.mjs`), so a renamed title reads as the harness's
+ * problem and not the app's.
+ */
+const byTitle = (tag, prefix, where = 'the Effects column') => aimOneByTitle(tag, prefix, where);
 
 /**
  * THE SCENE FORM, OPENED — it arrives COLLAPSED since EW-SHAPE-TABS (d-26b),
  * which is what gives the layers list above it a real height. `v_offset` lives
  * in it, so §8 needs it open. Idempotent, and the disclosure persists, so
  * calling it before every edit costs one DOM query.
+ *
+ * \u26a0 BY ITS SECTION ID, NOT ITS HEADER TEXT, since 2026-09-12. This found the
+ * header by `/^SCENE\s*<dash>/` and the header now reads `Scene: <id>`, so it
+ * returned 'no-scene-header', which nothing read, and section 8 could never
+ * reach `v_offset`. `aeon.effects.scene` is the CollapsibleSection id the app
+ * routes on (`providers/effects-sub-tabs.ts`), the door `lib/effects-sections.mjs`
+ * already uses; a miss now throws.
  */
-const OPEN_SCENE_FORM = String.raw`
-(() => {
-  const has = () => !!(${byTitle('input', 'v_offset:')});
-  if (has()) return 'already-open';
-  const hdr = [...document.querySelectorAll('div')]
-    .filter((d) => d.style && d.style.cursor === 'pointer'
-                && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
-  if (!hdr) return 'no-scene-header';
-  hdr.click();
-  return 'clicked';
-})()`;
+const OPEN_SCENE_FORM = openSectionOrThrow('aeon.effects.scene');
 
 // ── the strip's own pixels ─────────────────────────────────────────────────
 //
 // `getContext('2d')` returns the context the component already drew with, so
 // this is the FINAL backing store: anything drawn and then painted over is gone
 // by the time this runs, which is what makes catch 3's first half real.
+/** The strip canvas, or a STOP naming it. The id is `RasterTimelineStrip.tsx`'s. */
+const STRIP_CANVAS = aimOne('canvas#effects-raster-timeline',
+  'the colour sub-tab (RasterTimelineStrip.tsx renders it; is the strip mounted?)',
+  `document.querySelectorAll('canvas#effects-raster-timeline')`);
 const STRIP_ROW = (y, x, len) => String.raw`
 (() => {
-  const cv = document.getElementById('effects-raster-timeline');
-  if (!cv) return null;
+  const cv = ${STRIP_CANVAS};
   const ctx = cv.getContext('2d');
   if (!ctx) return null;
   const d = ctx.getImageData(${x}, ${y}, ${len}, 1).data;
@@ -305,8 +338,7 @@ function rowSummary(row) {
  */
 const SCROLL_AND_HIT = String.raw`
 (() => {
-  const cv = document.getElementById('effects-raster-timeline');
-  if (!cv) return { error: 'no-canvas' };
+  const cv = ${STRIP_CANVAS};
   cv.scrollIntoView({ block: 'center' });
   const r = cv.getBoundingClientRect();
   const px = Math.round(r.x + r.width / 2);
@@ -326,16 +358,13 @@ const SCROLL_AND_HIT = String.raw`
  * The Effects column's panels are re-parented under three sub-tabs, so the
  * sections this instrument measures are UNMOUNTED (not hidden) until their job
  * is shown. One click, immediately after the facet mounts; nothing else about
- * what these rows assert changed. A missing bar returns 'no-sub-tab' rather
- * than throwing, so the row below reports "not found" instead of a stack.
+ * what these rows assert changed.
+ *
+ * ⚠ A MISSING TAB NOW STOPS THE RUN (2026-09-12). It returned 'no-sub-tab',
+ * which no call site read, so every row after it measured whatever job
+ * happened to be showing. `showSubTabOrThrow` names the tab it looked for.
  */
-const SUBTAB = (id) => String.raw`
-(() => {
-  const t = document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]');
-  if (!t) return 'no-sub-tab';
-  t.click();
-  return 'ok';
-})()`;
+const SUBTAB = (id) => showSubTabOrThrow(id);
 
 async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
@@ -418,20 +447,35 @@ async function main() {
      * different sub-tabs now. This is that round trip, in one place, so no step
      * can measure a canvas that is not mounted or type into a card that is not.
      */
+    const selectedNow = () => c.evalExpr('window.__dbg.aeon.selectedScene()');
     const onParallax = async (expr) => {
+      // WHICH STEP OF THE ROUND TRIP MOVED THE SELECTION, when one did
+      // (2026-09-12; a NOTE, not a row). The first re-aimed run found the panel
+      // on another scene after this round trip, and a value typed into a layer
+      // card lands in whatever scene is selected.
+      const trail = [['before', await selectedNow()]];
       await c.evalExpr(SUBTAB('parallax'));
       await sleep(600);
+      trail.push(['parallax shown', await selectedNow()]);
       await c.evalExpr(OPEN_SCENE_FORM);
       await sleep(300);
+      trail.push(['scene form open', await selectedNow()]);
       const r = await c.evalExpr(expr);
+      trail.push(['edit made', await selectedNow()]);
       await c.evalExpr(SUBTAB('colour'));
       await sleep(800);
+      trail.push(['colour shown', await selectedNow()]);
+      if (trail.some(([, s]) => s !== trail[0][1])) {
+        note('the selected scene MOVED during a parallax round trip: '
+          + trail.map(([k, s]) => `${k}=${s}`).join(' -> '));
+      }
       return r;
     };
     const scenes0 = await c.json('window.__dbg.aeon.scenes()');
     note(`fixture scenes before this run: ${JSON.stringify(scenes0.map((s) => s.id))}`);
-    await c.evalExpr(SET_INPUT(`document.querySelector('input[placeholder="new_scene_id"]')`, SCENE_ID));
-    await c.evalExpr(clickByText('/^New$/'));
+    await c.evalExpr(SET_INPUT(aimOne('the new-scene id box, input[placeholder="new_scene_id"]',
+      'the Scenes section', `document.querySelectorAll('input[placeholder="new_scene_id"]')`), SCENE_ID));
+    await c.evalExpr(clickOneByText('/^New$/', 'button', 'the Scenes section'));
     await sleep(900);
     const scenes = await c.json('window.__dbg.aeon.scenes()');
     check('3a', 'ANTI-VACUOUS: the scene this harness authored exists in the model',
@@ -441,7 +485,10 @@ async function main() {
       (await c.evalExpr('window.__dbg.aeon.selectedScene()')) === SCENE_ID);
 
     // Two more layers, through the real "Add layer" button.
-    for (let i = 0; i < 2; i++) { await c.evalExpr(clickByText('/Add layer/')); await sleep(500); }
+    for (let i = 0; i < 2; i++) {
+      await c.evalExpr(clickOneByText('/Add layer/', 'button', 'the Layers section'));
+      await sleep(500);
+    }
     const sceneOf = (docs) => docs.find((s) => s.id === SCENE_ID) ?? null;
     let doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     check('3c', 'the real Add-layer button gave the scene three layers',
@@ -454,10 +501,10 @@ async function main() {
     }
     for (const [i, at] of [[1, AT_A], [2, AT_B]]) {
       watchMiss(`3 vsplit toggle L${i}`,
-        await c.evalExpr(SET_INPUT(byTitle('select', `Layer ${i} vsplit.at —`), 'at')));
+        await c.evalExpr(SET_INPUT(byTitle('select', VSPLIT.select(i), VSPLIT.where), 'at')));
       await sleep(400);
       watchMiss(`3 vsplit at L${i}`,
-        await c.evalExpr(SET_INPUT(byTitle('input', `Layer ${i} vsplit.at (`), at)));
+        await c.evalExpr(SET_INPUT(byTitle('input', VSPLIT.spinner(i), VSPLIT.where), at)));
       await sleep(400);
     }
 
@@ -495,8 +542,8 @@ async function main() {
       `active=${rep.active} scene=${rep.sceneId} paints=${rep.paints}`);
     check('5b', 'it planned exactly the two splits, at the ENGINE\'s fire lines',
       rep.splits.length === 2
-      && rep.splits[0].layer === 1 && rep.splits[0].line === TOP_A && rep.splits[0].at === AT_A
-      && rep.splits[1].layer === 2 && rep.splits[1].line === TOP_B && rep.splits[1].at === AT_B,
+      && rep.splits[0]?.layer === 1 && rep.splits[0]?.line === TOP_A && rep.splits[0]?.at === AT_A
+      && rep.splits[1]?.layer === 2 && rep.splits[1]?.line === TOP_B && rep.splits[1]?.at === AT_B,
       JSON.stringify(rep.splits));
     check('5b2', 'and it DREW them — one rule stroked per split, one fill per band',
       rep.markers === 2 && rep.fills === 3,
@@ -546,8 +593,16 @@ async function main() {
     watchMiss('6 top L1', await onParallax(SET_INPUT(byTitle('input', 'Layer 1 Screen line'), TOP_A2)));
     await sleep(700);
     rep = await c.json('window.__dbg.aeon.rasterTimeline()');
+    // THE DOCUMENT AND THE SELECTION BESIDE THE REPORT (2026-09-12, detail
+    // only; the condition is unchanged), so a split that VANISHED from the
+    // document can be told apart from one the strip failed to plan, and both
+    // from a strip now drawing some other scene.
+    const after6 = sceneOf(JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()')));
+    const selected6 = await c.evalExpr('window.__dbg.aeon.selectedScene()');
     check('6a', `moving the top ${TOP_A} -> ${TOP_A2} moved the SPLIT's fire line with it`,
-      rep.splits[0].line === TOP_A2, `line=${rep.splits[0].line}`);
+      rep.splits[0]?.line === TOP_A2,
+      `line=${rep.splits[0]?.line}; strip scene=${rep.sceneId} splits=${JSON.stringify(rep.splits)}; `
+      + `selected=${selected6}; ${SCENE_ID} layers=${JSON.stringify(after6?.layers)}`);
     const onNew = await sample2(c, rep, TOP_A2, SX, SLEN);
     const onOld = await sample2(c, rep, TOP_A, SX, SLEN);
     check('6b', `PIXELS: the marker is now at line ${TOP_A2} and GONE from ${TOP_A} `
@@ -562,14 +617,14 @@ async function main() {
     // marker here. The paints counter is checked in the same breath so that
     // "did not move" cannot be "did not repaint".
     const paintsBefore = rep.paints;
-    watchMiss('7 at L1', await onParallax(SET_INPUT(byTitle('input', 'Layer 1 vsplit.at ('), AT_A2)));
+    watchMiss('7 at L1', await onParallax(SET_INPUT(byTitle('input', VSPLIT.spinner(1), VSPLIT.where), AT_A2)));
     await sleep(700);
     rep = await c.json('window.__dbg.aeon.rasterTimeline()');
     check('7a', `the document took the new payload (at ${AT_A} -> ${AT_A2}) and the strip REPAINTED`,
-      rep.splits[0].at === AT_A2 && rep.paints > paintsBefore,
-      `at=${rep.splits[0].at} paints ${paintsBefore} -> ${rep.paints}`);
+      rep.splits[0]?.at === AT_A2 && rep.paints > paintsBefore,
+      `at=${rep.splits[0]?.at} paints ${paintsBefore} -> ${rep.paints}`);
     check('7b', 'THE CATCHER: the fire line did NOT move — `at` is a payload, not a position',
-      rep.splits[0].line === TOP_A2, `line=${rep.splits[0].line} (a build drawing \`at\` would say ${AT_A2})`);
+      rep.splits[0]?.line === TOP_A2, `line=${rep.splits[0]?.line} (a build drawing \`at\` would say ${AT_A2})`);
     const stillThere = await sample2(c, rep, TOP_A2, SX, SLEN);
     // ⚠ `AT_A2` is 301, which is off a 224-line ruler entirely; the reachable
     // wrong answer a payload-as-position build could produce on THIS ruler is
@@ -587,7 +642,7 @@ async function main() {
     rep = await c.json('window.__dbg.aeon.rasterTimeline()');
     check('8a', `v_offset ${V_OFFSET} lifted both fire lines by exactly ${V_OFFSET} `
       + '(aeon: screen = plane line less v_offset)',
-      rep.splits[0].line === TOP_A2 - V_OFFSET && rep.splits[1].line === TOP_B - V_OFFSET,
+      rep.splits[0]?.line === TOP_A2 - V_OFFSET && rep.splits[1]?.line === TOP_B - V_OFFSET,
       `lines=${JSON.stringify(rep.splits.map((s) => s.line))} `
       + `expected ${[TOP_A2 - V_OFFSET, TOP_B - V_OFFSET]}`);
     const moved = await sample2(c, rep, TOP_A2 - V_OFFSET, SX, SLEN);
@@ -607,7 +662,7 @@ async function main() {
     // to zero markers AND to zero marker pixels: an empty strip is what a broken
     // one looks like, so the run has to show it can produce both states.
     for (const i of [1, 2]) {
-      await onParallax(SET_INPUT(byTitle('select', `Layer ${i} vsplit.at —`), 'none'));
+      await onParallax(SET_INPUT(byTitle('select', VSPLIT.select(i), VSPLIT.where), 'none'));
       await sleep(400);
     }
     rep = await c.json('window.__dbg.aeon.rasterTimeline()');
@@ -623,14 +678,17 @@ async function main() {
     check('9b', 'and the bands are still drawn — dropping a split is not dropping the strip',
       rep.active === true && rep.fills === 3, `active=${rep.active} fills=${rep.fills}`);
 
-    // Restore one split for the owner's screenshot.
-    await c.evalExpr(SET_INPUT(byTitle('select', 'Layer 1 vsplit.at —'), 'at'));
-    await sleep(400);
-    await c.evalExpr(SET_INPUT(byTitle('input', 'Layer 1 vsplit.at ('), AT_A));
-    await sleep(400);
-    await c.evalExpr(SET_INPUT(byTitle('select', 'Layer 2 vsplit.at —'), 'at'));
-    await sleep(400);
-    await c.evalExpr(SET_INPUT(byTitle('input', 'Layer 2 vsplit.at ('), AT_B));
+    // Restore both splits for the owner's screenshot.
+    //
+    // ⚠ THROUGH `onParallax`, since 2026-09-12. These four ran bare while the
+    // COLOUR job was showing (the last `onParallax` ends there), where no layer
+    // card is mounted, so all four answered 'no-element' unwatched and the
+    // "for the owner" shot was of a strip with no splits. The strict aim made
+    // that a stop; the fix is to stand on the job that owns the cards.
+    await onParallax(SET_INPUT(byTitle('select', VSPLIT.select(1), VSPLIT.where), 'at'));
+    await onParallax(SET_INPUT(byTitle('input', VSPLIT.spinner(1), VSPLIT.where), AT_A));
+    await onParallax(SET_INPUT(byTitle('select', VSPLIT.select(2), VSPLIT.where), 'at'));
+    await onParallax(SET_INPUT(byTitle('input', VSPLIT.spinner(2), VSPLIT.where), AT_B));
     await sleep(700);
     await c.evalExpr(SCROLL_AND_HIT);
     await sleep(300);
@@ -640,13 +698,18 @@ async function main() {
       misses.length === 0, misses.length === 0 ? 'clean' : misses.join('\n        '));
 
     // ---- 10. Clean up the fixture out of the aeon tree ---------------------
-    await c.evalExpr(clickByText('/Delete scene/'));
+    // ⚠ ON THE PARALLAX JOB, for the reason the restore above gives: bare, it
+    // ran on the colour job and deleted nothing, silently.
+    await onParallax(clickOneByText('/Delete scene/', 'button', 'the selected scene'));
     await sleep(600);
     const left = await c.json('window.__dbg.aeon.scenes()');
     note(`scenes after cleanup: ${JSON.stringify(left.map((s) => s.id))}`);
   } finally {
     try { c?.close(); } catch { /* already gone */ }
-    try { process.kill(-child.pid, 'SIGTERM'); } catch { /* already gone */ }
+    // `killTree`, awaited: SIGTERM, a grace, then SIGKILL and a reap. The bare
+    // `process.kill(-pid)` this replaced gave the app no grace before the
+    // `process.exit` below (check-harness-guards G5's reasoning).
+    await killTree(child);
   }
 
   const passed = results.filter((r) => r.ok).length;
@@ -659,4 +722,17 @@ async function sample2(c, rep, line, x, len) {
   return c.json(STRIP_ROW(rep.originY + line * rep.scale, x, len));
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  // A STOP IS REPORTED WITH THE ROWS IT CUT OFF, so a stopped run cannot be
+  // read as a short green one, and a missed aim says whose problem it is.
+  const msg = e && e.message ? e.message : String(e);
+  const passed = results.filter((r) => r.ok).length;
+  console.error(`\nSTOPPED after ${results.length} rows (${passed} passed)`
+    + (msg.includes(AIM_MISSED)
+      ? ', on a MISSED AIM: an element this run needed was not there. Check the aim first (a '
+        + 'renamed control), then the app state that should have produced it:'
+      : ':'));
+  console.error(`  ${msg.split('\n')[0]}`);
+  if (fails.length) console.error('FAILED before the stop:\n  ' + fails.join('\n  '));
+  process.exit(1);
+});

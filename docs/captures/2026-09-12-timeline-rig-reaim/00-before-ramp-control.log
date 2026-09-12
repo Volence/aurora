@@ -1,0 +1,53 @@
+
+> aurora@0.1.0 harness:ramp-control
+> node scratchpad/ramp-control-harness.mjs
+
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0 — dist/main/index.mjs is 313s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0/src/test/element-stub.ts)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T06:39:05.383Z), so window.__dbg is in this bundle
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/ramp-control-harness-1159359-c04d135b — see HAZARD 6
+
+=== BOOT: the real aeon project (READ-ONLY — no save is ever issued) ===
+NOTE       aeon open threw
+        Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  [b1] the aeon project is open, with sections
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+=== FIXTURE: a fresh BANDS preset, created through the panel ===
+FAIL  [f0] ANTI-VACUOUS FIXTURE: the probe preset exists and is a BANDS document, the raster switch is on screen, and `Add raster band` is PRESENT, VISIBLE, IN ITS SCROLLER and ENABLED — every [dc] row below is about that chip going dead, so a chip that was already dead (or already off screen) would make them green for a reason that has nothing to do with the ramp
+        document = {"schema":1,"id":"aurora_local_rampctl_probe","bands":[{"top":112,"bot":128,"sh":false,"on":{"cram":{"addr":74,"colours":[0]}}}]}; Add chip = {"dpr":1,"left":1109,"top":467.90625,"w":268,"h":19,"disabled":false,"visible":true,"scroller":"DIV","inScroller":true,"text":"Add raster band","title":null,"value":""}; raster select = null
+
+=== [cv] the raster-program switch: bands → ramp, and back in one undo ===
+FAIL  [cv-a] the switch REALLY CONVERTED THE DOCUMENT — `ramp` is present with all five keys, and the `bands` key is GONE, not emptied. ⚠ THE CLAIM IS ABOUT THE DOCUMENT, read back through the model, not about a handler having run or a select showing a new label
+        driven by: native value setter + real `change` event (focus: absent; a real ArrowDown did NOT move a closed <select> under Xvfb, so the popup-free path was used — see the header for why this is SETUP-class here and what [f0] covers instead); document = {"schema":1,"id":"aurora_local_rampctl_probe","bands":[{"top":112,"bot":128,"sh":false,"on":{"cram":{"addr":74,"colours":[0]}}}]} (was {"schema":1,"id":"aurora_local_rampctl_probe","bands":[{"top":112,"bot":128,"sh":false,"on":{"cram":{"addr":74,"colours":[0]}}}]})
+PASS  [cv-b] and it never authored the BOTH-KEYS document the schema refuses — exactly one raster program at every instant
+        keys = ["bands","id","schema"]
+FAIL  [cv-z] ⚠ ONE Ctrl+Z RESTORES EXACTLY WHAT WAS THERE, byte for byte — the condition on building a destructive conversion at all (decision cards d-29/d-30). The comparison is a full JSON equality against the document as it stood BEFORE the switch, not a shape check
+        before = {"schema":1,"id":"aurora_local_rampctl_probe","bands":[{"top":112,"bot":128,"sh":false,"on":{"cram":{"addr":74,"colours":[0]}}}]}
+        after one undo = null
+NOTE       [cv] re-converting for the rows below
+        native value setter + real `change` event (focus: absent; a real ArrowDown did NOT move a closed <select> under Xvfb, so the popup-free path was used — see the header for why this is SETUP-class here and what [f0] covers instead)
+cleanup: tree under pid 1159856 (11 process(es)):
+           1159856 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           1159957 Xvfb :184 -screen 0 1680x1050x24 -nolisten tcp
+           1182291 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           1182358 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           1182432 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1182434 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           1182509 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           1182761 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1182767 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1182771 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           1182780 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server still up, tree gone in 50 ms; teardown 400 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+HARNESS ERROR: the second conversion did not take — the rows below have no ramp to measure
