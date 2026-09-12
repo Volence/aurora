@@ -1,0 +1,19 @@
+{
+ "tag": "fixed-final2",
+ "head": "96c3a542ba7d0c5e0df993c29970bed60ea797b1",
+ "root": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6",
+ "captures": {
+  "probe": {
+   "w": 816,
+   "h": 742,
+   "hash": "a55232571f3233f4",
+   "path": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6/scratchpad/shots-dpr-guides-offset/state-probe-a-N-fixed-final2.png"
+  },
+  "floor": {
+   "w": 816,
+   "h": 742,
+   "hash": "81860e4ef2e51081",
+   "path": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6/scratchpad/shots-dpr-guides-offset/state-floor-a-N-fixed-final2.png"
+  }
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "tag": "fixed-run3",
+ "head": "d8675a46b43eee5478acb17a9a4ad413e0f83088",
+ "root": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6",
+ "captures": {
+  "probe": {
+   "w": 816,
+   "h": 742,
+   "hash": "a55232571f3233f4",
+   "path": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6/scratchpad/shots-dpr-guides-offset/identity-probe-a-fixed-run3.png"
+  },
+  "floor": {
+   "w": 816,
+   "h": 742,
+   "hash": "81860e4ef2e51081",
+   "path": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6/scratchpad/shots-dpr-guides-offset/identity-floor-a-fixed-run3.png"
+  }
+ }
+}

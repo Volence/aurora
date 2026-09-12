@@ -1,0 +1,398 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6
+
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > the golden was recorded from master, and it and the scenarios name the same cases (anti-vacuous) 1ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > guides: act space, three layers, one disabled, fractional pan and zoom 1ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 1ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > surfaces: two remapped layers, one rule near the top edge 1ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > surfaces: zoom 2.5, one rule 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > frame: at rest, fractional pan, zoom 1.5 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > frame: active, zoom 2.5, caption override 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > frame: half off the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > camera: four bands, camera 320, fractional frame 1ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > lens label: anchored to coverage, fractional anchor 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > lens label: no coverage on screen: the corner 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued > the comparison can fail: at 1.35 the same draws differ from master (anti-vacuous) 1ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the snap reduces to master's dpr-1 arithmetic > centre, width and length at dpr 1 are Math.round(v) + 0.5, w and Math.round(len) 1ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the snap reduces to master's dpr-1 arithmetic > a device width keeps the parity of its CSS width and is the nearest such integer 1ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1.25: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1.25: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1.25: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1.35: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1.35: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1.35: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1.5: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1.5: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1.5: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1.75: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1.75: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 1.75: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 2: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 2: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 2: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 2.5: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 2.5: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 2.5: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 3: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 3: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > a guide is drawn where its hit test grabs it, at every scale factor > dpr 3: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 1: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 1: zoom 2.5, one rule 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 1.25: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 1.25: zoom 2.5, one rule 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 1.35: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 1.35: zoom 2.5, one rule 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 1.5: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 1.5: zoom 2.5, one rule 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 1.75: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 1.75: zoom 2.5, one rule 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 2: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 2: zoom 2.5, one rule 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 2.5: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 2.5: zoom 2.5, one rule 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 3: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the plane_y rule is drawn on the plane row it names, at every scale factor > dpr 3: zoom 2.5, one rule 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1: at rest, fractional pan, zoom 1.5 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1: active, zoom 2.5, caption override 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1: half off the top edge 0ms
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.25: at rest, fractional pan, zoom 1.5 2ms
+   → expected 0.875 to be less than or equal to 0.8000010000000001
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.25: active, zoom 2.5, caption override 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.25: half off the top edge 0ms
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.35: at rest, fractional pan, zoom 1.5 0ms
+   → expected 0.875 to be less than or equal to 0.7407417407407407
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.35: active, zoom 2.5, caption override 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.35: half off the top edge 0ms
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.5: at rest, fractional pan, zoom 1.5 0ms
+   → expected 0.875 to be less than or equal to 0.6666676666666667
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.5: active, zoom 2.5, caption override 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.5: half off the top edge 0ms
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.75: at rest, fractional pan, zoom 1.5 0ms
+   → expected 0.875 to be less than or equal to 0.5714295714285714
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.75: active, zoom 2.5, caption override 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.75: half off the top edge 0ms
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 2: at rest, fractional pan, zoom 1.5 0ms
+   → expected 0.875 to be less than or equal to 0.500001
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 2: active, zoom 2.5, caption override 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 2: half off the top edge 0ms
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 2.5: at rest, fractional pan, zoom 1.5 0ms
+   → expected 0.5 to be less than or equal to 0.400001
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 2.5: active, zoom 2.5, caption override 0ms
+   → expected 0.5 to be less than or equal to 0.400001
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 2.5: half off the top edge 0ms
+   → expected 0.5 to be less than or equal to 0.400001
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 3: at rest, fractional pan, zoom 1.5 0ms
+   → expected 0.5 to be less than or equal to 0.3333343333333333
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 3: active, zoom 2.5, caption override 0ms
+   → expected 0.5 to be less than or equal to 0.3333343333333333
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 3: half off the top edge 0ms
+   → expected 0.5 to be less than or equal to 0.3333343333333333
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1: surfaces: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1: surfaces: zoom 2.5, one rule 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1: frame: at rest, fractional pan, zoom 1.5 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1: frame: active, zoom 2.5, caption override 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1: frame: half off the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.25: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.25: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.25: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.25: surfaces: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.25: surfaces: zoom 2.5, one rule 0ms
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.25: frame: at rest, fractional pan, zoom 1.5 1ms
+   → expected false to be true // Object.is equality
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.25: frame: active, zoom 2.5, caption override 0ms
+   → expected false to be true // Object.is equality
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.25: frame: half off the top edge 0ms
+   → expected false to be true // Object.is equality
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.35: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.35: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.35: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.35: surfaces: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.35: surfaces: zoom 2.5, one rule 0ms
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.35: frame: at rest, fractional pan, zoom 1.5 0ms
+   → expected false to be true // Object.is equality
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.35: frame: active, zoom 2.5, caption override 0ms
+   → expected false to be true // Object.is equality
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.35: frame: half off the top edge 2ms
+   → expected false to be true // Object.is equality
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.5: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.5: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.5: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.5: surfaces: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.5: surfaces: zoom 2.5, one rule 0ms
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.5: frame: at rest, fractional pan, zoom 1.5 0ms
+   → expected false to be true // Object.is equality
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.5: frame: active, zoom 2.5, caption override 0ms
+   → expected 1 to be +0 // Object.is equality
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.5: frame: half off the top edge 0ms
+   → expected false to be true // Object.is equality
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.75: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.75: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.75: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.75: surfaces: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.75: surfaces: zoom 2.5, one rule 0ms
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.75: frame: at rest, fractional pan, zoom 1.5 0ms
+   → expected false to be true // Object.is equality
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.75: frame: active, zoom 2.5, caption override 0ms
+   → expected false to be true // Object.is equality
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.75: frame: half off the top edge 0ms
+   → expected false to be true // Object.is equality
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2: surfaces: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2: surfaces: zoom 2.5, one rule 0ms
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2: frame: at rest, fractional pan, zoom 1.5 0ms
+   → expected +0 to be 1 // Object.is equality
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2: frame: active, zoom 2.5, caption override 0ms
+   → expected false to be true // Object.is equality
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2: frame: half off the top edge 0ms
+   → expected +0 to be 1 // Object.is equality
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2.5: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2.5: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2.5: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2.5: surfaces: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2.5: surfaces: zoom 2.5, one rule 0ms
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2.5: frame: at rest, fractional pan, zoom 1.5 0ms
+   → expected false to be true // Object.is equality
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2.5: frame: active, zoom 2.5, caption override 0ms
+   → expected 1 to be +0 // Object.is equality
+ × src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2.5: frame: half off the top edge 0ms
+   → expected false to be true // Object.is equality
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 3: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 3: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 3: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 3: surfaces: two remapped layers, one rule near the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 3: surfaces: zoom 2.5, one rule 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 3: frame: at rest, fractional pan, zoom 1.5 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 3: frame: active, zoom 2.5, caption override 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 3: frame: half off the top edge 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.25: camera: four bands, camera 320, fractional frame 1ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.25: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.25: lens label: anchored to coverage, fractional anchor 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.25: lens label: no coverage on screen: the corner 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.35: camera: four bands, camera 320, fractional frame 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.35: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.35: lens label: anchored to coverage, fractional anchor 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.35: lens label: no coverage on screen: the corner 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.5: camera: four bands, camera 320, fractional frame 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.5: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.5: lens label: anchored to coverage, fractional anchor 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.5: lens label: no coverage on screen: the corner 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.75: camera: four bands, camera 320, fractional frame 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.75: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.75: lens label: anchored to coverage, fractional anchor 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 1.75: lens label: no coverage on screen: the corner 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 2: camera: four bands, camera 320, fractional frame 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 2: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 2: lens label: anchored to coverage, fractional anchor 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 2: lens label: no coverage on screen: the corner 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 2.5: camera: four bands, camera 320, fractional frame 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 2.5: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 2.5: lens label: anchored to coverage, fractional anchor 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 2.5: lens label: no coverage on screen: the corner 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 3: camera: four bands, camera 320, fractional frame 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 3: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 3: lens label: anchored to coverage, fractional anchor 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > the camera preview and the band lens caption are the dpr-1 drawing, scaled > dpr 3: lens label: no coverage on screen: the corner 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > no identity reset is left in the renderer except on canvases that are not dpr-scaled > the census read the renderer tree (anti-vacuous) 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > no identity reset is left in the renderer except on canvases that are not dpr-scaled > every identity reset left is on a canvas whose backing store is not dpr-scaled 0ms
+ ✓ src/renderer/canvas/__tests__/dpr-chrome.test.ts > no identity reset is left in the renderer except on canvases that are not dpr-scaled > and each of those sites still has one, so the list cannot outlive what it names 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 29 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.25: at rest, fractional pan, zoom 1.5
+AssertionError: expected 0.875 to be less than or equal to 0.8000010000000001
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:184:37
+    182|         const left = x0 / dpr; const right = x1 / dpr; const top = y0 …
+    183|         expect(Math.abs(left - r.x)).toBeLessThanOrEqual(1 / dpr + EPS…
+    184|         expect(Math.abs(top - r.y)).toBeLessThanOrEqual(1 / dpr + EPS);
+       |                                     ^
+    185|         expect(Math.abs(right - (r.x + r.w))).toBeLessThanOrEqual(1.5 …
+    186|         expect(Math.abs(bottom - (r.y + r.h))).toBeLessThanOrEqual(1.5…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/29]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.35: at rest, fractional pan, zoom 1.5
+AssertionError: expected 0.875 to be less than or equal to 0.7407417407407407
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:184:37
+    182|         const left = x0 / dpr; const right = x1 / dpr; const top = y0 …
+    183|         expect(Math.abs(left - r.x)).toBeLessThanOrEqual(1 / dpr + EPS…
+    184|         expect(Math.abs(top - r.y)).toBeLessThanOrEqual(1 / dpr + EPS);
+       |                                     ^
+    185|         expect(Math.abs(right - (r.x + r.w))).toBeLessThanOrEqual(1.5 …
+    186|         expect(Math.abs(bottom - (r.y + r.h))).toBeLessThanOrEqual(1.5…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/29]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.5: at rest, fractional pan, zoom 1.5
+AssertionError: expected 0.875 to be less than or equal to 0.6666676666666667
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:184:37
+    182|         const left = x0 / dpr; const right = x1 / dpr; const top = y0 …
+    183|         expect(Math.abs(left - r.x)).toBeLessThanOrEqual(1 / dpr + EPS…
+    184|         expect(Math.abs(top - r.y)).toBeLessThanOrEqual(1 / dpr + EPS);
+       |                                     ^
+    185|         expect(Math.abs(right - (r.x + r.w))).toBeLessThanOrEqual(1.5 …
+    186|         expect(Math.abs(bottom - (r.y + r.h))).toBeLessThanOrEqual(1.5…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/29]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 1.75: at rest, fractional pan, zoom 1.5
+AssertionError: expected 0.875 to be less than or equal to 0.5714295714285714
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:184:37
+    182|         const left = x0 / dpr; const right = x1 / dpr; const top = y0 …
+    183|         expect(Math.abs(left - r.x)).toBeLessThanOrEqual(1 / dpr + EPS…
+    184|         expect(Math.abs(top - r.y)).toBeLessThanOrEqual(1 / dpr + EPS);
+       |                                     ^
+    185|         expect(Math.abs(right - (r.x + r.w))).toBeLessThanOrEqual(1.5 …
+    186|         expect(Math.abs(bottom - (r.y + r.h))).toBeLessThanOrEqual(1.5…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/29]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 2: at rest, fractional pan, zoom 1.5
+AssertionError: expected 0.875 to be less than or equal to 0.500001
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:184:37
+    182|         const left = x0 / dpr; const right = x1 / dpr; const top = y0 …
+    183|         expect(Math.abs(left - r.x)).toBeLessThanOrEqual(1 / dpr + EPS…
+    184|         expect(Math.abs(top - r.y)).toBeLessThanOrEqual(1 / dpr + EPS);
+       |                                     ^
+    185|         expect(Math.abs(right - (r.x + r.w))).toBeLessThanOrEqual(1.5 …
+    186|         expect(Math.abs(bottom - (r.y + r.h))).toBeLessThanOrEqual(1.5…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/29]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 2.5: at rest, fractional pan, zoom 1.5
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 2.5: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 2.5: half off the top edge
+AssertionError: expected 0.5 to be less than or equal to 0.400001
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:183:38
+    181|         const [[x0, y0], [x1], [, y1]] = rects[0].pts;
+    182|         const left = x0 / dpr; const right = x1 / dpr; const top = y0 …
+    183|         expect(Math.abs(left - r.x)).toBeLessThanOrEqual(1 / dpr + EPS…
+       |                                      ^
+    184|         expect(Math.abs(top - r.y)).toBeLessThanOrEqual(1 / dpr + EPS);
+    185|         expect(Math.abs(right - (r.x + r.w))).toBeLessThanOrEqual(1.5 …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/29]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 3: at rest, fractional pan, zoom 1.5
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 3: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > the screen frame's four edges are drawn where screenFrameEdgeAt grabs them > dpr 3: half off the top edge
+AssertionError: expected 0.5 to be less than or equal to 0.3333343333333333
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:183:38
+    181|         const [[x0, y0], [x1], [, y1]] = rects[0].pts;
+    182|         const left = x0 / dpr; const right = x1 / dpr; const top = y0 …
+    183|         expect(Math.abs(left - r.x)).toBeLessThanOrEqual(1 / dpr + EPS…
+       |                                      ^
+    184|         expect(Math.abs(top - r.y)).toBeLessThanOrEqual(1 / dpr + EPS);
+    185|         expect(Math.abs(right - (r.x + r.w))).toBeLessThanOrEqual(1.5 …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/29]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.25: frame: at rest, fractional pan, zoom 1.5
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.25: frame: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.25: frame: half off the top edge
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.35: frame: at rest, fractional pan, zoom 1.5
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.35: frame: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.35: frame: half off the top edge
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.5: frame: at rest, fractional pan, zoom 1.5
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.5: frame: half off the top edge
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.75: frame: at rest, fractional pan, zoom 1.5
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.75: frame: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.75: frame: half off the top edge
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2.5: frame: at rest, fractional pan, zoom 1.5
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2.5: frame: half off the top edge
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:212:36
+    210|         atD.forEach((s, i) => {
+    211|           // A whole number of device pixels, of the parity the same s…
+    212|           expect(isWhole(s.width)).toBe(true);
+       |                                    ^
+    213|           expect(Math.round(s.width) % 2).toBe(Math.round(at1[i].width…
+    214|           // Centred on a device half-pixel: every line stroke's row, …
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:210:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/29]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 1.5: frame: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2.5: frame: active, zoom 2.5, caption override
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:213:43
+    211|           // A whole number of device pixels, of the parity the same s…
+    212|           expect(isWhole(s.width)).toBe(true);
+    213|           expect(Math.round(s.width) % 2).toBe(Math.round(at1[i].width…
+       |                                           ^
+    214|           // Centred on a device half-pixel: every line stroke's row, …
+    215|           // of a stroked rect, since its size is a whole number of de…
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:210:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/29]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2: frame: at rest, fractional pan, zoom 1.5
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2: frame: half off the top edge
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:213:43
+    211|           // A whole number of device pixels, of the parity the same s…
+    212|           expect(isWhole(s.width)).toBe(true);
+    213|           expect(Math.round(s.width) % 2).toBe(Math.round(at1[i].width…
+       |                                           ^
+    214|           // Centred on a device half-pixel: every line stroke's row, …
+    215|           // of a stroked rect, since its size is a whole number of de…
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:210:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/29]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for > dpr 2: frame: active, zoom 2.5, caption override
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:217:64
+    215|           // of a stroked rect, since its size is a whole number of de…
+    216|           if (s.kind === 'path') expect(onHalf(s.pts[0][1])).toBe(true…
+    217|           else for (const [x, y] of s.pts) { expect(onHalf(x)).toBe(tr…
+       |                                                                ^
+    218|         });
+    219|       });
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:210:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/29]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  29 failed | 146 passed (175)
+   Start at  06:29:56
+   Duration  672ms (transform 394ms, setup 412ms, import 128ms, tests 38ms, environment 0ms)
+

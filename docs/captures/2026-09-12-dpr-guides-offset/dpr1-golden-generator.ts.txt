@@ -1,0 +1,42 @@
+// ONE-OFF GENERATOR, NEVER COMMITTED: records the dpr-1 call log of the five chrome
+// draws AT MASTER'S SIGNATURES (no dpr argument), from master's sources, into the golden
+// that dpr-chrome.test.ts compares the fixed code against. Deleted after it runs; the
+// packet quotes it.
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { drawLayerGuides, drawSurfaceMarks, surfaceGeometry } from '../effects-guides';
+import { drawScreenFrame, screenFrameRect } from '../screen-frame';
+import { drawCameraPreview, cameraPreviewPlan } from '../camera-preview';
+import { drawBandLensLabel } from '../band-lens';
+import {
+  recordingContext, GUIDE_CASES, SURFACE_CASES, FRAME_CASES, CAMERA_CASES, LENS_LABEL_CASES,
+  CAMERA_SOURCES,
+} from './chrome-recorder';
+
+it('writes the dpr-1 golden from master', () => {
+  const cases: Record<string, unknown> = {};
+  for (const c of GUIDE_CASES) {
+    const r = recordingContext(); drawLayerGuides(r.ctx, c.vp, c.layers, c.opts); cases[`guides: ${c.name}`] = r.calls;
+  }
+  for (const c of SURFACE_CASES) {
+    const r = recordingContext(); drawSurfaceMarks(r.ctx, c.vp, surfaceGeometry(c.layers, c.vp)); cases[`surfaces: ${c.name}`] = r.calls;
+  }
+  for (const c of FRAME_CASES) {
+    const r = recordingContext(); drawScreenFrame(r.ctx, c.vp, c.anchor, c.opts); cases[`frame: ${c.name}`] = r.calls;
+  }
+  for (const c of CAMERA_CASES) {
+    const r = recordingContext();
+    drawCameraPreview(r.ctx, screenFrameRect(c.anchor, c.vp), c.vp.zoom,
+      cameraPreviewPlan(c.scene, c.camX, c.camY), CAMERA_SOURCES, { captions: c.captions });
+    cases[`camera: ${c.name}`] = r.calls;
+  }
+  for (const c of LENS_LABEL_CASES) {
+    const r = recordingContext(); drawBandLensLabel(r.ctx, c.vp, c.lines, c.anchor); cases[`lens label: ${c.name}`] = r.calls;
+  }
+  const out = fileURLToPath(new URL('./dpr1-chrome-master.golden.json', import.meta.url));
+  writeFileSync(out, `${JSON.stringify({
+    generatedFrom: 'master 803e8a301895709142cad70cc15763bd33a40ae2, signatures without a dpr argument',
+    cases,
+  }, null, 1)}\n`);
+});

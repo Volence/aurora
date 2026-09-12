@@ -1,0 +1,19 @@
+{
+ "tag": "master-final-real",
+ "head": "96c3a542ba7d0c5e0df993c29970bed60ea797b1",
+ "root": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6",
+ "captures": {
+  "probe": {
+   "w": 661,
+   "h": 620,
+   "hash": "a12aa4a58b096dcc",
+   "path": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6/scratchpad/shots-dpr-guides-offset/state-probe-a-E-master-final-real.png"
+  },
+  "floor": {
+   "w": 661,
+   "h": 620,
+   "hash": "e005f27e5abeeb35",
+   "path": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a01a0820646cffde6/scratchpad/shots-dpr-guides-offset/state-floor-a-E-master-final-real.png"
+  }
+ }
+}
