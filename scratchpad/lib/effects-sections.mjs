@@ -208,6 +208,37 @@ export const SECTION_COLLAPSED_ATTR = (sectionId) => String.raw`
 })()`;
 
 /**
+ * THE DOOR, WITH A VERDICT ON IT — `{ tab, section, collapsed, ok, why }`.
+ *
+ * `ok` is the APP's own `data-section-collapsed`, read back AFTER the click,
+ * and not the click's return value: a header whose handler was removed still
+ * takes a click, and `openEffectsSection` would still answer `'clicked'`.
+ *
+ * ⚠ IT RETURNS RATHER THAN THROWS SO A CALLER CAN MAKE IT A ROW. A door that
+ * can only throw gives its harness a row that cannot fail — success and failure
+ * emitting the same artifact, which is the defect class this whole module
+ * exists inside. Callers with a row check `ok` and then stop; callers without
+ * one (a re-open deeper in a run) use `openEffectsSectionOrThrow` below.
+ */
+export async function openEffectsSectionState(c, sectionId, { settleMs = 700 } = {}) {
+  const r = await openEffectsSection(c, sectionId, { settleMs });
+  await new Promise((res) => setTimeout(res, settleMs));
+  const collapsed = await c.evalExpr(SECTION_COLLAPSED_ATTR(sectionId));
+  const tabWanted = String(SECTION_SUB_TAB[sectionId] ?? 'none');
+  let why = null;
+  if (r.section === 'no-section' || collapsed === 'absent') {
+    why = `AIM MISSED: no [data-section=${JSON.stringify(sectionId)}] in the DOM `
+      + `(sub-tab ${JSON.stringify(tabWanted)} -> ${r.tab}). Nothing below this point can measure `
+      + 'what it was written to measure.';
+  } else if (collapsed !== 'false') {
+    why = `AIM MISSED: [data-section=${JSON.stringify(sectionId)}] is still collapsed after `
+      + `${r.section} (data-section-collapsed=${JSON.stringify(collapsed)}). The header took the `
+      + 'click and the section did not open.';
+  }
+  return { ...r, collapsed, ok: why === null, why };
+}
+
+/**
  * THE SAME DOOR, BUT IT REFUSES TO REPORT A MISS AS A CLOSED SECTION.
  *
  * ⚠ WHY THIS EXISTS RATHER THAN THE CALLERS EACH CHECKING. The defect this
@@ -227,19 +258,10 @@ export const SECTION_COLLAPSED_ATTR = (sectionId) => String.raw`
  * the panel (this module's own docblock says so). It is the door, not the view.
  */
 export async function openEffectsSectionOrThrow(c, sectionId, { settleMs = 700 } = {}) {
-  const r = await openEffectsSection(c, sectionId, { settleMs });
-  await new Promise((res) => setTimeout(res, settleMs));
-  const collapsed = await c.evalExpr(SECTION_COLLAPSED_ATTR(sectionId));
-  if (r.section === 'no-section' || collapsed === 'absent') {
-    throw new Error(`AIM MISSED: no [data-section=${JSON.stringify(sectionId)}] in the DOM `
-      + `(sub-tab ${JSON.stringify(String(SECTION_SUB_TAB[sectionId] ?? 'none'))} -> ${r.tab}). `
-      + 'Nothing below this point can measure what it was written to measure, so the run stops '
-      + 'here rather than reporting the section\'s contents as missing from the app.');
+  const r = await openEffectsSectionState(c, sectionId, { settleMs });
+  if (!r.ok) {
+    throw new Error(`${r.why} The run stops here rather than reporting the section's contents `
+      + 'as missing from the app.');
   }
-  if (collapsed !== 'false') {
-    throw new Error(`AIM MISSED: [data-section=${JSON.stringify(sectionId)}] is still collapsed `
-      + `after ${r.section} (data-section-collapsed=${JSON.stringify(collapsed)}). `
-      + 'The header took the click and the section did not open.');
-  }
-  return { ...r, collapsed };
+  return r;
 }

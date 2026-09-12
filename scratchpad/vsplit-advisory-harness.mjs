@@ -91,7 +91,7 @@ import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
-import { SECTION_SCENE_FORM, openEffectsSectionOrThrow } from './lib/effects-sections.mjs';
+import { SECTION_SCENE_FORM, openEffectsSectionState } from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9407);
 // SELF-LOCATING, never a pinned path: run from the main clone this must serve
@@ -562,7 +562,7 @@ function sceneOf(doc) { return doc.find((s) => s.id === SCENE_ID) ?? null; }
 // `Scene: ${selected.id}` and changes with the document under test, so there was
 // never a stable string to type. `data-section` is what the app routes on.
 const openSceneForm = (c, settleMs = 800) =>
-  openEffectsSectionOrThrow(c, SECTION_SCENE_FORM, { settleMs });
+  openEffectsSectionState(c, SECTION_SCENE_FORM, { settleMs });
 
 /** Show one of d-26b's three Effects jobs. See [5j]. */
 const SUBTAB_VS = (id) => String.raw`
@@ -654,10 +654,11 @@ async function main() {
     const openDoor = async () => {
       const r = await openSceneForm(c);
       check(`3s${doorRows++}`, 'INSTRUMENT: the Scene form is open — it arrives collapsed since d-26b',
-        (r.section === 'clicked' || r.section === 'already-open') && r.collapsed === 'false',
+        r.ok === true && (r.section === 'clicked' || r.section === 'already-open'),
         `open → ${JSON.stringify(r)} via [data-section="${SECTION_SCENE_FORM}"]. `
         + 'Read back off the app\'s own attribute AFTER the click, not off the click\'s return '
         + 'value: a header whose handler was removed still takes a click.');
+      if (!r.ok) throw new Error(r.why);
       return r;
     };
     const scenes0 = await c.json('window.__dbg.aeon.scenes()');
