@@ -72,11 +72,20 @@
 // ⚠ NO EMULATOR. Nothing here touches oracle or any emulator MCP tool.
 //
 // Build:  VITE_AURORA_DEBUG=1 npm run build   (in the tree the run is against)
+// ═══ PIXEL IDENTITY BETWEEN TWO BUILDS
+//
+// `SCAN_OUT=<json>` writes this run's per-geometry backing-store hashes (composite on and
+// off). `SCAN_BASELINE=<that json>` on a run of ANOTHER build adds an `.I2` row per
+// geometry comparing them. That is how "identical at dpr 1" is SHOWN rather than argued,
+// and it is why every geometry also carries a determinism row (`.I1`): a hash that moved
+// between two reads of one paint would make a cross-build difference unreadable.
+//
 // Run:    AEON_DIR=<copy> [SCALE=1.35] [EMULATE=1.35] [TAG=<name>] [SWEEP=1]
+//         [SCAN_OUT=<json>] [SCAN_BASELINE=<json>]
 //         node scratchpad/mapviewport-clear-size-harness.mjs
 
 import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
-import { mkdirSync, writeFileSync, existsSync, statSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import * as os from 'node:os';
 import * as http from 'node:http';
@@ -99,6 +108,10 @@ if (AEONDIR === siblingDefaultPathOrUnresolved('aeon')) {
 const SCALE = process.env.SCALE ? Number(process.env.SCALE) : null;
 const EMULATE = Number(process.env.EMULATE ?? 1.35);
 const SWEEP = process.env.SWEEP === '1';
+/** Where this run WRITES its per-geometry hashes, for another build to be compared against. */
+const SCAN_OUT = process.env.SCAN_OUT ?? null;
+/** A file written by SCAN_OUT on another build. Every geometry then gets an `.I2` row. */
+const SCAN_BASELINE = process.env.SCAN_BASELINE ?? null;
 const TAG = process.env.TAG ?? `run${Date.now()}`;
 const SHOTS = `${ROOT}/scratchpad/shots-mapviewport-clear-size`;
 mkdirSync(SHOTS, { recursive: true });
@@ -208,6 +221,9 @@ async function main() {
 
   let c;
   let exercised = 0;
+  const geoms = {};
+  const baseline = SCAN_BASELINE ? JSON.parse(readFileSync(SCAN_BASELINE, 'utf8')) : null;
+  if (baseline) note('pixel-identity baseline', `${SCAN_BASELINE}, written by a run of ${baseline.head} (${baseline.tag}), geometries ${J(Object.keys(baseline.geoms ?? {}))}`);
   try {
     c = cdp(await waitForTarget());
     await c.ready;
@@ -222,7 +238,8 @@ async function main() {
     };
     if (!(await waitDbg())) throw new Error('no __dbg: rebuild with VITE_AURORA_DEBUG=1');
     const haveProbes = await c.evalExpr('typeof window.__dbg.aeon.cameraPreview === "function" '
-      + '&& typeof window.__dbg.setOverlay === "function" && typeof window.__dbg.overlays === "function"');
+      + '&& typeof window.__dbg.setOverlay === "function" && typeof window.__dbg.overlays === "function" '
+      + '&& typeof window.__dbg.aeon.setLayer === "function" && typeof window.__dbg.aeon.selectedTile === "function"');
     check('0a', '[anti-vacuous] the build under test has the camera-preview and overlay probes', haveProbes === true, `${RUN.root}/dist`);
     if (!haveProbes) throw new Error('wrong build');
 
@@ -272,6 +289,7 @@ async function main() {
       const W = cv.width, H = cv.height;
       const d = cv.getContext('2d').getImageData(0, 0, W, H).data;
       let n = 0, minA = 255, maxSub = -1; const cols = new Set(), rows = new Set(); let first = null;
+      let outside = 0;
       for (let y = 0; y < H; y++) {
         const base = y * W * 4;
         for (let x = 0; x < W; x++) {
@@ -279,28 +297,45 @@ async function main() {
           if (a === 255) continue;
           n++; if (a < minA) minA = a; if (a > maxSub) maxSub = a;
           cols.add(x); rows.add(y);
+          if (x !== W - 1 && y !== H - 1) outside++;
           if (first === null) first = { x: x, y: y, a: a };
         }
       }
+      // THE WHOLE BACKING STORE, HASHED, so two builds can be compared pixel for pixel
+      // rather than through the summary above. Two independent mixes over the same bytes
+      // in opposite directions, as scratchpad/dpr-guides-offset-harness.mjs does.
+      let h1 = 0x811c9dc5, h2 = 0x01000193 ^ 0x5bd1e995;
+      for (let i = 0; i < d.length; i++) { h1 = Math.imul(h1 ^ d[i], 0x01000193) >>> 0; h2 = Math.imul(h2 ^ d[d.length - 1 - i], 0x5bd1e995) >>> 0; }
       const lastCol = []; const lastRow = [];
       for (const y of [0, H >> 2, H >> 1, H - 1]) lastCol.push({ y: y, a: d[(y * W + (W - 1)) * 4 + 3] });
       for (const x of [0, W >> 2, W >> 1, W - 1]) lastRow.push({ x: x, a: d[((H - 1) * W + x) * 4 + 3] });
-      return { W: W, H: H, n: n, minA: n ? minA : null, maxSubA: n ? maxSub : null,
+      return { W: W, H: H, n: n, minA: n ? minA : null, maxSubA: n ? maxSub : null, outside: outside,
         nCols: cols.size, cols: [...cols].sort(function (a, b) { return a - b; }).slice(0, 6),
         nRows: rows.size, rows: [...rows].sort(function (a, b) { return a - b; }).slice(0, 6),
-        first: first, lastColAlpha: lastCol, lastRowAlpha: lastRow }; })()`);
+        first: first, lastColAlpha: lastCol, lastRowAlpha: lastRow,
+        hash: h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0') }; })()`);
     const capture = async (name) => {
       const url = await c.evalExpr(`document.getElementById('map-canvas').toDataURL('image/png')`);
       const path = `${SHOTS}/${name}-${TAG}.png`;
       writeFileSync(path, Buffer.from(url.split(',')[1], 'base64'));
       return path;
     };
-    /** Give the map container an explicit CSS size. Returns the rect it actually got. */
+    /**
+     * Give the map container an explicit CSS size. Returns the rect it actually got.
+     *
+     * ⚠ THE ORIGINAL `cssText` IS SAVED AND PUT BACK WHOLE, not cleared property by
+     * property. `styles.container` is an INLINE style React writes (`flex: 1`), so
+     * `el.style.flex = ''` does not restore it — it deletes it, the container collapses to
+     * width 0, and the next `getImageData` dies with "source width is 0". Run master-run2
+     * of this file aborted in exactly that way, after its rows had passed.
+     */
     const impose = (w, h) => c.json(String.raw`(() => { const el = document.getElementById('map-canvas').parentElement;
+      if (el.dataset.harnessCss === undefined) el.dataset.harnessCss = el.style.cssText;
       el.style.flex = 'none'; el.style.width = ${J(`${w}px`)}; el.style.height = ${J(`${h}px`)};
       const b = el.getBoundingClientRect(); return { width: b.width, height: b.height }; })()`);
-    const unimpose = () => c.evalExpr(String.raw`(() => { const el = document.getElementById('map-canvas').parentElement;
-      el.style.flex = ''; el.style.width = ''; el.style.height = ''; return true; })()`);
+    const unimpose = () => c.json(String.raw`(() => { const el = document.getElementById('map-canvas').parentElement;
+      if (el.dataset.harnessCss !== undefined) { el.style.cssText = el.dataset.harnessCss; delete el.dataset.harnessCss; }
+      const b = el.getBoundingClientRect(); return { width: b.width, height: b.height, cssText: el.style.cssText }; })()`);
 
     // ---- 1. Open the aeon COPY and put the composite on screen ---------------
     await c.evalExpr(`window.__dbg.aeon.open(${J(AEONDIR)})`).catch((e) => console.log('        aeon open threw:', e.message));
@@ -320,11 +355,11 @@ async function main() {
     await c.evalExpr('window.__dbg.aeon.setBandLensTarget(null)').catch(() => null);
     await c.evalExpr("window.__dbg.setOverlay('playAnimatedArt', false)");
     await c.evalExpr("window.__dbg.setOverlay('showBgPlane', false)");
-    await c.evalExpr("window.__dbg.setLayer('fg')").catch(() => null);
+    await c.evalExpr("window.__dbg.aeon.setLayer('fg')");
     await select(FIXTURE_SCENE);
     await park();
     const overlays0 = await c.json('window.__dbg.overlays()');
-    const layer0 = (await c.json('window.__dbg.selectedTile()')).layer;
+    const layer0 = (await c.json('window.__dbg.aeon.selectedTile()')).layer;
     const cam0 = await c.json('window.__dbg.aeon.cameraPreview()');
     check('1c', 'the branch under test is the one running: Bg Plane overlay OFF, editing layer not bg, and the camera preview composite ACTIVE with real blits',
       overlays0.showBgPlane === false && layer0 !== 'bg' && cam0.active === true && cam0.blits > 0,
@@ -341,7 +376,7 @@ async function main() {
      * One geometry, measured twice: the composite ON (the branch under test) and the
      * composite OFF (the sibling clear, which is the control).
      */
-    const phase = async (P, label) => {
+    const phase = async (P, label, expect) => {
       await realClick(SUBTAB('parallax')); await sleep(400);
       await select(FIXTURE_SCENE);
       await repaint(); await park();
@@ -368,18 +403,30 @@ async function main() {
         camOn.active === true && camOn.blits > 0, J({ active: camOn.active, sceneId: camOn.sceneId, camX: camOn.camX, blits: camOn.blits }));
 
       const on = await scan();
+      const on2 = await scan();
       const shot = await capture(`composite-on-${P}`);
       note(`${P}.2 scan (composite ON)`, `${on.n} of ${on.W * on.H} pixels below alpha 255; alpha range ${J([on.minA, on.maxSubA])}; `
         + `${on.nCols} distinct columns ${J(on.cols)}${on.nCols > 6 ? '…' : ''}; ${on.nRows} distinct rows ${J(on.rows)}${on.nRows > 6 ? '…' : ''}; `
-        + `first ${J(on.first)}; last column alpha ${J(on.lastColAlpha)}; last row alpha ${J(on.lastRowAlpha)}; ${shot}`);
-      check(`${P}.2x`, `[anti-vacuous] this geometry EXERCISES the defect: frac(rect * dpr) >= 0.5 in some axis, so the two spellings can differ here`,
-        exercisedHere,
-        `deficit x ${dx.toFixed(4)} y ${dy.toFixed(4)} device px, threshold ${MIN_DEFICIT}. `
-        + (exercisedHere ? '' : 'WITH NO DEFICIT THE CONTAINER-RECT CLEAR OVERSHOOTS AND IS CLIPPED, so row .2 below cannot tell the two spellings apart in this geometry — it is NOT evidence that the clear is right.'));
-      check(`${P}.2`, 'the map canvas is FULLY CLEARED with the composite on: every device pixel of the backing store is opaque',
+        + `${on.outside} of them outside the last column and last row; `
+        + `first ${J(on.first)}; last column alpha ${J(on.lastColAlpha)}; last row alpha ${J(on.lastRowAlpha)}; hash ${on.hash}; ${shot}`);
+      // ⚠ THE GEOMETRY IS DECLARED, NOT DISCOVERED. `expect` says which class this geometry
+      // was set up to be, and the row fails if it is not that — so an imposed rect that
+      // silently did not take, or a window that changed size under the run, cannot be read
+      // as its own result. `any` is for geometries the WINDOW chose (N), where the class is
+      // whatever the launch produced and row 9a carries the run-level requirement.
+      const classNow = exercisedHere ? 'exercises' : 'overshoots';
+      check(`${P}.2x`, `[anti-vacuous] this geometry is the class it was set up to be (${expect}): `
+        + 'at frac(rect * dpr) >= 0.5 the two spellings CAN differ; below it the container-rect clear overshoots and the canvas clips it, so they cannot',
+        expect === 'any' || classNow === expect,
+        `deficit x ${dx.toFixed(4)} y ${dy.toFixed(4)} device px (threshold ${MIN_DEFICIT}); this geometry ${classNow}; declared ${expect}`);
+      check(`${P}.2`, 'the map canvas is FULLY CLEARED with the composite on: every device pixel of the backing store is opaque'
+        + (exercisedHere ? '' : ' [NOT EXERCISED HERE: this geometry has no deficit, so this row cannot tell the two spellings apart and is not evidence that the clear is right]'),
         on.n === 0,
         `${on.n} pixel(s) below alpha 255 (min ${on.minA}); columns ${J(on.cols)} of 0..${on.W - 1}; rows ${J(on.rows)} of 0..${on.H - 1}; `
+        + `${on.outside} outside the last column/row; `
         + `predicted by the container-rect spelling: alpha ${predX ?? 'n/a'} down column ${on.W - 1}, alpha ${predY ?? 'n/a'} along row ${on.H - 1}`);
+      check(`${P}.I1`, '[anti-vacuous] DETERMINISM: the backing store hashes the same on two reads of one paint, so a hash difference between builds is the code and not the run',
+        on.hash === on2.hash && on.n === on2.n, `${on.hash} / ${on2.hash}; ${on.n} / ${on2.n} translucent px`);
 
       // ---- the CONTROL: the same scan where this change does nothing ----------
       await realClick(SUBTAB('tileAnim')); await sleep(400);
@@ -388,12 +435,36 @@ async function main() {
       const off = await scan();
       const shotOff = await capture(`composite-off-${P}`);
       note(`${P}.3 scan (composite OFF)`, `${off.n} of ${off.W * off.H} pixels below alpha 255; alpha range ${J([off.minA, off.maxSubA])}; `
-        + `first ${J(off.first)}; last column alpha ${J(off.lastColAlpha)}; ${shotOff}`);
+        + `first ${J(off.first)}; last column alpha ${J(off.lastColAlpha)}; hash ${off.hash}; ${shotOff}`);
       check(`${P}.3`, '[control] with the composite OFF the same scan is fully opaque: SectionRenderer.render\'s clear already spans the backing store, so the change under test does nothing here',
         camOff.active === false && off.n === 0,
         `camera preview ${J({ active: camOff.active })}; ${off.n} pixel(s) below alpha 255 (min ${off.minA}); geometry unchanged ${J(await geometry())}`);
+
+      // ---- PIXEL IDENTITY against another build, when one was handed in -------
+      const rec = {
+        P, label, dpr: G.dpr, rect: [G.width, G.height], store: [G.storeW, G.storeH],
+        dx, dy, exercised: exercisedHere, onN: on.n, offN: off.n, onHash: on.hash, offHash: off.hash,
+      };
+      geoms[P] = rec;
+      if (baseline) {
+        const b = baseline.geoms?.[P];
+        if (!b) {
+          check(`${P}.I2`, 'PIXEL IDENTITY against the baseline build: the baseline has this geometry to compare against', false,
+            `${SCAN_BASELINE} has no geometry ${P} (it has ${J(Object.keys(baseline.geoms ?? {}))}), so this run establishes nothing about it`);
+        } else if (b.store[0] !== G.storeW || b.store[1] !== G.storeH) {
+          check(`${P}.I2`, 'PIXEL IDENTITY against the baseline build: the two runs measured the same surface', false,
+            `store ${G.storeW}x${G.storeH} here against ${b.store[0]}x${b.store[1]} in the baseline — NOT COMPARABLE, and not a verdict either way`);
+        } else {
+          const same = b.onHash === on.hash && b.offHash === off.hash;
+          check(`${P}.I2`, `PIXEL IDENTITY at dpr ${G.dpr} in geometry ${P}: the whole backing store hashes the same as the baseline build (${baseline.head}), composite ON and OFF`,
+            same,
+            `composite ON  ${on.hash} here / ${b.onHash} baseline${b.onHash === on.hash ? ' SAME' : ' DIFFERENT'}; `
+            + `composite OFF ${off.hash} here / ${b.offHash} baseline${b.offHash === off.hash ? ' SAME' : ' DIFFERENT'}; `
+            + `translucent px ON ${on.n} here / ${b.onN} baseline; store ${G.storeW}x${G.storeH}; deficit ${dx.toFixed(4)}/${dy.toFixed(4)}; from ${SCAN_BASELINE}`);
+        }
+      }
       await realClick(SUBTAB('parallax')); await sleep(400);
-      return { P, label, dpr: G.dpr, rect: [G.width, G.height], store: [G.storeW, G.storeH], dx, dy, on: on.n, off: off.n };
+      return rec;
     };
 
     const summary = [];
@@ -402,7 +473,22 @@ async function main() {
       : (Math.abs(nativeDpr - SCALE) < 1e-6
         ? `REAL forced factor (--force-device-scale-factor=${SCALE}): dpr ${nativeDpr}`
         : `--force-device-scale-factor=${SCALE} DID NOT TAKE: dpr ${nativeDpr}`);
-    summary.push(await phase('N', nativeLabel));
+    // N is whatever the window gave, so its class is `any`: on this host it has read dpr 1
+    // with an INTEGRAL rect, where the two spellings provably cannot differ — which is a
+    // dpr-1 datum and not a pass for the clear. Row 9a carries the run-level requirement.
+    summary.push(await phase('N', nativeLabel, 'any'));
+
+    // ---- the EMULATED factor -------------------------------------------------
+    const iw = await c.json('({ w: innerWidth, h: innerHeight })');
+    const emuTarget = Math.abs(nativeDpr - EMULATE) < 1e-6 ? 1 : EMULATE;
+    await c.send('Emulation.setDeviceMetricsOverride', { width: iw.w, height: iw.h, deviceScaleFactor: emuTarget, mobile: false });
+    await sleep(700); await repaint();
+    const emuDpr = await c.evalExpr('window.devicePixelRatio');
+    check('3a', `[anti-vacuous] the emulation took: devicePixelRatio reads ${emuTarget}`, Math.abs(emuDpr - emuTarget) < 1e-6, `dpr ${emuDpr}`);
+    summary.push(await phase('E', `EMULATED (Emulation.setDeviceMetricsOverride deviceScaleFactor ${emuTarget}): dpr ${emuDpr}`, 'any'));
+    await c.send('Emulation.clearDeviceMetricsOverride');
+    await sleep(500); await repaint();
+    note('emulation cleared', `devicePixelRatio ${await c.evalExpr('window.devicePixelRatio')} (native ${nativeDpr}); ${J(await geometry())}`);
 
     // ---- the IMPOSED fractional container, at the NATIVE factor --------------
     // The dpr-1 half of the question, and the only way to ask it: a container rect at dpr 1
@@ -412,26 +498,24 @@ async function main() {
     // side of the 0.5 threshold: at frac 0.25 the container-rect clear OVERSHOOTS and is
     // clipped, which must leave the canvas fully opaque on BOTH spellings.
     const base = await geometry();
-    for (const [frac, why] of [[0.5, 'the worst case the arithmetic admits'], [0.75, 'above the threshold'], [0.25, 'BELOW the threshold: the clear overshoots and is clipped, so both spellings must be fully opaque']]) {
+    for (const [frac, cls, why] of [
+      [0.5, 'exercises', 'the worst case the arithmetic admits'],
+      [0.75, 'exercises', 'above the 0.5 threshold'],
+      [0.25, 'overshoots', 'BELOW the threshold: the clear overshoots and is clipped, so both spellings must be fully opaque'],
+    ]) {
       const w = Math.floor(base.width) - 4 + frac;
       const h = Math.floor(base.height) - 4 + frac;
       const got = await impose(w, h);
       await repaint(); await sleep(400);
       summary.push(await phase(`I${String(frac).replace('.', '')}`,
-        `IMPOSED container rect (flex:none; width:${w}px; height:${h}px -> ${got.width} x ${got.height}) at dpr ${base.dpr} — ${why}`));
+        `IMPOSED container rect (flex:none; width:${w}px; height:${h}px -> ${got.width} x ${got.height}) at dpr ${base.dpr} — ${why}`, cls));
     }
-    await unimpose();
+    const restored = await unimpose();
     await repaint(); await sleep(400);
-    note('imposed rect cleared', J(await geometry()));
-
-    // ---- the EMULATED factor -------------------------------------------------
-    const iw = await c.json('({ w: innerWidth, h: innerHeight })');
-    const emuTarget = Math.abs(nativeDpr - EMULATE) < 1e-6 ? 1 : EMULATE;
-    await c.send('Emulation.setDeviceMetricsOverride', { width: iw.w, height: iw.h, deviceScaleFactor: emuTarget, mobile: false });
-    await sleep(700); await repaint();
-    const emuDpr = await c.evalExpr('window.devicePixelRatio');
-    check('3a', `[anti-vacuous] the emulation took: devicePixelRatio reads ${emuTarget}`, Math.abs(emuDpr - emuTarget) < 1e-6, `dpr ${emuDpr}`);
-    summary.push(await phase('E', `EMULATED (Emulation.setDeviceMetricsOverride deviceScaleFactor ${emuTarget}): dpr ${emuDpr}`));
+    const afterRestore = await geometry();
+    check('4a', '[anti-vacuous] the imposed container style was put back whole, so the geometries after it are the window\'s own again',
+      afterRestore.width === base.width && afterRestore.height === base.height,
+      `restored ${J(restored)}; geometry now ${J(afterRestore)}; before imposing ${J({ width: base.width, height: base.height })}`);
 
     // ---- an optional width SWEEP, for the packet's geometry census -----------
     if (SWEEP) {
@@ -443,15 +527,19 @@ async function main() {
         rows.push(`w${iw.w - d}: rect ${g.width} dpr ${g.dpr} -> ${(g.width * g.dpr).toFixed(3)} store ${g.storeW} deficit ${deficitOf(g.width, g.dpr).toFixed(3)}`);
       }
       note('viewport width sweep', rows.join('\n        '));
+      await c.send('Emulation.clearDeviceMetricsOverride');
+      await sleep(500); await repaint();
+      note('emulation cleared after the sweep', `devicePixelRatio ${await c.evalExpr('window.devicePixelRatio')} (native ${nativeDpr}); ${J(await geometry())}`);
     }
-    await c.send('Emulation.clearDeviceMetricsOverride');
-    await sleep(500); await repaint();
-    note('emulation cleared', `devicePixelRatio ${await c.evalExpr('window.devicePixelRatio')} (native ${nativeDpr}); ${J(await geometry())}`);
 
     check('9a', 'at least one geometry in this run EXERCISED the defect, so the run is evidence about it',
       exercised > 0, `${exercised} of ${summary.length} geometries had a deficit >= ${MIN_DEFICIT} device px`);
     note('geometry summary', summary.map((s) => `${s.P}: dpr ${s.dpr} rect ${J(s.rect)} store ${J(s.store)} deficit ${s.dx.toFixed(3)}/${s.dy.toFixed(3)} `
-      + `-> composite-on ${s.on} translucent px, composite-off ${s.off}`).join('\n        '));
+      + `${s.exercised ? 'EXERCISES' : 'overshoots'} -> composite-on ${s.onN} translucent px (hash ${s.onHash}), composite-off ${s.offN} (hash ${s.offHash})`).join('\n        '));
+    if (SCAN_OUT) {
+      writeFileSync(SCAN_OUT, `${J({ tag: TAG, head, root: RUN.root, geoms }, null, 1)}\n`);
+      note('pixel-identity record written', SCAN_OUT);
+    }
   } finally {
     const passed = results.filter((r) => r.ok).length;
     console.log(`\n${passed}/${results.length} rows passed`);
