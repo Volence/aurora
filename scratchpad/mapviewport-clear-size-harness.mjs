@@ -1,0 +1,470 @@
+#!/usr/bin/env node
+// DOES THE MAP'S CLEAR COVER THE WHOLE MAP CANVAS?
+//
+// docs/reviews/2026-09-12-dpr-guides-offset.md section 9 TAGGED this and did not fix it:
+// MapViewport's `redraw` clears for the CAMERA PREVIEW COMPOSITE with
+//
+//     ctx.fillRect(0, 0, rect.width, rect.height)        // the CONTAINER's CSS rect
+//
+// while the backing store it is clearing is `round(rect * dpr)` device pixels under
+// `setTransform(dpr, 0, 0, dpr, 0, 0)`, so the surface the transform maps onto is
+// `canvas.width / dpr` CSS px — which is what every SIBLING clear in the same file already
+// uses (`cssWidth, cssHeight` on the no-act path, `w / dpr, h / dpr` in
+// `drawCollisionPreview`, and `viewport.width/height` in `SectionRenderer.render`, which
+// MapViewport builds out of `cssWidth/cssHeight`).
+//
+// ═══ THE ARITHMETIC, DERIVED FROM SOURCE, WHICH IS WHERE EVERY EXPECTATION HERE COMES FROM
+//
+// Let  x = rect.width * dpr  and  W = canvas.width = Math.round(x).
+//
+//   * `fillRect(0, 0, cssWidth, …)` covers exactly [0, W) device px: full coverage, always.
+//   * `fillRect(0, 0, rect.width, …)` covers [0, x) device px.
+//       - x > W  (frac(x) < 0.5): it OVERSHOOTS and the canvas clips it. Identical.
+//       - x = W  (frac(x) = 0):   identical.
+//       - x < W  (frac(x) >= 0.5): the LAST device column, index W - 1, is covered
+//                                  frac(x) of the way across. The deficit is W - x.
+//
+// The same holds independently for the height. So the defect is present exactly when
+// `frac(rect * dpr) >= 0.5` in an axis, and its size there is `1 - frac`. THAT is what
+// this harness computes per geometry, and it refuses to read a geometry with no deficit as
+// evidence of anything (rows `.2x` and `9a`).
+//
+// ═══ WHAT IS MEASURED, AND WHY IT IS AN ALPHA
+//
+// Assigning `canvas.width` RESETS the backing store to transparent black — so on every
+// pass, the clear is the first ink on an empty surface. `CANVAS_BLACK` is `#000000`,
+// opaque, so a fully covered device pixel ends at alpha 255 and a partly covered one at
+// alpha ≈ 255 * coverage (Skia antialiases the rect's fractional edge; the previous
+// parcel's row .10 read 154 where this arithmetic predicts 153.0, and 156 where it
+// predicts 155.3).
+//
+// Nothing in the map canvas's draw path lowers alpha again: there is no
+// `globalCompositeOperation` anywhere in `src/`, and every `clearRect` in the renderer is
+// on an OFFSCREEN canvas or on the separate `map-preview-canvas`. So the invariant this
+// harness asserts is derived, not observed:
+//
+//     AFTER A FULL REDRAW, EVERY PIXEL OF #map-canvas HAS ALPHA 255.
+//
+// It holds for the composite-OFF path already (`SectionRenderer.render`'s `clearBackground`
+// arm, whose extent is `viewport.width` = `cssWidth`), which is why the composite-off scan
+// is carried in every geometry as the CONTROL: it is the same scan, over the same surface,
+// in the one state where the change under test does nothing.
+//
+// ═══ THE GEOMETRIES
+//
+//   N   native      whatever the launch produced. SCALE=<f> passes
+//                   `--force-device-scale-factor=<f>`; the phase says whether it TOOK.
+//   E   emulated    `Emulation.setDeviceMetricsOverride` at EMULATE (default 1.35).
+//   I*  imposed     the same window with the map CONTAINER given an explicit fractional
+//                   CSS width and height (`flex: none; width: <n>.5px`). This is a
+//                   geometry the harness IMPOSES, and it is labelled as one everywhere it
+//                   appears: it exists to answer the dpr-1 half of the question, because
+//                   a container rect at dpr 1 is integral in every geometry this window
+//                   produces on its own, and `frac(rect) >= 0.5` is the only state in
+//                   which the two spellings can differ there.
+//
+// Every row prints dpr, the container rect, the backing store and the derived deficit, and
+// no claim is read across two runs.
+//
+// ⚠ IT WRITES NOTHING in the aeon tree: no save, no Ctrl+S, no scene authored. It opens a
+// COPY (AEON_DIR), never the live tree.
+//
+// ⚠ NO EMULATOR. Nothing here touches oracle or any emulator MCP tool.
+//
+// Build:  VITE_AURORA_DEBUG=1 npm run build   (in the tree the run is against)
+// Run:    AEON_DIR=<copy> [SCALE=1.35] [EMULATE=1.35] [TAG=<name>] [SWEEP=1]
+//         node scratchpad/mapviewport-clear-size-harness.mjs
+
+import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { mkdirSync, writeFileSync, existsSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import * as os from 'node:os';
+import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot, assertFreshBuild, assertDebugBuild } from './lib/run-root.mjs';
+
+const PORT = Number(process.env.PORT ?? 9451);
+const ROOT = AURORA_DIR;
+const RUN = announceRunRoot(runTarget(ROOT));
+assertFreshBuild(RUN);
+assertDebugBuild(RUN);
+const ELECTRON = RUN.electron;
+const MAIN = RUN.main;
+const aeonOverride = checkoutOverride('aeon');
+if (aeonOverride === null) throw new Error('AEON_DIR must point at a COPY of an aeon tree, never the live one');
+const AEONDIR = aeonOverride.value;
+if (AEONDIR === siblingDefaultPathOrUnresolved('aeon')) {
+  throw new Error('refusing to run against the real aeon tree: use a throwaway copy');
+}
+const SCALE = process.env.SCALE ? Number(process.env.SCALE) : null;
+const EMULATE = Number(process.env.EMULATE ?? 1.35);
+const SWEEP = process.env.SWEEP === '1';
+const TAG = process.env.TAG ?? `run${Date.now()}`;
+const SHOTS = `${ROOT}/scratchpad/shots-mapviewport-clear-size`;
+mkdirSync(SHOTS, { recursive: true });
+
+/** The fixture scene with a BG plane, so the camera preview composite is ACTIVE on it. */
+const FIXTURE_SCENE = 'ojz_act1_floor';
+/**
+ * How partial the last device column must be before a geometry counts as EXERCISING the
+ * defect. A deficit is in (0, 0.5] device px by construction; 0.1 keeps the expected alpha
+ * at most 255 * 0.9 = 230, far enough below 255 that the row is reading the defect and not
+ * a rounding fringe. A geometry under this is reported NOT EXERCISED, never as a pass.
+ */
+const MIN_DEFICIT = 0.1;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const J = JSON.stringify;
+const up = () => `uptime ${os.uptime().toFixed(0)}s, load ${os.loadavg().map((n) => n.toFixed(2)).join(' ')}`;
+
+function getJSON(path, timeoutMs = 1500) {
+  return new Promise((resolve, reject) => {
+    const req = http.get({ host: '127.0.0.1', port: PORT, path, timeout: timeoutMs }, (res) => {
+      let d = ''; res.on('data', (ch) => (d += ch));
+      res.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { reject(e); } });
+    });
+    req.on('timeout', () => req.destroy(new Error('timeout')));
+    req.on('error', reject);
+  });
+}
+async function portFree() { try { await getJSON('/json/version'); return false; } catch { return true; } }
+async function waitForTarget() {
+  for (let i = 0; i < 90; i++) {
+    try {
+      const list = await getJSON('/json/list');
+      const page = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl);
+      if (page) return page.webSocketDebuggerUrl;
+    } catch { /* not up yet */ }
+    await sleep(500);
+  }
+  throw new Error('CDP target never appeared');
+}
+function cdp(wsUrl) {
+  const ws = new WebSocket(wsUrl);
+  let nextId = 1;
+  const pending = new Map();
+  ws.addEventListener('message', (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
+  });
+  const ready = new Promise((res, rej) => { ws.addEventListener('open', res); ws.addEventListener('error', rej); });
+  const send = (method, params = {}) => new Promise((resolve, reject) => {
+    const id = nextId++;
+    pending.set(id, (m) => (m.error ? reject(new Error(`${method}: ${J(m.error)}`)) : resolve(m.result)));
+    ws.send(J({ id, method, params }));
+  });
+  const evalExpr = async (expr) => {
+    const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
+    if (r.exceptionDetails) throw new Error(`eval threw: ${r.exceptionDetails.text} ${r.exceptionDetails.exception?.description ?? ''}`);
+    return r.result.value;
+  };
+  const json = async (expr) => JSON.parse(await evalExpr(`JSON.stringify(${expr})`));
+  return { ready, send, evalExpr, json, close: () => ws.close() };
+}
+
+const results = [];
+const fails = [];
+function check(id, name, ok, detail) {
+  console.log(`${ok ? 'PASS' : 'FAIL'}  [${id}] ${name}${detail !== undefined ? `\n        ${detail}` : ''}`);
+  results.push({ id, name, ok });
+  if (!ok) fails.push(`[${id}] ${name}`);
+}
+function note(what, detail) {
+  console.log(`NOTE       ${what}${detail !== undefined ? `\n        ${detail}` : ''}`);
+}
+
+const SUBTAB = (id) => `document.querySelector('[data-effects-sub-tab="${id}"]')`;
+
+/**
+ * The deficit this geometry leaves on one axis, FROM SOURCE: `canvas.width` is
+ * `Math.round(rect.width * dpr)`, and the container-rect spelling covers `rect.width * dpr`.
+ * Positive = device px of the last column the container-rect clear does not reach.
+ */
+function deficitOf(cssLen, dpr) {
+  const x = cssLen * dpr;
+  return Math.round(x) - x;
+}
+
+async function main() {
+  if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
+  let head = 'unknown';
+  try { head = execFileSync('git', ['-C', RUN.root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(); } catch { /* not a checkout */ }
+  let distAt = 'unknown';
+  try { distAt = statSync(MAIN).mtime.toISOString(); } catch { /* reported below */ }
+  if (!existsSync(`${AEONDIR}/games/sonic4/data/editor/effects/${FIXTURE_SCENE}.json`)) {
+    throw new Error(`the aeon copy has no effects/${FIXTURE_SCENE}.json to drive the composite with`);
+  }
+  note('environment', `${up()}; built tree ${RUN.root} at HEAD ${head}; dist/main mtime ${distAt}; aeon copy ${AEONDIR}; `
+    + `SCALE=${SCALE ?? 'unset'} EMULATE=${EMULATE} TAG=${TAG}`);
+  const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
+  delete env.DISPLAY;
+  const child = spawnGuarded('/usr/bin/xvfb-run',
+    ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON,
+      ...(SCALE !== null ? [`--force-device-scale-factor=${SCALE}`] : []),
+      MAIN],
+    { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+  child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
+  child.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[err] ${d}`); });
+
+  let c;
+  let exercised = 0;
+  try {
+    c = cdp(await waitForTarget());
+    await c.ready;
+    await c.send('Runtime.enable');
+    await c.send('Page.enable').catch(() => {});
+    const waitDbg = async () => {
+      for (let i = 0; i < 60; i++) {
+        if (await c.evalExpr('typeof window.__dbg === "object"').catch(() => false)) return true;
+        await sleep(300);
+      }
+      return false;
+    };
+    if (!(await waitDbg())) throw new Error('no __dbg: rebuild with VITE_AURORA_DEBUG=1');
+    const haveProbes = await c.evalExpr('typeof window.__dbg.aeon.cameraPreview === "function" '
+      + '&& typeof window.__dbg.setOverlay === "function" && typeof window.__dbg.overlays === "function"');
+    check('0a', '[anti-vacuous] the build under test has the camera-preview and overlay probes', haveProbes === true, `${RUN.root}/dist`);
+    if (!haveProbes) throw new Error('wrong build');
+
+    await c.evalExpr('localStorage.clear()');
+    await c.send('Page.reload');
+    await sleep(4000);
+    await waitDbg();
+
+    // ---- helpers bound to this connection ----------------------------------
+    const mouse = (type, x, y, button = 'none', buttons = 0) =>
+      c.send('Input.dispatchMouseEvent', { type, x, y, button, buttons, clickCount: 1 });
+    const aimEl = (expr) => c.json(String.raw`(() => { const el = ${expr}; if (!el) return null;
+      el.scrollIntoView({ block: 'center', inline: 'nearest' });
+      const b = el.getBoundingClientRect(); const x = Math.round(b.left + b.width / 2), y = Math.round(b.top + b.height / 2);
+      const hit = document.elementFromPoint(x, y); return { x, y, hitOk: !!(hit && (hit === el || el.contains(hit))) }; })()`);
+    const realClick = async (expr) => {
+      const p = await aimEl(expr);
+      if (!p || !p.hitOk) return p;
+      await mouse('mouseMoved', p.x, p.y);
+      await mouse('mousePressed', p.x, p.y, 'left', 1); await sleep(40);
+      await mouse('mouseReleased', p.x, p.y, 'left', 0); await sleep(400);
+      return p;
+    };
+    /** Park the pointer off the canvas so no hover chrome is in the picture. */
+    const park = async () => { await mouse('mouseMoved', 2, 2); await sleep(250); };
+    /**
+     * The map canvas's geometry AND the deficit derived from it. `rect` is the CONTAINER's,
+     * which is what `redraw` reads; the canvas is `position:absolute; width:100%; height:100%`
+     * of it, and both are printed so a divergence would be visible rather than assumed.
+     */
+    const geometry = () => c.json(String.raw`(() => { const cv = document.getElementById('map-canvas'); if (!cv) return null;
+      const el = cv.parentElement; const b = el.getBoundingClientRect(); const cb = cv.getBoundingClientRect();
+      return { dpr: window.devicePixelRatio, width: b.width, height: b.height, canvasW: cb.width, canvasH: cb.height,
+        storeW: cv.width, storeH: cv.height }; })()`);
+    /** Force a full `redraw` and wait for it. */
+    const repaint = async () => {
+      await c.evalExpr('window.__dbg.setView(0, 1, 1)'); await sleep(250);
+      await c.evalExpr('window.__dbg.setView(0, 0, 1)'); await sleep(500);
+    };
+    const select = async (id) => { await c.evalExpr(`window.__dbg.aeon.selectScene(${J(id)})`); await sleep(450); await repaint(); };
+    /**
+     * THE SCAN. Every pixel of the map backing store, counting the ones that are not fully
+     * opaque, and saying WHERE. Computed in the page: the store is ~3.7 MB of RGBA and
+     * carrying it over CDP per geometry is the instrument, not the measurement.
+     */
+    const scan = () => c.json(String.raw`(() => { const cv = document.getElementById('map-canvas');
+      const W = cv.width, H = cv.height;
+      const d = cv.getContext('2d').getImageData(0, 0, W, H).data;
+      let n = 0, minA = 255, maxSub = -1; const cols = new Set(), rows = new Set(); let first = null;
+      for (let y = 0; y < H; y++) {
+        const base = y * W * 4;
+        for (let x = 0; x < W; x++) {
+          const a = d[base + x * 4 + 3];
+          if (a === 255) continue;
+          n++; if (a < minA) minA = a; if (a > maxSub) maxSub = a;
+          cols.add(x); rows.add(y);
+          if (first === null) first = { x: x, y: y, a: a };
+        }
+      }
+      const lastCol = []; const lastRow = [];
+      for (const y of [0, H >> 2, H >> 1, H - 1]) lastCol.push({ y: y, a: d[(y * W + (W - 1)) * 4 + 3] });
+      for (const x of [0, W >> 2, W >> 1, W - 1]) lastRow.push({ x: x, a: d[((H - 1) * W + x) * 4 + 3] });
+      return { W: W, H: H, n: n, minA: n ? minA : null, maxSubA: n ? maxSub : null,
+        nCols: cols.size, cols: [...cols].sort(function (a, b) { return a - b; }).slice(0, 6),
+        nRows: rows.size, rows: [...rows].sort(function (a, b) { return a - b; }).slice(0, 6),
+        first: first, lastColAlpha: lastCol, lastRowAlpha: lastRow }; })()`);
+    const capture = async (name) => {
+      const url = await c.evalExpr(`document.getElementById('map-canvas').toDataURL('image/png')`);
+      const path = `${SHOTS}/${name}-${TAG}.png`;
+      writeFileSync(path, Buffer.from(url.split(',')[1], 'base64'));
+      return path;
+    };
+    /** Give the map container an explicit CSS size. Returns the rect it actually got. */
+    const impose = (w, h) => c.json(String.raw`(() => { const el = document.getElementById('map-canvas').parentElement;
+      el.style.flex = 'none'; el.style.width = ${J(`${w}px`)}; el.style.height = ${J(`${h}px`)};
+      const b = el.getBoundingClientRect(); return { width: b.width, height: b.height }; })()`);
+    const unimpose = () => c.evalExpr(String.raw`(() => { const el = document.getElementById('map-canvas').parentElement;
+      el.style.flex = ''; el.style.width = ''; el.style.height = ''; return true; })()`);
+
+    // ---- 1. Open the aeon COPY and put the composite on screen ---------------
+    await c.evalExpr(`window.__dbg.aeon.open(${J(AEONDIR)})`).catch((e) => console.log('        aeon open threw:', e.message));
+    let st = null;
+    for (let i = 0; i < 40; i++) {
+      st = await c.json('window.__dbg.aeon.state()').catch(() => null);
+      if (st && st.open) break;
+      await sleep(400);
+    }
+    check('1a', '[anti-vacuous] the aeon COPY is open, with sections', !!(st && st.open && st.sections > 0), J(st));
+    if (!st || !st.open) throw new Error('aeon did not open');
+    await sleep(2500);
+    const pill = await realClick(`[...document.querySelectorAll('[aria-label="Facets"] button')].find((b) => b.textContent.trim() === 'Effects') || null`);
+    await sleep(1200);
+    check('1b', '[anti-vacuous] the Effects facet was entered by a real click', !!(pill && pill.hitOk), J(pill));
+    await realClick(SUBTAB('parallax')); await sleep(400);
+    await c.evalExpr('window.__dbg.aeon.setBandLensTarget(null)').catch(() => null);
+    await c.evalExpr("window.__dbg.setOverlay('playAnimatedArt', false)");
+    await c.evalExpr("window.__dbg.setOverlay('showBgPlane', false)");
+    await c.evalExpr("window.__dbg.setLayer('fg')").catch(() => null);
+    await select(FIXTURE_SCENE);
+    await park();
+    const overlays0 = await c.json('window.__dbg.overlays()');
+    const layer0 = (await c.json('window.__dbg.selectedTile()')).layer;
+    const cam0 = await c.json('window.__dbg.aeon.cameraPreview()');
+    check('1c', 'the branch under test is the one running: Bg Plane overlay OFF, editing layer not bg, and the camera preview composite ACTIVE with real blits',
+      overlays0.showBgPlane === false && layer0 !== 'bg' && cam0.active === true && cam0.blits > 0,
+      `overlays.showBgPlane ${overlays0.showBgPlane}; editingLayer ${layer0}; camera preview ${J({ active: cam0.active, sceneId: cam0.sceneId, blits: cam0.blits })}`);
+
+    // ---- 2. The geometries ---------------------------------------------------
+    const nativeDpr = (await geometry()).dpr;
+    if (SCALE !== null) {
+      check('2a', `the forced factor took: devicePixelRatio reads ${SCALE} with --force-device-scale-factor=${SCALE}`,
+        Math.abs(nativeDpr - SCALE) < 1e-6, `devicePixelRatio ${nativeDpr}`);
+    }
+
+    /**
+     * One geometry, measured twice: the composite ON (the branch under test) and the
+     * composite OFF (the sibling clear, which is the control).
+     */
+    const phase = async (P, label) => {
+      await realClick(SUBTAB('parallax')); await sleep(400);
+      await select(FIXTURE_SCENE);
+      await repaint(); await park();
+      const G = await geometry();
+      const dx = deficitOf(G.width, G.dpr);
+      const dy = deficitOf(G.height, G.dpr);
+      const exercisedHere = dx >= MIN_DEFICIT || dy >= MIN_DEFICIT;
+      if (exercisedHere) exercised++;
+      const predX = dx > 0 ? Math.round(255 * (1 - dx)) : null;
+      const predY = dy > 0 ? Math.round(255 * (1 - dy)) : null;
+      console.log(`\n=== GEOMETRY ${P}: ${label}\n    dpr ${G.dpr}; map container rect ${G.width} x ${G.height}; canvas rect ${G.canvasW} x ${G.canvasH}; `
+        + `backing store ${G.storeW} x ${G.storeH}; ${up()}`);
+      console.log(`    DERIVED: rect*dpr = ${(G.width * G.dpr).toFixed(4)} x ${(G.height * G.dpr).toFixed(4)}; `
+        + `round -> ${Math.round(G.width * G.dpr)} x ${Math.round(G.height * G.dpr)}; `
+        + `container-rect clear leaves ${dx.toFixed(4)} x ${dy.toFixed(4)} device px uncovered `
+        + `(predicted last-column alpha ${predX ?? 'n/a'}, last-row alpha ${predY ?? 'n/a'})`);
+
+      check(`${P}.0`, '[anti-vacuous] the backing store is round(rect * dpr) in both axes, which is where this geometry\'s expectation comes from',
+        G.storeW === Math.round(G.width * G.dpr) && G.storeH === Math.round(G.height * G.dpr),
+        `store ${G.storeW}x${G.storeH}; round(rect*dpr) ${Math.round(G.width * G.dpr)}x${Math.round(G.height * G.dpr)}; rect ${G.width}x${G.height}; dpr ${G.dpr}`);
+
+      const camOn = await c.json('window.__dbg.aeon.cameraPreview()');
+      check(`${P}.1`, '[anti-vacuous] the camera preview composite is ACTIVE in this geometry, so the clear under test is the one that ran',
+        camOn.active === true && camOn.blits > 0, J({ active: camOn.active, sceneId: camOn.sceneId, camX: camOn.camX, blits: camOn.blits }));
+
+      const on = await scan();
+      const shot = await capture(`composite-on-${P}`);
+      note(`${P}.2 scan (composite ON)`, `${on.n} of ${on.W * on.H} pixels below alpha 255; alpha range ${J([on.minA, on.maxSubA])}; `
+        + `${on.nCols} distinct columns ${J(on.cols)}${on.nCols > 6 ? '…' : ''}; ${on.nRows} distinct rows ${J(on.rows)}${on.nRows > 6 ? '…' : ''}; `
+        + `first ${J(on.first)}; last column alpha ${J(on.lastColAlpha)}; last row alpha ${J(on.lastRowAlpha)}; ${shot}`);
+      check(`${P}.2x`, `[anti-vacuous] this geometry EXERCISES the defect: frac(rect * dpr) >= 0.5 in some axis, so the two spellings can differ here`,
+        exercisedHere,
+        `deficit x ${dx.toFixed(4)} y ${dy.toFixed(4)} device px, threshold ${MIN_DEFICIT}. `
+        + (exercisedHere ? '' : 'WITH NO DEFICIT THE CONTAINER-RECT CLEAR OVERSHOOTS AND IS CLIPPED, so row .2 below cannot tell the two spellings apart in this geometry — it is NOT evidence that the clear is right.'));
+      check(`${P}.2`, 'the map canvas is FULLY CLEARED with the composite on: every device pixel of the backing store is opaque',
+        on.n === 0,
+        `${on.n} pixel(s) below alpha 255 (min ${on.minA}); columns ${J(on.cols)} of 0..${on.W - 1}; rows ${J(on.rows)} of 0..${on.H - 1}; `
+        + `predicted by the container-rect spelling: alpha ${predX ?? 'n/a'} down column ${on.W - 1}, alpha ${predY ?? 'n/a'} along row ${on.H - 1}`);
+
+      // ---- the CONTROL: the same scan where this change does nothing ----------
+      await realClick(SUBTAB('tileAnim')); await sleep(400);
+      await repaint(); await park();
+      const camOff = await c.json('window.__dbg.aeon.cameraPreview()');
+      const off = await scan();
+      const shotOff = await capture(`composite-off-${P}`);
+      note(`${P}.3 scan (composite OFF)`, `${off.n} of ${off.W * off.H} pixels below alpha 255; alpha range ${J([off.minA, off.maxSubA])}; `
+        + `first ${J(off.first)}; last column alpha ${J(off.lastColAlpha)}; ${shotOff}`);
+      check(`${P}.3`, '[control] with the composite OFF the same scan is fully opaque: SectionRenderer.render\'s clear already spans the backing store, so the change under test does nothing here',
+        camOff.active === false && off.n === 0,
+        `camera preview ${J({ active: camOff.active })}; ${off.n} pixel(s) below alpha 255 (min ${off.minA}); geometry unchanged ${J(await geometry())}`);
+      await realClick(SUBTAB('parallax')); await sleep(400);
+      return { P, label, dpr: G.dpr, rect: [G.width, G.height], store: [G.storeW, G.storeH], dx, dy, on: on.n, off: off.n };
+    };
+
+    const summary = [];
+    const nativeLabel = SCALE === null
+      ? `native (Xvfb default, no switch): dpr ${nativeDpr}`
+      : (Math.abs(nativeDpr - SCALE) < 1e-6
+        ? `REAL forced factor (--force-device-scale-factor=${SCALE}): dpr ${nativeDpr}`
+        : `--force-device-scale-factor=${SCALE} DID NOT TAKE: dpr ${nativeDpr}`);
+    summary.push(await phase('N', nativeLabel));
+
+    // ---- the IMPOSED fractional container, at the NATIVE factor --------------
+    // The dpr-1 half of the question, and the only way to ask it: a container rect at dpr 1
+    // is integral in every geometry this window produces on its own, so `frac(rect * dpr)`
+    // is 0 and the two spellings cannot differ. `.5` is the largest deficit the arithmetic
+    // admits (round half up), so it is the worst case, and `.25`/`.75` bracket it either
+    // side of the 0.5 threshold: at frac 0.25 the container-rect clear OVERSHOOTS and is
+    // clipped, which must leave the canvas fully opaque on BOTH spellings.
+    const base = await geometry();
+    for (const [frac, why] of [[0.5, 'the worst case the arithmetic admits'], [0.75, 'above the threshold'], [0.25, 'BELOW the threshold: the clear overshoots and is clipped, so both spellings must be fully opaque']]) {
+      const w = Math.floor(base.width) - 4 + frac;
+      const h = Math.floor(base.height) - 4 + frac;
+      const got = await impose(w, h);
+      await repaint(); await sleep(400);
+      summary.push(await phase(`I${String(frac).replace('.', '')}`,
+        `IMPOSED container rect (flex:none; width:${w}px; height:${h}px -> ${got.width} x ${got.height}) at dpr ${base.dpr} — ${why}`));
+    }
+    await unimpose();
+    await repaint(); await sleep(400);
+    note('imposed rect cleared', J(await geometry()));
+
+    // ---- the EMULATED factor -------------------------------------------------
+    const iw = await c.json('({ w: innerWidth, h: innerHeight })');
+    const emuTarget = Math.abs(nativeDpr - EMULATE) < 1e-6 ? 1 : EMULATE;
+    await c.send('Emulation.setDeviceMetricsOverride', { width: iw.w, height: iw.h, deviceScaleFactor: emuTarget, mobile: false });
+    await sleep(700); await repaint();
+    const emuDpr = await c.evalExpr('window.devicePixelRatio');
+    check('3a', `[anti-vacuous] the emulation took: devicePixelRatio reads ${emuTarget}`, Math.abs(emuDpr - emuTarget) < 1e-6, `dpr ${emuDpr}`);
+    summary.push(await phase('E', `EMULATED (Emulation.setDeviceMetricsOverride deviceScaleFactor ${emuTarget}): dpr ${emuDpr}`));
+
+    // ---- an optional width SWEEP, for the packet's geometry census -----------
+    if (SWEEP) {
+      const rows = [];
+      for (let d = 0; d < 24; d++) {
+        await c.send('Emulation.setDeviceMetricsOverride', { width: iw.w - d, height: iw.h, deviceScaleFactor: emuTarget, mobile: false });
+        await sleep(250); await repaint();
+        const g = await geometry();
+        rows.push(`w${iw.w - d}: rect ${g.width} dpr ${g.dpr} -> ${(g.width * g.dpr).toFixed(3)} store ${g.storeW} deficit ${deficitOf(g.width, g.dpr).toFixed(3)}`);
+      }
+      note('viewport width sweep', rows.join('\n        '));
+    }
+    await c.send('Emulation.clearDeviceMetricsOverride');
+    await sleep(500); await repaint();
+    note('emulation cleared', `devicePixelRatio ${await c.evalExpr('window.devicePixelRatio')} (native ${nativeDpr}); ${J(await geometry())}`);
+
+    check('9a', 'at least one geometry in this run EXERCISED the defect, so the run is evidence about it',
+      exercised > 0, `${exercised} of ${summary.length} geometries had a deficit >= ${MIN_DEFICIT} device px`);
+    note('geometry summary', summary.map((s) => `${s.P}: dpr ${s.dpr} rect ${J(s.rect)} store ${J(s.store)} deficit ${s.dx.toFixed(3)}/${s.dy.toFixed(3)} `
+      + `-> composite-on ${s.on} translucent px, composite-off ${s.off}`).join('\n        '));
+  } finally {
+    const passed = results.filter((r) => r.ok).length;
+    console.log(`\n${passed}/${results.length} rows passed`);
+    if (fails.length) console.log(`FAILED:\n  ${fails.join('\n  ')}`);
+    note('environment at end', up());
+    try { c?.close(); } catch { /* closed */ }
+    await killTree(child);
+  }
+  process.exit(fails.length ? 1 : 0);
+}
+
+main().catch((e) => {
+  console.error(`HARNESS ABORTED: ${e.message}`);
+  console.error(`  ${results.filter((r) => r.ok).length}/${results.length} rows had run: this is NOT a pass over the rows that never ran.`);
+  process.exit(2);
+});
