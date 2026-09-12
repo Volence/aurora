@@ -85,6 +85,54 @@ this rig wrote into their live tree. **This pass cannot tell which**, and it is 
 observation rather than an attribution. Relayed to the hub for aeon to look at before those
 files are committed. Every run in this packet used a `git archive` copy.
 
+## The aeon observation, SETTLED the same night — and it was not us
+
+The aeon lane dated the write to the second and handed back the one discriminator only this
+lane could supply: *did a chunk-links rig run at `2026-09-10T13:25:54Z`?* On their side:
+`section_0.chunklinks.json` is **untracked and has never been committed on any branch**, its
+content is exactly those three placements, and four files were written in the same second
+(`chunklinks.json` .937, `tiles.bin` .931, `collattr.bin` .936, `collattrb.bin` .937), with an
+830-byte `tiles.bin` delta across 78 runs spanning a contiguous region.
+
+**Answer: NO. They are the owner's own authoring, and aeon was told to preserve them.**
+
+**Timing.** No Aurora session existed anywhere on this box in that window. Aurora's transcripts
+carry **3,867 entries on 2026-09-10, spanning 02:31:36Z to 10:28:08Z, and ZERO in
+12:00Z–15:00Z** — the instrument plainly sees that day, so the silence is a measurement and not
+a gap. Widened to **every** Claude project directory on the machine: in that window the only
+live sessions were the owner's own home/work/work-devops/work-support sessions and the hub,
+whose entries are its half-hourly tick (13:07:38 and 13:37:39, nothing between, none of it
+chunk-, harness- or aurora-shaped). The write sits in that gap. There is exactly one aurora
+project directory, so a session in a worktree could not have hidden elsewhere.
+
+**Content, arguing the same way independently.** A completed chunk-links run leaves exactly
+**one** surviving placement (row 3 stamps, row 5 detaches, the re-stamp adds one, row 8's stamp
+is deliberately detached and records none), of the chunk in the **first library slot carrying
+real art** — deterministic for a given tree. The residue is **three** placements of **two**
+chunks. `OJZ_1D` is slot 29; for the rig to arm it, slots 0–28 would all have to lack real art,
+and `OJZ_00` (slot 0) demonstrably has art — it is what the rig armed on both fixtures driven
+tonight. One tree cannot yield both ids from this rig.
+
+**Three limits, stated rather than buried.**
+1. This proves no **Claude session** ran it. It cannot prove no human typed
+   `npm run harness:chunk-links` in a terminal; that leaves no trace reachable from here.
+2. The instrument that would have dated any harness run *directly* — the `/tmp/xvfb-run.*`
+   tempdir every run leaks — **cannot see 2026-09-10**. The oldest survivor on the box is
+   2026-09-11 04:29 local; the rest are reaped. **That is an unmeasurable, and it is counted as
+   evidence in neither direction.** (Noted because a 127-strong population invites being read as
+   a census.)
+3. **None of this clears the defect.** The rig's header promises the aeon directory is *"OPEN
+   ONLY — never written"*, its row 9 clicks Save, which writes, **and its `AEON_DIR` defaults to
+   the live sibling tree when nothing overrides it.** It did not fire on 09-10; it is a loaded
+   gun pointed at another lane's working copy. Booked as `RIG-WRITES-LIVE-AEON`.
+
+**The timezone very nearly cost this.** Aurora's transcripts show chunk-links activity at
+`09:25:31.998Z` and `09:25:33.794Z` on the same day, against a write reported as *"09:25:54"* —
+a 20-second gap and an obvious culprit. It is a **four-hour** gap: the peer's figure was local
+(`-0400`) and correctly converted, and the coincidence is in the digits alone. Re-measured here
+with `stat` printing both frames side by side before answering. **A peer's timestamp carries a
+timezone, and the reading that looks like a smoking gun is the one to re-measure.**
+
 ## Reproduction
 
 ```sh
