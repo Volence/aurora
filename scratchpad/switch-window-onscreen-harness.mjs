@@ -8,8 +8,9 @@
 // SOURCE: docs/reviews/2026-09-12-switch-window-fix.md, section 9 (T-1), and the
 // review that asked for this file (its rework section records the run).
 //
-// WHY A HARNESS. The node suite (src/renderer/state/__tests__/switch-window-edit
-// .test.ts) proves the stores refuse the commit and set the error. It cannot see
+// WHY A HARNESS. The node suite, in
+// src/renderer/state/__tests__/switch-window-edit.test.ts,
+// proves the stores refuse the commit and set the error. It cannot see
 // the window: whether that error is PAINTED, and whether the level the user was
 // editing is still the one on screen, are properties of the running app.
 //
