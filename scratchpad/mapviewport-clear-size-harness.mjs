@@ -63,6 +63,12 @@
 //                   produces on its own, and `frac(rect) >= 0.5` is the only state in
 //                   which the two spellings can differ there.
 //
+// Every geometry is one of three CLASSES (`classOf`), and every row says which, because a
+// green row means different things in each: `exercises` (a deficit the rasteriser resolves
+// — the only class in which row .2 is evidence), `sub-raster` (a positive deficit below
+// that, measured), and `overshoots` (no positive deficit, so the two spellings cannot
+// differ at all). Row 9a fails a run in which no geometry exercised the defect.
+//
 // Every row prints dpr, the container rect, the backing store and the derived deficit, and
 // no claim is read across two runs.
 //
@@ -120,11 +126,22 @@ mkdirSync(SHOTS, { recursive: true });
 const FIXTURE_SCENE = 'ojz_act1_floor';
 /**
  * How partial the last device column must be before a geometry counts as EXERCISING the
- * defect. A deficit is in (0, 0.5] device px by construction; 0.1 keeps the expected alpha
- * at most 255 * 0.9 = 230, far enough below 255 that the row is reading the defect and not
- * a rounding fringe. A geometry under this is reported NOT EXERCISED, never as a pass.
+ * defect — which is NOT the same question as whether the defect is arithmetically there.
+ *
+ * ⚠ THE RASTERISER DOES NOT RESOLVE AN ARBITRARILY SMALL DEFICIT, and that was measured
+ * here, not assumed. Run master-real geometry I025 left a HEIGHT deficit of 0.0625 device
+ * px — the arithmetic predicts alpha 239 along the last row — and the scan found ZERO
+ * pixels below alpha 255 over the whole store. So a geometry with a small positive deficit
+ * would go GREEN on master's own code, and reading that as "the clear is right" is the
+ * failure mode this constant exists to prevent.
+ *
+ * 0.25 is the SMALLEST deficit this repo has measured producing partial coverage (run
+ * master-final geometry I075, deficit 0.25, last column alpha 192 against the arithmetic's
+ * 191). The true threshold is somewhere in (0.0625, 0.25]; geometries at 0.125 and 0.0625
+ * are carried below as the `sub-raster` class precisely so each run says where it is,
+ * rather than this number standing on one observation forever.
  */
-const MIN_DEFICIT = 0.1;
+const MIN_DEFICIT = 0.25;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const J = JSON.stringify;
@@ -196,6 +213,22 @@ const SUBTAB = (id) => `document.querySelector('[data-effects-sub-tab="${id}"]')
 function deficitOf(cssLen, dpr) {
   const x = cssLen * dpr;
   return Math.round(x) - x;
+}
+
+/**
+ * WHICH OF THE THREE THINGS A GEOMETRY IS, from its two deficits:
+ *
+ *   `exercises`   a deficit at or above MIN_DEFICIT: the defect is present AND this
+ *                 rasteriser renders it as coverage the scan can read.
+ *   `sub-raster`  a positive deficit below it: arithmetically defective, but below what
+ *                 the rasteriser resolves, so a green row here is NOT evidence.
+ *   `overshoots`  no positive deficit: the container-rect clear runs past the store and
+ *                 the canvas clips it, so the two spellings cannot differ at all.
+ */
+function classOf(dx, dy) {
+  if (dx >= MIN_DEFICIT || dy >= MIN_DEFICIT) return 'exercises';
+  if (dx > 0 || dy > 0) return 'sub-raster';
+  return 'overshoots';
 }
 
 async function main() {
@@ -383,7 +416,8 @@ async function main() {
       const G = await geometry();
       const dx = deficitOf(G.width, G.dpr);
       const dy = deficitOf(G.height, G.dpr);
-      const exercisedHere = dx >= MIN_DEFICIT || dy >= MIN_DEFICIT;
+      const classNow = classOf(dx, dy);
+      const exercisedHere = classNow === 'exercises';
       if (exercisedHere) exercised++;
       const predX = dx > 0 ? Math.round(255 * (1 - dx)) : null;
       const predY = dy > 0 ? Math.round(255 * (1 - dy)) : null;
@@ -409,18 +443,21 @@ async function main() {
         + `${on.nCols} distinct columns ${J(on.cols)}${on.nCols > 6 ? '…' : ''}; ${on.nRows} distinct rows ${J(on.rows)}${on.nRows > 6 ? '…' : ''}; `
         + `${on.outside} of them outside the last column and last row; `
         + `first ${J(on.first)}; last column alpha ${J(on.lastColAlpha)}; last row alpha ${J(on.lastRowAlpha)}; hash ${on.hash}; ${shot}`);
-      // ⚠ THE GEOMETRY IS DECLARED, NOT DISCOVERED. `expect` says which class this geometry
-      // was set up to be, and the row fails if it is not that — so an imposed rect that
-      // silently did not take, or a window that changed size under the run, cannot be read
-      // as its own result. `any` is for geometries the WINDOW chose (N), where the class is
-      // whatever the launch produced and row 9a carries the run-level requirement.
-      const classNow = exercisedHere ? 'exercises' : 'overshoots';
-      check(`${P}.2x`, `[anti-vacuous] this geometry is the class it was set up to be (${expect}): `
-        + 'at frac(rect * dpr) >= 0.5 the two spellings CAN differ; below it the container-rect clear overshoots and the canvas clips it, so they cannot',
+      // ⚠ THE GEOMETRY IS DECLARED BEFORE THE PHASE AND RE-DERIVED INSIDE IT. `expect` is
+      // the class computed from an INDEPENDENT read taken right after the geometry was set
+      // up; this re-derives it from the phase's own read. A disagreement means the window
+      // or the layout moved under the run, and the rows below would be describing a
+      // surface that no longer exists. `any` is for geometries the WINDOW chose (N, E),
+      // where the class is whatever the launch produced and row 9a carries the run-level
+      // requirement.
+      check(`${P}.2x`, `[anti-vacuous] this geometry is still the class it was set up as (${expect}) when its rows run`,
         expect === 'any' || classNow === expect,
-        `deficit x ${dx.toFixed(4)} y ${dy.toFixed(4)} device px (threshold ${MIN_DEFICIT}); this geometry ${classNow}; declared ${expect}`);
+        `deficit x ${dx.toFixed(4)} y ${dy.toFixed(4)} device px (MIN_DEFICIT ${MIN_DEFICIT}); this geometry ${classNow}; declared ${expect}`);
       check(`${P}.2`, 'the map canvas is FULLY CLEARED with the composite on: every device pixel of the backing store is opaque'
-        + (exercisedHere ? '' : ' [NOT EXERCISED HERE: this geometry has no deficit, so this row cannot tell the two spellings apart and is not evidence that the clear is right]'),
+        + (classNow === 'exercises' ? ''
+          : classNow === 'sub-raster'
+            ? ` [SUB-RASTER: the deficit here is ${Math.max(dx, dy).toFixed(4)} device px, below the ${MIN_DEFICIT} this rasteriser has been measured to resolve, so a green here is NOT evidence that the clear is right]`
+            : ' [NOT EXERCISED HERE: this geometry has no positive deficit, so the container-rect clear overshoots and the canvas clips it, and this row cannot tell the two spellings apart]'),
         on.n === 0,
         `${on.n} pixel(s) below alpha 255 (min ${on.minA}); columns ${J(on.cols)} of 0..${on.W - 1}; rows ${J(on.rows)} of 0..${on.H - 1}; `
         + `${on.outside} outside the last column/row; `
@@ -443,7 +480,8 @@ async function main() {
       // ---- PIXEL IDENTITY against another build, when one was handed in -------
       const rec = {
         P, label, dpr: G.dpr, rect: [G.width, G.height], store: [G.storeW, G.storeH],
-        dx, dy, exercised: exercisedHere, onN: on.n, offN: off.n, onHash: on.hash, offHash: off.hash,
+        dx, dy, klass: classNow, onN: on.n, offN: off.n, onMinA: on.minA, onOutside: on.outside,
+        onLastCol: on.lastColAlpha, onLastRow: on.lastRowAlpha, onHash: on.hash, offHash: off.hash,
       };
       geoms[P] = rec;
       if (baseline) {
@@ -497,18 +535,24 @@ async function main() {
     // admits (round half up), so it is the worst case, and `.25`/`.75` bracket it either
     // side of the 0.5 threshold: at frac 0.25 the container-rect clear OVERSHOOTS and is
     // clipped, which must leave the canvas fully opaque on BOTH spellings.
+    // The five fractions bracket every class the arithmetic admits, at this window's dpr:
+    // 0.5 is the largest deficit rounding can leave; 0.75 sits at MIN_DEFICIT exactly;
+    // 0.875 and 0.9375 are POSITIVE deficits below what the rasteriser was measured to
+    // resolve (0.0625 left no coverage at all in run master-real), and they are carried so
+    // every run says where that threshold is rather than leaving it on one observation;
+    // 0.25 is a NEGATIVE deficit, where the clear overshoots and the canvas clips it.
     const base = await geometry();
-    for (const [frac, cls, why] of [
-      [0.5, 'exercises', 'the worst case the arithmetic admits'],
-      [0.75, 'exercises', 'above the 0.5 threshold'],
-      [0.25, 'overshoots', 'BELOW the threshold: the clear overshoots and is clipped, so both spellings must be fully opaque'],
-    ]) {
+    for (const frac of [0.5, 0.75, 0.875, 0.9375, 0.25]) {
       const w = Math.floor(base.width) - 4 + frac;
       const h = Math.floor(base.height) - 4 + frac;
       const got = await impose(w, h);
-      await repaint(); await sleep(400);
+      await repaint(); await sleep(500);
+      // The class is fixed HERE, from a read of its own, before the phase measures anything.
+      const g = await geometry();
+      const cls = classOf(deficitOf(g.width, g.dpr), deficitOf(g.height, g.dpr));
       summary.push(await phase(`I${String(frac).replace('.', '')}`,
-        `IMPOSED container rect (flex:none; width:${w}px; height:${h}px -> ${got.width} x ${got.height}) at dpr ${base.dpr} — ${why}`, cls));
+        `IMPOSED container rect (flex:none; width:${w}px; height:${h}px -> ${got.width} x ${got.height}) at dpr ${g.dpr} — `
+        + `deficit ${deficitOf(g.width, g.dpr).toFixed(4)} x ${deficitOf(g.height, g.dpr).toFixed(4)} device px, class ${cls}`, cls));
     }
     const restored = await unimpose();
     await repaint(); await sleep(400);
@@ -534,8 +578,47 @@ async function main() {
 
     check('9a', 'at least one geometry in this run EXERCISED the defect, so the run is evidence about it',
       exercised > 0, `${exercised} of ${summary.length} geometries had a deficit >= ${MIN_DEFICIT} device px`);
-    note('geometry summary', summary.map((s) => `${s.P}: dpr ${s.dpr} rect ${J(s.rect)} store ${J(s.store)} deficit ${s.dx.toFixed(3)}/${s.dy.toFixed(3)} `
-      + `${s.exercised ? 'EXERCISES' : 'overshoots'} -> composite-on ${s.onN} translucent px (hash ${s.onHash}), composite-off ${s.offN} (hash ${s.offHash})`).join('\n        '));
+
+    // ═══ THE BOTH-SIDES ROW, and the reason it is stated against the BASELINE'S OWN
+    // MEASUREMENTS rather than against the deficit.
+    //
+    // ⚠ LATER OPAQUE DRAWING CAN COVER PART OF THE EDGE, so a deficit does not guarantee a
+    // translucent pixel survives to be read. Measured: at the REAL 1.35 factor the last
+    // device ROW came back fully opaque in every geometry (run master-real, N: 717
+    // translucent pixels, all of them in column 892, none in row 837) while the same
+    // arithmetic at dpr 1 left both the last column AND the last row partly clear. The map
+    // is 620 CSS px tall in that window against 742 at dpr 1, so the section art reaches
+    // the bottom edge there and does not here. A green row .2 is therefore not by itself
+    // proof that the clear covered the edge — it can also mean something else painted over
+    // it. THIS row closes that, by requiring the change against a build that was measured
+    // in the SAME geometry: every geometry the baseline showed an uncleared edge in must be
+    // clean here AND its pixels must have moved, and every geometry the baseline showed
+    // none in must be byte-identical here.
+    if (baseline) {
+      const rows = [];
+      let ok = true;
+      for (const [P, b] of Object.entries(baseline.geoms ?? {})) {
+        const m = geoms[P];
+        if (!m) { rows.push(`${P}: NOT MEASURED in this run`); ok = false; continue; }
+        if (m.store[0] !== b.store[0] || m.store[1] !== b.store[1]) {
+          rows.push(`${P}: store ${J(m.store)} here against ${J(b.store)} in the baseline — NOT COMPARABLE`); ok = false; continue;
+        }
+        const changed = m.onHash !== b.onHash;
+        const want = b.onN > 0 ? (m.onN === 0 && changed) : (!changed && m.onN === 0);
+        if (!want) ok = false;
+        rows.push(`${P}: baseline ${b.onN} translucent px -> here ${m.onN}; composite-ON hash ${changed ? 'CHANGED' : 'same'}; `
+          + `composite-OFF hash ${m.offHash !== b.offHash ? 'CHANGED' : 'same'}; ${want ? 'as required' : 'NOT AS REQUIRED'}`);
+      }
+      check('9b', `against the baseline build (${baseline.head}): every geometry the baseline showed a partly-uncleared edge in is fully cleared here AND its pixels moved; `
+        + 'every geometry the baseline showed none in is byte-identical here',
+        ok, rows.join('\n        '));
+    }
+    note('geometry summary', summary.map((s) => `${s.P}: dpr ${s.dpr} rect ${J(s.rect)} store ${J(s.store)} deficit ${s.dx.toFixed(4)}/${s.dy.toFixed(4)} `
+      + `${s.klass.toUpperCase()} -> composite-on ${s.onN} translucent px (min alpha ${s.onMinA}, ${s.onOutside} outside the last column/row, hash ${s.onHash}), `
+      + `composite-off ${s.offN} (hash ${s.offHash})`).join('\n        '));
+    note('the deficit this rasteriser resolves', summary.map((s) => `deficit ${Math.max(s.dx, s.dy).toFixed(4)} -> ${s.onN} translucent px`)
+      .join('; ') + `  (MIN_DEFICIT is ${MIN_DEFICIT}; a positive deficit that leaves 0 px is BELOW what this rasteriser resolves, `
+      + 'and a green row in such a geometry is not evidence)');
     if (SCAN_OUT) {
       writeFileSync(SCAN_OUT, `${J({ tag: TAG, head, root: RUN.root, geoms }, null, 1)}\n`);
       note('pixel-identity record written', SCAN_OUT);
