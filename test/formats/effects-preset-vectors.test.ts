@@ -18,17 +18,20 @@
 // THE ID RULE IS KEPT OUT OF THE WAY ON PURPOSE. `parseEffectsPreset` refuses a
 // document whose `id` disagrees with the filename stem — a loader rule the
 // vectors do not exercise. Each document is parsed under its own id as the
-// stem, and a `fail` vector must be refused with the SCHEMA's sentence, so a
-// stray identity refusal could not pass for a shape refusal.
+// stem, and a `fail` vector must be refused BY THE SCHEMA — asserted by running
+// the vendored schema over the document directly, so a stray identity refusal
+// could not pass for a shape refusal. See the REJECT block for why the sentence
+// the codec speaks is no longer what carries that claim.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { createHash } from 'crypto';
 import { resolve } from 'path';
 import {
-  parseEffectsPreset, serializeEffectsPreset, EffectsPresetError,
+  parseEffectsPreset, serializeEffectsPreset, EffectsPresetError, EFFECTS_PRESET_SCHEMA,
   type EffectsPresetLibrary,
 } from '../../src/core/formats/effects/preset';
+import { validateAgainstSchema } from '../../src/core/formats/effects/json-schema-subset';
 import { addBandCommand } from '../../src/renderer/providers/effects-preset';
 import {
   peerRepo, resolveRev, readAtRev, isAncestor, currencyBranch, CURRENCY_BRANCH_SHAPE,
@@ -178,7 +181,29 @@ describe('every ACCEPT vector survives a band edit in the renderer with its item
   }
 });
 
+/**
+ * THERE ARE TWO SHAPE SENTENCES, NOT ONE, and this row learned that from the
+ * d6cbac7 vectors. `parseEffectsPreset` speaks the VERSION rule in its own words
+ * BEFORE it runs the schema (preset.ts's comment says why: "expected the
+ * constant 1" does not tell an author there is deliberately no migration
+ * machinery to ask for). Until d6cbac7 no vector exercised the version rule, so
+ * a single regex over the schema sentence looked like the whole story; the two
+ * new version vectors are refused with the version sentence and tripped it.
+ *
+ * WIDENING A PROSE REGEX IS HOW A GATE GETS WEAKER, so the prose check is no
+ * longer what carries this row. The row now MEASURES the claim in its title:
+ * `validateAgainstSchema(doc, EFFECTS_PRESET_SCHEMA)` is run directly and must
+ * be NON-EMPTY — the SCHEMA ITSELF refuses this document, whichever sentence the
+ * codec chose to speak. That holds for all 35 reject vectors (measured, not
+ * assumed; the census row below keeps it from silently becoming an empty
+ * population) and it is strictly MORE than the old regex asserted on the 33 that
+ * predate d6cbac7: prose can be reworded, a refusal cannot.
+ */
 describe('every REJECT vector is refused by the SCHEMA, not by the id rule', () => {
+  const SCHEMA_SENTENCE = /does not match the raster preset schema/;
+  const VERSION_SENTENCE = /wave 2 refuses anything but 1/;
+  const ID_SENTENCE = /filename stem and the id must match/;
+
   for (const c of REJECT) {
     it(`refuses: ${c.name}`, () => {
       const text = JSON.stringify(c.doc, null, 2) + '\n';
@@ -186,10 +211,42 @@ describe('every REJECT vector is refused by the SCHEMA, not by the id rule', () 
       try { parseEffectsPreset(text, c.doc.id); } catch (e) { thrown = e; }
       expect(thrown, `${c.name}: the contract says FAIL (${c.why}) and Aurora parsed it`)
         .toBeInstanceOf(EffectsPresetError);
-      expect((thrown as Error).message).toMatch(/does not match the raster preset schema/);
-      expect((thrown as Error).message).not.toMatch(/filename stem and the id must match/);
+      // The claim in the describe's title, measured against the schema rather
+      // than read off the codec's prose.
+      expect(
+        validateAgainstSchema(c.doc, EFFECTS_PRESET_SCHEMA),
+        `${c.name}: the contract says FAIL (${c.why}) and the vendored SCHEMA accepts it. `
+        + 'Whatever refused this document, it was not the schema.',
+      ).not.toEqual([]);
+      // ...and the codec refused it for one of the two SHAPE reasons, never the
+      // loader's identity rule.
+      const msg = (thrown as Error).message;
+      expect(
+        SCHEMA_SENTENCE.test(msg) || VERSION_SENTENCE.test(msg),
+        `${c.name}: refused, but with neither shape sentence: ${msg}`,
+      ).toBe(true);
+      expect(msg).not.toMatch(ID_SENTENCE);
     });
   }
+
+  /**
+   * ANTI-VACUOUS CENSUS. Two named branches are two chances for one of them to
+   * become an empty population without anything going red — which is exactly
+   * what the version branch WAS before d6cbac7 landed.
+   */
+  it('both shape sentences are exercised by real vectors', () => {
+    const spoken = (re: RegExp) => REJECT.filter((c) => {
+      try { parseEffectsPreset(JSON.stringify(c.doc, null, 2) + '\n', c.doc.id); return false; } catch (e) {
+        return re.test((e as Error).message);
+      }
+    }).map((c) => c.name);
+    expect(spoken(SCHEMA_SENTENCE), 'no vector is refused by the schema sentence').not.toEqual([]);
+    expect(
+      spoken(VERSION_SENTENCE),
+      'NO VECTOR EXERCISES THE VERSION RULE. That was true until empyrean d6cbac7; if it is '
+      + 'true again the version branch above certifies nothing and a re-vendor dropped the cases.',
+    ).not.toEqual([]);
+  });
 });
 
 /**
