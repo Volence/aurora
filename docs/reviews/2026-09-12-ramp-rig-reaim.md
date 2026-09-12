@@ -1,6 +1,7 @@
 # RAMP-RIG-DCB-NEEDLE: `[dc-b]` reads its sentence instead of retyping it
 
-Parcel size S, branch `parcel/ramp-rig-reaim`, cut from master `b8090d5b`. This is the ruled
+Parcel size S, branch `parcel/ramp-rig-reaim`, cut from master `8ec57e14` (which carries
+`b8090d5b`). This is the ruled
 follow-up of the open item `docs/reviews/2026-09-12-timeline-rig-reaim.md` left behind:
 *"dc-b's needle (the second (b)). Owner ruling on re-pointing it at the post-`boundary`
 wording, preferably derived from source."* It is re-pointed, and it is derived from source.
