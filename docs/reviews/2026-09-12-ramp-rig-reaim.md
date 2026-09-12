@@ -81,7 +81,16 @@ fragment of the chip title and now requires the whole derived sentence. Both pri
 derivation and its source on every run.
 
 **`test/harness-effects-control-aims.test.ts`**: four rows running the reader against the real
-`bandControlsRefusal`, over every non-bands arm the contract declares.
+`bandControlsRefusal`, over every non-bands arm the contract declares. A `.mjs` reader of
+TypeScript is a pattern and a pattern rots quietly, so the reshape goes red in `npm test` and
+not only at the next hand run — which is how the last two aim drifts sat unnoticed for a week.
+
+**`scratchpad/lib/effects-control-aims.d.mts`**: the signature, because `tsconfig.json` keeps
+`allowJs` off and `npm run typecheck` runs BEFORE vitest in the chain. No needle, noun or
+pattern is spelled there, so nothing in it can disagree with the source the module reads.
+
+**Commits:** `003ab287` (the reader and the rows), `4a9ef6ec` (this packet), `d5a04d69` (the
+declaration and a cast the typecheck refused).
 
 ## The needle is unique to this rule, and here is the grep
 
@@ -179,6 +188,28 @@ $ grep -n "const noun = PROGRAM_ARM_NOUNS" src/renderer/providers/effects-preset
 `is derived, not retyped: every needle is really in the sentence the app composes` and
 `follows the arm noun and the way out rather than assuming either`. Restored with
 `git restore --source=HEAD --` and re-run: **11 passed (11)**, `failure-class: no failures`.
+
+**Re-established after the test file moved.** That red-first ran before `d5a04d69` changed a
+cast in the same test file. The cast is not the method, but the file is, so the plant was
+re-applied to the final committed state and re-run: `Tests 2 failed | 9 passed (11)`, the same
+two rows, exit 1; restored from `HEAD`, `Tests 11 passed (11)`, exit 0.
+
+### The whole node suite
+
+```
+$ VITEST_MAX_WORKERS=4 npm test          # exit 0
+Test Files  615 passed | 3 skipped (618)
+     Tests  9557 passed | 9 skipped (9566)
+failure-class: no failures in this run (618 module(s) reported).
+```
+
+⚠ **A worktree gotcha worth the line, found by the suite refusing to guess.** The first attempt
+died `check-cited-paths: COULD NOT MEASURE: the exit-0 arm is not behaving`. A linked worktree
+carries no `node_modules`, and the obvious first move is a symlink to the main checkout — at
+which point `git check-ignore node_modules/<probe>` answers `fatal: … is beyond a symbolic
+link`, so the gate could not prove its own ignore arm and correctly refused to report a pass.
+A hard-link copy (`cp -al`) fixes it; the gate then answers `.gitignore:1:node_modules/`.
+Nothing in the repo changed for this.
 
 ## Stopped on, and left open
 
