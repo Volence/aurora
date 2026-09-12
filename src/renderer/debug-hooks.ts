@@ -54,6 +54,7 @@ import {
 import { auditCrossovers, crossoverAuditSeverity, type CrossoverAudit } from '../core/collision/crossover-audit';
 import { lastCameraPreviewReport, type CameraPreviewReport } from './canvas/camera-preview';
 import { lastRasterTimelineReport, type RasterTimelineReport } from './canvas/raster-timeline';
+import { presetProgramArm } from '../core/formats/effects/preset';
 import { lastBandLensReport, lastBandMarkReport } from './canvas/band-lens';
 import type { BandLensReport, BandMarkReport } from './canvas/band-lens';
 import { lastStripDragReport } from './providers/band-strip-range';
@@ -887,7 +888,7 @@ interface AeonProbeApi {
    * across versions, and the ON arm IS a oneOf — the one thing a band harness
    * most needs to read back exactly.
    */
-  presets(): { id: string; name: string | null; bands: number }[];
+  presets(): { id: string; name: string | null; bands: number; program: string | null }[];
   presetsJson(): string;
   unreadablePresets(): { path: string; reason: string }[];
   selectedPreset(): string | null;
@@ -1510,6 +1511,13 @@ function installAeonProbe(): AeonProbeApi {
       id: p.id,
       name: typeof p.name === 'string' ? p.name : null,
       bands: (p.bands ?? []).length,
+      // ⚠ WHICH PROGRAM THE DOCUMENT CARRIES, BESIDE THE COUNT (bands-not-
+      // required audit, 2026-09-11, F3 — the same additive field F1 gave the
+      // agent's `list_effects_presets`). A ramp, base_swap or boundary preset
+      // has no `bands` key, so the count above is 0, and on its own that zero
+      // reads as an empty band list, which the schema (`minItems: 1`) says
+      // cannot exist. The count stays: band-preset-harness row 1b reads it.
+      program: presetProgramArm(p),
     })),
     presetsJson: () =>
       JSON.stringify(useProjectStore.getState().project?.effectsPresets.presets ?? []),
