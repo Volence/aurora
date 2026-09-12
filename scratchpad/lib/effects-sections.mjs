@@ -86,11 +86,41 @@
 /** The sub-tab that renders the tile-animation sections. `providers/effects-sub-tabs.ts`. */
 export const TILE_ANIM_SUB_TAB = 'tileAnim';
 
+/** The scroll job's tab, and the facet's arrival tab. `providers/effects-sub-tabs.ts`. */
+export const PARALLAX_SUB_TAB = 'parallax';
+
 /** The band list. `BgAnimBandPanel.tsx`, `<CollapsibleSection id="aeon.bganim.bands">`. */
 export const SECTION_TILE_ANIMATIONS = 'aeon.bganim.bands';
 
 /** The creation form. `BgAnimBandPanel.tsx`, `<CollapsibleSection id="aeon.bganim.new">`. */
 export const SECTION_NEW_TILE_ANIMATION = 'aeon.bganim.new';
+
+/**
+ * The SCENE FORM — `v_factor`, `v_offset`, the deform attachments, the name.
+ * `EffectsScenePanel.tsx`, `<CollapsibleSection id="aeon.effects.scene">`.
+ *
+ * ⚠ THE SECOND INSTANCE OF THIS MODULE'S OWN DEFECT, and it cost two rigs their
+ * whole measurement. `effects-deform-harness` and `vsplit-advisory-harness` each
+ * carried a private copy of a title-based opener:
+ *
+ *     [...document.querySelectorAll('div')]
+ *       .filter((d) => d.style && d.style.cursor === 'pointer'
+ *                   && /^SCENE\s*—/i.test((d.innerText || '').trim()))[0]
+ *
+ * That needle — `SCENE` followed by an EM DASH — died on 2026-09-05 in
+ * `24541886` ("dash sweep (effects panels): the last 85, and two assertions
+ * moved with them"), which gave every effects section header a colon. The
+ * header reads `Scene: <id>` today, so the opener returned `'no-scene-header'`,
+ * the form stayed shut, and every control inside it was absent. Neither rig
+ * reached the round trip it exists for; `effects-deform` went as far as
+ * throwing `wrong build — VITE_AURORA_DEBUG=1 npx electron-vite build` at a
+ * build that was correct.
+ *
+ * ⚠ AND THE TITLE IS NOT A FIXED STRING AT ALL: the call site composes it as
+ * `` `Scene: ${selected.id}` ``, so it changes with the document under test.
+ * There is nothing here for a harness to type. The id is.
+ */
+export const SECTION_SCENE_FORM = 'aeon.effects.scene';
 
 /**
  * Which sub-tab renders which section.
@@ -104,6 +134,7 @@ export const SECTION_NEW_TILE_ANIMATION = 'aeon.bganim.new';
 export const SECTION_SUB_TAB = {
   [SECTION_TILE_ANIMATIONS]: TILE_ANIM_SUB_TAB,
   [SECTION_NEW_TILE_ANIMATION]: TILE_ANIM_SUB_TAB,
+  [SECTION_SCENE_FORM]: PARALLAX_SUB_TAB,
 };
 
 /**
@@ -167,4 +198,48 @@ export async function openEffectsSection(c, sectionId, { settleMs = 700 } = {}) 
   }
   const section = await c.evalExpr(OPEN_EFFECTS_SECTION(sectionId));
   return { tab, section };
+}
+
+/** The app's own answer to "is this section open?": `'true' | 'false' | 'absent'`. */
+export const SECTION_COLLAPSED_ATTR = (sectionId) => String.raw`
+(() => {
+  const el = document.querySelector('[data-section=${JSON.stringify(sectionId)}]');
+  return el === null ? 'absent' : String(el.getAttribute('data-section-collapsed'));
+})()`;
+
+/**
+ * THE SAME DOOR, BUT IT REFUSES TO REPORT A MISS AS A CLOSED SECTION.
+ *
+ * ⚠ WHY THIS EXISTS RATHER THAN THE CALLERS EACH CHECKING. The defect this
+ * module was written for is an opener that silently finds nothing, and
+ * `openEffectsSection` still hands `'no-section'` back as an ordinary value —
+ * correct for a caller that wants to branch on it, and exactly the shape that
+ * let `effects-deform-harness` carry on past a shut form and then blame the
+ * BUILD for controls that were merely unmounted. A caller that has no branch
+ * for a miss should not have to invent one.
+ *
+ * It re-reads `data-section-collapsed` AFTER the click and throws unless the
+ * app itself says the section is open. That is a different claim from "the
+ * click returned 'clicked'": a header whose handler was removed still takes a
+ * click. Returns `{ tab, section, collapsed }` for the caller's row to print.
+ *
+ * NOT a visibility measurement — the section can be open and scrolled out of
+ * the panel (this module's own docblock says so). It is the door, not the view.
+ */
+export async function openEffectsSectionOrThrow(c, sectionId, { settleMs = 700 } = {}) {
+  const r = await openEffectsSection(c, sectionId, { settleMs });
+  await new Promise((res) => setTimeout(res, settleMs));
+  const collapsed = await c.evalExpr(SECTION_COLLAPSED_ATTR(sectionId));
+  if (r.section === 'no-section' || collapsed === 'absent') {
+    throw new Error(`AIM MISSED: no [data-section=${JSON.stringify(sectionId)}] in the DOM `
+      + `(sub-tab ${JSON.stringify(String(SECTION_SUB_TAB[sectionId] ?? 'none'))} -> ${r.tab}). `
+      + 'Nothing below this point can measure what it was written to measure, so the run stops '
+      + 'here rather than reporting the section\'s contents as missing from the app.');
+  }
+  if (collapsed !== 'false') {
+    throw new Error(`AIM MISSED: [data-section=${JSON.stringify(sectionId)}] is still collapsed `
+      + `after ${r.section} (data-section-collapsed=${JSON.stringify(collapsed)}). `
+      + 'The header took the click and the section did not open.');
+  }
+  return { ...r, collapsed };
 }

@@ -91,6 +91,7 @@ import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { SECTION_SCENE_FORM, openEffectsSectionOrThrow } from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9407);
 // SELF-LOCATING, never a pinned path: run from the main clone this must serve
@@ -548,18 +549,20 @@ function sceneOf(doc) { return doc.find((s) => s.id === SCENE_ID) ?? null; }
  * THE SCENE FORM, OPENED - it arrives COLLAPSED since EW-SHAPE-TABS (d-26b),
  * which is what gives the layers list above it a real height. Idempotent.
  */
-const OPEN_SCENE_FORM = String.raw`
-(() => {
-  const has = () => [...document.querySelectorAll('input')]
-    .some((e) => (e.title || '').startsWith('v_offset'));
-  if (has()) return 'already-open';
-  const hdr = [...document.querySelectorAll('div')]
-    .filter((d) => d.style && d.style.cursor === 'pointer'
-                && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
-  if (!hdr) return 'no-scene-header';
-  hdr.click();
-  return 'clicked';
-})()`;
+// \u26a0 RE-AIMED (EFFECTS-RIGS-AIM-MISS, 2026-09-12); the old aim is quoted in
+// `scratchpad/lib/effects-sections.mjs` beside `SECTION_SCENE_FORM`. It hunted a
+// `div` with `cursor: pointer` whose text matched `/^SCENE\s*\u2014/i`. That em dash
+// died in `24541886` on 2026-09-05 (the effects dash sweep: every section header
+// took a colon), so the opener answered `'no-scene-header'`, the form never
+// opened, and `[5a0]` could not find the `v_factor` spinner \u2014 after which every
+// route-A row reported an advisory that was missing from a screen the author had
+// never put into the illegal state at all.
+//
+// The needle is RETIRED rather than repaired: the header is composed as
+// `Scene: ${selected.id}` and changes with the document under test, so there was
+// never a stable string to type. `data-section` is what the app routes on.
+const openSceneForm = (c, settleMs = 800) =>
+  openEffectsSectionOrThrow(c, SECTION_SCENE_FORM, { settleMs });
 
 /** Show one of d-26b's three Effects jobs. See [5j]. */
 const SUBTAB_VS = (id) => String.raw`
@@ -641,9 +644,20 @@ async function main() {
     // ---- 3. THE FIXTURE, BUILT THROUGH THE REAL CONTROLS. -----------------
     // ⚠ v_factor and the rest of the scene form arrive COLLAPSED since d-26b's
     // sub-tabs. Opened here, once, before anything reads a control inside it.
-    const openSceneForm = async () => {
-      const r = await c.evalExpr(OPEN_SCENE_FORM);
-      await sleep(800);
+    // ⚠ AND IT IS NOW A ROW, not a side effect. The door was opened here for
+    // three weeks with its answer thrown away, so when the needle died
+    // (EFFECTS-RIGS-AIM-MISS) the first thing that spoke was `[5a0]` — "the
+    // v_factor spinner took a camera-tracking shift", which reads as a missing
+    // CONTROL and is not what was wrong. `openDoor` records the app's own
+    // `data-section-collapsed` so a shut form fails as a shut form.
+    let doorRows = 0;
+    const openDoor = async () => {
+      const r = await openSceneForm(c);
+      check(`3s${doorRows++}`, 'INSTRUMENT: the Scene form is open — it arrives collapsed since d-26b',
+        (r.section === 'clicked' || r.section === 'already-open') && r.collapsed === 'false',
+        `open → ${JSON.stringify(r)} via [data-section="${SECTION_SCENE_FORM}"]. `
+        + 'Read back off the app\'s own attribute AFTER the click, not off the click\'s return '
+        + 'value: a header whose handler was removed still takes a click.');
       return r;
     };
     const scenes0 = await c.json('window.__dbg.aeon.scenes()');
@@ -711,7 +725,7 @@ async function main() {
     // 5. ⚠ THE DISCRIMINATING SECTION, ROUTE A: move v_factor off the lock
     //    while a split is already placed. The author never touches a layer.
     // =====================================================================
-    await openSceneForm();
+    await openDoor();
     await setField('5a0', 'the v_factor spinner took a camera-tracking shift', vfField, UNLOCKED_VF);
     await sleep(700);
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
@@ -815,7 +829,7 @@ async function main() {
     const mechStrip = await c.json(MECH_STATE);
     await c.evalExpr(SUBTAB_VS('parallax'));
     await sleep(900);
-    await openSceneForm();
+    await openDoor();
     check('5j', 'SCOPE HELD: the raster strip\'s own sentence is NOT converted and is still whole',
       stripOf(mechStrip).length >= 1
       && stripOf(mechStrip).every((m) => m.visible === true && m.rects >= 1 && m.h > 0),
@@ -1043,7 +1057,7 @@ async function main() {
   if (fails.length) { console.log('FAILED:'); for (const f of fails) console.log(`  ${f}`); }
   console.log(
     '\nROWS THAT DO NOT DISCRIMINATE, named so nobody counts them twice:\n'
-    + '  [0y] [0a] [1a] [2a] [3a0] [3a1] [3a2] [3b] [4a0] [4a] [5a0] [5a1] [5f2] [6b0] [9a0]\n'
+    + '  [0y] [0a] [1a] [2a] [3a0] [3a1] [3a2] [3b] [3s0] [3s1] [4a0] [4a] [5a0] [5a1] [5f2] [6b0] [9a0]\n'
     + '  [9b0] [9b1] [9b2] [9c0] [10a] — setup and anti-vacuous rows. They prove the instrument\n'
     + '      built and saw its subject; none can fail for the ADVISORY being wrong.\n'
     + '  [8b] — reads a spinner back. It would go red only if something clamped v_factor,\n'

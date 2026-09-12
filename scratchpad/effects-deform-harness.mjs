@@ -103,6 +103,7 @@ import { dirname, join } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { SECTION_SCENE_FORM, openEffectsSectionOrThrow } from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9397);
 // SELF-LOCATING, never a pinned path: run from the main clone this must serve
@@ -525,18 +526,19 @@ function panelIsDrawn(text) {
  * state has to be opened the way an author opens it: one click on the header.
  * Idempotent — it returns 'already-open' when the form is showing.
  */
-const OPEN_SCENE_FORM = String.raw`
-(() => {
-  const has = () => [...document.querySelectorAll('input')]
-    .some((e) => (e.title || '').startsWith('v_offset'));
-  if (has()) return 'already-open';
-  const hdr = [...document.querySelectorAll('div')]
-    .filter((d) => d.style && d.style.cursor === 'pointer'
-                && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
-  if (!hdr) return 'no-scene-header';
-  hdr.click();
-  return 'clicked';
-})()`;
+// \u26a0 RE-AIMED (EFFECTS-RIGS-AIM-MISS, 2026-09-12), and the old aim is quoted in
+// `scratchpad/lib/effects-sections.mjs` beside `SECTION_SCENE_FORM`. This used
+// to hunt a `div` with `cursor: pointer` whose text matched `/^SCENE\s*\u2014/i`.
+// That em dash died in `24541886` on 2026-09-05 (the effects dash sweep: every
+// section header took a colon), so the opener returned `'no-scene-header'` on
+// every run, the form stayed shut, and the whole of this file measured a panel
+// with no scene controls in it \u2014 reporting that at row `[0a]` as a wrong BUILD.
+//
+// The needle is not repaired, it is RETIRED: the title is composed as
+// `Scene: ${selected.id}` and changes with the document under test, so there
+// was never a stable string to type. `data-section` is what the app routes on.
+const openSceneForm = (c, settleMs = 900) =>
+  openEffectsSectionOrThrow(c, SECTION_SCENE_FORM, { settleMs });
 
 async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
@@ -595,10 +597,13 @@ async function main() {
       headings.includes('Scenes'), JSON.stringify(headings));
     // The scene form arrives collapsed since d-26b's sub-tabs; every deform row
     // is a control inside it.
-    const openedForm = await c.evalExpr(OPEN_SCENE_FORM);
-    await sleep(900);
+    const openedForm = await openSceneForm(c);
     check('2c', 'the Scene form is open — it arrives collapsed since d-26b [instrument]',
-      openedForm === 'clicked' || openedForm === 'already-open', `open → ${openedForm}`);
+      (openedForm.section === 'clicked' || openedForm.section === 'already-open')
+      && openedForm.collapsed === 'false',
+      `open → ${JSON.stringify(openedForm)} via [data-section="${SECTION_SCENE_FORM}"]. `
+      + 'The state is the APP\'s own data-section-collapsed read back after the click, not the '
+      + 'click\'s return value: a header whose handler was removed still takes a click.');
 
     // ---- 3. Author a scene through the real form. ------------------------
     const scenes0 = await c.json('window.__dbg.aeon.scenes()');
@@ -1186,8 +1191,7 @@ async function main() {
     // find them after opening a project: the pill, then the collapsed form.
     await c.evalExpr(clickByText('/^Effects$/'));
     await sleep(1200);
-    const reopenedForm = await c.evalExpr(OPEN_SCENE_FORM);
-    await sleep(900);
+    const reopenedForm = await openSceneForm(c);
 
     const libraryPresets = JSON.parse(await c.evalExpr('window.__dbg.aeon.presetsJson()'));
     const unreadablePresets = await c.json('window.__dbg.aeon.unreadablePresets()');
@@ -1207,7 +1211,8 @@ async function main() {
       && !libraryPresets.some((p) => p.id === WITNESS.danglingPreset)
       && unreadableRef === WITNESS.unreadablePreset
       && unreadablePresets.some((u) => u.path.endsWith(`/${WITNESS.unreadablePreset}.json`))
-      && (reopenedForm === 'clicked' || reopenedForm === 'already-open'),
+      && (reopenedForm.section === 'clicked' || reopenedForm.section === 'already-open')
+      && reopenedForm.collapsed === 'false',
       `state=${JSON.stringify(fst)}\n        `
       + `ramp preset in library = ${rampPreset === null ? 'NONE' : rampPreset.id} `
       + `(chosen because its document carries a \`ramp\`, not by id)\n        `
@@ -1215,7 +1220,7 @@ async function main() {
       + `present in library=${libraryPresets.some((p) => p.id === WITNESS.danglingPreset)}\n        `
       + `rasterRef(${WITNESS.unreadableSection})=${JSON.stringify(unreadableRef)} `
       + `unreadable=${JSON.stringify(unreadablePresets)}\n        `
-      + `scene form=${reopenedForm}`);
+      + `scene form=${JSON.stringify(reopenedForm)}`);
     if (rampPreset === null) throw new Error('the fixture project has no ramp preset to narrow');
 
     // ---- The scene, authored through the form. ---------------------------
@@ -1296,8 +1301,7 @@ async function main() {
     const boundRamp = await c.evalExpr(SET_INPUT(RASTER_REF_SELECT, rampPreset.id));
     await sleep(700);
     await subTab('parallax');
-    await c.evalExpr(OPEN_SCENE_FORM);
-    await sleep(700);
+    await openSceneForm(c, 700);
     const boundScene = await c.evalExpr(SET_INPUT(SCENE_REF_SELECT, WITNESS.sceneId));
     await sleep(700);
     const narrowBindings = {
@@ -1346,8 +1350,7 @@ async function main() {
     await sleep(700);
     for (const index of [WITNESS.danglingSection, WITNESS.unreadableSection]) {
       await focusSection(index);
-      await c.evalExpr(OPEN_SCENE_FORM);
-      await sleep(500);
+      await openSceneForm(c, 500);
       await c.evalExpr(SET_INPUT(SCENE_REF_SELECT, WITNESS.sceneId));
       await sleep(700);
     }
