@@ -1,0 +1,191 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557 — dist/main/index.mjs is 11s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557/src/renderer/components/MarqueePasteOptions.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T06:09:31.689Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T06:09:31.689Z), so window.__dbg is in this bundle
+=== cdp-sweep-3 2026-09-12 harness ===
+    PART         : all
+    node         : v24.15.0
+    loadavg      : 3.04 4.41 4.83
+    ORACLE_SOCKET: /tmp/cdps3-sock-rvG92h/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-3-0912-harness-3650643-0d739f67   (pinned by spawnGuarded, fresh per process)
+    PORT         : 9412   DISPLAY: xvfb-run -a (never :0)
+    captures     : docs/captures/2026-09-12-cdp-sweep-3   tag run6
+    aeon tarball : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/aac06b57-255e-4170-b49c-c612f4f44934/scratchpad/tars/aeon-0eaf09a0.tar   commit 0eaf09a0d072b6f77019b9f0a8d06c64452464b4
+    s1 tarball   : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/aac06b57-255e-4170-b49c-c612f4f44934/scratchpad/tars/s1disasm-HEAD.tar   commit f6ece657c1cf253404312137dfcb8ec15fa42318
+    oracle       : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557/src/core/editing/map-clipboard.ts bundled; PASTE_HINT "Click to paste · hold Alt for art only, Shift for collision only · X flips it left↔right, Y top↕bottom · Esc to stop"
+    copy A       : /tmp/cdps3-aeonA-wjM0Ny   name "Sonic 4 (sweep3 A)"
+    copy X       : /tmp/cdps3-aeonX-5boH3F   (zones[0].id deleted, engine "s4")
+    copy S1a     : /tmp/cdps3-s1a-etYnA6
+    copy S1b     : /tmp/cdps3-s1b-A4BiZS
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-3-0912-harness-3650643-0d739f67 — see HAZARD 6
+    dpr at start : 1
+
+──── classic: cold start ────  typo path "/tmp/cdps3-s1a-etYnA6-typo"; expected banner head "\"/tmp/cdps3-s1a-etYnA6-typo\" is not a recognized project."; F-3 loader reason "Zone missing \"id\""
+PASS  [CFO.0a] COLD START: nothing open (classic closed, no aeon project), Home shows the no-project field, no banner   [load 2.73/4.30/4.79]
+        dpr 1; projStatus {"status":"closed","zones":0}; aeon {"open":false,"zone":null,"act":null,"sections":0,"gridWidth":null,"gridHeight":null,"tool":"view","dirty":false,"dirtyActs":[]}; home {"field":"","fieldLabel":"…or type a project directory path","chip":null,"name":null,"dir":null,"headerRect":null}
+PASS  [CFO.0b] S1a opened through Home's path box (real click, typed, Enter): Home is the S1 project page naming S1a, and the field EMPTIED on success (the control for "keeps the typo")   [load 2.73/4.30/4.79]
+        field aim {"x":785,"y":238,"hitOk":true,"dpr":1,"rect":{"x":472,"y":221,"w":626.64,"h":33}}; settled true after 1ms; home {"field":"","fieldLabel":"…or type another project directory path","chip":"S1","name":"Sonic 1 Disassembly (GitHub)","dir":"/tmp/cdps3-s1a-etYnA6","headerRect":{"x":0,"y":0,"w":0,"h":0}}; projStatus {"status":"open","zones":18}
+PASS  [CFO.0c] Green Hill act 1 opened from Home's Levels card by a real click: its tab is listed and the act is loaded   [load 2.75/4.27/4.78]
+        cards [{"title":"Open Green Hill Zone Act 1","disabled":false},{"title":"Open Green Hill Zone Act 2","disabled":false},{"title":"Open Green Hill Zone Act 3","disabled":false},{"title":"Open Marble Zone Act 1","disabled":false},{"title":"Open Marble Zone Act 2","disabled":false},{"title":"Open Marble Zone Act 3","disabled":false},{"title":"Open Spring Yard Zone Act 1","disabled":false},{"title":"Open Spring Yard Zone Act 2","disabled":false},{"title":"Open Spring Yard Zone Act 3","disabled":false},{"title":"Open Labyrinth Zone Act 1","disabled":false},{"title":"Open Labyrinth Zone Act 2","disabled":false},{"title":"Open Labyrinth Zone Act 3","disabled":false},{"title":"Open Star Light Zone Act 1","disabled":false},{"title":"Open Star Light Zone Act 2","disabled":false},{"title":"Open Star Light Zone Act 3","disabled":false},{"title":"Open Scrap Brain Zone Act 1","disabled":false},{"title":"Open Scrap Brain Zone Act 2","disabled":false},{"title":"Open Scrap Brain Zone Act 3","disabled":false}]; aim {"x":578,"y":188,"hitOk":true,"dpr":1,"rect":{"x":464.5,"y":167,"w":226.66,"h":42}}; levelState {"status":"ready","zone":"ghz","act":1}; tabs ["Home","Green Hill Zone Act 1"]
+
+──── CFO F-1: a typo in the path box, Sonic 1 resident ────
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-banner-run6.png  (clip {"x":0,"y":0,"width":1400,"height":68,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-home-header-run6.png  (clip {"x":462,"y":146,"width":701,"height":31,"scale":1})
+   capture cfo-F1-field: the element was outside the viewport and was scrolled into view for the picture
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-field-run6.png  (clip {"x":462,"y":771,"width":701,"height":55,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-tabstrip-run6.png  (clip {"x":238,"y":64,"width":1162,"height":38,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-full-run6.png
+PASS  [CFO.F1.a] F-1: the red banner is PAINTED and begins with the classic store's own not-recognized sentence for the typed path (no banner before the Enter)   [load 2.85/4.27/4.77]
+        dpr 1; banner before false; paint {"found":true,"text":"\"/tmp/cdps3-s1a-etYnA6-typo\" is not a recognized project.\n• Sonic 1 disassembly expects: sonic.asm + artnem/ + map256/ + levels/\n• Aeon project expects: project.json (engine \"s4\")\nDismiss","rect":{"x":0,"y":0,"w":1400,"h":66},"rects":1,"visible":true,"hitInside":true,"inScrollerBox":null,"inViewport":true,"dpr":1}; text "\"/tmp/cdps3-s1a-etYnA6-typo\" is not a recognized project.\n• Sonic 1 disassembly expects: sonic.asm + artnem/ + map256/ + levels/\n• Aeon project expects: project.json (engine \"s4\")"; captures ["docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-banner-run6.png","docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-home-header-run6.png","docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-field-run6.png","docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-tabstrip-run6.png"]
+PASS  [CFO.F1.b] F-1: Home STAYS on the S1 project page (chip S1, the S1 name, S1a's path, the switch field) and the classic project is still open   [load 2.85/4.27/4.77]
+        home {"field":"/tmp/cdps3-s1a-etYnA6-typo","fieldLabel":"…or type another project directory path","chip":"S1","name":"Sonic 1 Disassembly (GitHub)","dir":"/tmp/cdps3-s1a-etYnA6","headerRect":{"x":464.5,"y":148,"w":696,"h":27}}; projStatus {"status":"open","zones":18}
+PASS  [CFO.F1.c] F-1: the field KEEPS the typo   [load 2.85/4.27/4.77]
+        field "/tmp/cdps3-s1a-etYnA6-typo"; typed ok true
+PASS  [CFO.F1.d] F-1: the level tab is still there and its act is still loaded, and it NEVER left loaded while the open ran (the project never left open either: the mid-open trace)   [load 2.85/4.27/4.77]
+        tabs ["Home","Green Hill Zone Act 1"]; levelState {"status":"ready","zone":"ghz","act":1}; trace open/ready/ghz1@14199
+
+──── CFO F-3: the path of an aeon checkout whose project.json fails to load ────
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F3-banner-run6.png  (clip {"x":0,"y":0,"width":1400,"height":32,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F3-home-header-run6.png  (clip {"x":462,"y":74,"width":701,"height":31,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F3-tabstrip-run6.png  (clip {"x":238,"y":28,"width":1162,"height":38,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-3/cfo-F3-full-run6.png
+PASS  [CFO.F3.0] CONTROL: the F-1 banner was dismissed by a real click and was absent before this Enter   [load 2.78/4.23/4.76]
+        {"was":true,"pressed":{"x":482,"y":33,"hitOk":true,"dpr":1,"rect":{"x":453.11,"y":24,"w":58,"h":18}},"goneAfter":true}
+PASS  [CFO.F3.a] F-3: the banner is painted and says the AEON LOADER's reason (s4-config.ts), not the not-recognized sentence   [load 2.78/4.23/4.76]
+        dpr 1; loader reason printed by the app: "Zone missing \"id\""; paint {"found":true,"text":"Zone missing \"id\"\nDismiss","rect":{"x":0,"y":0,"w":1400,"h":30},"rects":1,"visible":true,"hitInside":true,"inScrollerBox":null,"inViewport":true,"dpr":1}; typed true; captures ["docs/captures/2026-09-12-cdp-sweep-3/cfo-F3-banner-run6.png","docs/captures/2026-09-12-cdp-sweep-3/cfo-F3-home-header-run6.png","docs/captures/2026-09-12-cdp-sweep-3/cfo-F3-tabstrip-run6.png"]
+PASS  [CFO.F3.b] F-3: Sonic 1 STAYS open (Home names S1a, classic open, the level tab and its act survive) and no aeon project was loaded   [load 2.78/4.23/4.76]
+        home {"field":"/tmp/cdps3-aeonX-5boH3F","fieldLabel":"…or type another project directory path","chip":"S1","name":"Sonic 1 Disassembly (GitHub)","dir":"/tmp/cdps3-s1a-etYnA6","headerRect":{"x":464.5,"y":76,"w":696,"h":27}}; projStatus {"status":"open","zones":18}; levelState {"status":"ready","zone":"ghz","act":1}; tabs ["Home","Green Hill Zone Act 1"]; aeon {"open":false,"zone":null,"act":null,"sections":0,"gridWidth":null,"gridHeight":null,"tool":"view","dirty":false,"dirtyActs":[]}; trace open/ready/ghz1@19072
+
+──── CFO F-4: S1a to S1b, then S1b to aeon ────
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F4a-home-header-run6.png  (clip {"x":462,"y":44,"width":701,"height":31,"scale":1})
+PASS  [CFO.F4.a] F-4 CONTROL: a SUCCESSFUL Sonic 1 to Sonic 1 open switches (Home names S1b, classic open, no banner, the field emptied), and the mid-open trace SEES the act leave loaded   [load 2.72/4.19/4.74]
+        dismiss {"was":true,"pressed":{"x":156,"y":15,"hitOk":true,"dpr":1,"rect":{"x":126.73,"y":6,"w":58,"h":18}},"goneAfter":true}; home {"field":"","fieldLabel":"…or type another project directory path","chip":"S1","name":"Sonic 1 Disassembly (GitHub)","dir":"/tmp/cdps3-s1b-A4BiZS","headerRect":{"x":464.5,"y":46,"w":696,"h":27}}; trace open/ready/ghz1@23952 > open/loading/ghz1@23967 > open/ready/ghz1@23976; right after the open {"headerRectBeforeHomePress":{"x":0,"y":0,"w":0,"h":0},"tabs":["Home","Green Hill Zone Act 1"],"levelState":{"status":"ready","zone":"ghz","act":1}}; Home header before {"x":464.5,"y":46,"w":696,"h":27}; levelState after {"status":"ready","zone":"ghz","act":1}; tabs ["Home","Green Hill Zone Act 1"]; capture docs/captures/2026-09-12-cdp-sweep-3/cfo-F4a-home-header-run6.png
+NOTE  [OBS-F4a] after the successful S1a to S1b switch the Green Hill tab stayed listed and act ghz 1 is loaded again (in S1b), and Home was not the active pane (header rect {"x":0,"y":0,"w":0,"h":0}): the shell reopened the same tab id in the new project. Observed, not judged.
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F4b-home-header-run6.png  (clip {"x":470,"y":80,"width":700,"height":31,"scale":1})
+NOTE  [F4b] right after the aeon open, before pressing Home: {"headerRectBeforeHomePress":{"x":0,"y":0,"w":0,"h":0},"tabs":["Home","Oracle Jungle Zone · act1"]}; trace open/ready/ghz1@29037 > closed/idle/nullnull@29250
+PASS  [CFO.F4.b] F-4 CONTROL: a SUCCESSFUL Sonic 1 to aeon open switches: Home names aeon copy A (chip AEON), classic closed, aeon open   [load 2.58/4.14/4.72]
+        home {"field":"","fieldLabel":"…or type another project directory path","chip":"AEON","name":"Sonic 4 (sweep3 A)","dir":null,"headerRect":{"x":472,"y":82,"w":696,"h":27}}; projStatus {"status":"closed","zones":0}; aeon {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}; title "Aurora - Sonic 4 (sweep3 A)"; capture docs/captures/2026-09-12-cdp-sweep-3/cfo-F4b-home-header-run6.png
+
+──── CFO F-2: aeon open, then S1a, then F-1 again ────
+PASS  [CFO.F2.0] PREMISE: Sonic 1 opened over aeon copy A, and the aeon store STILL holds copy A underneath (the stale project F-2 is about exists)   [load 2.37/4.07/4.70]
+        {"home":{"field":"","fieldLabel":"…or type another project directory path","chip":"S1","name":"Sonic 1 Disassembly (GitHub)","dir":"/tmp/cdps3-s1a-etYnA6","headerRect":{"x":464.5,"y":82,"w":696,"h":27}},"aeon":{"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]},"proj":{"status":"open","zones":18}}
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-banner-run6.png  (clip {"x":0,"y":0,"width":1400,"height":68,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-home-header-run6.png  (clip {"x":462,"y":146,"width":701,"height":31,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-tabstrip-run6.png  (clip {"x":238,"y":64,"width":1162,"height":38,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-full-run6.png
+PASS  [CFO.F2.a] F-2: after the failed open Home STILL names the Sonic 1 project (chip S1, S1 name, S1a), NOT aeon copy A; the banner is painted with the not-recognized sentence   [load 2.18/4.00/4.67]
+        dpr 1; level {"status":"ready","zone":"ghz","act":1}; banner "\"/tmp/cdps3-s1a-etYnA6-typo\" is not a recognized project.\n• Sonic 1 disassembly expects: sonic.asm + artnem/ + map256/ + levels/\n• Aeon project expects: project.json (engine \"s4\")"; home {"field":"/tmp/cdps3-s1a-etYnA6-typo","fieldLabel":"…or type another project directory path","chip":"S1","name":"Sonic 1 Disassembly (GitHub)","dir":"/tmp/cdps3-s1a-etYnA6","headerRect":{"x":464.5,"y":148,"w":696,"h":27}}; projStatus {"status":"open","zones":18}; captures ["docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-banner-run6.png","docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-home-header-run6.png","docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-tabstrip-run6.png"]
+PASS  [CFO.F2.b] F-2: and, as in F-1, the field keeps the typo and the level tab and its act survive   [load 2.18/4.00/4.67]
+        field "/tmp/cdps3-s1a-etYnA6-typo"; tabs ["Home","Green Hill Zone Act 1"]; levelState {"status":"ready","zone":"ghz","act":1}; typed true; trace open/ready/ghz1@42010
+
+──── paste: open aeon copy A (setup, __dbg.aeon.open) ────
+NOTE  [0] dpr 1; map canvas {"x":284,"y":74,"w":876,"h":721,"dpr":1}; open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; S {"col":16,"row":26,"distinct":12} H {"col":36,"row":26,"differ":16} aim {"x":575,"y":285}
+PASS  [PSB.0a] aeon copy A is open on ojz act1 with both zones listed and the Layout and Collision facets present   [load 2.25/3.99/4.66]
+        rows ["Oracle Jungle Zone · act1","Oracle Jungle Zone · act2","Sweep Zone B · act1"]; facets ["Layout","Objects","Effects","Rings","Collision","Palette","Art"]; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+──── PSB F-5: zone A, a block-aligned copy, Ctrl+V ────
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-F5-bar-run6.png  (clip {"x":246,"y":850,"width":671,"height":21,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-F5-panel-hint-run6.png  (clip {"x":1159,"y":510,"width":228,"height":54,"scale":1})
+PASS  [PSB.F5.a] F-5 PREMISE: the block-aligned copy carries collision, Layers is on Both, and Ctrl+V ARMED (the bar label turned to the paste label, the ghost paints)   [load 2.15/3.94/4.64]
+        dpr 1; marquee {"sectionIndex":0,"col":16,"row":26,"w":4,"h":4,"aligned":true}; clipboard {"widthTiles":4,"heightTiles":4,"artOnly":false,"collisionALen":4,"collisionBLen":4,"nonzeroTiles":16}; layers [["Both","rgb(52, 211, 153)"],["Art","rgb(34, 39, 54)"],["Collision","rgb(34, 39, 54)"]]; bar before {"found":true,"n":5,"label":"Marquee","layer":"FG","zone":"Oracle Jungle Zone","scope":"Section 0","context":"drag to select · Ctrl+C copy · Ctrl+V paste · X/Y flip · S save as chunk · Esc clear"}; ghost {"pasting":true,"hover":{"sectionIndex":0,"baseCol":36,"baseRow":26},"paints":2}
+PASS  [PSB.F5.b] F-5: the STATUS BAR reads the home line from the armed offer ("Click to paste · hold Alt ..., Shift ... · Esc to stop"), not the old neutral line   [load 2.15/3.94/4.64]
+        bar {"found":true,"n":5,"label":"Paste","layer":"FG","zone":"Oracle Jungle Zone","scope":"Section 0","context":"Click to paste · hold Alt for art only, Shift for collision only · Esc to stop"}; want "Click to paste · hold Alt for art only, Shift for collision only · Esc to stop"; captures ["docs/captures/2026-09-12-cdp-sweep-3/psb-F5-bar-run6.png","docs/captures/2026-09-12-cdp-sweep-3/psb-F5-panel-hint-run6.png"]
+PASS  [PSB.F5.c] F-5 CONTROL: the panel hint is PASTE_HINT byte for byte, and the bar says its gestures without the flip keys   [load 2.15/3.94/4.64]
+        panel "Click to paste · hold Alt for art only, Shift for collision only · X flips it left↔right, Y top↕bottom · Esc to stop"
+
+──── PSB F-1 / PHC F-1: zone B, Ctrl+V, Layers Both then Collision ────
+PASS  [PSB.F1.0] F-1 PREMISE: zone B opened by a real Explorer click, its tile set differs (zone-art hash), the switch left paste mode OFF, and Ctrl+V armed with COLLISION_ONLY_HERE painted   [load 1.98/3.87/4.62]
+        dpr 1; zoneArtHash ojz 628154474 zb 1662671378; bar before {"found":true,"n":5,"label":"Marquee","layer":"FG","zone":"Sweep Zone B","scope":"Section 0","context":"drag to select · Ctrl+C copy · Ctrl+V paste · X/Y flip · S save as chunk · Esc clear"}; toast {"text":"Only the collision can be pasted here: the copied tiles belong to another tile set. Shift+click pastes collision only.","x":700,"y":816,"rect":{"x":420,"y":792,"w":560,"h":48},"rects":1,"hitInside":true,"inViewport":true,"border":"rgb(56, 189, 248)"}; ghost {"pasting":true,"hover":{"sectionIndex":0,"baseCol":36,"baseRow":26},"paints":6}
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-F1-bar-both-run6.png  (clip {"x":246,"y":850,"width":737,"height":21,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/phc-F1-panel-hint-both-run6.png  (clip {"x":1159,"y":581,"width":228,"height":55,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-F1-layers-both-run6.png  (clip {"x":1159,"y":462,"width":228,"height":26,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-3/psb-F1-full-both-run6.png
+PASS  [PSB.F1.a] F-1: the bar reads the paste label, then "Shift+click to paste collision only · a plain click and Alt+click are refused here · Esc to stop" (the offer's statusHint)   [load 1.98/3.87/4.62]
+        bar {"found":true,"n":5,"label":"Paste","layer":"FG","zone":"Sweep Zone B","scope":"Section 0","context":"Shift+click to paste collision only · a plain click and Alt+click are refused here · Esc to stop"}; want "Shift+click to paste collision only · a plain click and Alt+click are refused here · Esc to stop"; captures ["docs/captures/2026-09-12-cdp-sweep-3/psb-F1-bar-both-run6.png","docs/captures/2026-09-12-cdp-sweep-3/phc-F1-panel-hint-both-run6.png","docs/captures/2026-09-12-cdp-sweep-3/psb-F1-layers-both-run6.png"]
+PASS  [PSB.F1.b] F-1: the panel hint says the SAME gestures, with the flip keys (panel = offer.hint, and the bar's gesture part is its head)   [load 1.98/3.87/4.62]
+        panel "Shift+click to paste collision only · a plain click and Alt+click are refused here · X flips it left↔right, Y top↕bottom · Esc to stop"; notice "Only the collision can be pasted here: the copied tiles belong to another tile set. Shift+click pastes collision only. Layers is set to Both, so a plain click here is refused. Choose Collision to paste with a plain click."; buttons [["Both",true],["Art",true],["Collision",false]]
+PASS  [PHC.F1.a] PHC F-1: in another zone with Layers on Both the panel hint reads the offer's line AND wraps inside its column (2+ lines, no horizontal overflow, inside the scroller)   [load 1.98/3.87/4.62]
+        geometry {"rect":{"x":1161,"w":224,"right":1385,"h":50},"column":{"x":1160,"right":1400,"w":240},"lines":3,"scrollW":224,"clientW":224,"insideColumn":true}
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-W-harness-default-bar-run6.png  (clip {"x":240,"y":848,"width":1160,"height":24,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-3/psb-W-harness-default-full-run6.png
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-W-1280-bar-run6.png  (clip {"x":240,"y":848,"width":1040,"height":24,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-3/psb-W-1280-full-run6.png
+PASS  [PSB.F1.W1] F-1 / O-1 at the HARNESS's default window (outer 1400x900, innerWidth 1400): the bar's left half is on one row, unclipped, and the zoom controls and Aether badge are inside the window   [load 1.98/3.87/4.62]
+        geometry {"found":true,"innerWidth":1400,"innerHeight":872,"outerWidth":1400,"outerHeight":900,"dpr":1,"footer":{"x":240,"y":848,"w":1160,"h":24,"right":1400,"bottom":872},"left":{"x":248,"y":852.5,"w":733,"h":16,"right":981,"bottom":868.5},"leftScrollW":733,"leftClientW":733,"inner":{"x":248,"y":852.5,"w":733,"h":16,"right":981,"bottom":868.5},"innerScrollW":733,"innerClientW":733,"context":{"x":442,"y":852.5,"w":539,"h":16,"right":981,"bottom":868.5,"text":"Shift+click to paste collision only · a plain click and Alt+click are refused here · Esc to stop","lines":1,"scrollW":539,"clientW":539},"oneRowH":16,"wraps":false,"clipped":false,"overflowsFooter":false,"zoomIn":{"x":1260.48,"y":849.5,"w":20.44,"h":22,"right":1280.92,"bottom":871.5,"inWindow":true},"zoomOut":{"x":1192.05,"y":849.5,"w":20.44,"h":22,"right":1212.48,"bottom":871.5,"inWindow":true},"badge":{"x":1294.92,"y":852.5,"w":97.08,"h":16,"right":1392,"bottom":868.5,"inWindow":true,"text":"Aether ◇ offline"},"rightOverlapsLeft":false}; captures ["docs/captures/2026-09-12-cdp-sweep-3/psb-W-harness-default-bar-run6.png"]
+PASS  [PSB.F1.W2] F-1 / O-1 at 1280 wide (via window.resizeTo(1280, 900): a real window resize; innerWidth 1280): one row, unclipped, zoom and badge inside the window   [load 1.98/3.87/4.62]
+        geometry {"found":true,"innerWidth":1280,"innerHeight":872,"outerWidth":1280,"outerHeight":900,"dpr":1,"footer":{"x":240,"y":848,"w":1040,"h":24,"right":1280,"bottom":872},"left":{"x":248,"y":852.5,"w":733,"h":16,"right":981,"bottom":868.5},"leftScrollW":733,"leftClientW":733,"inner":{"x":248,"y":852.5,"w":733,"h":16,"right":981,"bottom":868.5},"innerScrollW":733,"innerClientW":733,"context":{"x":442,"y":852.5,"w":539,"h":16,"right":981,"bottom":868.5,"text":"Shift+click to paste collision only · a plain click and Alt+click are refused here · Esc to stop","lines":1,"scrollW":539,"clientW":539},"oneRowH":16,"wraps":false,"clipped":false,"overflowsFooter":false,"zoomIn":{"x":1140.48,"y":849.5,"w":20.44,"h":22,"right":1160.92,"bottom":871.5,"inWindow":true},"zoomOut":{"x":1072.05,"y":849.5,"w":20.44,"h":22,"right":1092.48,"bottom":871.5,"inWindow":true},"badge":{"x":1174.92,"y":852.5,"w":97.08,"h":16,"right":1272,"bottom":868.5,"inWindow":true,"text":"Aether ◇ offline"},"rightOverlapsLeft":false}; captures ["docs/captures/2026-09-12-cdp-sweep-3/psb-W-1280-bar-run6.png"]; attempts ["Browser domain: Browser.getWindowForTarget: {\"code\":-32601,\"message\":\"'Browser.getWindowForTarget' wasn't found\"}"]; restored innerWidth 1400 (was 1400)
+PASS  [PSB.F1.c] F-1, THE CLICK: a plain click and Alt+click are REFUSED with OTHER_TILESET_REFUSAL and write nothing; Shift+click WRITES (what the line says)   [load 2.06/3.83/4.59]
+        {"plain":{"toast":"Not pasted: the copied tiles belong to another tile set, so pasting them here would put different tiles down. Copy again from a map that uses this tile set.","wrote":false,"canUndo":[false,false],"hashMoved":false,"pastingAfter":false,"undoneTo":null},"alt":{"toast":"Not pasted: the copied tiles belong to another tile set, so pasting them here would put different tiles down. Copy again from a map that uses this tile set.","wrote":false,"canUndo":[false,false],"hashMoved":false,"pastingAfter":false,"undoneTo":null},"shift":{"toast":null,"wrote":true,"canUndo":[false,true],"hashMoved":true,"pastingAfter":true,"undoneTo":false}}
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-F1-bar-collision-run6.png  (clip {"x":246,"y":850,"width":682,"height":21,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/phc-F1-panel-hint-collision-run6.png  (clip {"x":1159,"y":554,"width":228,"height":55,"scale":1})
+PASS  [PSB.F1.d] F-1: Layers switched to Collision by a real click while pasting: the bar reads "Click or Shift+click to paste collision only · Alt+click is refused here · Esc to stop"   [load 2.06/3.83/4.59]
+        aim {"x":1301,"y":477,"hitOk":true,"dpr":1,"rect":{"x":1275.64,"y":468,"w":51.58,"h":18}}; bar {"found":true,"n":5,"label":"Paste","layer":"FG","zone":"Sweep Zone B","scope":"Section 0","context":"Click or Shift+click to paste collision only · Alt+click is refused here · Esc to stop"}; want "Click or Shift+click to paste collision only · Alt+click is refused here · Esc to stop"; captures ["docs/captures/2026-09-12-cdp-sweep-3/psb-F1-bar-collision-run6.png","docs/captures/2026-09-12-cdp-sweep-3/phc-F1-panel-hint-collision-run6.png"]
+PASS  [PHC.F1.b] PHC F-1: and the panel hint reads the same gestures with the flip keys   [load 2.06/3.83/4.59]
+        panel "Click or Shift+click to paste collision only · Alt+click is refused here · X flips it left↔right, Y top↕bottom · Esc to stop"
+
+──── PSB F-2: Collision facet, Ctrl+V in zone B ────
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-F2-bar-run6.png  (clip {"x":246,"y":850,"width":737,"height":21,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-3/psb-F2-full-run6.png
+PASS  [PSB.F2.a] F-2: in the Collision facet (no Paste panel mounted) Ctrl+V arms and the bar reads F-1's line; it is the ONLY element on screen saying the gestures   [load 2.06/3.83/4.59]
+        dpr 1; facet aim {"x":522,"y":54,"hitOk":true,"dpr":1,"rect":{"x":488.92,"y":44.5,"w":65.58,"h":18}}; Both aim true; panel gone true; bar {"found":true,"n":5,"label":"Paste","layer":"FG","zone":"Sweep Zone B","scope":"Section 0","context":"Shift+click to paste collision only · a plain click and Alt+click are refused here · Esc to stop"}; holders [{"tag":"SPAN","text":"Shift+click to paste collision only · a plain click and Alt+click are refused here · Esc to stop"}]; captures ["docs/captures/2026-09-12-cdp-sweep-3/psb-F2-bar-run6.png"]
+
+──── PSB F-3: stamp tool, a chunk, Ctrl+V, Esc ────
+PASS  [PSB.F3.0] F-3 CONTROL: with the stamp tool armed the bar says the stamp's own line, before and after a real click selects a chunk   [load 2.14/3.81/4.58]
+        tool stamp-chunk; before "Select a chunk from the library panel" (want "Select a chunk from the library panel"); cell "OJZ $01" aim {"x":1301,"y":434,"hitOk":true,"dpr":1,"rect":{"x":1257,"y":390,"w":88,"h":88}}; after "Chunk: OJZ_01 · Alt: art only" (want "Chunk: OJZ_01 · Alt: art only")
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-F3-bar-pasting-run6.png  (clip {"x":246,"y":850,"width":737,"height":21,"scale":1})
+PASS  [PSB.F3.a] F-3: Ctrl+V with the stamp armed: the bar reads F-1's paste line, not "Chunk: ... · Alt: art only"   [load 2.14/3.81/4.58]
+        tool stamp-chunk; bar {"found":true,"n":5,"label":"Paste","layer":"FG","zone":"Sweep Zone B","scope":"Section 0","context":"Shift+click to paste collision only · a plain click and Alt+click are refused here · Esc to stop"}; capture docs/captures/2026-09-12-cdp-sweep-3/psb-F3-bar-pasting-run6.png
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-F3-bar-after-esc-run6.png  (clip {"x":246,"y":850,"width":396,"height":21,"scale":1})
+PASS  [PSB.F3.b] F-3: Esc, and the stamp's line comes back   [load 2.14/3.81/4.58]
+        bar {"found":true,"n":5,"label":"Stamp Chunk","layer":"FG","zone":"Sweep Zone B","scope":"Section 0","context":"Chunk: OJZ_01 · Alt: art only"}; capture docs/captures/2026-09-12-cdp-sweep-3/psb-F3-bar-after-esc-run6.png
+
+──── PSB F-4 / PHC F-2: zone A, a 3x3 tile copy ────
+   clip: docs/captures/2026-09-12-cdp-sweep-3/phc-F2-copyside-layers-run6.png  (clip {"x":1159,"y":342,"width":228,"height":26,"scale":1})
+PASS  [PHC.F2.a] PHC F-2, the copy side: Layers set to Collision (a real click, while it was live), then an unaligned 3x3 selection stands: Collision is greyed WITH the chosen mark (dashed, the warning colour, the chosen-dead opacity)   [load 2.12/3.78/4.57]
+        dpr 1; row true; before the drag {"label":"Collision","disabled":false,"opacity":"1","borderStyle":"solid","borderColor":"rgb(52, 211, 153)","background":"rgb(52, 211, 153)","rect":{"x":1275.64,"y":348,"w":51.58,"h":18}}; marquee {"sectionIndex":0,"col":17,"row":27,"w":3,"h":3,"aligned":false}; Collision now {"label":"Collision","disabled":true,"opacity":"0.7","borderStyle":"dashed","borderColor":"rgb(251, 191, 36)","background":"rgb(34, 39, 54)","rect":{"x":1275.64,"y":348,"w":51.58,"h":18}}; warning colour "rgb(251, 191, 36)"; want {"opacity":"0.7","borderStyle":"dashed"}; capture docs/captures/2026-09-12-cdp-sweep-3/phc-F2-copyside-layers-run6.png
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-F4-bar-collision-run6.png  (clip {"x":246,"y":850,"width":721,"height":21,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-F4-panel-hint-collision-run6.png  (clip {"x":1159,"y":399,"width":228,"height":54,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/phc-F2-pasting-layers-run6.png  (clip {"x":1159,"y":320,"width":228,"height":26,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/phc-F2-collision-chosen-dead-run6.png  (clip {"x":1274,"y":325,"width":55,"height":20,"scale":1})
+PASS  [PSB.F4.a] F-4, Layers on Collision: the art-only copy ARMED at home; panel "Alt+click to paste art only · a plain click and Shift+click paste nothing · X flips ..." and the bar the same without the flips   [load 2.12/3.78/4.57]
+        clipboard {"widthTiles":3,"heightTiles":3,"artOnly":true,"collisionALen":0,"collisionBLen":0,"nonzeroTiles":9}; ghost {"pasting":true,"hover":{"sectionIndex":0,"baseCol":36,"baseRow":26},"paints":34}; panel "Alt+click to paste art only · a plain click and Shift+click paste nothing · X flips it left↔right, Y top↕bottom · Esc to stop"; bar {"found":true,"n":5,"label":"Paste","layer":"FG","zone":"Oracle Jungle Zone","scope":"Section 0","context":"Alt+click to paste art only · a plain click and Shift+click paste nothing · Esc to stop"}; captures ["docs/captures/2026-09-12-cdp-sweep-3/psb-F4-bar-collision-run6.png","docs/captures/2026-09-12-cdp-sweep-3/psb-F4-panel-hint-collision-run6.png","docs/captures/2026-09-12-cdp-sweep-3/phc-F2-pasting-layers-run6.png"]
+PASS  [PHC.F2.b] PHC F-2, pasting: Collision stays set and shows as chosen and unavailable (dashed, the warning colour, the chosen-dead opacity)   [load 2.12/3.78/4.57]
+        Collision {"label":"Collision","disabled":true,"opacity":"0.7","borderStyle":"dashed","borderColor":"rgb(251, 191, 36)","background":"rgb(34, 39, 54)","rect":{"x":1275.64,"y":326,"w":51.58,"h":18}}; warning colour "rgb(251, 191, 36)"; capture docs/captures/2026-09-12-cdp-sweep-3/phc-F2-collision-chosen-dead-run6.png
+PASS  [PSB.F4.b] F-4, THE CLICK: Shift+click and a plain click show the "carries no collision" toast and write nothing; Alt+click writes (what the line says)   [load 2.03/3.73/4.55]
+        {"shift":{"toast":"This clipboard carries no collision: it was copied from a selection that is not block-aligned. Paste art, or re-copy on even tile bounds.","wrote":false,"canUndo":[false,false],"hashMoved":false,"pastingAfter":true,"undoneTo":null},"plain":{"toast":"This clipboard carries no collision: it was copied from a selection that is not block-aligned. Paste art, or re-copy on even tile bounds.","wrote":false,"canUndo":[false,false],"hashMoved":false,"pastingAfter":true,"undoneTo":null},"alt":{"toast":null,"wrote":true,"canUndo":[false,true],"hashMoved":true,"pastingAfter":true,"undoneTo":false}}
+   clip: docs/captures/2026-09-12-cdp-sweep-3/phc-F2-collision-plain-dead-run6.png  (clip {"x":1274,"y":347,"width":55,"height":20,"scale":1})
+PASS  [PHC.F2.c] PHC F-2 CONTROL: with Layers on Both, Collision is greyed in the PLAIN unavailable look (the plain opacity, not dashed), and its picture differs from the chosen-and-unavailable one   [load 1.95/3.69/4.53]
+        Collision {"label":"Collision","disabled":true,"opacity":"0.4","borderStyle":"solid","borderColor":"rgb(42, 47, 61)","background":"rgb(34, 39, 54)","rect":{"x":1275.64,"y":348,"w":51.58,"h":18}}; pixel diff chosen-dead vs plain-dead {"comparable":true,"changed":918,"total":1100}; capture docs/captures/2026-09-12-cdp-sweep-3/phc-F2-collision-plain-dead-run6.png
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-F4-bar-both-run6.png  (clip {"x":246,"y":850,"width":677,"height":21,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/psb-F4-panel-hint-both-run6.png  (clip {"x":1159,"y":399,"width":228,"height":54,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-3/psb-F4-full-both-run6.png
+PASS  [PSB.F4.c] F-4, Layers on Both: panel "Click or Alt+click to paste art only · Shift+click pastes nothing · X flips ..." and the bar the same without the flips   [load 1.95/3.69/4.53]
+        ghost {"pasting":true,"hover":{"sectionIndex":0,"baseCol":36,"baseRow":26},"paints":49}; panel "Click or Alt+click to paste art only · Shift+click pastes nothing · X flips it left↔right, Y top↕bottom · Esc to stop"; bar {"found":true,"n":5,"label":"Paste","layer":"FG","zone":"Oracle Jungle Zone","scope":"Section 0","context":"Click or Alt+click to paste art only · Shift+click pastes nothing · Esc to stop"}; captures ["docs/captures/2026-09-12-cdp-sweep-3/psb-F4-bar-both-run6.png","docs/captures/2026-09-12-cdp-sweep-3/psb-F4-panel-hint-both-run6.png"]
+PASS  [PSB.F4.d] F-4, THE CLICK: Shift+click still shows the "carries no collision" toast and writes nothing; a plain click writes   [load 1.87/3.64/4.51]
+        {"shift":{"toast":"This clipboard carries no collision: it was copied from a selection that is not block-aligned. Paste art, or re-copy on even tile bounds.","wrote":false,"canUndo":[false,false],"hashMoved":false,"pastingAfter":true,"undoneTo":null},"plain":{"toast":null,"wrote":true,"canUndo":[false,true],"hashMoved":true,"pastingAfter":true,"undoneTo":false}}
+cleanup: tree under pid 3650675 (11 process(es)):
+           3650675 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           3650685 Xvfb :184 -screen 0 1680x1050x24 -nolisten tcp
+           3650865 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           3650872 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           3650898 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3650899 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3650901 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3650927 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3650932 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3650936 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           3650944 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 51 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 351 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PART=all: 39/39 rows PASS · 0 FAIL · 0 UNMEASURABLE · 94.4s ════
+     loadavg at end 1.87 3.64 4.51
+END-OF-RUN
