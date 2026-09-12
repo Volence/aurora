@@ -587,7 +587,16 @@ describe('the call sites still exist in ComposerCanvas (source read)', () => {
   });
 
   it('[F2] the re-sync effect is present and keyed on the history clock', () => {
+    // RE-AIMED 2026-09-12, and the old shape is the defect rather than the
+    // baseline: `[historyVersion, open]` re-ran the effect on every
+    // `markOpenDirty()` — which REPLACES the `open` wrapper — so it fired
+    // between a tile-space write and the `up` that commits it, saw the document
+    // ahead of its chunk, and rebuilt the document from the chunk, discarding
+    // the stroke. `chunkDocSyncKey` states the rule and is measured in
+    // state/__tests__/chunk-doc-sync-key.test.ts; the history clock, which is
+    // what this row is about, is still the first half of that key.
+    // docs/reviews/2026-09-12-chunklinks-row9-regression.md.
     expect(code()).toMatch(
-      /useEffect\(\(\) => \{ syncChunkDocFromLibrary\(\); \}, \[historyVersion, open\]\)/);
+      /useEffect\(\(\) => \{ syncChunkDocFromLibrary\(\); \}, chunkDocSyncKey\(historyVersion, open\)\)/);
   });
 });

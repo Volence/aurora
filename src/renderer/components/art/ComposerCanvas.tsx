@@ -17,7 +17,7 @@ import {
   recordComposerEdit, recordComposerSnapshot, takeComposerSnapshot,
 } from '../../state/composer-history';
 import {
-  commitChunkDocStep, isChunkDocument, syncChunkDocFromLibrary,
+  chunkDocSyncKey, commitChunkDocStep, isChunkDocument, syncChunkDocFromLibrary,
 } from '../../state/chunk-doc-commit';
 import type { ComposerSnapshot } from '../../../core/editing/composer-history';
 import { paintDocCollision, applyClipboardCollisionToDoc } from '../../../core/art/composer-collision';
@@ -200,8 +200,17 @@ export default function ComposerCanvas() {
    * A no-op whenever the document and its chunk already agree, which is the
    * common case: this clock also ticks for every `set-tileset-tiles` on an
    * atlas-backed cell, which moves tile pixels and no nametable word.
+   *
+   * ⚠ AND IT MUST NOT RUN AT ANY OTHER MOMENT. The key is `chunkDocSyncKey` and
+   * not `[historyVersion, open]`, because `markOpenDirty()` replaces the `open`
+   * wrapper: keyed on that, the effect ran BETWEEN a tile-space write and the
+   * `up` that commits it, found the document ahead of its chunk, and rebuilt the
+   * document from the chunk — discarding the stroke. The rule, the defect and
+   * the reason `open.doc` is the honest identity are written out at
+   * `chunkDocSyncKey`, and measured in state/__tests__/chunk-doc-sync-key.test.ts.
    */
-  useEffect(() => { syncChunkDocFromLibrary(); }, [historyVersion, open]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { syncChunkDocFromLibrary(); }, chunkDocSyncKey(historyVersion, open));
 
   // ---------- resolved render inputs ----------
 

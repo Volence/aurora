@@ -52,6 +52,7 @@ import { useProjectStore, getActiveLevel, getCurrentZone } from './projectStore'
 import { executeCommand } from './editorStore';
 import { useToastStore } from './toastStore';
 import { docFromChunk, restoreComposerDoc, sliceForSave } from '../../core/art/composer-buffer';
+import type { ComposerDoc } from '../../core/art/composer-buffer';
 import type { AnyCommand } from '../../core/editing/commands';
 import type { ChunkDef, Tile } from '../../core/model/s4-types';
 
@@ -261,4 +262,44 @@ export function syncChunkDocFromLibrary(): void {
     && sameWords(o!.doc.collisionB, chunk.collisionB)) return;
   restoreComposerDoc(o!.doc, docFromChunk(chunk));
   s.bumpDoc();
+}
+
+/**
+ * WHEN THE COMPOSER MAY ASK `syncChunkDocFromLibrary` — the effect key, here
+ * rather than inline in `ComposerCanvas`, so the rule can be MEASURED (see
+ * `state/__tests__/chunk-doc-sync-key.test.ts`) instead of only read.
+ *
+ * THE RULE. The sync rebuilds the open document FROM the library chunk whenever
+ * the two disagree, and it cannot tell the two reasons they might: the LIBRARY
+ * moved (an undo of a chunk step — the case it exists for) or the DOCUMENT moved
+ * (a gesture that has not been committed yet). So it must only ever be asked at a
+ * moment when the document is supposed to already agree — i.e. when the HISTORY
+ * CLOCK ticked, or when a different document was opened. Never merely because
+ * the `open` wrapper was replaced.
+ *
+ * THE DEFECT THAT WROTE THIS (docs/reviews/2026-09-12-chunklinks-row9-regression.md).
+ * The key was `[historyVersion, open]`, and `artStore.markOpenDirty()` REPLACES
+ * `open` to flip one boolean. A tile-space gesture (tile stamp / collision /
+ * palette-apply) writes the document and marks it dirty in `applyTileCell`, but
+ * commits at `up` in `endTileGesture` — one React commit later. So the effect ran
+ * in between, found the document ahead of its chunk, and "repaired" the drift by
+ * throwing the author's stamp away. A single-click stamp was lost whole; a drag
+ * lost its first cell (the second `markOpenDirty` is a no-op, so `open` keeps its
+ * identity). Nothing on screen said so, and Save then wrote the unchanged
+ * document back and propagated nothing — which is how the CDP rig saw it
+ * (chunk-links row 9) and the node suite did not.
+ *
+ * The pixel tools were never exposed: they mark dirty and call
+ * `commitChunkDocStep` in the same synchronous block, so the library chunk has
+ * caught up before React runs any effect.
+ *
+ * `open.doc` and not `open`: the document buffer is a stable object for the life
+ * of the document (`markOpenDirty` spreads the wrapper, never the doc), and it
+ * is what a rebuild would overwrite — so it is the honest identity for "a
+ * different document is open now".
+ */
+export function chunkDocSyncKey(
+  historyVersion: number, open: OpenDocument | null,
+): [number, ComposerDoc | null] {
+  return [historyVersion, open ? open.doc : null];
 }
