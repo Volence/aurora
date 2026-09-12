@@ -25,6 +25,13 @@
 //       the armed chunk's id. Prints the plane readout it judges.
 //   4   hovering the stamped region makes the panel NAME it — both the store
 //       latch and the rendered text, printed.
+//   4b  the Detach button is PAINTED at the size its own style declares.
+//       CHIP-FONT-13PX, and it is RED ON PURPOSE: the defect is measured, the
+//       cause is `Chip`'s button branch, and the one-line fix at that cause
+//       moves EVERY interactive chip in the app — so it is the owner's call,
+//       not this harness's. See docs/reviews/2026-09-12-scene-row-and-chip-font.md.
+//       The row prints the blast radius (every chip-shaped element mounted, with
+//       its computed and inherited size) so the ruling has the list.
 //   5   the panel's real Detach button clears that placement AND LEAVES THE ART
 //       ALONE (detaching turns a link into a copy). The nametable comparison is
 //       the half that separates "detached" from "erased".
@@ -203,7 +210,34 @@ async function main() {
     }
 
     // ── Row 1: the real project, the real map, the real panel ───────────────
-    await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(AEON_DIR)})`);
+    //
+    // THE OPEN IS POLLED, NOT `awaitPromise`d, AND THAT IS A RUNNER FIX, not a
+    // style preference. `Runtime.evaluate` with `awaitPromise: true` holds no
+    // strong reference to the promise it is waiting on, so V8 is free to
+    // collect it — and it did, every run, in this worktree: the harness died at
+    // this line with `Runtime.evaluate: {"code":-32000,"message":"Promise was
+    // collected"}` BEFORE ROW 1, which reads like the app failing to open and
+    // is not that. The open resolves in about half a second (printed below).
+    // Parking the promise's outcome on `window` gives it an owner, and the poll
+    // then reads a plain string. A run that never leaves `pending` throws
+    // rather than walking on into rows that would all be vacuous.
+    await c.send('Runtime.evaluate', {
+      expression: `(() => { window.__openState = 'pending';
+        window.__dbg.aeon.open(${JSON.stringify(AEON_DIR)})
+          .then((v) => { window.__openState = 'resolved:' + v; })
+          .catch((e) => { window.__openState = 'rejected:' + (e && e.message); });
+        return 'started'; })()`,
+      returnByValue: true,
+    });
+    let openState = 'pending';
+    for (let i = 0; i < 120; i++) {
+      openState = await c.evalExpr('window.__openState').catch((e) => `ERR ${e.message}`);
+      if (openState !== 'pending') { console.log(`        [open] ${openState} after ${(i * 0.5).toFixed(1)}s`); break; }
+      await sleep(500);
+    }
+    if (openState !== 'resolved:true') {
+      throw new Error(`aeon open did not succeed (${openState}) — every row below would be vacuous`);
+    }
     await sleep(1500);
     const st0 = await c.json('window.__dbg.aeon.state()');
     await c.evalExpr(`window.__dbg.activate(${JSON.stringify(st0.zone)}, ${JSON.stringify(st0.act)})`);
@@ -397,6 +431,75 @@ async function main() {
       `store=${JSON.stringify(hoverStore)} button=${JSON.stringify(detachEnabled)}\n`
       + `        rendered readout: ${JSON.stringify(hoverText)}`);
     await shot(c, '2-hover');
+
+    // ── Row 4b: the Detach button is RENDERED AT THE SIZE ITS STYLE DECLARES ─
+    //
+    // CHIP-FONT-13PX. `Chip`'s button branch (primitives.tsx:282) sets
+    // `fontSize: T.tXs`, i.e. `var(--text-xs-size)`, and its own comment says
+    // "a chip in a 13px bar is still 11px". On screen it is not.
+    //
+    // THE EXPECTATION IS DERIVED, NEVER TYPED: `--text-xs-size` is read out of
+    // the live document's own custom properties, so this row cannot drift from
+    // the token, and it goes LOUD (not green) if the property resolves empty.
+    //
+    // DPR CANNOT CONFOUND IT. `getComputedStyle().fontSize` is resolved CSS px,
+    // not device px, and both sides of the comparison come from the same
+    // document in the same evaluation — the reading is not assembled from two
+    // runs. dpr is printed anyway, beside the button's own rect, because this
+    // box has been seen at 1 and at 1.35 hours apart.
+    //
+    // THE CENSUS beside it is the blast-radius measurement: every chip-shaped
+    // <button> mounted right now, with its computed size and the size it
+    // inherits. `Chip`'s span branch carries no `font: inherit`, so the two
+    // branches of one primitive are expected to disagree today.
+    const chipFont = await c.json(`(() => {
+      const declared = getComputedStyle(document.documentElement)
+        .getPropertyValue('--text-xs-size').trim();
+      const chipish = (e) => e.style.display === 'inline-flex' && e.style.whiteSpace === 'nowrap';
+      const detach = [...document.querySelectorAll('button')]
+        .find((e) => e.textContent.trim() === 'Detach');
+      // inlineFontSize IS THE MECHANISM, read back out of the DOM: React writes
+      // the style object's keys in enumeration order, and a duplicate fontSize
+      // in {...style, font:'inherit', fontSize: T.tXs} keeps the SPREAD's
+      // earlier slot while taking the later value -- so font-size is written
+      // first and the font shorthand then resets it to inherit. If that is what
+      // is happening, the inline longhand reads 'inherit', not a pixel value,
+      // and the computed size is the PARENT's.
+      const read = (e) => ({
+        text: e.textContent.trim().slice(0, 28),
+        tag: e.tagName,
+        computed: getComputedStyle(e).fontSize,
+        inherited: getComputedStyle(e.parentElement).fontSize,
+        inlineFontSize: e.style.fontSize || '(unset)',
+        inlineFontShorthand: e.style.font || '(does not serialize)',
+      });
+      return {
+        declared,
+        dpr: window.devicePixelRatio,
+        detach: detach ? { ...read(detach), rect: detach.getBoundingClientRect().toJSON() } : null,
+        census: [...document.querySelectorAll('button, span')].filter(chipish).map(read),
+      };
+    })()`);
+    const declaredPx = chipFont.declared;
+    const measuredPx = chipFont.detach ? chipFont.detach.computed : '(no button)';
+    const censusLines = chipFont.census
+      .map((e) => `          ${e.tag.padEnd(6)} computed=${String(e.computed).padStart(7)} `
+        + `inherited=${String(e.inherited).padStart(7)} inline font-size=${String(e.inlineFontSize).padStart(9)}`
+        + `  ${JSON.stringify(e.text)}`);
+    const censusOff = chipFont.census.filter((e) => e.computed !== declaredPx);
+    check('4b', "the panel's Detach button is painted at the size its own style declares (--text-xs-size), not at whatever it inherits",
+      // LOUD ON UNMEASURABLE: an empty token or a missing button is a failure,
+      // never a pass by absence.
+      /^\d+(\.\d+)?px$/.test(declaredPx) && chipFont.detach !== null
+      && measuredPx === declaredPx,
+      `declared --text-xs-size=${JSON.stringify(declaredPx)} computed=${JSON.stringify(measuredPx)} `
+      + `inherited=${JSON.stringify(chipFont.detach && chipFont.detach.inherited)} `
+      + `inline font-size=${JSON.stringify(chipFont.detach && chipFont.detach.inlineFontSize)} `
+      + `inline font shorthand=${JSON.stringify(chipFont.detach && chipFont.detach.inlineFontShorthand)}\n`
+      + `        [env] dpr=${chipFont.dpr} buttonRect=`
+      + `${JSON.stringify(chipFont.detach && chipFont.detach.rect)}\n`
+      + `        BLAST RADIUS — chip-shaped elements mounted now: ${chipFont.census.length}, `
+      + `of which ${censusOff.length} are NOT at ${declaredPx}:\n${censusLines.join('\n')}`);
 
     // ── Row 5: the real Detach button — link gone, ART UNTOUCHED ────────────
     const artBeforeDetach = await c.json(
