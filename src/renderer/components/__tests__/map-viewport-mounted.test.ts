@@ -4509,4 +4509,27 @@ describe('the stamp tool reports the placement under the pointer, and Detach act
     expect(placedAt(1), 'Detach left the hovered placement linked').toBeNull();
     expect(placedAt(0)?.chunkId, 'Detach also unlinked the other section\'s placement').toBe(CHUNK.s0);
   });
+
+  it('DETACH-WRONG-SECTION: over a placement in ANOTHER section than the active one, Detach unlinks the placement the panel names', async () => {
+    // The hover never claims a section (nothing in its branch writes
+    // `activeSectionIndex`), so after a stamp in section 1 the author can hover
+    // section 0's placement and the panel names it: "Under cursor: <its chunk>
+    // (#id)", and the chip's title "Detach placement #id". The press must act on
+    // THAT placement. Both sections hold a placement with the same id, so a
+    // detach resolved in the active section instead unlinks the other one.
+    const s = await stampBoth();
+    expect(ed().activeSectionIndex, 'the premise: the last stamp claimed section 1').toBe(1);
+    s.on().onMouseMove(worldAt(tileCentre(0, AT.col, AT.row)));
+    expect(hover(), 'the premise: the hover names section 0\'s placement')
+      .toEqual({ sectionIndex: 0, placementId: placedAt(0)!.id, chunkId: CHUNK.s0 });
+    const { detach, readout } = renderPanel();
+    expect(readout, 'the premise: the panel names section 0\'s chunk under the cursor').toContain('Hover chunk in section 0');
+    expect(detach.props.disabled, 'the premise: the panel offers Detach on it').toBe(false);
+    (detach.props.onClick as () => void)();
+    // SOFT, so a failure reports BOTH halves: that the named placement kept its
+    // link, and whether the other section's lost its link instead.
+    expect.soft(placedAt(0), 'Detach left the placement the panel named linked').toBeNull();
+    expect.soft(placedAt(1)?.chunkId, 'Detach unlinked the ACTIVE section\'s placement with the same number instead')
+      .toBe(CHUNK.s1);
+  });
 });
