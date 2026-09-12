@@ -1,0 +1,41 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557 — dist/main/index.mjs is 286s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557/src/test/element-stub.ts)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T05:12:03.584Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T05:12:03.584Z), so window.__dbg is in this bundle
+=== cdp-sweep-3 2026-09-12 harness ===
+    PART         : all
+    node         : v24.15.0
+    loadavg      : 3.83 4.11 5.73
+    ORACLE_SOCKET: /tmp/cdps3-sock-lQTuPx/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-3-0912-harness-4151088-90ebf853   (pinned by spawnGuarded, fresh per process)
+    PORT         : 9412   DISPLAY: xvfb-run -a (never :0)
+    captures     : docs/captures/2026-09-12-cdp-sweep-3   tag run1
+    aeon tarball : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/aac06b57-255e-4170-b49c-c612f4f44934/scratchpad/tars/aeon-0eaf09a0.tar   commit 0eaf09a0d072b6f77019b9f0a8d06c64452464b4
+    s1 tarball   : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/aac06b57-255e-4170-b49c-c612f4f44934/scratchpad/tars/s1disasm-HEAD.tar   commit f6ece657c1cf253404312137dfcb8ec15fa42318
+    oracle       : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557/src/core/editing/map-clipboard.ts bundled; PASTE_HINT "Click to paste · hold Alt for art only, Shift for collision only · X flips it left↔right, Y top↕bottom · Esc to stop"
+    copy A       : /tmp/cdps3-aeonA-jCE7ZJ   name "Sonic 4 (sweep3 A)"
+    copy X       : /tmp/cdps3-aeonX-0QNWA1   (zones[0].id deleted, engine "s4")
+    copy S1a     : /tmp/cdps3-s1a-tQryTB
+    copy S1b     : /tmp/cdps3-s1b-wsptuJ
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-3-0912-harness-4151088-90ebf853 — see HAZARD 6
+    dpr at start : 1
+
+──── classic: cold start ────  typo path "/tmp/cdps3-s1a-tQryTB-typo"; expected banner head "\"/tmp/cdps3-s1a-tQryTB-typo\" is not a recognized project."; F-3 loader reason "Zone missing \"id\""
+PASS  [CFO.0a] COLD START: nothing open (classic closed, no aeon project), Home shows the no-project field, no banner   [load 3.62/4.05/5.70]
+        dpr 1; projStatus {"status":"closed","zones":0}; aeon {"open":false,"zone":null,"act":null,"sections":0,"gridWidth":null,"gridHeight":null,"tool":"view","dirty":false,"dirtyActs":[]}; home {"field":"","fieldLabel":"…or type a project directory path","chip":null,"name":null,"dir":null,"headerRect":null}
+PASS  [CFO.0b] S1a opened through Home's path box (real click, typed, Enter): Home is the S1 project page naming S1a, and the field EMPTIED on success (the control for "keeps the typo")   [load 3.41/4.00/5.67]
+        field aim {"x":785,"y":238,"hitOk":true,"dpr":1,"rect":{"x":472,"y":221,"w":626.64,"h":33}}; settled true after 1ms; home {"field":"","fieldLabel":"…or type another project directory path","chip":"S1","name":"Sonic 1 Disassembly (GitHub)","dir":"/tmp/cdps3-s1a-tQryTB","headerRect":{"x":0,"y":0,"w":0,"h":0}}; projStatus {"status":"open","zones":18}
+PASS  [CFO.0c] Green Hill act 1 opened from Home's Levels card by a real click: its tab is listed and the act is loaded   [load 3.41/4.00/5.67]
+        cards [{"title":"Open Green Hill Zone Act 1","disabled":false},{"title":"Open Green Hill Zone Act 2","disabled":false},{"title":"Open Green Hill Zone Act 3","disabled":false},{"title":"Open Marble Zone Act 1","disabled":false},{"title":"Open Marble Zone Act 2","disabled":false},{"title":"Open Marble Zone Act 3","disabled":false},{"title":"Open Spring Yard Zone Act 1","disabled":false},{"title":"Open Spring Yard Zone Act 2","disabled":false},{"title":"Open Spring Yard Zone Act 3","disabled":false},{"title":"Open Labyrinth Zone Act 1","disabled":false},{"title":"Open Labyrinth Zone Act 2","disabled":false},{"title":"Open Labyrinth Zone Act 3","disabled":false},{"title":"Open Star Light Zone Act 1","disabled":false},{"title":"Open Star Light Zone Act 2","disabled":false},{"title":"Open Star Light Zone Act 3","disabled":false},{"title":"Open Scrap Brain Zone Act 1","disabled":false},{"title":"Open Scrap Brain Zone Act 2","disabled":false},{"title":"Open Scrap Brain Zone Act 3","disabled":false}]; aim {"x":578,"y":188,"hitOk":true,"dpr":1,"rect":{"x":464.5,"y":167,"w":226.66,"h":42}}; levelState {"status":"ready","zone":"ghz","act":1}; tabs ["Home","Green Hill Zone Act 1"]
+
+──── CFO F-1: a typo in the path box, Sonic 1 resident ────
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-banner-run1.png  (clip {"x":0,"y":0,"width":1400,"height":68,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-home-header-run1.png  (clip {"x":462,"y":146,"width":701,"height":31,"scale":1})
