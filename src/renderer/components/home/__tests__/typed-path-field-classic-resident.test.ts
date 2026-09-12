@@ -15,6 +15,11 @@
 //     before the bridge is even asked. With no aeon `config` underneath, Home
 //     flips to its no-project page for the length of the open, and stays there
 //     after a failure (the store ends CLOSED with its error).
+//     SINCE CLASSIC-FAILED-OPEN-CLOSES-PROJECT (2026-09-12) that is true only
+//     of a COLD open: a resident classic project stays open through an open
+//     and after a failure, so Home no longer flips for it. The rows below that
+//     asserted the flip as a premise now assert its absence, and the flip that
+//     remains (a cold open that succeeds) has a row of its own.
 //   * An aeon open never clears `config` (setLoading / setError leave it), so an
 //     aeon resident never flips.
 //   * React keeps a component's state only while the same type sits at the same
@@ -254,19 +259,19 @@ describe('CLASSIC-PATH-FIELD-RESIDENT · Home keeps the typed path across its pa
     __setClassicBridgeForTest(b);
     pressEnter(s);
     await tick();
-    // The cause, measured: the classic store has left 'open' and Home has moved
-    // the field to its other position, so React mounted a second instance.
-    expect(useClassicProjectStore.getState().status, 'premise: the open is in flight').toBe('opening');
+    // These premises used to measure the flip ('opening', a second field). The
+    // resident project now stays open mid-open, so they pin its absence.
+    expect(useClassicProjectStore.getState().status, 'premise: the resident project stays open mid-open').toBe('open');
     expect(b.calls, 'premise: the bridge was asked for the typed path').toEqual([TYPO]);
-    expect(label(s), 'premise: Home flipped to its other page').not.toBe(before);
-    expect(mounted(s), 'premise: the flip mounted a second field').toBe(2);
+    expect(label(s), 'premise: Home stays on the project page').toBe(before);
+    expect(mounted(s), 'premise: one field throughout').toBe(1);
     b.release();
     await settleOpens(s);
     expect(useClassicProjectStore.getState().error, 'premise: the open failed').toMatch(/is not a recognized project/);
     expect(value(s), 'the typo survives the failed open').toBe(TYPO);
   });
 
-  it('REPRODUCTION: while the open is in flight, the field on the page Home flipped to still shows what was submitted', async () => {
+  it('REPRODUCTION: while a classic switch is in flight, the field still shows what was submitted', async () => {
     await openClassicResident(RESIDENT);
     const s = screen();
     type(s, OTHER);
@@ -274,7 +279,7 @@ describe('CLASSIC-PATH-FIELD-RESIDENT · Home keeps the typed path across its pa
     __setClassicBridgeForTest(b);
     pressEnter(s);
     await tick();
-    expect(mounted(s), 'premise: the flip mounted a second field').toBe(2);
+    expect(mounted(s), 'premise: one field throughout (Home no longer flips for a classic resident)').toBe(1);
     expect(value(s), 'the submitted text is still in the field mid-open').toBe(OTHER);
     b.release();
     await settleOpens(s);
@@ -288,13 +293,33 @@ describe('CLASSIC-PATH-FIELD-RESIDENT · Home keeps the typed path across its pa
     __setClassicBridgeForTest(b);
     pressEnter(s);
     await tick();
-    expect(mounted(s), 'premise: the flip mounted a second field').toBe(2);
-    // The person types into the field they can see, on the page Home flipped to.
+    expect(mounted(s), 'premise: one field throughout (Home no longer flips for a classic resident)').toBe(1);
     type(s, NEXT);
     b.release();
     await settleOpens(s);
     expect(useClassicProjectStore.getState().dir, 'premise: the switch succeeded').toBe(OTHER);
-    expect(mounted(s), 'premise: Home flipped back and mounted a third field').toBe(3);
+    expect(mounted(s), 'premise: still one field after the switch').toBe(1);
+    expect(value(s), 'what was typed during the open is kept').toBe(NEXT);
+  });
+
+  it('the cold open flip: text typed WHILE the open is in flight survives its success', async () => {
+    // The flip that remains: with nothing open, Home sits on its no-project page
+    // for the whole open and moves to the project page when it succeeds, so
+    // React mounts a fresh field there. This is the row that still needs the
+    // typed path held by HomeTab rather than by either field.
+    const s = screen();
+    type(s, OTHER);
+    const b = gatedBridge(OPENED);
+    __setClassicBridgeForTest(b);
+    pressEnter(s);
+    await tick();
+    expect(useClassicProjectStore.getState().status, 'premise: the open is in flight').toBe('opening');
+    expect(mounted(s), 'premise: still the no-project page, one field so far').toBe(1);
+    type(s, NEXT);
+    b.release();
+    await settleOpens(s);
+    expect(useClassicProjectStore.getState().dir, 'premise: the open succeeded').toBe(OTHER);
+    expect(mounted(s), 'premise: Home flipped to the project page and mounted a second field').toBe(2);
     expect(value(s), 'what was typed during the open is kept').toBe(NEXT);
   });
 

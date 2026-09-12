@@ -215,8 +215,10 @@ export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
   // NO NEW DISCARD ROAD, which is the question a reader of this file will ask.
   // That close resets `classicLevelStore` and so zeroes `classicDirty`. It is
   // reachable from two places and neither is new: the user road, where
-  // `openDirectory` had already reset the same store before `openAeonProject`
-  // was called at all, and the unguarded debug door, which discarded that work
+  // `confirmProjectOpen` has already asked (`openDirectory` used to reset the
+  // same store before `openAeonProject` was called at all; since 2026-09-12 it
+  // leaves a resident classic project alone and this close, run only after the
+  // aeon load succeeds, is the one that does it), and the unguarded debug door, which discarded that work
   // regardless. No production caller reaches it with unsaved classic edits that
   // `confirmProjectOpen` has not already asked about.
   //
@@ -490,9 +492,12 @@ export async function confirmProjectOpen(): Promise<boolean> {
     // NEXT open sees phantom dirtiness 'Save & open' can never clear (re-runs the
     // no-op savers forever; the re-snapshot keeps aborting).
     //
-    // classicDirty needs no explicit clear here: classicProjectStore.openDirectory
-    // calls useClassicLevelStore.getState().reset() as soon as the switch begins
-    // (Task 7), which zeroes every dirty domain.
+    // classicDirty is not cleared here: classicProjectStore.openDirectory resets
+    // the classic level store when a switch COMMITS (and openAeonProject when an
+    // aeon load does), which zeroes every dirty domain. It used to reset as soon
+    // as the switch began. Since CLASSIC-FAILED-OPEN-CLOSES-PROJECT an open that
+    // FAILS leaves the classic project open, and with it these edits, still
+    // marked dirty.
     useEditorStore.getState().markClean();
     // endDocumentSession drops every sprite and canvas document + its history +
     // unsaved flag, which also closes the cross-project hazard: the surviving

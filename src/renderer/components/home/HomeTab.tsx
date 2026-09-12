@@ -87,6 +87,10 @@ export default function HomeTab({ onOpenProject, onOpenRecent, onOpenPath }: Hom
   // the one where the person needs it back to fix a typo. Held here it
   // survives the flip: HomeTab is kept alive (App.tsx, display:none) and this
   // hook runs above the branch, so both positions read and write one value.
+  // Since CLASSIC-FAILED-OPEN-CLOSES-PROJECT a resident classic project stays
+  // open through an open, so that mid-open flip is gone. A cold open still
+  // flips when it succeeds, and text typed while it loads survives that flip
+  // only because it is held here.
   // WHEN it changes is unchanged and is typed-path-open.ts's rule.
   const [typedPath, setTypedPath] = useState('');
   // Current project's identity, for excluding it from the with-project recents

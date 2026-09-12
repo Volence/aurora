@@ -96,16 +96,33 @@ const CLOSED = {
   sidecar: null,
 };
 
-export const useClassicProjectStore = create<ClassicProjectState>((set) => ({
+export const useClassicProjectStore = create<ClassicProjectState>((set, get) => ({
   ...CLOSED,
 
   openDirectory: async (dir: string): Promise<OpenOutcome> => {
-    set({ ...CLOSED, status: 'opening', dir });
-    // A project switch invalidates the loaded classic doc NOW — previously the
-    // reset lived in ClassicProjectView's handle-identity effect, leaving a
-    // window where a stale doc (with a dead handle) was still live if the view
-    // was unmounted mid-switch (e.g. switching away from sprite mode).
-    useClassicLevelStore.getState().reset();
+    // A FAILED OPEN LEAVES A RESIDENT PROJECT OPEN (CLASSIC-FAILED-OPEN-CLOSES-
+    // PROJECT), which is what the aeon loader has always done: its setLoading /
+    // setError leave `config` and `project` in place. This used to begin with
+    // `set({ ...CLOSED, status: 'opening', dir })` whatever was open, so a typo
+    // in Home's path box closed the Sonic 1 project before the bridge was even
+    // asked, flipped the session key (resetProjectRuntime), and, with an aeon
+    // project left underneath from earlier, surfaced THAT one instead.
+    //
+    // So nothing resident is touched until the outcome is known. Only a cold
+    // open (nothing classic resident) passes through 'opening'.
+    const resident = get().status === 'open';
+    if (resident) {
+      set({ error: null });
+    } else {
+      set({ ...CLOSED, status: 'opening', dir });
+      useClassicLevelStore.getState().reset();
+    }
+    // The failure answer for both kinds of start: a resident project keeps
+    // everything and gains the error; a cold open goes back to CLOSED with it.
+    const fail = (error: string): OpenOutcome => {
+      set(resident ? { error } : { ...CLOSED, error });
+      return 'error';
+    };
     try {
       const res = await bridge.open(dir);
       if (res.kind === 'opened') {
@@ -147,6 +164,12 @@ export const useClassicProjectStore = create<ClassicProjectState>((set) => ({
             } catch { /* planner defaults cover it; the setup tab shows the sidecar state */ }
           }
         }
+        // The switch commits HERE, so the previous project's loaded doc goes
+        // here: a surviving doc would hold a handle into the project being left.
+        // (It used to go at the top, which is also what made a failed open drop
+        // the act of a project that stayed.) Before the set, so no subscriber
+        // sees the new project over the old doc.
+        useClassicLevelStore.getState().reset();
         set({
           status: 'open',
           dir,
@@ -163,9 +186,12 @@ export const useClassicProjectStore = create<ClassicProjectState>((set) => ({
       }
       // Not a classic project.
       if (res.aeon) {
-        // A real aeon project — clear back to closed and let the untouched aeon
-        // loader take over (the shell wiring calls it on 'not-classic').
-        set({ ...CLOSED });
+        // A real aeon project: hand it to the aeon loader (the shell wiring
+        // calls it on 'not-classic'). A resident classic project is NOT closed
+        // here: the aeon load can still fail, and openAeonProject closes it
+        // itself once the aeon project is loaded (aeon-open.ts,
+        // closeResidentClassicProject). A cold open just leaves 'opening'.
+        if (!resident) set({ ...CLOSED });
         return 'not-classic';
       }
       // Neither classic nor aeon — surface a helpful notice about what each
@@ -176,11 +202,9 @@ export const useClassicProjectStore = create<ClassicProjectState>((set) => ({
         `• Sonic 1 disassembly expects: sonic.asm + artnem/ + map256/ + levels/\n` +
         `• Aeon project expects: project.json (engine "s4")` +
         (res.detail ? `\n${res.detail}` : '');
-      set({ ...CLOSED, error: msg });
-      return 'error';
+      return fail(msg);
     } catch (e) {
-      set({ ...CLOSED, error: e instanceof Error ? e.message : String(e) });
-      return 'error';
+      return fail(e instanceof Error ? e.message : String(e));
     }
   },
 

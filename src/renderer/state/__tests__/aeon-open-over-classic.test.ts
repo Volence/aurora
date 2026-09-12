@@ -25,9 +25,12 @@
 //    and completely invisible behind the classic facet set: exactly the report.
 //
 // §1 is that mechanism, on the two stores. §2 is the CENSUS VERDICT, executed:
-// no production road can produce the mask, because every road to an aeon project
-// runs `classicProjectStore.openDirectory` first and its 'not-classic' branch
-// closes the classic store on the way to that answer. §3 holds the fix, which is
+// no production road can produce the mask. That used to be because every road to
+// an aeon project runs `classicProjectStore.openDirectory` first and its
+// 'not-classic' branch closed the classic store on the way to that answer. Since
+// CLASSIC-FAILED-OPEN-CLOSES-PROJECT (2026-09-12) that branch closes nothing (an
+// aeon load that fails must leave the classic project open), so the user road
+// now rests on §3's close, run once the aeon load has succeeded. §3 holds the fix, which is
 // in the loader rather than in the debug door: the mask was being closed by an
 // accident of call order in a store the aeon loader cannot see, and a safety
 // property held by call order is the bet `shell/project-open-guard.ts` records
@@ -211,12 +214,16 @@ describe('F6 §2 · the census verdict, executed: no USER road can produce the m
     const outcome = await useClassicProjectStore.getState().openDirectory('/proj/aeon');
     expect(outcome).toBe('not-classic');
 
-    // THE UNMASKING, and the whole reason F6 is unreachable from the UI: the
-    // 'not-classic' branch does `set({ ...CLOSED })` before it returns, so
-    // classic precedence has nothing left to win with.
-    expect(useClassicProjectStore.getState().status).toBe('closed');
-    expect(openEngine(), 'classic closed, aeon not yet loaded: no project is open')
-      .toBeNull();
+    // THE CLASSIC PROJECT IS STILL OPEN HERE. The 'not-classic' branch used to
+    // `set({ ...CLOSED })` before returning, and that was the whole reason F6
+    // was unreachable from the UI. Since CLASSIC-FAILED-OPEN-CLOSES-PROJECT it
+    // closes nothing, because the aeon load can still fail and a failed open
+    // must leave the classic project open. The unmasking is now the loader's
+    // own close (§3), after the load succeeds, and the last line below is what
+    // proves the user road still ends visible.
+    expect(useClassicProjectStore.getState().status).toBe('open');
+    expect(openEngine(), 'the classic project stays open until the aeon one is loaded')
+      .toBe('s1');
 
     expect(await openAeonProject('/proj/aeon')).toBe(true);
     expect(openEngine(), 'the user road ends with the aeon project VISIBLE').toBe('aeon');
