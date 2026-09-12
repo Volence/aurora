@@ -270,7 +270,33 @@ which only the owner has (section 10).
 
 ## 8. Suite and typecheck
 
-PENDING-SUITE
+Run on the final tree, with src at the fix plus the recorder change (`1bd40ec7`) and the packet
+committed (`83d0abc6`):
+
+- **vitest: 613 test files passed, 3 skipped (616); 9423 tests passed, 9 skipped (9432); 0
+  failed.** Duration 18.16s, started at uptime 159782s (load 2.18). `failure-class: no failures in
+  this run (616 module(s) reported)`. `skip-report: OK. Every skip named its reason`: all 9 are
+  pre-existing rows gated on an environment variable (for example `AURORA_FG_GATE_FILE`), none of
+  them this parcel's. This parcel's own file, `src/renderer/canvas/__tests__/dpr-chrome.test.ts`,
+  is 175 of those, all green.
+- **`tsc --noEmit`: rc 0**, inside the same chain, before vitest.
+- **Every `check:*` gate: OK.** `check-test-collection` (616 of 616 collected), `check-pseudo-skip`,
+  `check-peer-path-literals`, `check-doc-citations` (this packet's cited paths are tracked),
+  `check-object-stringify`, the four dash gates, `check-guide-text`, `check-prose-constants`,
+  `check-ledger-timestamps`, `check-python-resolver`, and `check-harness-guards` (277 clean of 277
+  classified, the new harness included).
+- **`check-cited-paths`: OK, rc 0, measured separately.** `npm test` as one command cannot pass it
+  in this worktree. The chain stops there with COULD NOT MEASURE, because the worktree's
+  `node_modules` is a symlink to the main checkout and `git check-ignore` refuses paths beyond a
+  symlink, so the gate's own exit-0 self-test comes back empty. That is exactly what
+  `docs/reviews/2026-09-10-cdp-sweep.md` records, and it is an artifact of the worktree, not of
+  these files. So the gate was run on its own with the symlink removed: all four arms of its ignore
+  query proven, and every in-repo path named in a comment on disk. The rest of the chain ran in
+  `package.json`'s own order with the symlink in place.
+- **The first full attempt was red, and it was this parcel's.** At uptime 159703s vitest read 1
+  failed / 9422 passed / 9 skipped: `test/renderer/no-raw-hex.test.ts`, 2 raw hex literals in
+  src/renderer against a ceiling of 0. They were the recorder's `'#000'` placeholder styles, since
+  the guardrail counts `__tests__` too. That was fixed in `1bd40ec7`; the guardrail reads 0.
 
 ## 9. Findings outside this parcel's change (TAGGED)
 
@@ -321,4 +347,16 @@ PENDING-SUITE
 
 ## 12. Commits
 
-PENDING-COMMITS
+On `parcel/dpr-guides-offset`, oldest first. The tip is the commit that fills this section, so
+it cannot name itself; the final report names it.
+
+| Commit | What |
+|---|---|
+| `fe5193d6` | instruments: the harness, the recording 2D context, master's dpr-1 golden (before any src change) |
+| `e330784b` | harness: the probe undoes its own commit, park clears hover, the composite row prints its runs |
+| `5a09df4a` | harness: the composite row moves the camera off 0; identity pinned to the parallax sub-tab |
+| `be428ed4` | **the fix**: five chrome draws in the CSS frame, snapped to the device grid; 175 node rows |
+| `d8675a46` | harness: diff scans ignore the canvas's last, partly covered device column and row |
+| `96c3a542` | harness: the two fixed states captured in every phase (look at 1.35, identity at 1) |
+| `1bd40ec7` | recorder: no colour literal (the `no-raw-hex` guardrail counts `__tests__` too) |
+| `83d0abc6` | this packet and its 53 captures |
