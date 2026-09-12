@@ -77,9 +77,16 @@ import {
   EFFECTS_PRESET_MAX_PATCH, ANCHOR_PHASE_RANGE,
   // THE NARROWING QUESTION, ASKED ONCE. `bands` left the schema's top-level
   // `required` when `ramp` arrived and the root became a `oneOf`, so a preset
-  // carries EXACTLY ONE raster program. This is the codec's helper for asking
-  // which; testing `bands` for undefined here would be a second spelling of a
-  // rule that lives in the contract.
+  // holds EXACTLY ONE program — the app's own sentence, `bandControlsRefusal`
+  // in providers/effects-preset.ts. It said "exactly one RASTER program" until
+  // empyrean `c4a1da2` put `boundary` in the oneOf (aurora 46bfbb58): a
+  // boundary is an arm of that same one-of and is NOT a raster program at all,
+  // it installs into the patched channel, so "raster" narrowed the rule to
+  // three of its four arms. That is why TWO helpers are imported here and they
+  // are not interchangeable: `presetProgramArm` answers what the document
+  // CARRIES (every arm), `presetRasterChannel` answers which key writes
+  // `ep_raster` (never `boundary`). Testing `bands` for undefined here would be
+  // a second spelling of a rule that lives in the contract.
   presetRasterChannel, presetProgramArm, presetFp16ToNumber,
   EFFECTS_PRESET_BOUNDARY_KEYS, EFFECTS_PRESET_TINT_REGION_KEYS,
 } from '../../../core/formats/effects/preset';
