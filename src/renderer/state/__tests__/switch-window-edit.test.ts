@@ -302,6 +302,8 @@ interface SwitchPlan {
   /** 'discard': edit first, and answer the guard's dialog Discard & open.
    *  'no-dialog': edit first, on a door that asks nothing. */
   dirtyBefore?: 'discard' | 'no-dialog';
+  /** Runs after `dirtyBefore`'s edit and before the door starts. */
+  beforeDoor?: () => void;
   /** Runs while the dialog is up, before its answer. */
   duringDialog?: () => void | Promise<void>;
   /** What happens inside the window. Absent: an edit on the resident project.
@@ -323,6 +325,7 @@ async function runSwitch(plan: SwitchPlan): Promise<SwitchRun> {
   resetAll();
   const undoId = await openResident(plan.engine, plan.residentDir());
   if (plan.dirtyBefore) editResident(plan.engine);
+  plan.beforeDoor?.();
   const target = plan.target();
   asked.clear();
   const release = hold(target);
@@ -788,21 +791,32 @@ describe('SWITCH-WINDOW-EDIT-DROPPED · an edit made while a project switch load
   // ends clean", kept as a CONTROL: it is green with or without (c3).
 
   describe('(c3) a committed aeon open never carries the previous project\'s dirty state', () => {
-    let before = { dirty: false, acts: 0 };
+    let before = { dirty: false, acts: 0, hardActs: 0 };
     scenario('aeon to aeon through the debug door, over a project dirtied before the call', true,
       {
         engine: 'aeon', residentDir: AEON_COPY, target: AEON_TARGET, door: DEBUG_AEON_OPEN,
+        // The palette edit is a command, which is `markDirty({ undoable: true })`
+        // and never sets a hard-dirty mark. So the project also takes the other
+        // kind: a bare `markDirty()`, which is what the writes that record no undo
+        // step call (MapViewport's gesture-time BG tile writes, the chunk-library
+        // import, the marquee paste). Without it the hard-dirty row below could
+        // not fail.
         dirtyBefore: 'no-dialog',
+        beforeDoor: () => { useEditorStore.getState().markDirty(); },
         inWindow: () => {
           const e = useEditorStore.getState();
-          before = { dirty: e.dirty, acts: Object.keys(e.dirtyActs).length };
+          before = {
+            dirty: e.dirty, acts: Object.keys(e.dirtyActs).length,
+            hardActs: Object.keys(e.hardDirtyActs).length,
+          };
         },
       },
       (run) => {
-        it('premise: the project being left was dirty, and the switch committed', () => {
+        it('premise: the project being left was dirty, both kinds, and the switch committed', () => {
           const r = run();
           expect(before.dirty).toBe(true);
           expect(before.acts).toBeGreaterThan(0);
+          expect(before.hardActs).toBeGreaterThan(0);
           expect(r.after.aeonBase).toBe(AEON_TARGET());
         });
         it('the new project is not marked dirty', () => {
