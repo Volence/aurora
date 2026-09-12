@@ -52,8 +52,12 @@
 //     project's status right after the stamp: it must still be 'open' (for the
 //     aeon road, no aeon project yet), so the edit is known to have landed
 //     inside the window, not after a commit.
-//   * AN EDIT THAT CHANGED NOTHING. The stamp report must say `docChanged`, and
-//     the document hash must differ from before the stamp.
+//   * AN EDIT THAT CHANGED NOTHING. The stamp report must say `docChanged`
+//     (its `cellAfter` is read from the doc). After each cancelled open the
+//     cell is read back by the NEXT stamp, which reads it (`from`) before it
+//     writes: no hook reads a layout cell, and `docHash` does not hash the
+//     layout planes (run 2 found that: it did not move when the stamp did). So
+//     that read writes, and it is only ever taken after the row's evidence.
 //   * A CONTROL THAT CANNOT FAIL. The controls are the same opens with the
 //     stamp taken out: they must COMMIT (the new project on Home), so a
 //     harness that "sees a banner" for any open would fail them.
@@ -353,6 +357,7 @@ async function rows(c, O, { S1a, S1b, AEONc }) {
     await pressHome();
     return c.json(String.raw`(() => { const header = ${HEADER_EL};
       return { chip: header ? header.children[0].textContent.trim() : null,
+        name: header && header.children[1] ? header.children[1].textContent.trim() : null,
         dir: header && header.children[2] ? header.children[2].textContent.trim() : null }; })()`);
   };
   const BANNER_BTN = String.raw`([...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Dismiss'
@@ -415,13 +420,19 @@ async function rows(c, O, { S1a, S1b, AEONc }) {
    *  async IIFE, and `c.json` stringified the PENDING promise instead of awaiting it. */
   const openWithEdit = async (openCall) => {
     const { pre, out } = await openAndWait(String.raw`
-      const hashBefore = window.__dbg.classic.docHash();
       const p = ${openCall};
       const stamp = window.__dbg.classic.stampLayoutCell('fg');
-      const pre = { hashBefore, stamp, hashAfterStamp: window.__dbg.classic.docHash(),
-        inWindow: { classic: window.__dbg.projStatus().status, aeonOpen: window.__dbg.aeon.state().open } };`);
-    return { ...pre, out, hashAfterOpen: await c.evalExpr('window.__dbg.classic.docHash()') };
+      const pre = { stamp, inWindow: { classic: window.__dbg.projStatus().status, aeonOpen: window.__dbg.aeon.state().open } };`);
+    return { ...pre, out };
   };
+  /** THE STAMPED CELL, READ BACK. ⚠ RUN 2: `__dbg.classic.docHash()` hashes tiles, objects and
+   *  palettes, NOT the layout planes, so it stayed put while the stamp changed an fg cell; and no
+   *  hook reads a layout cell. The read used instead is the next stamp's own: `stampLayoutCell`
+   *  reads the cell (`from`, via chooseLayoutStamp over the doc) BEFORE it writes. So this reads by
+   *  writing, and it is only ever called after a row's other evidence is taken. */
+  const readCellByStamp = () => c.json("window.__dbg.classic.stampLayoutCell('fg')");
+  const sameCell = (a, b) => !!(a && b && a.ok && b.ok && a.plane === b.plane && a.x === b.x && a.y === b.y);
+  const stampOk = (r) => !!(r.stamp && r.stamp.ok && r.stamp.docChanged);
 
   // ── SW.0: setup ─────────────────────────────────────────────────────────
   console.log('\n──── setup: S1a open, a level tab loaded by a real click ────');
@@ -448,7 +459,6 @@ async function rows(c, O, { S1a, S1b, AEONc }) {
   const pa = await bannerPaint(); const ha = await home(); const la = await lvl();
   const da = await c.json(PAINTED(DOT_ON(TAB_TITLE)));
   await shot('sw-a-cancelled');
-  const stampOk = (r) => !!(r.stamp && r.stamp.ok && r.stamp.docChanged && r.hashAfterStamp !== r.hashBefore);
   check('SW.a.0', 'SW.a premise: the stamp changed the document INSIDE the window (the classic project still open, no aeon project, in the same evaluate)',
     stampOk(ra) && ra.inWindow.classic === 'open', `result ${J(ra)}`);
   check('SW.a.1', 'SW.a: no banner before the open; the open reports error; the banner is PAINTED and reads edit-consent.ts\'s own level sentence, exactly',
@@ -456,9 +466,10 @@ async function rows(c, O, { S1a, S1b, AEONc }) {
     `banner before ${ba}; open returned ${J(ra.out)}; paint ${J(pa)}; want ${J(O.level)}`);
   check('SW.a.2', 'SW.a: S1a is still the open project (Home\'s header names S1a, not S1b), with its act loaded',
     ha.chip === 'S1' && ha.dir === S1a && actReady(la), `home ${J(ha)}; levelState ${J(la)}`);
-  check('SW.a.3', 'SW.a: the stamped cell is still in the document (its hash is the one right after the stamp)',
-    ra.hashAfterOpen === ra.hashAfterStamp && ra.hashAfterOpen !== ra.hashBefore,
-    `before ${ra.hashBefore}; after stamp ${ra.hashAfterStamp}; after the cancelled open ${ra.hashAfterOpen}`);
+  const ka = await readCellByStamp();
+  check('SW.a.3', 'SW.a: the stamped cell is still in the document after the cancelled open (the next stamp read the same cell and found the value this one wrote)',
+    sameCell(ra.stamp, ka) && ka.from === ra.stamp.to,
+    `stamp in the window ${J(ra.stamp)}; read back by the next stamp ${J(ka)}`);
   check('SW.a.4', 'SW.a: the level tab still shows its unsaved dot, painted', onScreen(da), `dot ${J(da)}`);
 
   // ── SW.b: classic to aeon, an edit inside the window ───────────────────
@@ -478,9 +489,10 @@ async function rows(c, O, { S1a, S1b, AEONc }) {
     onScreen(pb) && pb.text === O.level, `paint ${J(pb)}; want ${J(O.level)}`);
   check('SW.b.3', 'SW.b: S1a is still the open project with its act loaded, and no aeon project was committed',
     hb.chip === 'S1' && hb.dir === S1a && actReady(lb) && ab.open === false, `home ${J(hb)}; levelState ${J(lb)}; aeon ${J(ab)}`);
-  check('SW.b.4', 'SW.b: the stamped cell is still in the document, and the unsaved dot is still painted',
-    rb.hashAfterOpen === rb.hashAfterStamp && rb.hashAfterOpen !== rb.hashBefore && onScreen(db),
-    `before ${rb.hashBefore}; after stamp ${rb.hashAfterStamp}; after ${rb.hashAfterOpen}; dot ${J(db)}`);
+  const kb = await readCellByStamp();
+  check('SW.b.4', 'SW.b: the stamped cell is still in the document (read back by the next stamp), and the unsaved dot is still painted',
+    sameCell(rb.stamp, kb) && kb.from === rb.stamp.to && onScreen(db),
+    `stamp in the window ${J(rb.stamp)}; read back by the next stamp ${J(kb)}; dot ${J(db)}`);
 
   // ── SW.c1: CONTROL, classic to classic with no edit ─────────────────────
   console.log('\n──── SW.c1: CONTROL, classic to classic, no edit ────');
@@ -500,8 +512,13 @@ async function rows(c, O, { S1a, S1b, AEONc }) {
   await sleep(1500);
   const hc2 = await home(); const pc2 = await c.json(PAINTED(BANNER_TEXT)); const ac2 = await aeonSt(); const prc2 = await proj();
   await shot('sw-c2-committed');
-  check('SW.c2', 'CONTROL: with no edit, the same aeon open COMMITS: banner absent before and after, the classic project closed, Home names the aeon copy',
-    !bc2 && oc2 === true && ac2.open === true && prc2.status === 'closed' && hc2.chip === 'AEON' && hc2.dir === AEONc && pc2.found === false,
+  // Home shows NO directory for an aeon project (HomeTab.tsx renders `{dir && ...}` from the classic
+  // store only; run 2 read `dir: null`), so what it offers to name the copy is the project's name,
+  // read here from the copy's own project.json.
+  const aeonName = JSON.parse(readFileSync(`${AEONc}/project.json`, 'utf8')).name;
+  if (hc2.dir === null) console.log(`NOTE  [SW.c2] Home shows no directory for an aeon project; it names ${J(hc2.name)}`);
+  check('SW.c2', 'CONTROL: with no edit, the same aeon open COMMITS: banner absent before and after, the classic project closed, Home is the AEON page naming the copy\'s project',
+    !bc2 && oc2 === true && ac2.open === true && prc2.status === 'closed' && hc2.chip === 'AEON' && hc2.name === aeonName && pc2.found === false,
     `banner before ${bc2}; open ${J(oc2)}; aeon ${J(ac2)}; projStatus ${J(prc2)}; home ${J(hc2)}; banner after ${J(pc2)}`);
 }
 
