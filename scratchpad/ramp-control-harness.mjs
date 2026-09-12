@@ -88,7 +88,7 @@ import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs
 import {
   AIM_MISSED, AIM_ONE_FN, aimOne, clickOneByText, showSubTabOrThrow, openSectionOrThrow,
 } from './lib/strict-aim.mjs';
-import { programArms } from './lib/effects-control-aims.mjs';
+import { programArms, bandRefusalNeedles } from './lib/effects-control-aims.mjs';
 
 const PORT = Number(process.env.PORT ?? 9487);
 const ROOT = AURORA_DIR;
@@ -256,6 +256,30 @@ const NS_PREMISE_OPEN = NS_PREMISE.length > 0;
 //
 // The prefix is the fix: an id no other repo would author. Do not shorten it.
 const PRESET_ID = 'aurora_local_rampctl_probe';
+
+// ═══ THE [dc] SENTENCE IS READ OUT OF THE FUNCTION THAT COMPOSES IT ═══
+//
+// RAMP-RIG-DCB-NEEDLE, 2026-09-12. [dc-b] asked for four hand-typed fragments
+// and one of them, `EXACTLY ONE raster program`, had been dead since 2026-09-04:
+// `46bfbb58` dropped the word `raster` ON PURPOSE when `boundary` joined the
+// `oneOf` — it lowers into `ep_patched`, so the exclusivity rule is about
+// PROGRAMS and not about raster programs. The row then demanded a phrase
+// nothing on earth produces, went red on a repo where nothing was wrong, and
+// measured only the three fragments that happened to survive.
+//
+// Retyping the new sentence here would book the same repair for the next
+// rewording, so the needles come out of `bandControlsRefusal` itself
+// (`lib/effects-control-aims.mjs`, read from the BUILT tree this run drives).
+// ⚠ AND THE NEEDLES ARE THIS RULE'S ALONE: both runs below are unique in the
+// whole tree to that one composition site —
+//   `grep -rn 'cannot write here at' src/ test/ scratchpad/`      → 1 hit
+//   `grep -rn 'back to bands to author bands' src/ test/ scratchpad/` → 1 hit
+// which is the check this repo pays for when it is skipped: a row once matched
+// `/has only \d+ tiles/` and spent its whole life catching an unrelated
+// refusal. `bandRefusalNeedles` is pinned against the real function by
+// `test/harness-effects-control-aims.test.ts`, so a reader that stopped
+// matching what the app composes goes red in `npm test` and not only here.
+const DC_REFUSAL = bandRefusalNeedles(RUN.root, 'ramp', PRESET_ID);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
@@ -729,26 +753,39 @@ async function main() {
     // ══════════════════════════════════════════════════════════════════════
     console.log('\n=== [dc] the band controls on a ramp document ===');
     const addPost = await readHandle(c, 'addBand');
-    const sentence = await c.json(`window.__rp.paintedRect('carries a ramp, not bands', `
-      + `['carries a ramp, not bands', 'EXACTLY ONE raster program', 'no combinator', `
-      + `'one undo step'])`);
+    // ⚠ SEARCH KEY AND NEEDLES BOTH DERIVED (see DC_REFUSAL). The key is the
+    // sentence's first clause — short, single-line, and a prefix of needle 0 —
+    // because `paintedRect` finds its element by RAW innerText and asserts on
+    // the whitespace-normalised text; a multi-line key could miss an element
+    // whose sentence is fully on screen.
+    note('[dc] the sentence this run requires, read from bandControlsRefusal',
+      `${DC_REFUSAL.where}\n        search key: ${JSON.stringify(DC_REFUSAL.search)}`
+      + `\n        needles: ${JSON.stringify(DC_REFUSAL.needles)}`);
+    const sentence = await c.json(`window.__rp.paintedRect(${JSON.stringify(DC_REFUSAL.search)}, `
+      + `${JSON.stringify(DC_REFUSAL.needles)})`);
     await shot(c, 'dc-dead-chip');
     check('dc-a', 'the `Add raster band` chip is DISABLED on a ramp document',
       !!addPost && addPost.disabled === true,
       `chip = ${JSON.stringify(addPost)}`);
     check('dc-b', '⚠ AND IT CARRIES A SENTENCE, WHICH IS THE ROW THAT MATTERS — the refusal is '
       + 'PAINTED in a real element whose rect lands inside its own scroller (not merely present in '
-      + 'the DOM, and not hover-only), and it SAYS THE THING: which document, the exactly-one-'
-      + 'raster-program rule, and the way out. A row that asserted only the disabled flag would pass '
-      + 'for a control that had greyed out for an unrelated reason — this repo has been bitten by '
-      + 'that three times',
+      + 'the DOM, and not hover-only), and it SAYS THE THING: which preset, which program, the '
+      + 'exactly-one-PROGRAM rule and its no-combinator reason, that the band controls cannot write '
+      + 'here at all, and the way out. A row that asserted only the disabled flag would pass for a '
+      + 'control that had greyed out for an unrelated reason — this repo has been bitten by that '
+      + 'three times. ⚠ NOT ONE WORD OF THE EXPECTATION IS TYPED HERE: every needle is composed '
+      + `from ${DC_REFUSAL.where}, which is why the row survives the next rewording instead of `
+      + 'demanding the last one',
       !!sentence && sentence.inScroller === true && sentence.w > 0 && sentence.h > 0
       && sentence.allPresent === true,
       `painted refusal = ${JSON.stringify(sentence)}`);
-    check('dc-c', 'the same sentence is on the chip\'s own title, so a pointer finds it too',
+    check('dc-c', 'the same sentence is on the chip\'s own title, so a pointer finds it too — and '
+      + 'the title is asked for the WHOLE derived sentence, not a fragment of it, so a title '
+      + 'composed from a different (or truncated) source shows up here',
       !!addPost && typeof addPost.title === 'string'
-      && addPost.title.includes('carries a ramp, not bands'),
-      `chip title = ${JSON.stringify(addPost && addPost.title)}`);
+      && DC_REFUSAL.needles.every((n) => addPost.title.includes(n)),
+      `chip title = ${JSON.stringify(addPost && addPost.title)}\n        needles = `
+      + `${JSON.stringify(DC_REFUSAL.needles)}`);
     note('[dc] NO "I CLICKED THE DISABLED CHIP" ROW IS SHIPPED, and that is deliberate',
       'A disabled <button> fires no onClick, so "I pressed it and the document did not move" is '
       + 'green however the code behaves — the green-by-construction shape the nine-parcel refused '
