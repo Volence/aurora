@@ -645,13 +645,29 @@ async function classicPart(d, O, { A, X, S1a, S1b }) {
     await c.send('Input.insertText', { text: path });
     await sleep(200);
     const typed = await c.evalExpr(`(${PATH_INPUT}).value`);
+    // THE MID-OPEN TRACE. ⚠ Run 2 read "the act is still loaded" AFTER a
+    // successful switch too: the shell reopened the same tab id in the new
+    // project. So "still loaded" after a FAILED open means something only if the
+    // act never left 'ready' while the open ran. An in-page 4 ms sampler records
+    // every change of (project status, act status, zone, act) from before Enter
+    // to after the outcome; a successful switch is its control (it must show a
+    // drop, or the sampler cannot see one).
+    await c.evalExpr(String.raw`(() => { clearInterval(window.__sweepTraceTimer); window.__sweepTrace = []; let last = null;
+      const tick = () => { const p = window.__dbg.projStatus(); const l = window.__dbg.levelState();
+        const k = p.status + '|' + l.status + '|' + l.zone + '|' + l.act;
+        if (k !== last) { last = k; window.__sweepTrace.push({ p: p.status, l: l.status, z: l.zone, a: l.act, t: Math.round(performance.now()) }); } };
+      tick(); window.__sweepTraceTimer = setInterval(tick, 4); return true; })()`);
     await d.namedKey('Enter', 13, '\r');
     const t = Date.now(); let settled = false;
     while (Date.now() - t < maxMs) { if (await done().catch(() => false)) { settled = true; break; } await sleep(250); }
     const waitedMs = Date.now() - t;
     await sleep(1000);
-    return { homeTab, field, cleared, typedOk: typed === path, settled, waitedMs };
+    const trace = await c.json('(() => { clearInterval(window.__sweepTraceTimer); return window.__sweepTrace || []; })()');
+    return { homeTab, field, cleared, typedOk: typed === path, settled, waitedMs, trace };
   };
+  /** The project stayed open and the act stayed loaded for the whole open. */
+  const steady = (tr) => Array.isArray(tr) && tr.length > 0 && tr.every((x) => x.p === 'open' && x.l === 'ready' && x.z === 'ghz' && String(x.a) === '1');
+  const traceStr = (tr) => (tr || []).map((x) => `${x.p}/${x.l}/${x.z}${x.a}@${x.t}`).join(' > ');
   const LEVEL_CARDS = String.raw`(() => { const w = ${FIELD_WRAP}; const col = w ? w.parentElement : null; if (!col) return [];
     return [...col.querySelectorAll('button')].filter((b) => /^Open /.test(b.title || '')).map((b) => ({ title: b.title, disabled: b.disabled })); })()`;
   const GHZ1_CARD = String.raw`(() => { const w = ${FIELD_WRAP}; const col = w ? w.parentElement : null; if (!col) return null;
@@ -718,8 +734,9 @@ async function classicPart(d, O, { A, X, S1a, S1b }) {
     f1Home.chip === 'S1' && f1Home.name === S1_LABEL && f1Home.dir === S1a && f1Home.fieldLabel === O.homeLabels.switch && f1Proj.status === 'open',
     `home ${J(f1Home)}; projStatus ${J(f1Proj)}`);
   check('CFO.F1.c', 'F-1: the field KEEPS the typo', f1Home.field === TYPO, `field ${J(f1Home.field)}; typed ok ${f1.typedOk}`);
-  check('CFO.F1.d', 'F-1: the level tab is still there and its act is still loaded',
-    f1Tabs.includes(TAB_TITLE) && actReady(f1Lvl), `tabs ${J(f1Tabs)}; levelState ${J(f1Lvl)}`);
+  check('CFO.F1.d', 'F-1: the level tab is still there and its act is still loaded, and it NEVER left loaded while the open ran (the project never left open either: the mid-open trace)',
+    f1Tabs.includes(TAB_TITLE) && actReady(f1Lvl) && steady(f1.trace),
+    `tabs ${J(f1Tabs)}; levelState ${J(f1Lvl)}; trace ${traceStr(f1.trace)}`);
 
   // ── F-3: an aeon checkout that fails to load, S1 resident ────────────────
   console.log('\n──── CFO F-3: the path of an aeon checkout whose project.json fails to load ────');
@@ -736,21 +753,42 @@ async function classicPart(d, O, { A, X, S1a, S1b }) {
     onScreen(f3Banner) && f3Text === O.zoneNoId && !String(f3Text).includes(O.notRecognized),
     `dpr ${await d.dpr()}; loader reason printed by the app: ${J(f3Text)}; paint ${J(f3Banner)}; typed ${f3.typedOk}; captures ${J(f3Caps)}`);
   check('CFO.F3.b', 'F-3: Sonic 1 STAYS open (Home names S1a, classic open, the level tab and its act survive) and no aeon project was loaded',
-    f3Home.chip === 'S1' && f3Home.dir === S1a && f3Proj.status === 'open' && f3Tabs.includes(TAB_TITLE) && actReady(f3Lvl) && f3Aeon.open === false,
-    `home ${J(f3Home)}; projStatus ${J(f3Proj)}; levelState ${J(f3Lvl)}; tabs ${J(f3Tabs)}; aeon ${J(f3Aeon)}`);
+    f3Home.chip === 'S1' && f3Home.dir === S1a && f3Proj.status === 'open' && f3Tabs.includes(TAB_TITLE) && actReady(f3Lvl) && f3Aeon.open === false
+      && steady(f3.trace),
+    `home ${J(f3Home)}; projStatus ${J(f3Proj)}; levelState ${J(f3Lvl)}; tabs ${J(f3Tabs)}; aeon ${J(f3Aeon)}; trace ${traceStr(f3.trace)}`);
 
   // ── F-4: the successes still switch ──────────────────────────────────────
   console.log('\n──── CFO F-4: S1a to S1b, then S1b to aeon ────');
   const dm4 = await dismissBanner();
+  // ⚠ RUN 2 FAILED THIS ROW ON A PREMISE THE PACKET NEVER STATED. It asserted
+  // "the act is dropped" as an end state; the packet's F-4 says only "the
+  // successes still switch". On screen the shell reopened the same tab id
+  // (level:ghz:1) in the new project, so the act read 'ready' again and Home was
+  // no longer the active pane. The row now asks what the packet asks (the
+  // switch), and the TRACE is the control for F-1/F-3/F-2's trace rows: here it
+  // must show the act leaving 'ready', or the sampler cannot see a drop at all.
+  const homeShownBefore4a = (await home()).headerRect;
   const f4a = await typedOpen(S1b, async () => (await proj()).status === 'open' && (await home()).dir === S1b);
+  const f4aAfterOpen = { headerRectBeforeHomePress: (await home()).headerRect, tabs: await d.tabs(), levelState: await lvl() };
+  await d.pressTab(d.HOME_TAB);
   const f4aHome = await home(); const f4aLvl = await lvl(); const f4aTabs = await d.tabs();
   const f4aCap = await d.grabEl(HEADER_EL, 'cfo-F4a-home-header');
-  check('CFO.F4.a', 'F-4 CONTROL: a SUCCESSFUL Sonic 1 to Sonic 1 open switches: Home names S1b, the act is dropped, no banner, the field emptied',
-    dm4.goneAfter && f4a.settled && f4aHome.chip === 'S1' && f4aHome.dir === S1b && !actReady(f4aLvl) && !(await bannerPresent()) && f4aHome.field === '',
-    `dismiss ${J(dm4)}; home ${J(f4aHome)}; levelState ${J(f4aLvl)}; tabs ${J(f4aTabs)}; capture ${f4aCap && f4aCap.path}`);
+  const dropped4a = (f4a.trace || []).some((x) => x.l !== 'ready');
+  check('CFO.F4.a', 'F-4 CONTROL: a SUCCESSFUL Sonic 1 to Sonic 1 open switches (Home names S1b, classic open, no banner, the field emptied), and the mid-open trace SEES the act leave loaded',
+    dm4.goneAfter && f4a.settled && f4aHome.chip === 'S1' && f4aHome.dir === S1b && (await proj()).status === 'open'
+      && !(await bannerPresent()) && f4aHome.field === '' && dropped4a,
+    `dismiss ${J(dm4)}; home ${J(f4aHome)}; trace ${traceStr(f4a.trace)}; right after the open ${J(f4aAfterOpen)}; Home header before ${J(homeShownBefore4a)}; `
+    + `levelState after ${J(f4aLvl)}; tabs ${J(f4aTabs)}; capture ${f4aCap && f4aCap.path}`);
+  if (actReady(f4aLvl)) {
+    note('OBS-F4a', `after the successful S1a to S1b switch the Green Hill tab stayed listed and act ghz 1 is loaded again (in S1b), and Home was not the active pane `
+      + `(header rect ${J(f4aAfterOpen.headerRectBeforeHomePress)}): the shell reopened the same tab id in the new project. Observed, not judged.`);
+  }
   const f4b = await typedOpen(A.dir, async () => (await aeonSt()).open === true && (await proj()).status === 'closed' && (await home()).chip === 'AEON', 60000);
+  const f4bAfterOpen = { headerRectBeforeHomePress: (await home()).headerRect, tabs: await d.tabs() };
+  await d.pressTab(d.HOME_TAB);
   const f4bHome = await home(); const f4bProj = await proj(); const f4bAeon = await aeonSt(); const f4bTitle = await c.evalExpr('document.title');
   const f4bCap = await d.grabEl(HEADER_EL, 'cfo-F4b-home-header');
+  note('F4b', `right after the aeon open, before pressing Home: ${J(f4bAfterOpen)}; trace ${traceStr(f4b.trace)}`);
   check('CFO.F4.b', 'F-4 CONTROL: a SUCCESSFUL Sonic 1 to aeon open switches: Home names aeon copy A (chip AEON), classic closed, aeon open',
     f4b.settled && f4bHome.chip === 'AEON' && f4bHome.name === A.name && f4bProj.status === 'closed' && f4bAeon.open === true,
     `home ${J(f4bHome)}; projStatus ${J(f4bProj)}; aeon ${J(f4bAeon)}; title ${J(f4bTitle)}; capture ${f4bCap && f4bCap.path}`);
@@ -776,7 +814,8 @@ async function classicPart(d, O, { A, X, S1a, S1b }) {
       && f2Home.chip === 'S1' && f2Home.name === S1_LABEL && f2Home.name !== A.name && f2Home.dir === S1a && f2Proj.status === 'open',
     `dpr ${await d.dpr()}; level ${J(g2.lvl)}; banner ${J(f2Text)}; home ${J(f2Home)}; projStatus ${J(f2Proj)}; captures ${J(f2Caps)}`);
   check('CFO.F2.b', 'F-2: and, as in F-1, the field keeps the typo and the level tab and its act survive',
-    f2Home.field === TYPO && f2Tabs.includes(TAB_TITLE) && actReady(f2Lvl), `field ${J(f2Home.field)}; tabs ${J(f2Tabs)}; levelState ${J(f2Lvl)}; typed ${f2.typedOk}`);
+    f2Home.field === TYPO && f2Tabs.includes(TAB_TITLE) && actReady(f2Lvl) && steady(f2.trace),
+    `field ${J(f2Home.field)}; tabs ${J(f2Tabs)}; levelState ${J(f2Lvl)}; typed ${f2.typedOk}; trace ${traceStr(f2.trace)}`);
   await dismissBanner();
 }
 
