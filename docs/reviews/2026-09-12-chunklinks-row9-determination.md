@@ -125,6 +125,17 @@ tonight. One tree cannot yield both ids from this rig.
    ONLY — never written"*, its row 9 clicks Save, which writes, **and its `AEON_DIR` defaults to
    the live sibling tree when nothing overrides it.** It did not fire on 09-10; it is a loaded
    gun pointed at another lane's working copy. Booked as `RIG-WRITES-LIVE-AEON`.
+   **The aeon lane's sharpening, better than the sentence above and kept in their words: it did
+   not fire "and that is luck about defaults rather than a property of the rig."** A rig that has
+   never written to a live tree and a rig that cannot are different artifacts, and only one of
+   them is safe to hand to an agent.
+
+**Why the peer counted this as corroborated rather than as one answer, which is the standard
+worth copying:** the two lines enumerate over genuinely different parameters — the timing line
+over session transcripts, the content line over what the rig can deterministically produce, with
+no dependence on the clock at all. **The content argument would still hold if every transcript on
+the box had been lost.** Two clock-based checks agreeing would only have said the same check ran
+twice.
 
 **The timezone very nearly cost this.** Aurora's transcripts show chunk-links activity at
 `09:25:31.998Z` and `09:25:33.794Z` on the same day, against a write reported as *"09:25:54"* —
