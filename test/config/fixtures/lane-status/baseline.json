@@ -1,0 +1,40 @@
+{
+  "_fixture": "A COMMITTED, INSIDE-EVERY-BOUND lane-status document. It is the baseline that test/config/lane-status-bounds.test.ts mutates into tmpdir copies to prove each size bound red-first. It is never mutated in place, so a mutation that failed to apply cannot be mistaken for a restored baseline: both would print ok, and only one of them is this file. The live docs/lane-status.json is gitignored and has no committed baseline, which is why the proof runs here instead.",
+  "focus": "Fixture lane, standing still on purpose so a gate can be proven against it.",
+  "inFlight": [],
+  "blockedOnOwner": [],
+  "nextBoundary": "Nothing is in flight; this document exists to be measured.",
+  "awaiting": null,
+  "atBoundary": false,
+  "queue": [
+    {
+      "id": "FX-1",
+      "title": "The row that is doing something, so the exactly-one-next rule has a predecessor to sit behind.",
+      "state": "doing",
+      "size": "S",
+      "blockedBy": null
+    },
+    {
+      "id": "FX-2",
+      "title": "The one startable next row, with no blocker named, so the baseline is green on every pre-existing check as well as on the three bounds.",
+      "state": "next",
+      "size": "S",
+      "blockedBy": null
+    },
+    {
+      "id": "FX-3",
+      "title": "An open row, so the queue is not a two-row degenerate case.",
+      "state": "open",
+      "size": "M",
+      "blockedBy": null
+    },
+    {
+      "id": "FX-4",
+      "title": "A blocked row that names its blocker, because blocked with no blocker named is its own defect.",
+      "state": "blocked",
+      "size": "L",
+      "blockedBy": "the fixture it is waiting on"
+    }
+  ],
+  "updatedAt": "2026-09-12T00:00:00Z"
+}

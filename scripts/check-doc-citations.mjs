@@ -952,6 +952,25 @@ const EXEMPT = [
        + 'it describes exists on disk and in no commit. The path is what the sentence is about; '
        + 'deleting it would leave the claim pointing at nothing. Untracked by contract '
        + '(empyrean contract/LANE_STATUS.md), so it cannot be made openable.' },
+
+  // Added 2026-09-12, same token and the same third reason on the bar as the row
+  // above, and this one is the purest instance of it in the list: the packet's
+  // §4 is a finding ABOUT that file being unopenable. It records that the gate
+  // `scripts/check-lane-status.mjs` could only ever check one hard-coded,
+  // gitignored path, that this left its three new size bounds with no committed
+  // baseline to prove a red against, and that the only remaining proof would
+  // have been vandalising the file the owner writes live. Every one of those
+  // sentences has to name the path to say anything at all. Repairing the
+  // citation is not available: the file is untracked BY CONTRACT (empyrean
+  // contract/LANE_STATUS.md), which is the premise of the finding rather than an
+  // accident of this checkout. NOT a licence: the packet's actual evidence is
+  // quoted runs and `git diff --stat` in the document itself, not a path.
+  { file: 'docs/reviews/2026-09-12-lane-status-bounds.md', token: 'docs/lane-status.json',
+    why: 'the packet STATES PROVENANCE and its central finding is that this exact file is '
+       + 'gitignored, so a gate whose only subject is that path cannot be proven red-first '
+       + 'from a committed baseline. The unopenability is the subject; deleting the path '
+       + 'would delete the finding. Untracked by contract (empyrean contract/LANE_STATUS.md), '
+       + 'so it cannot be made openable.' },
 ];
 
 // ---------------------------------------------------------------------------
