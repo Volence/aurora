@@ -215,7 +215,7 @@ describe('the preset column\'s caption: three states, and the third is no longer
   });
 
   for (const d of NON_BANDS) {
-    it(`${d.preset.id} (${d.arm}): the caption is "no bands" — not "bands" over an empty column, and not "no preset"`, () => {
+    it(`${d.preset.id} (${d.arm}): the caption is "no bands": not "bands" over an empty column, and not "no preset"`, () => {
       const v = viewWith(d.preset);
       const caption = rasterTimelinePresetCaption(v);
       expect(caption).toBe('no bands');
@@ -306,7 +306,7 @@ describe('F3: __dbg.aeon.presets() carries `program` beside the band count', () 
     expect(src).toMatch(/import \{ presetProgramArm \} from '\.\.\/core\/formats\/effects\/preset'/);
   });
 
-  it('CONTROL: the band count is still there — band-preset-harness row 1b reads it', () => {
+  it('CONTROL: the band count is still there, because band-preset-harness row 1b reads it', () => {
     expect(hook).toContain('bands: (p.bands ?? []).length');
   });
 });
@@ -348,7 +348,7 @@ describe('F4: sectionArmExclusivityRefusal names every raster program, not just 
     expect(say).toContain('lowers to a raster program');
   });
 
-  it('CONTROL: the boundary noun is NOT in it — a boundary lowers to patched:, and this sentence is about raster:', () => {
+  it('CONTROL: the boundary noun is NOT in it, because a boundary lowers to patched: and this sentence is about raster:', () => {
     // The sentence is still the wrong one for a boundary document (condition
     // 2's recorded defect, not this parcel's); what this row pins is that the
     // fix did not paper over that by claiming a boundary lowers to raster.
