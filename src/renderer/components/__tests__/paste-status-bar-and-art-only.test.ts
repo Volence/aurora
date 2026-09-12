@@ -347,3 +347,68 @@ describe('one derivation behind both surfaces (added with the fix)', () => {
     expect(neutral, 'the neutral paste hint is not the Esc the landed line ends in').toBe(ESC);
   });
 });
+
+// ── PASTE-SAME-ZONE-ART-ONLY-SHIFT ─────────────────────────────────────────────
+
+describe('a paste line names as pasting only the gestures that write something (PASTE-SAME-ZONE-ART-ONLY-SHIFT)', () => {
+  it('home, an art-only clipboard, every setting: neither surface offers a gesture that writes nothing; each names those as pasting nothing, and none as refused', () => {
+    let nothingSeen = 0;
+    for (const sticky of LAYERS) {
+      openZone(HERE, 'a');
+      useEditorStore.getState().setTool('select');
+      const clip = artOnly();
+      arm(clip, sticky);
+      const o = oracle(clip, sticky);
+      expect(o.refused, `Layers ${sticky}: the premise, the click refuses nothing at home`).toEqual([]);
+      expect(o.nothing.length, `Layers ${sticky}: the premise, some gesture writes nothing here`).toBeGreaterThan(0);
+      nothingSeen += o.nothing.length;
+      // Both surfaces read before anything is asserted, so a red names both
+      // lines rather than stopping at the panel.
+      const lines = { panel: panelHint(), bar: barLine().context };
+      const got: Record<string, unknown> = {};
+      const want: Record<string, unknown> = {};
+      for (const [who, line] of Object.entries(lines)) {
+        got[who] = { line, ...readHint(line) };
+        want[who] = { line, advertised: o.lands, refused: [], nothing: o.nothing };
+      }
+      expect(got, `Layers ${sticky}: a surface offers a gesture that writes nothing, or calls it refused`).toEqual(want);
+    }
+    expect(nothingSeen, 'no gesture that writes nothing was measured').toBeGreaterThan(0);
+  });
+
+  it('over clipboard x place x Layers, each surface offers exactly the gestures the click lands, and where something lands it names every other gesture as the click takes it', () => {
+    const offered = new Set<string>();
+    let mixedNothing = 0;
+    for (const { at, o } of cells()) {
+      const lines = { panel: panelHint(), bar: barLine().context };
+      for (const [who, line] of Object.entries(lines)) {
+        expect(line, `${at}: the ${who} is empty`).toContain(ESC);
+        const read = readHint(line);
+        expect(read.advertised, `${at}: the ${who} offers other than what the click lands ("${line}")`).toEqual(o.lands);
+        if (o.lands.length > 0) {
+          expect(read.refused, `${at}: the ${who} names as refused other than what the click refuses ("${line}")`).toEqual(o.refused);
+          expect(read.nothing, `${at}: the ${who} names as pasting nothing other than what writes nothing ("${line}")`).toEqual(o.nothing);
+        }
+      }
+      offered.add(o.lands.join('+'));
+      if (o.lands.length > 0 && o.nothing.length > 0) mixedNothing++;
+    }
+    // All three, some, and none; and a cell where one gesture pastes while
+    // another writes nothing, the case this row exists for.
+    expect([...offered].length, `the landing sets measured: ${[...offered].join(' | ')}`).toBeGreaterThanOrEqual(3);
+    expect(mixedNothing, 'no cell where a gesture lands and another writes nothing was measured').toBeGreaterThan(0);
+  });
+
+  it('CONTROL: home, a clipboard that carries collision, every setting: the panel says PASTE_HINT byte for byte, and the bar the same line without the flip keys', () => {
+    const FLIPS = PASTE_HINT.split(' · ').at(-2)!;
+    for (const sticky of LAYERS) {
+      openZone(HERE, 'a');
+      useEditorStore.getState().setTool('select');
+      const clip = withCollision();
+      arm(clip, sticky);
+      expect(oracle(clip, sticky).lands, `Layers ${sticky}: the premise, every gesture lands at home`).toEqual(GESTURES);
+      expect(panelHint(), `Layers ${sticky}: the landed panel line changed`).toBe(PASTE_HINT);
+      expect(barLine().context, `Layers ${sticky}: the bar's home line changed`).toBe(PASTE_HINT.replace(` · ${FLIPS}`, ''));
+    }
+  });
+});
