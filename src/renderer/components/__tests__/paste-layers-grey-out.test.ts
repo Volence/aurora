@@ -314,13 +314,20 @@ describe('the panel and the click ask ONE decision', () => {
       .toContain(squash(`pasteRefusal(
           pasteFit(clip, getCurrentZone(pstate)?.tileset, pstate.project),
           effectivePasteLayers(clip, layers))`));
+    // The panel's store reads behind the offer moved into `useArmedPasteOffer`
+    // (PASTE-STATUS-BAR-HINT), which aeon's status bar calls too. So the
+    // expression is asked of that hook, and the panel is held to calling it.
     const panel = readFileSync('src/renderer/components/MarqueePasteOptions.tsx', 'utf8');
-    expect(panel, 'the panel does not ask pasteFit').toMatch(/pasteFit\(\s*clipboard,\s*openTileset,\s*project\s*\)/);
-    expect(panel, 'the panel does not take its availability from pasteLayerOffer').toContain('pasteLayerOffer(');
-    // No second copy of the rule in the panel: it never reads a fit's halves or
-    // the two identity questions behind them.
-    for (const second of ['clipboardFitsTileset', 'clipboardFromProject', 'fit.art', 'fit.collision', 'pasteRefusal(']) {
-      expect(panel.includes(second), `the panel carries its own copy of the rule (${second})`).toBe(false);
+    const reads = readFileSync('src/renderer/components/armed-paste-offer.ts', 'utf8');
+    expect(panel, 'the panel does not take its offer from useArmedPasteOffer').toContain('useArmedPasteOffer()');
+    expect(reads, 'the offer hook does not ask pasteFit').toMatch(/pasteFit\(\s*clipboard,\s*openTileset,\s*project\s*\)/);
+    expect(reads, 'the offer hook does not take availability from pasteLayerOffer').toContain('pasteLayerOffer(');
+    // No second copy of the rule in either: neither reads a fit's halves or the
+    // two identity questions behind them.
+    for (const [who, src] of [['the panel', panel], ['the offer hook', reads]] as const) {
+      for (const second of ['clipboardFitsTileset', 'clipboardFromProject', 'fit.art', 'fit.collision', 'pasteRefusal(']) {
+        expect(src.includes(second), `${who} carries its own copy of the rule (${second})`).toBe(false);
+      }
     }
   });
 });

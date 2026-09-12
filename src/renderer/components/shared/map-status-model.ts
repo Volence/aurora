@@ -9,6 +9,7 @@
 
 import type React from 'react';
 import { TOOL_LABELS, TOOL_HINTS, type ToolId } from '../../workspace/tool-meta';
+import { PASTE_ESC } from '../../../core/editing/map-clipboard';
 
 export interface StatusLabel { label: string; hint: string }
 
@@ -37,7 +38,12 @@ export interface MapStatusPort {
    * supposed to catch rather than ship.
    */
   readonly scopeTone?: 'normal' | 'error';
-  /** Overrides the tool hint when non-empty — engine-specific context. */
+  /**
+   * Overrides the tool hint when non-empty: engine-specific context. Aeon's
+   * live stamp target, and, while pasting, what a paste click does where the
+   * author is (aeon's armed paste offer, PASTE-STATUS-BAR-HINT), which only the
+   * engine can know.
+   */
   readonly contextInfo: string;
   /**
    * True when the FACET already mounts a hint line of its own (a `ToolOptions`
@@ -63,14 +69,17 @@ export interface MapStatusPort {
 }
 
 /** Pasting is independent of the active tool — Ctrl+V does not switch tools —
- *  so it overrides whatever the tool vocabulary would otherwise show. */
+ *  so it overrides whatever the tool vocabulary would otherwise show.
+ *
+ *  The paste HINT here names no gesture (PASTE-STATUS-BAR-HINT). What a paste
+ *  click does depends on where the author is (in another zone the click refuses
+ *  the tiles, so a plain click and Alt+click can be refused), and this neutral
+ *  model cannot see that. It said "Click to paste · Alt: art only · Shift:
+ *  collision only" in every zone. So it says only Esc, which is true anywhere,
+ *  and the gestures are the engine's to say through `contextInfo`: aeon's port
+ *  passes the armed paste offer's `statusHint`. */
 export function statusLabel(s: { tool: ToolId; pasting: boolean }): StatusLabel {
-  if (s.pasting) {
-    return {
-      label: 'Paste',
-      hint: 'Click to paste · Alt: art only · Shift: collision only · Esc to stop',
-    };
-  }
+  if (s.pasting) return { label: 'Paste', hint: PASTE_ESC };
   return { label: TOOL_LABELS[s.tool], hint: TOOL_HINTS[s.tool] };
 }
 
@@ -80,7 +89,8 @@ export function statusLabel(s: { tool: ToolId; pasting: boolean }): StatusLabel 
  * decision left in the component is a decision no test can reach.
  *
  * Three cases, in priority order:
- *   1. the port's own `contextInfo` (aeon's live stamp target);
+ *   1. the port's own `contextInfo` (aeon's live stamp target, or while pasting
+ *      its armed paste line);
  *   2. nothing, when the facet mounts its own hint line (see `ownHintLine`);
  *   3. the generic per-tool hint.
  */

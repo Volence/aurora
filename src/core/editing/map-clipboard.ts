@@ -209,13 +209,24 @@ export function pasteClickLayers(mods: { altKey: boolean; shiftKey: boolean }, s
   return mods.altKey ? 'art' : mods.shiftKey ? 'collision' : sticky;
 }
 
-/** The end of every paste hint: the flip keys mirror the clipboard and Esc
- *  leaves paste mode wherever the author is, so both are always true. */
-const PASTE_HINT_TAIL = 'X flips it left↔right, Y top↕bottom · Esc to stop';
+/** The flip keys: they mirror the clipboard wherever the author is, so this is
+ *  always true in paste mode. */
+const PASTE_FLIPS = 'X flips it left↔right, Y top↕bottom';
+
+/** Esc leaves paste mode wherever the author is. The one thing a surface that
+ *  cannot see where the author is may say about paste mode (the neutral status
+ *  bar's own paste hint, `statusLabel`). */
+export const PASTE_ESC = 'Esc to stop';
+
+/** The end of every paste hint: both halves are always true. */
+const PASTE_HINT_TAIL = `${PASTE_FLIPS} · ${PASTE_ESC}`;
+
+/** The gestures, said where every one of them lands: the landed line's words. */
+const EVERY_GESTURE_LANDS = 'Click to paste · hold Alt for art only, Shift for collision only';
 
 /** The paste hint line wherever every choice lands (the zone the copy was made
  *  in). The line the panel has always carried there. */
-export const PASTE_HINT = `Click to paste · hold Alt for art only, Shift for collision only · ${PASTE_HINT_TAIL}`;
+export const PASTE_HINT = `${EVERY_GESTURE_LANDS} · ${PASTE_HINT_TAIL}`;
 
 /** The three paste gestures, in the order the hint names them: the modifiers
  *  the click reads, the gesture's name leading a sentence, and in a list. */
@@ -230,17 +241,22 @@ const WHAT_PASTES: Readonly<Record<PasteLayers, string>> = {
 };
 
 /**
- * The paste hint line (PASTE-HINT-LINE-MISLEADS). Where every choice lands it is
- * `PASTE_HINT`, unchanged. Elsewhere each gesture is said as the click will take
- * it: the click's two checks, its refusal (`refusals`, the very verdicts the
- * Layers buttons are greyed from) and whether anything is left to write
- * (`effectivePasteLayers`), over the layers `pasteClickLayers` gives that
+ * What each paste gesture does here, the part of the paste hint that depends on
+ * where the author is (PASTE-HINT-LINE-MISLEADS). Where every choice lands it is
+ * the landed line's words, unchanged. Elsewhere each gesture is said as the
+ * click will take it: the click's two checks, its refusal (`refusals`, the very
+ * verdicts the Layers buttons are greyed from) and whether anything is left to
+ * write (`effectivePasteLayers`), over the layers `pasteClickLayers` gives that
  * gesture. So the line cannot offer a gesture the buttons show as refused.
+ *
+ * Every surface that says what a paste click does is built from this one
+ * string (`PasteLayerOffer.hint` and `.statusHint`), so no two can name
+ * different gestures.
  */
-function pasteHintLine(
+function pasteGestureLine(
   clip: MapClipboard, refusals: Readonly<Record<PasteLayers, string | null>>, sticky: PasteLayers,
 ): string {
-  if (PASTE_LAYER_ORDER.every((v) => refusals[v] === null)) return PASTE_HINT;
+  if (PASTE_LAYER_ORDER.every((v) => refusals[v] === null)) return EVERY_GESTURE_LANDS;
   const lands = new Map<PasteLayers, string[]>();
   const refused: string[] = [];
   for (const { mods, lead, listed } of PASTE_GESTURES) {
@@ -249,13 +265,13 @@ function pasteHintLine(
     if (refusals[layers] === null && writes !== null) lands.set(writes, [...(lands.get(writes) ?? []), lead]);
     else refused.push(listed);
   }
-  if (lands.size === 0) return `Nothing can be pasted here · ${PASTE_HINT_TAIL}`;
+  if (lands.size === 0) return 'Nothing can be pasted here';
   const parts = [...lands].map(([writes, leads]) => `${leads.join(' or ')} to paste ${WHAT_PASTES[writes]}`);
   if (refused.length > 0) {
     const names = refused.length === 1 ? refused[0] : `${refused.slice(0, -1).join(', ')} and ${refused[refused.length - 1]}`;
     parts.push(`${names} ${refused.length === 1 ? 'is' : 'are'} refused here`);
   }
-  return [...parts, PASTE_HINT_TAIL].join(' · ');
+  return parts.join(' · ');
 }
 
 /** See `pasteLayerOffer`. */
@@ -264,8 +280,17 @@ export interface PasteLayerOffer {
   refusals: Readonly<Record<PasteLayers, string | null>>;
   /** The one sentence shown beside the control, or null when every choice lands. */
   notice: string | null;
-  /** The paste hint line: what each click gesture does here (`pasteHintLine`). */
+  /** The Paste panel's hint line: what each click gesture does here
+   *  (`pasteGestureLine`), then the flip keys and Esc. */
   hint: string;
+  /**
+   * The map status bar's paste line (PASTE-STATUS-BAR-HINT): the SAME gesture
+   * segments as `hint`, then Esc, without the flip keys. The bar is one row
+   * shared with the tool, plane, zone, section and zoom, and its paste line has
+   * never carried the flips; the gestures are the part it must not get wrong,
+   * and it takes them from the one string `hint` is built from.
+   */
+  statusHint: string;
 }
 
 /**
@@ -296,19 +321,22 @@ export interface PasteLayerOffer {
 export function pasteLayerOffer(clip: MapClipboard, fit: PasteFit, sticky: PasteLayers): PasteLayerOffer {
   const click = (v: PasteLayers) => pasteRefusal(fit, effectivePasteLayers(clip, v));
   const refusals = { both: click('both'), art: click('art'), collision: click('collision') };
-  const hint = pasteHintLine(clip, refusals, sticky);
+  const gestures = pasteGestureLine(clip, refusals, sticky);
+  const hint = `${gestures} · ${PASTE_HINT_TAIL}`;
+  const statusHint = `${gestures} · ${PASTE_ESC}`;
   const refused = PASTE_LAYER_ORDER.filter((v) => refusals[v] !== null);
-  if (refused.length === 0) return { refusals, notice: null, hint };
+  if (refused.length === 0) return { refusals, notice: null, hint, statusHint };
   const nothingLands = armRefusal(clip, fit, sticky);
-  if (nothingLands !== null) return { refusals, notice: nothingLands, hint };
+  if (nothingLands !== null) return { refusals, notice: nothingLands, hint, statusHint };
   if (refusals.collision === null) {
     return {
       refusals,
       notice: refusals[sticky] === null ? COLLISION_ONLY_HERE : `${COLLISION_ONLY_HERE} ${stickyRefusedHere(sticky)}`,
       hint,
+      statusHint,
     };
   }
-  return { refusals, notice: refusals[sticky] ?? refusals[refused[0]], hint };
+  return { refusals, notice: refusals[sticky] ?? refusals[refused[0]], hint, statusHint };
 }
 
 /**

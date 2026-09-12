@@ -36,6 +36,7 @@
 // nothing, or as pasting.
 
 import { describe, it, expect, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type React from 'react';
 import { renderHooked, type Hooked } from '../../../test/render-hooked';
 import MarqueePasteOptions from '../MarqueePasteOptions';
@@ -46,9 +47,9 @@ import { TOOL_IDS } from '../../workspace/tool-meta';
 import { useEditorStore } from '../../state/editorStore';
 import { useProjectStore, getCurrentZone } from '../../state/projectStore';
 import {
-  copyChunkToClipboard, pasteFit, pasteRefusal, effectivePasteLayers, PASTE_HINT,
+  copyChunkToClipboard, pasteFit, pasteRefusal, effectivePasteLayers, pasteLayerOffer, PASTE_HINT,
 } from '../../../core/editing/map-clipboard';
-import type { MapClipboard, PasteLayers } from '../../../core/editing/map-clipboard';
+import type { MapClipboard, PasteLayers, PasteFit } from '../../../core/editing/map-clipboard';
 import { createChunkDef } from '../../../core/model/s4-types';
 
 // ── the fixture (the sibling files', restated: they export nothing) ─────────────
@@ -294,5 +295,55 @@ describe('the status bar says what a paste click will do here, as the panel does
       expected[tool] = `${o.lands.join('+')} ("${context}")`;
     }
     expect(offered, 'with some tool armed the bar offers what the click does not land').toEqual(expected);
+  });
+});
+
+describe('one derivation behind both surfaces (added with the fix)', () => {
+  // Every fit a PasteFit can hold, the one the map cannot reach included.
+  const FITS: ReadonlyArray<[string, PasteFit]> = [
+    ['home', { art: true, collision: true }],
+    ['another zone', { art: false, collision: true }],
+    ['another project', { art: false, collision: false }],
+    ['tiles fit, collision does not (unreachable on the map)', { art: true, collision: false }],
+  ];
+  /** The flip keys' segment, from the landed line. */
+  const FLIPS = PASTE_HINT.split(' · ').at(-2)!;
+  const dash = new RegExp(`[${String.fromCharCode(0x2013, 0x2014)}]`);
+
+  it('offer.statusHint is offer.hint without the flip keys, for every clipboard kind, fit and setting: one string of gestures, two surfaces', () => {
+    let n = 0;
+    for (const make of [withCollision, artOnly]) {
+      for (const [where, fit] of FITS) {
+        for (const sticky of LAYERS) {
+          const clip = make();
+          const offer = pasteLayerOffer(clip, fit, sticky);
+          const at = `${where}, art only ${clip.artOnly}, Layers ${sticky}`;
+          expect(offer.hint.endsWith(` · ${FLIPS} · ${ESC}`), `${at}: the panel hint lost its tail ("${offer.hint}")`).toBe(true);
+          expect(offer.statusHint, at).toBe(offer.hint.replace(` · ${FLIPS} · ${ESC}`, ` · ${ESC}`));
+          expect(offer.statusHint, `${at}: a dash`).not.toMatch(dash);
+          n++;
+        }
+      }
+    }
+    expect(n, 'the table is not 2 x 4 x 3').toBe(24);
+  });
+
+  it('the seam: the bar and the panel both take the offer from useArmedPasteOffer and neither makes its reads, and the neutral model\'s own paste hint names no gesture', () => {
+    const port = readFileSync('src/renderer/providers/map-status-aeon.ts', 'utf8');
+    const panelSrc = readFileSync('src/renderer/components/MarqueePasteOptions.tsx', 'utf8');
+    expect(port, 'the aeon port does not take the armed offer').toContain('useArmedPasteOffer()');
+    expect(port, 'the aeon port does not pass the offer\'s status line').toContain('pasteOffer?.statusHint');
+    expect(panelSrc, 'the panel does not take the armed offer').toContain('useArmedPasteOffer()');
+    for (const [who, src] of [['the aeon port', port], ['the panel', panelSrc]] as const) {
+      for (const own of ['pasteFit(', 'pasteLayerOffer(']) {
+        expect(src.includes(own), `${who} makes the offer's reads itself (${own})`).toBe(false);
+      }
+    }
+    // The neutral model cannot see where the author is, so what it says on its
+    // own while pasting must be true everywhere: Esc, and no gesture.
+    const neutral = statusLabel({ tool: 'select', pasting: true }).hint;
+    expect(readHint(neutral), `the neutral paste hint names a gesture ("${neutral}")`)
+      .toEqual({ advertised: [], refused: [], nothing: [] });
+    expect(neutral, 'the neutral paste hint is not the Esc the landed line ends in').toBe(ESC);
   });
 });
