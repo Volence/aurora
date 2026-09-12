@@ -270,10 +270,17 @@ const PRESET_ID = 'aurora_local_rampctl_probe';
 // Retyping the new sentence here would book the same repair for the next
 // rewording, so the needles come out of `bandControlsRefusal` itself
 // (`lib/effects-control-aims.mjs`, read from the BUILT tree this run drives).
-// ⚠ AND THE NEEDLES ARE THIS RULE'S ALONE: both runs below are unique in the
-// whole tree to that one composition site —
-//   `grep -rn 'cannot write here at' src/ test/ scratchpad/`      → 1 hit
-//   `grep -rn 'back to bands to author bands' src/ test/ scratchpad/` → 1 hit
+// ⚠ AND THE NEEDLES ARE THIS RULE'S ALONE: each has exactly ONE COMPOSITION
+// SITE in `src/`, and it is `bandControlsRefusal` in
+// src/renderer/providers/effects-preset.ts —
+//   `grep -rn 'cannot write here at' src/`
+//   `grep -rn 'back to bands to author bands' src/`
+// STATED AS THE PROPERTY, NOT AS A HIT COUNT, because these two lines are
+// themselves matches: the same greps widened to `src/ test/ scratchpad/` return
+// 3 and 2, and a comment recording "→ 1 hit" refutes itself the moment anyone
+// re-runs it. The prose hits (this comment, and the docblock in
+// lib/effects-control-aims.mjs) compose no sentence, so the property the rows
+// rest on is about `src/` and holds however much is written ABOUT the rule.
 // which is the check this repo pays for when it is skipped: a row once matched
 // `/has only \d+ tiles/` and spent its whole life catching an unrelated
 // refusal. `bandRefusalNeedles` is pinned against the real function by
