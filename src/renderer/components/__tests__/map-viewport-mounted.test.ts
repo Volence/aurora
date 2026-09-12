@@ -73,7 +73,8 @@ import {
   BG_OVERRIDE_CONSUMER_OUT_DIR, LAYOUT_TILE_INDEX_MASK, type BgOverrideDocument,
 } from '../../../core/formats/bg-override/bg-override';
 import { documentBands, bandSlotBases } from '../../../core/formats/bg-override/bg-anim-band';
-import { packCollisionCell, unpackCollisionCell } from '../../../core/collision/collision-cell-word';
+import { packCollisionCell, unpackCollisionCell, selectedCollisionWord } from '../../../core/collision/collision-cell-word';
+import { collisionPaintWord } from '../../../core/editing/collision-word';
 import { SECTION_PLANE_WORDS } from '../../../core/collision/collision-cell-resolve';
 import { readCrossover, handOffFrom } from '../../../core/collision/layer-transition';
 import { snapMarquee, effectiveGranularity, type MapClipboard } from '../../../core/editing/map-clipboard';
@@ -3344,6 +3345,12 @@ describe('collision paint: Alt propagates, a wide brush covers an area, and the 
     ed.setCollisionBrushSize(1);
     ed.setCollisionCrossoverBrush('keep');
     ed.setCollisionCrossoverSpanMode('cell');
+    // The BRUSH-WORD-LATCH rows arm flips, a mirrored entry and another floor
+    // type; the setters below are sticky store state and outlive this block.
+    ed.pickCollisionShape(PICK, false);
+    ed.setSelectedCollisionXFlip(false);
+    ed.setSelectedCollisionYFlip(false);
+    ed.setSelectedCollisionSolidity('all');
     // Arming an authoring crossover brush turns the crossover lens on as a side
     // effect (editorStore's setter). It is view state and outlives this block.
     useViewStore.getState().setOverlay('showCrossover', false);
@@ -3468,6 +3475,74 @@ describe('collision paint: Alt propagates, a wide brush covers an area, and the 
     s.on().onMouseDown(collCell(Q.cc, Q.cr));
     win!.dispatch('mouseup', {});
     expect(painted(), 'the NEXT press did not take the size picked during the last stroke').toEqual(area(Q));
+  });
+
+  // BRUSH-WORD-LATCH (hub ruling, empyrean docs/OVERSEER-LOG.md 2026-09-12T09:39:48Z,
+  // option (a)): "Shape, flip and solidity latch at the press as M4 latches size."
+  // The word has FIVE store inputs, the argument of `selectedCollisionWord`: the
+  // shape and the picked entry's mirror flag (one shape button writes both,
+  // through `pickCollisionShape`), Flip H, Flip V and the floor type. One row
+  // each, each change made through the setter its palette control calls
+  // (cdp-sweep-4 section 5.4 O2 measured the shape route on screen: Space on a
+  // focused shape button, cells 3 and 4 of one stroke took another word). The
+  // bits each change must move are derived from the encoder one field at a
+  // time, so a change that leaves the word alone cannot pass as a latch.
+  const fieldBits = {
+    shape: packCollisionCell({ shape: 0xFFFF, xFlip: false, yFlip: false, solidity: 'none' }),
+    xFlip: packCollisionCell({ shape: 0, xFlip: true, yFlip: false, solidity: 'none' }),
+    yFlip: packCollisionCell({ shape: 0, xFlip: false, yFlip: true, solidity: 'none' }),
+    solidity: packCollisionCell({ shape: 0, xFlip: false, yFlip: false, solidity: 'all' }),
+  } as const;
+  const brushWordNow = (): number => {
+    const st = useEditorStore.getState();
+    return selectedCollisionWord({
+      shape: st.selectedCollisionProfile, entryFlipX: st.selectedCollisionEntryFlipX,
+      userXFlip: st.selectedCollisionXFlip, yFlip: st.selectedCollisionYFlip, solidity: st.selectedCollisionSolidity,
+    });
+  };
+  const WORD_CHANGES: Array<{ name: string; field: keyof typeof fieldBits; change: () => void }> = [
+    { name: 'another shape (a shape button, pickCollisionShape)', field: 'shape',
+      change: () => useEditorStore.getState().pickCollisionShape(PICK + 1, false) },
+    { name: 'the mirrored entry of the same shape (a shape button, pickCollisionShape)', field: 'xFlip',
+      change: () => useEditorStore.getState().pickCollisionShape(PICK, true) },
+    { name: 'Flip H (setSelectedCollisionXFlip)', field: 'xFlip',
+      change: () => useEditorStore.getState().setSelectedCollisionXFlip(true) },
+    { name: 'Flip V (setSelectedCollisionYFlip)', field: 'yFlip',
+      change: () => useEditorStore.getState().setSelectedCollisionYFlip(true) },
+    { name: 'another floor type (a Floor button, setSelectedCollisionSolidity)', field: 'solidity',
+      change: () => useEditorStore.getState().setSelectedCollisionSolidity('top') },
+  ];
+
+  it.each(WORD_CHANGES)('BRUSH-WORD-LATCH: the brush WORD is LATCHED at the press: $name picked mid-drag leaves the stroke on the pressed word, and the next press takes it', async ({ name, field, change }) => {
+    const ed = useEditorStore.getState();
+    ed.pickCollisionShape(PICK, false);
+    ed.setSelectedCollisionXFlip(false);
+    ed.setSelectedCollisionYFlip(false);
+    ed.setSelectedCollisionSolidity('all');
+    const fill = collWord(COLL_SHAPE.act1.a);
+    const w1 = brushWordNow();
+    const P = { cc: 4, cr: 4 }; const Q = { cc: 5, cr: 4 }; const R = { cc: 6, cr: 4 };
+    const stroke = [P, Q, R].flatMap((q) => cellSubTiles(q.cc, q.cr));
+    const wordsAt = (idx: number[]): number[] => { const a = collPlane('act1', 'a'); return idx.map((i) => a[i]); };
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(P.cc, P.cr));
+    expect(wordsAt(cellSubTiles(P.cc, P.cr)), 'the premise: the press painted cell P with the word selected at the press')
+      .toEqual(cellSubTiles(P.cc, P.cr).map(() => collisionPaintWord(w1, fill)));
+    change();   // Space on the focused palette button: the drag is held
+    const w2 = brushWordNow();
+    expect((w1 ^ w2) & fieldBits[field], `ANTI-VACUOUS: ${name} did not move the ${field} bits of the brush word`).not.toBe(0);
+    expect(collisionPaintWord(w2, fill), 'ANTI-VACUOUS: the two words paint the same cell word').not.toBe(collisionPaintWord(w1, fill));
+    s.on().onMouseMove(collCell(Q.cc, Q.cr));
+    s.on().onMouseMove(collCell(R.cc, R.cr));
+    expect(wordsAt(stroke), `${name} picked mid-drag changed the word for the rest of the stroke`)
+      .toEqual(stroke.map(() => collisionPaintWord(w1, fill)));
+    win!.dispatch('mouseup', {});
+    focusedHistory()!.undo();
+    expect(painted(), 'the premise of the second half: one undo took the stroke back').toHaveLength(0);
+    s.on().onMouseDown(collCell(Q.cc, Q.cr));
+    win!.dispatch('mouseup', {});
+    expect(wordsAt(cellSubTiles(Q.cc, Q.cr)), `the NEXT press did not take the word ${name} picked during the last stroke`)
+      .toEqual(cellSubTiles(Q.cc, Q.cr).map(() => collisionPaintWord(w2, fill)));
   });
 
   it('HAND-OFF marks every sub-tile of the cell to leave the plane it is painted on: A hands to B, B to A', async () => {
