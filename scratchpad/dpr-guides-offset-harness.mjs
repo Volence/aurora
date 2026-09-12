@@ -230,6 +230,23 @@ const TOP_INPUT = (i) => `[...document.querySelectorAll('input[type=number]')].f
 const BTN_TEXT = (re) => `([...document.querySelectorAll('button')].find((e) => ${re}.test(((e.textContent || '') + ' ' + (e.getAttribute('aria-label') || '')).trim())) || null)`;
 const SUBTAB = (id) => `document.querySelector('[data-effects-sub-tab="${id}"]')`;
 
+/**
+ * Drop a run that lies wholly in the LAST device index of a scan.
+ *
+ * ⚠ AN INSTRUMENT LIMIT, WRITTEN DOWN RATHER THAN WIDENED INTO A TOLERANCE. The backing
+ * store is `round(rect * dpr)` device px, so at a fractional product its last column
+ * (and row) is only partly under the CSS surface, and what it holds depends on which
+ * draw's extent reached it. Fixed-build run wrongway-native (and master-run4) read one
+ * such column differing between the composite on and off, 432 CSS px right of the frame;
+ * the reason read from source is its own finding (MapViewport clears for the composite
+ * to `rect.width`, the backing store maps to `canvas.width / dpr`), printed by row .10 and
+ * reported in the packet. Nothing this harness measures sits within a device pixel of the
+ * canvas edge, which .10 checks before it relies on this.
+ */
+function trimLastDevice(runs, storeLen) {
+  return runs.filter((r) => r.dev[0] < storeLen - 1);
+}
+
 /** Contiguous runs of differing indices, as CSS-pixel spans. */
 function diffRuns(a, b, scale) {
   const runs = [];
@@ -523,7 +540,7 @@ async function main() {
       await select(BASE_ID); await park();
       const colB = await readColumn(GX);
       await select(SCENE_ID); await park();
-      const gRuns = diffRuns(colA.px, colB.px, colA.scale);
+      const gRuns = trimLastDevice(diffRuns(colA.px, colB.px, colA.scale), G.storeH);
       const near = (runs, at) => runs.find((r) => Math.abs(r.center - at) <= DRAWN_TOL) ?? null;
       const every = TOPS.every((t) => near(gRuns, t) !== null);
       const stray = gRuns.filter((r) => !TOPS.some((t) => Math.abs(r.center - t) <= DRAWN_TOL));
@@ -593,7 +610,7 @@ async function main() {
       await select(BASE_ID); await park();
       const rowB = await readRow(FY);
       await select(SCENE_ID); await park();
-      const fRuns = diffRuns(rowA.px, rowB.px, rowA.scale);
+      const fRuns = trimLastDevice(diffRuns(rowA.px, rowB.px, rowA.scale), G.storeW);
       const rightmost = fRuns.length ? fRuns.reduce((a, b) => (b.center > a.center ? b : a)) : null;
       check(`${P}.6`, "the frame's right edge is DRAWN where the hit test measures (the rightmost differing run within 1.5 CSS px of rect.x + rect.w)",
         rightmost !== null && Math.abs(rightmost.center - fRight) <= DRAWN_TOL,
@@ -674,8 +691,21 @@ async function main() {
       const inL = fx.rect.x + 3; const inR = fxR - 3;
       let minX = Infinity; let maxX = -Infinity; let n = 0; let bestInterior = 0;
       const perRow = [];
+      // The canvas's last device column, with the composite on and off, per row: the
+      // evidence for the separate edge-clear finding (see trimLastDevice).
+      const lastCol = [];
       for (let k = 0; k < rowsY.length; k++) {
-        const runs = diffRuns(onRows[k].px, offRows[k].px, onRows[k].scale);
+        const o = (G.storeW - 1) * 4;
+        const on = onRows[k].px.slice(o, o + 4); const off = offRows[k].px.slice(o, o + 4);
+        if (J(on) !== J(off)) lastCol.push(`${rowsY[k]}: on ${J(on)} off ${J(off)}`);
+      }
+      note(`${P}.10 last device column`, `store column ${G.storeW - 1} (CSS ${((G.storeW - 1) / ratioX).toFixed(2)}..${G.width.toFixed(2)}); `
+        + `rows where it differs, RGBA with the composite on and off: ${lastCol.length ? lastCol.join('; ') : 'none'}`);
+      if (fx.rect.x + fx.rect.w > G.width - 2) {
+        check(`${P}.10`, 'UNMEASURABLE: the frame reaches the canvas edge, where the last device column is not a measurement', false, J(fx.rect));
+      }
+      for (let k = 0; k < rowsY.length; k++) {
+        const runs = trimLastDevice(diffRuns(onRows[k].px, offRows[k].px, onRows[k].scale), G.storeW);
         perRow.push(`${rowsY[k]}:${J(runs.map((r) => [r.from, r.to]))}`);
         let interior = 0;
         for (const r of runs) {
