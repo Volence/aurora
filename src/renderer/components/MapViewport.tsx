@@ -2933,8 +2933,16 @@ export default function MapViewport() {
     // ⚠ THE DRAG CACHE IS KEYED ON THE SPAN TOO. Without it, dragging from one
     // half of a cell to the other inside a single stroke would be "the same
     // cursor cell — skip", and the second half could never be marked. In `cell`
-    // mode the span is constant, so this key is byte-for-byte what it was.
-    const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}:${crossoverSpan}`;
+    // mode the span is constant, so it never splits a cell on its own.
+    //
+    // ⚠ AND ON THE PLANE, for the same reason (hub ruling M2,
+    // docs/reviews/2026-09-12-rulings-asked.md). `plane` is read from the store
+    // per cell, above, so it can change under a held drag (Tab to the other
+    // Plane button, then Space). Left out of the key, the cell under the
+    // pointer at the switch was "the same cursor cell, skip" for the NEW
+    // plane: it stayed unpainted there until the pointer left it
+    // (map-coverage-6 O2). A key must name everything the write depends on.
+    const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}:${crossoverSpan}:${plane}`;
     if (lastPaintedCell.current === cellKey) return; // same cursor cell — skip
     lastPaintedCell.current = cellKey;
 

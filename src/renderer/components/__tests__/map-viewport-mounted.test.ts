@@ -4446,6 +4446,28 @@ describe('a collision stroke whose plane changes mid-drag lands one command per 
       .toEqual(['blur:B', 'plane:b', 'blur:A', 'plane:a']);
   });
 
+  it('M2: after a plane switch mid-drag, a move inside the SAME cell paints that cell on the new plane', async () => {
+    // Hub ruling M2: "Put the plane in the key." map-coverage-6 O2 measured the
+    // defect: with the key `section:col:row:span`, the cell under the pointer at
+    // the switch was "the same cursor cell, skip" for the new plane, and B stayed
+    // empty there until the pointer left the cell.
+    const first = { x: 1 * 16 + 4, y: CR * 16 + 4 };    // cell (1, CR), its top-left 8px tile
+    const second = { x: 1 * 16 + 12, y: CR * 16 + 12 }; // the SAME cell, its bottom-right tile
+    expect([Math.floor(first.x / 16), Math.floor(first.y / 16)],
+      'ANTI-VACUOUS: the two points must be in one 16px cell').toEqual([Math.floor(second.x / 16), Math.floor(second.y / 16)]);
+    expect(Math.floor(first.x / 8), 'ANTI-VACUOUS: and on two different 8px tiles of it, so the move is a real move')
+      .not.toBe(Math.floor(second.x / 8));
+    const s = await mountMap();
+    const plane = renderPalette();
+    s.on().onMouseDown(mouse(first.x, first.y));
+    expect(planes(), 'the premise: the press painted cell 1 on plane A only').toEqual({ a: cells(1), b: [] });
+    plane.B();                                   // Tab to B, Space: the drag is still held
+    expect(useEditorStore.getState().collisionPaintPlane, 'ANTI-VACUOUS: B did not move the aimed plane').toBe('b');
+    s.on().onMouseMove(mouse(second.x, second.y));
+    expect(planes(), 'the cell under the pointer at the switch was skipped for the new plane')
+      .toEqual({ a: cells(1), b: cells(1) });
+  });
+
   it('a stroke whose plane changes from A to B mid-drag is two commands: the first undo takes back the plane-B run only', async () => {
     const s = await mountMap();
     const plane = renderPalette();
