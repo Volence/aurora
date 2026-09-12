@@ -1,0 +1,20 @@
+RESTORE AFTER THE HARNESS RED-FIRST, 2026-09-12
+
+The scratch revert 10d9c35000f81743d67bc4167cf1c164338d1488 was dropped with
+  git reset -q --hard c381efdde8c8de984d10a8fba85ebe815b8fac5d
+(c381efdd is the captures commit on top of the fix e9482f68.) Untracked captures
+survived, as a hard reset leaves untracked files alone.
+
+Read back after the reset:
+  git rev-parse HEAD            c381efdde8c8de984d10a8fba85ebe815b8fac5d
+  git branch --show-current     parcel/scene-selection-snaps-back
+  git status --short            only `??` lines, all under
+                                docs/captures/2026-09-12-scene-selection-snaps-back/
+  src/renderer/state/effects-scene-follow.ts   PRESENT
+
+Rebuilt with `VITE_AURORA_DEBUG=1 npx electron-vite build`, exit 0. The bundle
+(dist/renderer/assets/*.js) then held:
+  installEffectsSceneFollow                    2 hits
+  }, [activeSectionIndex, boundSceneRef]);     0 hits (the mount effect is gone)
+
+The green run on that build is 43-restored-raster-timeline.log.

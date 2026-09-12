@@ -1,0 +1,169 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+
+ ❯ src/renderer/state/__tests__/effects-scene-follow.test.ts (22 tests | 6 failed) 10ms
+     ✓ the first step ever is an arrival and follows 1ms
+     × the SAME identity never moves the selection, whatever is selected 2ms
+     ✓ a different projectPath is a different section and follows 0ms
+     ✓ a different zoneId is a different section and follows 0ms
+     ✓ a different actId is a different section and follows 0ms
+     ✓ a different sectionIndex is a different section and follows 0ms
+     ✓ a different sceneRef is a different section and follows 0ms
+     ✓ nothing to follow to: the act default, an unreadable ref, no library 0ms
+     ✓ already on the section's scene: no write 0ms
+     ✓ arrival: a project already open when it installs is followed 0ms
+     ✓ arrival: opening a project after it installs is followed 0ms
+     ✓ changing the active section follows, from a scene the author picked 0ms
+     ✓ a section change that comes BACK to where it started still follows (A -> B -> A) 0ms
+     × SECTION ASSIGNMENT follows: an in-place sceneRef edit is seen through the history hub 1ms
+     × a section bound to nothing leaves the selection where it is 0ms
+     × sub-tab round trips, a scene edit and unrelated editor traffic keep the pick 1ms
+     ✓ another act, same section index, same sceneRef: follows 0ms
+     ✓ another zone, same act id, same index, same sceneRef: follows 0ms
+     ✓ another checkout with the same zone, act and refs: follows 0ms
+     × a same-directory reopen (a fresh project object, the same scenes) keeps the pick 0ms
+     × an edit that replaces the project object (addChunks) keeps the pick 0ms
+     ✓ installing twice is one follower, and uninstalling stops it 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/state/__tests__/effects-scene-follow.test.ts > sceneSelectionFollowStep: follow a CHANGE of section, never a repeat of one > the SAME identity never moves the selection, whatever is selected
+AssertionError: expected 'start' to be null
+
+- Expected:
+null
+
++ Received:
+"start"
+
+ ❯ src/renderer/state/__tests__/effects-scene-follow.test.ts:97:73
+     95|
+     96|   it('the SAME identity never moves the selection, whatever is selecte…
+     97|     expect(sceneSelectionFollowStep({ ...ID }, ID, library(), 'water')…
+       |                                                                         ^
+     98|     expect(sameSectionIdentity({ ...ID }, ID)).toBe(true);
+     99|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/renderer/state/__tests__/effects-scene-follow.test.ts > installEffectsSceneFollow: P2, the section is followed > SECTION ASSIGNMENT follows: an in-place sceneRef edit is seen through the history hub
+AssertionError: expected 'start' to be 'water' // Object.is equality
+
+Expected: "water"
+Received: "start"
+
+ ❯ src/renderer/state/__tests__/effects-scene-follow.test.ts:173:24
+    171|     if (!s0) throw new Error('fixture: section 0 is missing');
+    172|     s0.sceneRef = 'floor';
+    173|     expect(selected()).toBe('water');       // no store changed identi…
+       |                        ^
+    174|     fireHistory();
+    175|     expect(selected()).toBe('floor');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/renderer/state/__tests__/effects-scene-follow.test.ts > installEffectsSceneFollow: P2, the section is followed > a section bound to nothing leaves the selection where it is
+AssertionError: expected 'start' to be 'water' // Object.is equality
+
+Expected: "water"
+Received: "start"
+
+ ❯ src/renderer/state/__tests__/effects-scene-follow.test.ts:183:24
+    181|     pick('water');
+    182|     toSection(5);
+    183|     expect(selected()).toBe('water');
+       |                        ^
+    184|     toSection(6);                            // `gone`: no readable sc…
+    185|     expect(selected()).toBe('water');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/renderer/state/__tests__/effects-scene-follow.test.ts > installEffectsSceneFollow: P1, a pick survives everything that is not a section change > sub-tab round trips, a scene edit and unrelated editor traffic keep the pick
+AssertionError: expected 'start' to be 'water' // Object.is equality
+
+Expected: "water"
+Received: "start"
+
+ ❯ src/renderer/state/__tests__/effects-scene-follow.test.ts:200:24
+    198|     fireHistory();                           // an edit to a scene: sa…
+    199|     useEditorStore.setState({ collisionBrushSize: 3 });
+    200|     expect(selected()).toBe('water');
+       |                        ^
+    201|   });
+    202| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  src/renderer/state/__tests__/effects-scene-follow.test.ts > installEffectsSceneFollow: P4, a re-parse of the same scenes does not yank a pick > a same-directory reopen (a fresh project object, the same scenes) keeps the pick
+AssertionError: expected 'start' to be 'water' // Object.is equality
+
+Expected: "water"
+Received: "start"
+
+ ❯ src/renderer/state/__tests__/effects-scene-follow.test.ts:236:24
+    234|     pick('water');
+    235|     open(project('/p', TWO_ACTS));
+    236|     expect(selected()).toBe('water');
+       |                        ^
+    237|   });
+    238|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  src/renderer/state/__tests__/effects-scene-follow.test.ts > installEffectsSceneFollow: P4, a re-parse of the same scenes does not yank a pick > an edit that replaces the project object (addChunks) keeps the pick
+AssertionError: expected 'start' to be 'water' // Object.is equality
+
+Expected: "water"
+Received: "start"
+
+ ❯ src/renderer/state/__tests__/effects-scene-follow.test.ts:244:24
+    242|     pick('water');
+    243|     useProjectStore.getState().addChunks([]);
+    244|     expect(selected()).toBe('water');
+       |                        ^
+    245|   });
+    246| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 16 passed (22)
+   Start at  10:05:54
+   Duration  440ms (transform 274ms, setup 304ms, import 62ms, tests 10ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 6 failure record(s) in 1 file(s) (6 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        6   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/state/__tests__/effects-scene-follow.test.ts
+    [ASSERTION] sceneSelectionFollowStep: follow a CHANGE of section, never a repeat of one > the SAME identity never moves the selection, whatever is selected
+        AssertionError: expected 'start' to be null
+        why this bucket: name is AssertionError
+    [ASSERTION] installEffectsSceneFollow: P2, the section is followed > SECTION ASSIGNMENT follows: an in-place sceneRef edit is seen through the history hub
+        AssertionError: expected 'start' to be 'water' // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] installEffectsSceneFollow: P2, the section is followed > a section bound to nothing leaves the selection where it is
+        AssertionError: expected 'start' to be 'water' // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] installEffectsSceneFollow: P1, a pick survives everything that is not a section change > sub-tab round trips, a scene edit and unrelated editor traffic keep the pick
+        AssertionError: expected 'start' to be 'water' // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] installEffectsSceneFollow: P4, a re-parse of the same scenes does not yank a pick > a same-directory reopen (a fresh project object, the same scenes) keeps the pick
+        AssertionError: expected 'start' to be 'water' // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] installEffectsSceneFollow: P4, a re-parse of the same scenes does not yank a pick > an edit that replaces the project object (addChunks) keeps the pick
+        AssertionError: expected 'start' to be 'water' // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 6 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.

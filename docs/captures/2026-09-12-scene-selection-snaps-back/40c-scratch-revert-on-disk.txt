@@ -1,0 +1,9 @@
+=== the reverted mount effect, quoted back from disk (EffectsScenePanel.tsx)
+509:    if (useEditorStore.getState().selectedEffectsSceneId === follow) return;
+515:  }, [activeSectionIndex, boundSceneRef]);
+=== effects-scene-follow.ts: ABSENT
+=== installEffectsSceneFollow in App.tsx: 0
+=== the reverted BUILD, hit counts over dist/renderer/assets/*.js
+installEffectsSceneFollow 0
+sceneSelectionFollowStep 0
+old effect deps line 1

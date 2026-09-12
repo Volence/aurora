@@ -1,0 +1,84 @@
+=== run: vsplit-advisory-harness label=fix-sweep
+=== at: 2026-09-12T10:11:18-04:00
+=== worktree HEAD: c381efdde8c8de984d10a8fba85ebe815b8fac5d branch: parcel/scene-selection-snaps-back
+=== AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/0eb36743-1a69-4f1f-b7e4-62a77c584915/scratchpad/runs/fix-sweep-20260912T101118-2881415/aeon (fresh cp -a of snapshot taken 2026-09-12T09:54:05-04:00)
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/vsplit-advisory-harness-2881490-6714d93c — see HAZARD 6
+NOTE       CONTRACT PARSED FROM SOURCE (no sentence is typed in this file):
+        EFFECTS_V_FACTOR_LOCK=15, so the scene is dropped to v_factor 3
+        from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d/src/renderer/providers/effects-aeon.ts
+        MECHANISM      = "Two writers, one word: the parallax step recomputes Plane B's vertical s…" (427 chars)
+        REMEDY_LOCK    = "lock the plane (v_factor 15) and author the depth as a split"
+        REMEDY_HORIZ   = "express the depth horizontally instead (the layer's Plane B factor, or a Plane B curve), which the walker recomputes every frame"
+PASS  [0y] ANTI-VACUOUS: the three parsed clauses are distinct, non-empty, and none contains another
+        a parse that collapsed to "" would make every text row below pass trivially
+PASS  [0a] ANTI-VACUOUS: the build under test has the scene probe at all
+        /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d/dist
+        aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  [1a] ANTI-VACUOUS: the aeon project is open, with sections
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  [2a] the facet bar offers an Effects pill
+NOTE       fixture scenes before this run: ["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start"]
+PASS  [3a0] ANTI-VACUOUS: the Add-layer control was found and clicked
+        click result = "ok"
+PASS  [3a1] ANTI-VACUOUS: layer 0's top field exists and took a value
+        set result = "ok" (wanted 0)
+PASS  [3a2] ANTI-VACUOUS: layer 1's top field exists and took a value
+        set result = "ok" (wanted 96)
+PASS  [3b] ANTI-VACUOUS: the scene exists, has TWO layers, and starts LOCKED
+        id=vsplit_lock_probe v_factor=15 layers=2
+PASS  [4a0] the layer card offers a Plane B split control on layer 0
+        set result = "ok" (wanted at)
+PASS  [4a] ⚠ THE CONTROL IS REALLY THE CONTROL: L0 carries a vsplit, L1 does not, scene LOCKED
+        L0.vsplit={"at":0} L1.vsplit=undefined v_factor=15 — a locked scene with a split is LEGAL and must be silent
+PASS  [4b] ⚠ DISCRIMINATING (silence): a LOCKED scene with a split says NOTHING on screen
+        0 element(s) render the mechanism clause. This is the row that stops an always-on hint being read as a working feature — and the row a deleted feature ALSO passes, which is why 5a exists.
+        shot → scratchpad/shots-vsplit-advisory/4-locked-with-split-silent.png
+FAIL  [5a0] the v_factor spinner took a camera-tracking shift
+        set result = "no-element" (wanted 3)
+FAIL  [5a1] ANTI-VACUOUS: the DOCUMENT now holds the illegal combination
+        v_factor=15 (lock is 15) L0.vsplit={"at":0} — without this, every row below would be asking about a scene that is fine
+FAIL  [5a] ⚠ DISCRIMINATING for PRESENCE, and it CANNOT see paint: the MECHANISM is in the rendered DOM (5e/5g own "is it painted")
+        0 element(s) render it. Paired with 4b (same session, same scene, one field changed), this is the pair a deleted feature cannot pass.
+FAIL  [5b] ⚠ BOTH REMEDIES are in the rendered DOM — the engine offers two and they are different products (5c/5d own "are they painted")
+        lock=0 horiz=0. The one sentence Aurora had before row 80 offered only the lock.
+FAIL  [5b2] the author's OWN v_factor value is in the sentence, not a generic prohibition
+        0 element(s) render "Plane B's vertical scroll TRACKS THE CAMERA (v_factor 3; 15 is the lock sentinel)". (mechanism leaves seen: [])
+NOTE       AIM: dpr=undefined rect=undefined aim=(undefined,undefined) hit=<undefined>
+FAIL  [5c] ⚠ RENDERED AND NOT HIDDEN: elementFromPoint at the REMEDIES' own centre lands INSIDE them
+        inside=undefined hitTag=undefined hitText="undefined". A display:none hint still has a textContent; this is what separates the two. Aimed at the LAST clause on purpose — it is what a positional truncation hides.
+FAIL  [5d] and the browser agrees the remedies are visible (checkVisibility, opacity + CSS)
+        []
+        shot → scratchpad/shots-vsplit-advisory/5-unlocked-by-v_factor.png
+NOTE       MECHANISM ELEMENTS, COLLAPSED (the artifact [5e] and [5j] judge):
+        []
+FAIL  [5e] ⚠ VACUITY CLOSED: collapsed, the panel's mechanism is in the DOM and PAINTS NOTHING
+        0 mechanism element(s) inside a disclosure block (want 2: the v_factor row and layer 0's card): []. inText proves textContent still carries it — which is exactly why no row here may use textContent. visible/rects/blockHit are the measurement.
+FAIL  [5j] SCOPE HELD: the raster strip's own sentence is NOT converted and is still whole
+        0 mechanism element(s) with no disclosure: []. That is `canvas/raster-timeline.ts`'s `splitRefusal`, in a different collapsible section — O15's scope names the v_factor row and the layer cards, and this row is what makes "scope held" a measurement instead of a sentence in a packet.
+NOTE       DISCLOSURES ON SCREEN:
+        []
+FAIL  [5f] one "Why this happens" disclosure per converted advisory, visible, aria-expanded=false
+        0 disclosure(s) vs 0 converted mechanism element(s). A mechanism with no control to open it is a deleted feature with a textContent.
+NOTE       CLICK on disclosure 0 (the v_factor row's):
+        {"ok":false,"why":"no such disclosure","count":0}
+FAIL  [5f2] ANTI-VACUOUS: the disclosure was hit-testable at its own centre and was clicked
+        hit=undefined hitTag=undefined hitText="undefined" — a button under something else is not a control an author can reach
+NOTE       MECHANISM ELEMENTS, DISCLOSURE 0 EXPANDED (the artifact [5g] judges):
+        []
+        AIM (strict): {"found":false,"leaves":0}
+FAIL  [5g] ⚠ VACUITY CLOSED: expanded, the mechanism PAINTS and elementFromPoint lands INSIDE it
+        mech[0]={hasDisclosure:undefined, visible:undefined, rects:undefined, h:undefined} strict-hit inside=undefined on <undefined> "undefined". Paired with [5e], one session, one click apart — a build that always hides or always shows the mechanism cannot pass both.
+FAIL  [5g2] and it is ONE disclosure, not all of them: layer 0's card stayed collapsed
+        mech[1]={hasDisclosure:undefined, visible:undefined, rects:undefined}. Every advisory owning its own state is what stops one click reflowing the panel.
+HARNESS ERROR: TypeError: Cannot read properties of undefined (reading 'blockH')
+    at main (file:///home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d/scratchpad/vsplit-advisory-harness.mjs:865:32)
+=== END exit=2 at 2026-09-12T10:11:38-04:00

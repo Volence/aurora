@@ -1,0 +1,13 @@
+diff --git a/src/renderer/providers/effects-aeon.ts b/src/renderer/providers/effects-aeon.ts
+index 2ecd0da3..ec026d71 100644
+--- a/src/renderer/providers/effects-aeon.ts
++++ b/src/renderer/providers/effects-aeon.ts
+@@ -3630,7 +3630,7 @@ export function sceneSelectionFollowStep(
+   last: SectionIdentity | null, next: SectionIdentity,
+   library: EffectsSceneLibrary | null, selected: string | null,
+ ): string | null {
+-  if (last !== null && sameSectionIdentity(last, next)) return null;
++  // PLANTED: every step re-follows, the snap-back in store form (no identity check)
+   if (library === null) return null;
+   const follow = sceneSelectionFollow(library, { sceneRef: next.sceneRef });
+   if (follow === null || follow === selected) return null;

@@ -34,6 +34,7 @@ import { startBuildAndRunWithToasts } from './state/build-and-run';
 import { registerHistoryFactories } from './state/history-factories';
 import { registerAeonFacetModules, registerS1FacetModules } from './workspace/register-facets';
 import { useSessionLifecycle, useActTabSync } from './shell/session-lifecycle';
+import { installEffectsSceneFollow } from './state/effects-scene-follow';
 import { requestOpenTab, requestFocusIndex } from './shell/tab-activation';
 import { buildCommands } from './shell/commands';
 import { classicLevelTab, aeonLevelTab, untitledSpriteTab, PROJECT_SETUP_TAB, parseGuideTabId } from './shell/tabs';
@@ -126,6 +127,9 @@ export default function App() {
     registerHistoryFactories();   // must precede any edit: the hub builds no stack without it
     registerAeonFacetModules();
     registerS1FacetModules();
+    // The Effects scene selection follows the active section on every change
+    // of it, and never on a panel mount (SCENE-SELECTION-SNAPS-BACK).
+    installEffectsSceneFollow();
   }, []);
   useSessionLifecycle();
   useActTabSync();

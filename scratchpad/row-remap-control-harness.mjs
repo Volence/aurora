@@ -686,6 +686,13 @@ async function main() {
     // `ojz_act1_start`. A `selectScene` issued BEFORE the mount is therefore
     // OVERWRITTEN by the app, correctly and by design.
     //
+    // ⚠ SINCE 2026-09-12 THE MOUNT NO LONGER WRITES (SCENE-SELECTION-SNAPS-BACK,
+    // docs/reviews/2026-09-12-scene-selection-snaps-back.md). The follow is now
+    // a store subscription (src/renderer/state/effects-scene-follow.ts). It fires
+    // at project open and on a change of section, never on a mount, so a
+    // `selectScene` made after the project opens now sticks. The order below and
+    // [1c2] still hold, and still assert the precondition.
+    //
     // ⚠ AND THE OVERWRITE IS SILENT, which is what actually cost the rows below.
     // With the call in its old place the panel painted `ojz_act1_start`'s cards
     // while every row here read `ojz_act1_depth` out of `scenesJson()`. The

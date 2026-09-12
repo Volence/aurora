@@ -1,0 +1,48 @@
+=== run: effects-deform-harness label=fix-sweep
+=== at: 2026-09-12T10:10:52-04:00
+=== worktree HEAD: c381efdde8c8de984d10a8fba85ebe815b8fac5d branch: parcel/scene-selection-snaps-back
+=== AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/0eb36743-1a69-4f1f-b7e4-62a77c584915/scratchpad/runs/fix-sweep-20260912T101052-2878449/aeon (fresh cp -a of snapshot taken 2026-09-12T09:54:05-04:00)
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/effects-deform-harness-2878482-a9a00a79 — see HAZARD 6
+        aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  [1a] ANTI-VACUOUS: the aeon project is open, with sections
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  [2a] the facet bar offers an Effects pill
+PASS  [2b] ANTI-VACUOUS: the Effects panel is mounted
+        ["Scenes","Scenes","Layers (5/16 per scene)","Layers (5/16 per scene)","Section assignment","Section assignment"]
+FAIL  [2c] the Scene form is open — it arrives collapsed since d-26b [instrument]
+        open → no-scene-header
+NOTE       fixture scenes before this run: ["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start"]
+PASS  [3a] ANTI-VACUOUS: the scene this harness authored exists in the model
+        before=["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start"] after=["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start","deform_probe"]
+PASS  [3b] the panel is editing THAT scene
+        selectedScene()=deform_probe
+PASS  [3c] ANTI-VACUOUS: the fresh scene carries NO deform key of any kind — every row below is a DELTA from nothing
+        {"schema":1,"id":"deform_probe","layers":[{"world_y":0,"fa":"FACTOR_1","fb":"FACTOR_1"}],"v_factor":15}
+FAIL  [0a] the build under test contains the deform rows (this branch, not master)
+        /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d/dist — controls titled deform_fg: []
+cleanup: tree under pid 2878496 (11 process(es)):
+           2878496 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           2878512 Xvfb :218 -screen 0 1680x1050x24 -nolisten tcp
+           2878578 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           2878585 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           2878588 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2878589 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2878591 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2878618 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2878625 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2878627 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           2878635 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 51 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 351 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+HARNESS ERROR: Error: wrong build — VITE_AURORA_DEBUG=1 npx electron-vite build
+    at main (file:///home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d/scratchpad/effects-deform-harness.mjs:632:35)
+=== END exit=2 at 2026-09-12T10:11:05-04:00

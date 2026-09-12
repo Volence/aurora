@@ -1,0 +1,5 @@
+ src/renderer/App.tsx                               |  4 -
+ .../components/effects/EffectsScenePanel.tsx       | 35 +++++---
+ src/renderer/providers/effects-aeon.ts             | 72 ----------------
+ src/renderer/state/effects-scene-follow.ts         | 99 ----------------------
+ 4 files changed, 22 insertions(+), 188 deletions(-)

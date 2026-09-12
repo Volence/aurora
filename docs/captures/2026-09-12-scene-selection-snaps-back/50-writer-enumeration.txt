@@ -1,0 +1,68 @@
+== CMD 1: grep -rn "selectedEffectsSceneId\|setSelectedEffectsSceneId" src/ test/ scratchpad/*.mjs scratchpad/lib/ --include=*.ts --include=*.tsx --include=*.mjs
+src/renderer/debug-hooks.ts:1508:    selectedScene: () => useEditorStore.getState().selectedEffectsSceneId,
+src/renderer/debug-hooks.ts:1509:    selectScene: (id) => useEditorStore.getState().setSelectedEffectsSceneId(id),
+src/renderer/providers/effects-aeon.ts:3533: * highlights whatever `selectedEffectsSceneId` holds and the forms below edit
+src/renderer/state/effects-scene-follow.ts:86:      useEditorStore.getState().selectedEffectsSceneId);
+src/renderer/state/effects-scene-follow.ts:87:    if (select !== null) useEditorStore.getState().setSelectedEffectsSceneId(select);
+src/renderer/state/__tests__/effects-scene-follow.test.ts:61:const selected = (): string | null => useEditorStore.getState().selectedEffectsSceneId;
+src/renderer/state/__tests__/effects-scene-follow.test.ts:62:const pick = (id: string): void => useEditorStore.getState().setSelectedEffectsSceneId(id);
+src/renderer/state/__tests__/effects-scene-follow.test.ts:72:  useEditorStore.setState({ activeSectionIndex: 0, selectedEffectsSceneId: null, effectsSubTab: 'parallax' });
+src/renderer/state/editorStore.ts:324:  selectedEffectsSceneId: string | null;
+src/renderer/state/editorStore.ts:331:   * `selectedEffectsSceneId` is: a sibling has to be able to write it. A tile
+src/renderer/state/editorStore.ts:348:   * The id and not the document, on `selectedEffectsSceneId`'s own reasoning:
+src/renderer/state/editorStore.ts:361:   * `selectedEffectsSceneId` was (ROADMAP item 43): MapViewport is a SIBLING,
+src/renderer/state/editorStore.ts:554:  setSelectedEffectsSceneId: (id: string | null) => void;
+src/renderer/state/editorStore.ts:772:  selectedEffectsSceneId: null,
+src/renderer/state/editorStore.ts:873:  setSelectedEffectsSceneId: (id) => set({ selectedEffectsSceneId: id }),
+src/renderer/components/effects/BgAnimBandPanel.tsx:304:  // `selectedEffectsSceneId` took for part 1, for exactly the same reason.
+src/renderer/components/effects/EffectsScenePanel.tsx:415:  const selectedId = useEditorStore((s) => s.selectedEffectsSceneId);
+src/renderer/components/effects/EffectsScenePanel.tsx:416:  const setSelectedId = useEditorStore((s) => s.setSelectedEffectsSceneId);
+src/renderer/components/effects/EffectsScenePanel.tsx:486:  // `selectedEffectsSceneId` happened to hold, which on arrival is
+src/renderer/components/MapViewport.tsx:206:  return resolveSelectedScene(library, useEditorStore.getState().selectedEffectsSceneId);
+src/renderer/components/MapViewport.tsx:657:  const selectedEffectsSceneId = useEditorStore((s) => s.selectedEffectsSceneId);
+src/renderer/components/MapViewport.tsx:1714:    activeFacet, selectedEffectsSceneId, guideHover,
+src/renderer/components/effects/RasterTimelineStrip.tsx:118:  const selectedId = useEditorStore((s) => s.selectedEffectsSceneId);
+scratchpad/effects-scene-selection-harness.mjs:9:// `resolveSelectedScene(library, selectedEffectsSceneId)` is WHOLLY independent
+scratchpad/effects-scene-selection-harness.mjs:440:    // THE ROW THE FIX IS ABOUT. Before it, `selectedEffectsSceneId` was null on
+scratchpad/effects-guides-harness.mjs:366:    // EffectsScenePanel; it is now editorStore.selectedEffectsSceneId, which is
+scratchpad/row-remap-control-harness.mjs:684:    // the tab): on mount it calls `setSelectedEffectsSceneId(sceneSelectionFollow(
+== CMD 2: grep -n "setSelectedId" src/renderer/components/effects/EffectsScenePanel.tsx   (the panel aliases the setter)
+416:  const setSelectedId = useEditorStore((s) => s.setSelectedEffectsSceneId);
+526:    setSelectedId(newId.trim());
+555:                <button key={e.id} type="button" onClick={() => setSelectedId(e.id)}
+== CMD 3: grep -rn "useEditorStore.setState\|editorStore.setState\|persist(\|getInitialState\|initialEditorState\|resetEditor" src/renderer --include=*.ts --include=*.tsx | grep -v __tests__
+src/renderer/state/editorStore.ts:1014:  useEditorStore.setState({ marquee: null, pasting: false });
+src/renderer/components/effects/BgAnimBandPanel.tsx:427:      useEditorStore.setState({ bandCandidate: { ...b, staticBase: want } });
+== CMD 4: grep -rn "selectScene(" src/renderer scratchpad/*.mjs --include=*.ts --include=*.tsx --include=*.mjs   (callers of the debug writer)
+src/renderer/debug-hooks.ts:881:  selectScene(id: string | null): void;
+scratchpad/camera-preview-harness.mjs:384:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_FLAT)})`);
+scratchpad/camera-preview-harness.mjs:604:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_DEEP)})`);
+scratchpad/camera-preview-harness.mjs:663:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_FLAT)})`);
+scratchpad/d27-four-survivors-harness.mjs:436:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+scratchpad/d27-disputed-six-harness.mjs:503:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+scratchpad/d27-effects-focus-harness.mjs:483:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+scratchpad/effects-drift-harness.mjs:355:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+scratchpad/dpr-guides-offset-harness.mjs:39:// id, so `selectScene(null)` draws the FIRST fixture scene's five guides. Master run 1 of
+scratchpad/dpr-guides-offset-harness.mjs:352:    const select = async (id) => { await c.evalExpr(`window.__dbg.aeon.selectScene(${J(id)})`); await sleep(500); await repaint(); };
+scratchpad/numberfield-empty-harness.mjs:85:    window.__dbg.aeon.selectScene(list[0].id);
+scratchpad/layer-card-height-harness.mjs:361:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+scratchpad/layer-card-height-harness.mjs:587:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+scratchpad/guard-surface-harness.mjs:381:async function selectScene(c, id) {
+scratchpad/guard-surface-harness.mjs:382:  await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(id)})`);
+scratchpad/guard-surface-harness.mjs:385:  if (picked !== id) throw new Error(`selectScene(${id}) landed on ${picked}`);
+scratchpad/guard-surface-harness.mjs:469:    let text = await selectScene(c, 'gap_sprite_mask');
+scratchpad/guard-surface-harness.mjs:497:    text = await selectScene(c, 'gap_accept_control');
+scratchpad/guard-surface-harness.mjs:505:    text = await selectScene(c, 'gap_curve_anchor');
+scratchpad/guard-surface-harness.mjs:518:    text = await selectScene(c, 'gap_curve_boundary');
+scratchpad/guard-surface-harness.mjs:528:    text = await selectScene(c, 'gap_period_64');
+scratchpad/guard-surface-harness.mjs:546:    text = await selectScene(c, 'gap_period_100');
+scratchpad/guard-surface-harness.mjs:569:    text = await selectScene(c, 'gap_sprite_mask');
+scratchpad/plane-y-referent-capture.mjs:234:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+scratchpad/ramp-scroll-mode-harness.mjs:465:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_VDEF)})`);
+scratchpad/rowremap-author-harness.mjs:477:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+scratchpad/scene-anchor-writer-harness.mjs:472:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+scratchpad/sec7-worldwater-harness.mjs:501:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+scratchpad/refusal-box-fit-harness.mjs:441:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+scratchpad/row-remap-control-harness.mjs:702:    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+scratchpad/sec7-ui-reauthor-harness.mjs:531:    async function selectScene(tag) {
+scratchpad/sec7-ui-reauthor-harness.mjs:548:    const selB = await selectScene('B');
