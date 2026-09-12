@@ -438,6 +438,23 @@ function disposeStacksFor(ref: ZoneActRef | null): void {
 let versionClock = 0;
 function nextVersion(): number { return ++versionClock; }
 
+/**
+ * THE CLASSIC EDIT SERIAL (SWITCH-WINDOW-EDIT-DROPPED). Moved on by every
+ * content change to the loaded level doc, which is exactly the three places that
+ * bump `domainGen` (`applyCommit`, `writeLayoutSnapshot`, `writeArtSnapshot`), and
+ * by nothing else. A project switch reads it at consent and again at its commit
+ * (state/edit-consent.ts): a difference means the level was edited after the user
+ * agreed to the switch, and the switch does not commit over it.
+ *
+ * NOT `domainGen`, which was the obvious candidate. `openAct` and `reset` put
+ * that back to `{}`, and neither is an edit: an act switch made while a project
+ * loads would read as an edit and refuse a clean open (after a Discard & open,
+ * `domainGen` is still non-empty, so the reset is a visible change). Module
+ * level, like `versionClock`, so no `set({ ...IDLE })` can rewind it.
+ */
+let editSerial = 0;
+export function classicEditSerial(): number { return editSerial; }
+
 // A monotonically-increasing token guards against a slow read for act A landing
 // after the user has already selected act B — only the latest request commits.
 let loadToken = 0;
@@ -647,6 +664,7 @@ export function readLayoutSnapshot(): ClassicLayoutSnapshot {
 }
 
 export function writeLayoutSnapshot(snap: ClassicLayoutSnapshot): void {
+  editSerial += 1; // an undo or redo changes the doc: see `editSerial`
   useClassicLevelStore.setState((s) => ({
     doc: { ...s.doc!, fg: snap.fg, bg: snap.bg, objects: snap.objects, start: snap.start },
     dirty: restoreDomainDirty(s.dirty, snap.dirty, LAYOUT_DOMAINS),
@@ -668,6 +686,7 @@ export function readArtSnapshot(): ClassicArtSnapshot {
 }
 
 export function writeArtSnapshot(snap: ClassicArtSnapshot): void {
+  editSerial += 1; // see writeLayoutSnapshot
   useClassicLevelStore.setState((s) => ({
     doc: {
       ...s.doc!,
@@ -810,6 +829,7 @@ function applyCommit(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: VersionEffe
     }
   }
 
+  editSerial += 1; // every committed edit: see `editSerial`
   useClassicLevelStore.setState({
     doc: newDoc,
     dirty: { ...s.dirty, ...dirtyPatch },

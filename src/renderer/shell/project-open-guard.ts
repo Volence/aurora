@@ -149,10 +149,13 @@ export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
   //   whose only exit throws the work away, in the exact form the three surfaces
   //   above were fixed for.
   //
-  // NOT A USER GESTURE, and that is written here rather than left implied: no
-  // production road reaches it (the census below still holds, and it is what
-  // makes this a hardening rather than a bug fix). It IS reachable in dev and by
-  // the CDP harnesses, which drive that hook every run.
+  // NOT A USER GESTURE WITH THE DIRT ALREADY THERE, and that is written here
+  // rather than left implied: no production road reaches it with the aeon edits
+  // resident at the moment this guard asks (the census below still holds for
+  // that, and it is what makes this a hardening rather than a bug fix). It IS
+  // reachable in dev and by the CDP harnesses, which drive that hook every run.
+  // ⚠ THE USER'S OWN DOOR REACHED IT TOO, by an edit made AFTER this guard
+  // answered: see "RIGHT ABOUT THE MECHANISM, WRONG ABOUT THE EXTENT" below.
   //
   // THE CLASSIC HALF IS DEFENSIVE ONLY — `classicDirty` implies
   // `openEngine() === 's1'` by construction (see CLASSIC below), so its term can
@@ -197,7 +200,8 @@ export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
   // WHERE A REPRODUCTION WOULD COME FROM, since the state is constructible: the
   // two DEBUG hooks that open a project with no guard at all, `__aurora.classic
   // .openDir` and `__aurora.aeon.open` (renderer/debug-hooks.ts). Those are the
-  // only unguarded doors left, and neither is a user gesture.
+  // only unguarded doors left, and neither is a user gesture. (The only DOORS,
+  // not the only road: see the 2026-09-12 section below.)
   //
   // ── ONE MECHANISM ABOVE MOVED (2026-09-10, UX seat A's F6) ───────────────
   // The AEON paragraph's "`openEngine()` can flip from 'aeon' to 's1' only
@@ -240,6 +244,22 @@ export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
   // and a save still clears it, and the same classic dirt with a classic project
   // open still offers Save. That is what the two `engine ===` terms cost, stated
   // as a measurement rather than as an argument.
+  //
+  // ── RIGHT ABOUT THE MECHANISM, WRONG ABOUT THE EXTENT (2026-09-12) ────────
+  // SWITCH-WINDOW-EDIT-DROPPED (docs/reviews/2026-09-12-switch-window-measure.md,
+  // section 7, point 3) reached "a classic open over a resident, dirty aeon
+  // project" on the user's own door, no debug hook involved: the aeon project
+  // CLEAN when this guard asks, an aeon edit landing while the classic bridge
+  // reads the new directory (a cold classic open is 'opening', so `openEngine()`
+  // still answers 'aeon' and every aeon surface keeps editing), then the classic
+  // commit, which masked it. The paragraphs above reason from the state at the
+  // moment this guard answers, and about that they are right; they did not
+  // cover the state changing after it. That road now ends at the commit instead
+  // of here: a switch refuses to commit over anything edited after consent
+  // (state/edit-consent.ts, read by classicProjectStore.openDirectory and
+  // aeon-open.openAeonProject), so the open fails with the aeon edit still open
+  // and savable. The debug hooks are again the only way into this state, and
+  // this guard's handling of it is unchanged.
   const unsavable: string[] = [];
   // The two savers' own predicates, verbatim. A dirty domain whose saver will not
   // fire is unsavable in exactly the sense the canvas/sprite/art terms mean.
@@ -441,6 +461,11 @@ export function unsavedAgentRefusal(
  * tab-activation.ts: opening a project is a modal-ish, rare action, so a
  * second open racing a pending confirm is an edge case not worth the extra
  * state — revisit only if users actually hit a race in practice.
+ *
+ * WHAT IT DOES NOT COVER is the time after it answers. An edit made while the
+ * open it approved is still loading is not this function's question: the door
+ * takes a consent token the moment this resolves (state/edit-consent.ts), and
+ * the switch's commit refuses to run over anything edited since.
  */
 export async function confirmProjectOpen(): Promise<boolean> {
   const snap = currentOpenDirtySnapshot();

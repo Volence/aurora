@@ -25,6 +25,8 @@ import { useClassicLevelStore } from './classicLevelStore';
 // coalesced summary looks like (notice.ts), and this toast is one reader of each.
 import { bgUnresolvedCauseText } from '../../core/formats/bg-library';
 import { nameSome } from '../../core/project/notice';
+import { captureEditConsent, editedSinceConsentMessage, type EditConsent } from './edit-consent';
+import { openProjectDir } from './open-project';
 
 /**
  * A WINDOW HOLDS EXACTLY ONE PROJECT, and this is where the aeon loader keeps
@@ -69,7 +71,14 @@ function closeResidentClassicProject(): void {
   useClassicProjectStore.getState().reset();
 }
 
-export async function openAeonProject(dir: string): Promise<boolean> {
+/**
+ * `consent` is the edit counters as they stood when this switch was agreed to
+ * (state/edit-consent.ts): passed by a door with a dialog, taken here at the
+ * start by a door with none.
+ */
+export async function openAeonProject(
+  dir: string, consent: EditConsent = captureEditConsent(),
+): Promise<boolean> {
   const store = useProjectStore.getState();
   try {
     store.setLoading(true);
@@ -81,6 +90,28 @@ export async function openAeonProject(dir: string): Promise<boolean> {
     // strictly safer than the old ordering — if addRecentProject throws, nothing
     // has been committed (the old path could fail with config set, project null).
     await recordRecentProject(dir, aeon.config.name);
+    // AN EDIT SINCE CONSENT CANCELS THE SWITCH (SWITCH-WINDOW-EDIT-DROPPED).
+    // The recents await above is the last await of this open, so from here to
+    // the end of the commit nothing can interleave. The project being left
+    // stayed editable through the load and the recents IPC; the commit below
+    // would close it (classic) or replace it (aeon) over an edit made in that
+    // window, with no dialog. So the open fails the way a failed aeon open
+    // always has: `setError`, and everything resident stays. The recents entry
+    // just written stays too: the directory did load, and is one the user asked
+    // to open. What this commit discards:
+    //   classicLevel  closeResidentClassicProject drops the loaded act.
+    //   aeonProject   openLoaded replaces the project object.
+    //   composer      replaced below on every aeon open (openDocument / closeDocument).
+    //   documents     when the session key changes (resetProjectRuntime).
+    // Before closeResidentClassicProject and far from openLoaded, so the
+    // no-await stretch the constraint further down protects is untouched.
+    const cancelled = editedSinceConsentMessage(consent, {
+      classicLevel: true, aeonProject: true, documents: openProjectDir() !== dir, composer: true,
+    });
+    if (cancelled) {
+      store.setError(cancelled);
+      return false;
+    }
     // The classic project goes only now, with the aeon project loaded and no
     // await left before its commit. It used to go before the load, so an aeon
     // directory that failed to load closed a resident Sonic 1 project for
