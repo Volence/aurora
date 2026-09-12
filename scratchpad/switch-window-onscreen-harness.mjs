@@ -383,20 +383,49 @@ async function rows(c, O, { S1a, S1b, AEONc }) {
     return false;
   };
 
-  /** The open and the edit, in ONE evaluate: the edit lands before the open's first IPC await resolves. */
-  const openWithEdit = (openCall) => c.json(String.raw`(async () => {
-    const hashBefore = window.__dbg.classic.docHash();
-    const p = ${openCall};
-    const stamp = window.__dbg.classic.stampLayoutCell('fg');
-    const inWindow = { classic: window.__dbg.projStatus().status, aeonOpen: window.__dbg.aeon.state().open };
-    const hashAfterStamp = window.__dbg.classic.docHash();
-    const out = await p;
-    return { hashBefore, stamp, inWindow, hashAfterStamp, out, hashAfterOpen: window.__dbg.classic.docHash() };
-  })()`);
+  /** Start an open and POLL for its outcome.
+   *  ⚠ RUN 1 ABORTED at SW.c2 with `Runtime.evaluate: {"code":-32000,"message":"Promise was
+   *  collected"}`: Chromium can collect a long promise that `awaitPromise` is waiting on
+   *  (classic-wheel-passive-harness.mjs and s1-boss-sprites-harness.mjs record the same). So no
+   *  evaluate here awaits an open: the page records the outcome on `window.__swOut` and this
+   *  polls it. `body` must declare `p` (the open's promise) and may declare `pre` (synchronous
+   *  reads, returned at once). */
+  const openAndWait = async (body, maxMs = 40000) => {
+    const key = `sw${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const pre = JSON.parse(await c.evalExpr(String.raw`(() => {
+      window.__swOut = window.__swOut || {};
+      const rec = { done: false };
+      window.__swOut[${J(key)}] = rec;
+      ${body}
+      p.then((v) => { rec.done = true; rec.out = v; }, (e) => { rec.done = true; rec.err = String((e && e.message) || e); });
+      return JSON.stringify(typeof pre === 'undefined' ? {} : pre);
+    })()`));
+    const t = Date.now();
+    let rec = null;
+    while (Date.now() - t < maxMs) {
+      rec = await c.json(`window.__swOut[${J(key)}]`).catch(() => null);
+      if (rec && rec.done) break;
+      await sleep(150);
+    }
+    const out = !rec || !rec.done ? { timedOut: maxMs } : rec.err !== undefined ? { threw: rec.err } : rec.out;
+    return { pre, out };
+  };
+  /** The open and the edit in ONE synchronous evaluate: the edit lands before the open's first IPC
+   *  await resolves. ⚠ RUN 1 also read `{}` from this row's first version: it handed `c.json` an
+   *  async IIFE, and `c.json` stringified the PENDING promise instead of awaiting it. */
+  const openWithEdit = async (openCall) => {
+    const { pre, out } = await openAndWait(String.raw`
+      const hashBefore = window.__dbg.classic.docHash();
+      const p = ${openCall};
+      const stamp = window.__dbg.classic.stampLayoutCell('fg');
+      const pre = { hashBefore, stamp, hashAfterStamp: window.__dbg.classic.docHash(),
+        inWindow: { classic: window.__dbg.projStatus().status, aeonOpen: window.__dbg.aeon.state().open } };`);
+    return { ...pre, out, hashAfterOpen: await c.evalExpr('window.__dbg.classic.docHash()') };
+  };
 
   // ── SW.0: setup ─────────────────────────────────────────────────────────
   console.log('\n──── setup: S1a open, a level tab loaded by a real click ────');
-  const o0 = await c.evalExpr(`window.__dbg.openDir(${J(S1a)})`);
+  const o0 = (await openAndWait(`const p = window.__dbg.openDir(${J(S1a)});`)).out;
   await waitFor(async () => (await proj()).status === 'open', 20000);
   const h0 = await home();
   const card = await realClick(GHZ1_CARD, { scroll: true });
@@ -457,7 +486,7 @@ async function rows(c, O, { S1a, S1b, AEONc }) {
   console.log('\n──── SW.c1: CONTROL, classic to classic, no edit ────');
   const dmc1 = await dismissBanner();
   const bc1 = await bannerPresent();
-  const oc1 = await c.evalExpr(`window.__dbg.openDir(${J(S1b)})`);
+  const oc1 = (await openAndWait(`const p = window.__dbg.openDir(${J(S1b)});`)).out;
   await sleep(1200);
   const hc1 = await home(); const pc1 = await c.json(PAINTED(BANNER_TEXT));
   check('SW.c1', 'CONTROL: with no edit, the same classic open COMMITS: banner absent before and after, Home names S1b',
@@ -467,7 +496,7 @@ async function rows(c, O, { S1a, S1b, AEONc }) {
   // ── SW.c2: CONTROL, classic to aeon with no edit ────────────────────────
   console.log('\n──── SW.c2: CONTROL, classic to aeon, no edit ────');
   const bc2 = await bannerPresent();
-  const oc2 = await c.evalExpr(`window.__dbg.aeon.open(${J(AEONc)})`);
+  const oc2 = (await openAndWait(`const p = window.__dbg.aeon.open(${J(AEONc)});`)).out;
   await sleep(1500);
   const hc2 = await home(); const pc2 = await c.json(PAINTED(BANNER_TEXT)); const ac2 = await aeonSt(); const prc2 = await proj();
   await shot('sw-c2-committed');
