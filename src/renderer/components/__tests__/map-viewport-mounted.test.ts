@@ -78,7 +78,10 @@ import { SECTION_PLANE_WORDS } from '../../../core/collision/collision-cell-reso
 import { readCrossover, handOffFrom } from '../../../core/collision/layer-transition';
 import { snapMarquee, effectiveGranularity, type MapClipboard } from '../../../core/editing/map-clipboard';
 import { selectionToChunk } from '../../../core/editing/selection-to-chunk';
+import { chunkOriginAt } from '../../../core/editing/chunk-links';
 import { SCREEN_WIDTH } from '../../../core/model/screen';
+import ChunkLinkOptions from '../ChunkLinkOptions';
+import { Chip } from '../ui';
 
 // ── the fixture ────────────────────────────────────────────────────────────────
 
@@ -4163,5 +4166,370 @@ describe('the hover bar says where the cursor is: section, local tile and world 
     useViewStore.getState().setOverlay('showCollision', false);      // B alone
     s.on().onMouseMove(tileAt(hover.col, hover.row));
     says(bar(s), ['Coll B #14'], 'with plane B alone shown the readout did not read plane B');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// map-coverage-5 STARTS HERE. Same harness, same rules as map-coverage-3 above.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════════
+// A PAINT OR COLLISION STROKE CROSSING A SECTION BOUNDARY (`recordPaint`'s flush).
+//
+// COVERAGE. `recordPaint` states the rule: "A change of section or plane flushes
+// the stroke and starts a new one — one command per contiguous run, never one
+// spanning two sections." Every stroke row above runs on a one-section act,
+// where that flush cannot fire. A `set-tiles` or `set-collision-edit` command
+// names ONE `sectionIndex`, so a stroke that did not flush would carry section
+// 1's cells, and section 1's old words, into a command against section 0: undo
+// would write them into the wrong section and leave the right one painted.
+//
+// Section 1 has its own fills (`FG_S1`, and its own collision shapes below), so
+// every such wrong write is a wrong VALUE and `offFill` sees it.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('a stroke crossing a section boundary lands one command per section, undone newest first', () => {
+  /** The camera parked so the boundary sits mid-VIEWPORT, at client x 320. */
+  const VIEW = { vpX: SECTION_PIXEL_SIZE - 320, vpY: 0, zoom: 1 };
+  const worldAt = (p: { x: number; y: number }) => mouse(p.x - VIEW.vpX, p.y - VIEW.vpY);
+  const W = SECTION_TILES_WIDE;
+  const LAST = W - 1;
+  /** Section 1's collision shapes: neither act1's section-0 shapes nor PICK. */
+  const S1_SHAPE = { a: 5, b: 6 } as const;
+  const PICK = 9;
+
+  function sec(i: 0 | 1): Section {
+    const s = useProjectStore.getState().project?.zones[0]?.acts[0]?.sections[i];
+    if (!s) throw new Error(`map-viewport-mounted: act1 has no section ${i}; the two-section fixture moved`);
+    return s;
+  }
+  /** Indices of `words` off `fill`, ascending. */
+  const offFill = (words: ArrayLike<number>, fill: number): number[] => {
+    const out: number[] = [];
+    for (let i = 0; i < words.length; i++) if (words[i] !== fill) out.push(i);
+    return out;
+  };
+  const fgOff = (i: 0 | 1) => offFill(sec(i).tileGrid.nametable, i === 0 ? FG_FILL.act1 : FG_S1);
+  const collOff = (i: 0 | 1, plane: 'a' | 'b') => {
+    const words = plane === 'a' ? sec(i).collisionEdit : sec(i).collisionEditB;
+    if (!words) throw new Error(`map-viewport-mounted: plane ${plane} of section ${i} is unseeded`);
+    return offFill(words, collWord(i === 0 ? COLL_SHAPE.act1[plane] : S1_SHAPE[plane]));
+  };
+  /** Both planes of both sections, as one value a row compares whole. */
+  const allColl = () => ({
+    s0: { a: collOff(0, 'a'), b: collOff(0, 'b') },
+    s1: { a: collOff(1, 'a'), b: collOff(1, 'b') },
+  });
+
+  beforeEach(() => {
+    makeAct1TwoSections();
+    useViewStore.setState(VIEW);
+  });
+
+  afterEach(() => {
+    useViewStore.getState().setOverlay('showSolidBothPlanes', false);
+    useEditorStore.getState().setCollisionPaintBothPlanes(false);
+  });
+
+  it('a TILE stroke from section 0 into section 1 is two commands: the first undo takes back section 1 only', async () => {
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-tile');
+    ed.setEditingLayer('fg');
+    ed.setSelectedTileIndex(5);
+    const row = 3;
+    const s = await mountMap();
+    s.on().onMouseDown(worldAt(tileCentre(0, LAST - 1, row)));
+    s.on().onMouseMove(worldAt(tileCentre(0, LAST, row)));
+    s.on().onMouseMove(worldAt(tileCentre(1, 0, row)));
+    s.on().onMouseMove(worldAt(tileCentre(1, 1, row)));
+    const s0 = [row * W + LAST - 1, row * W + LAST];
+    const s1 = [row * W, row * W + 1];
+    expect([fgOff(0), fgOff(1)], 'the stroke did not paint both sides of the boundary, each in its own section')
+      .toEqual([s0, s1]);
+    win!.dispatch('mouseup', {});
+    focusedHistory()!.undo();
+    expect([fgOff(0), fgOff(1)], 'the first undo did not take back exactly the section-1 run, in section 1')
+      .toEqual([s0, []]);
+    focusedHistory()!.undo();
+    expect([fgOff(0), fgOff(1)], 'the second undo did not take back the section-0 run').toEqual([[], []]);
+    expect(focusedHistory()!.canUndo, 'the crossing stroke left more than two entries').toBe(false);
+  });
+
+  it('a BOTH-PLANES collision stroke from section 0 into section 1 is two commands, each putting back both planes of its own section', async () => {
+    seedCollision();
+    sec(1).collisionEdit = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(S1_SHAPE.a));
+    sec(1).collisionEditB = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(S1_SHAPE.b));
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-collision');
+    ed.setSelectedCollisionProfile(PICK);
+    ed.setSelectedCollisionSolidity('all');
+    ed.setCollisionPaintPlane('a');
+    ed.setCollisionPaintBothPlanes(true);
+    ed.setCollisionBrushSize(1);
+    ed.setCollisionCrossoverBrush('keep');
+    ed.setCollisionCrossoverSpanMode('cell');
+    const cr = 1;
+    const lastCell = W / 2 - 1;
+    const s = await mountMap();
+    s.on().onMouseDown(worldAt(tileCentre(0, 2 * lastCell, 2 * cr)));   // section 0's last cell
+    s.on().onMouseMove(worldAt(tileCentre(1, 0, 2 * cr)));             // section 1's first
+    const s0 = cellSubTiles(lastCell, cr);
+    const s1 = cellSubTiles(0, cr);
+    expect(allColl(), 'the stroke did not paint both planes on both sides of the boundary')
+      .toEqual({ s0: { a: s0, b: s0 }, s1: { a: s1, b: s1 } });
+    win!.dispatch('mouseup', {});
+    focusedHistory()!.undo();
+    expect(allColl(), 'the first undo did not take back exactly section 1, on both of its planes')
+      .toEqual({ s0: { a: s0, b: s0 }, s1: { a: [], b: [] } });
+    focusedHistory()!.undo();
+    expect(allColl(), 'the second undo did not take back section 0 on both planes')
+      .toEqual({ s0: { a: [], b: [] }, s1: { a: [], b: [] } });
+    expect(focusedHistory()!.canUndo, 'the crossing stroke left more than two entries').toBe(false);
+  });
+
+  it('a stroke that lands on the SAME cell of the next section paints it, rather than skipping it as the cell just painted', async () => {
+    // `paintCollisionCell`'s drag cache: "same cursor cell — skip". Its key
+    // starts with the section index, and that is the only thing separating
+    // cell (3, 1) of section 0 from cell (3, 1) of section 1. A pointer event
+    // can jump that far: at zoom 0.25 both cells are inside one 640px viewport.
+    const ZOOMED = { vpX: 0, vpY: 0, zoom: 0.25 };
+    useViewStore.setState(ZOOMED);
+    const at = (p: { x: number; y: number }) =>
+      mouse((p.x - ZOOMED.vpX) * ZOOMED.zoom, (p.y - ZOOMED.vpY) * ZOOMED.zoom);
+    seedCollision();
+    sec(1).collisionEdit = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(S1_SHAPE.a));
+    sec(1).collisionEditB = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(S1_SHAPE.b));
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-collision');
+    ed.setSelectedCollisionProfile(PICK);
+    ed.setSelectedCollisionSolidity('all');
+    ed.setCollisionPaintPlane('a');
+    ed.setCollisionBrushSize(1);
+    ed.setCollisionCrossoverBrush('keep');
+    ed.setCollisionCrossoverSpanMode('cell');
+    const cell = { cc: 3, cr: 1 };
+    const p0 = tileCentre(0, 2 * cell.cc, 2 * cell.cr);
+    const p1 = tileCentre(1, 2 * cell.cc, 2 * cell.cr);
+    expect([p0, p1].map((p) => Number.isInteger(p.x * ZOOMED.zoom) && p.x * ZOOMED.zoom < VIEWPORT.width),
+      'ANTI-VACUOUS: both cells are whole client pixels inside the viewport at this zoom').toEqual([true, true]);
+    const s = await mountMap();
+    s.on().onMouseDown(at(p0));
+    s.on().onMouseMove(at(p1));
+    expect([collOff(0, 'a'), collOff(1, 'a')],
+      'the same cell of the next section was skipped as the cell the stroke had just painted')
+      .toEqual([cellSubTiles(cell.cc, cell.cr), cellSubTiles(cell.cc, cell.cr)]);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE STAMP TOOL'S LINK HOVER (`setLinkHover`), AND THE DETACH IT AIMS.
+//
+// COVERAGE. MapViewport states the rule over the stamp-chunk branch of
+// `handleMouseMove`: "while the stamp is armed, report the placement under the
+// pointer so the Chunk links panel can offer Detach on it. Read through
+// `chunkOriginAt` [...] NOT cleared when the pointer leaves the canvas: the
+// Detach button lives off the map [...] `setLinkHover` de-duplicates, so this
+// is one store write per placement crossed". Nothing ran it.
+//
+// THE PLACEMENTS ARE MADE BY THE REAL STAMP CLICK, so their ids are the ones
+// `allocatePlacementId` hands out: per SECTION, from 1. That is why this block
+// uses the two-section act. Section 0 and section 1 each hold a placement with
+// the SAME id, of DIFFERENT chunks, at the same local spot, so a read (or a
+// detach) in the wrong section is a wrong chunk and not a missing one.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('the stamp tool reports the placement under the pointer, and Detach acts on that one', () => {
+  /** The camera parked so the boundary sits mid-VIEWPORT, at client x 320. */
+  const VIEW = { vpX: SECTION_PIXEL_SIZE - 320, vpY: 0, zoom: 1 };
+  const worldAt = (p: { x: number; y: number }) => mouse(p.x - VIEW.vpX, p.y - VIEW.vpY);
+  const W = SECTION_TILES_WIDE;
+  /** The block both chunks are saved from, in section 0: four distinct words. */
+  const SOURCE = { col: 20, row: 20, w: 2, h: 2 };
+  const SOURCE_WORDS = [1, 2, 3, 4].map((t) => packNametableWord(t, 0, false, false, false));
+  const CHUNK = { s0: 'hover-s0', s1: 'hover-s1' } as const;
+  /** Where each section's placement lands, in that section's OWN tile space.
+   *  A multiple of the chunk's 2x2 size, so the stamp's snap leaves it, and off
+   *  the diagonal, so a read with row and column swapped is another tile. */
+  const AT = { col: 6, row: 2 };
+  const ed = () => useEditorStore.getState();
+  const hover = () => ed().linkHover;
+
+  function sec(i: 0 | 1): Section {
+    const s = useProjectStore.getState().project?.zones[0]?.acts[0]?.sections[i];
+    if (!s) throw new Error(`map-viewport-mounted: act1 has no section ${i}; the two-section fixture moved`);
+    return s;
+  }
+  /** The placement section `i` remembers at local tile (col, row), read off the section. */
+  const placedAt = (i: 0 | 1, col = AT.col, row = AT.row) => chunkOriginAt(sec(i), row * W + col);
+
+  /** Every element of `type` in a subtree, as data. */
+  function elementsOf(
+    node: unknown, type: unknown, out: Array<React.ReactElement<Record<string, unknown>>> = [],
+  ): Array<React.ReactElement<Record<string, unknown>>> {
+    if (Array.isArray(node)) { for (const c of node) elementsOf(c, type, out); return out; }
+    if (!node || typeof node !== 'object') return out;
+    const el = node as React.ReactElement<Record<string, unknown>>;
+    if (el.type === type) out.push(el);
+    const children = (el.props as { children?: unknown } | undefined)?.children;
+    if (children !== undefined) elementsOf(children, type, out);
+    return out;
+  }
+
+  let panel: Hooked<Record<string, never>> | null = null;
+  /** The Chunk links panel, rendered over the live stores: its Detach chip and
+   *  the "Under cursor" readout beside it. */
+  function renderPanel(): { detach: React.ReactElement<Record<string, unknown>>; readout: string } {
+    panel?.unmount();
+    panel = renderHooked(ChunkLinkOptions as unknown as (p: Record<string, never>) => React.ReactElement, {});
+    const tree = panel.el();
+    const chips = elementsOf(tree, Chip).filter((c) => c.props.children === 'Detach');
+    expect(chips, 'HARNESS: the panel rendered no single Detach chip').toHaveLength(1);
+    const spans = elementsOf(tree, 'span').filter((sp) => sp.props['data-testid'] === 'chunk-link-hover');
+    expect(spans, 'HARNESS: the panel rendered no single "Under cursor" readout').toHaveLength(1);
+    return { detach: chips[0], readout: String(spans[0].props.children) };
+  }
+
+  beforeEach(() => {
+    makeAct1TwoSections();
+    useViewStore.setState(VIEW);
+    const s0 = sec(0);
+    for (let r = 0; r < SOURCE.h; r++) {
+      for (let c = 0; c < SOURCE.w; c++) {
+        s0.tileGrid.nametable[(SOURCE.row + r) * W + SOURCE.col + c] = SOURCE_WORDS[r * SOURCE.w + c];
+      }
+    }
+    // The save-as-chunk button's own two calls, twice: two library chunks with
+    // the same words and different ids, so only the id tells a stamp apart.
+    const defs = [
+      selectionToChunk(s0, SOURCE.col, SOURCE.row, SOURCE.w, SOURCE.h, 'Hover chunk in section 0', CHUNK.s0),
+      selectionToChunk(s0, SOURCE.col, SOURCE.row, SOURCE.w, SOURCE.h, 'Hover chunk in section 1', CHUNK.s1),
+    ];
+    if (defs.some((d) => !d)) throw new Error('map-viewport-mounted: selectionToChunk refused an aligned block; the fixture moved');
+    useProjectStore.getState().addChunks(defs as NonNullable<(typeof defs)[number]>[]);
+    ed().setStampDetached(false);
+    ed().setLinkHover(null);
+    ed().setTool('stamp-chunk');
+  });
+
+  afterEach(() => {
+    panel?.unmount();
+    panel = null;
+    ed().setLinkHover(null);
+  });
+
+  /** Stamp `chunkId` into section `i` at AT, with the real click. */
+  function stamp(s: Surface, i: 0 | 1, chunkId: string): void {
+    ed().setSelectedChunkId(chunkId);
+    s.on().onMouseDown(worldAt(tileCentre(i, AT.col, AT.row)));
+    win!.dispatch('mouseup', {});
+  }
+
+  /** Mount, and stamp section 0 then section 1: the last stamp claims section 1. */
+  async function stampBoth(): Promise<Surface> {
+    const s = await mountMap();
+    stamp(s, 0, CHUNK.s0);
+    stamp(s, 1, CHUNK.s1);
+    expect([placedAt(0)?.chunkId, placedAt(1)?.chunkId], 'the premise: each section holds its own chunk at AT')
+      .toEqual([CHUNK.s0, CHUNK.s1]);
+    expect(placedAt(0)!.id, 'ANTI-VACUOUS: the two placements must share an id, so only the section tells them apart')
+      .toBe(placedAt(1)!.id);
+    // THE PICK IS PUT DOWN BEFORE ANY ROW HOVERS. With a chunk picked, the
+    // move goes on past the link hover to the stamp GHOST, which rasterises the
+    // chunk (`regionPreviewCanvas`, MapViewport.tsx:796) and needs a `document`
+    // this suite does not have. The ghost is a drawing claim and is
+    // foreground-only. The link hover reads the tool, the tile and
+    // `chunkOriginAt`, never the pick, so every row here measures the same
+    // write with or without one.
+    ed().setSelectedChunkId(null);
+    return s;
+  }
+
+  it('over a placement in section 1 it names section 1, that placement and its chunk, not section 0\'s at the same spot', async () => {
+    const s = await stampBoth();
+    expect(hover(), 'the premise: a stamp click writes no hover of its own').toBeNull();
+    // The placement's LAST tile, (col + 1, row + 1): a read that dropped the
+    // offset inside the chunk, or swapped row and column, lands elsewhere.
+    s.on().onMouseMove(worldAt(tileCentre(1, AT.col + 1, AT.row + 1)));
+    expect(hover(), 'the hover did not name section 1\'s own placement under the pointer')
+      .toEqual({ sectionIndex: 1, placementId: placedAt(1)!.id, chunkId: CHUNK.s1 });
+  });
+
+  it('onto an unlinked tile it says null, which is a real answer, and back onto the placement it names it again', async () => {
+    const s = await stampBoth();
+    const named = { sectionIndex: 0, placementId: placedAt(0)!.id, chunkId: CHUNK.s0 };
+    s.on().onMouseMove(worldAt(tileCentre(0, AT.col, AT.row)));
+    expect(hover(), 'the premise: over the placement the hover names it').toEqual(named);
+    const beside = { col: AT.col + 2, row: AT.row };   // just right of the 2-wide placement
+    expect(placedAt(0, beside.col, beside.row), 'ANTI-VACUOUS: the tile beside the placement is unlinked').toBeNull();
+    s.on().onMouseMove(worldAt(tileCentre(0, beside.col, beside.row)));
+    expect(hover(), 'the hover kept naming a placement the pointer has left').toBeNull();
+    s.on().onMouseMove(worldAt(tileCentre(0, AT.col + 1, AT.row)));
+    expect(hover(), 'back over the placement the hover did not name it again').toEqual(named);
+  });
+
+  it('leaving the canvas does not clear it: the Detach button it names is off the map', async () => {
+    const s = await stampBoth();
+    s.on().onMouseMove(worldAt(tileCentre(0, AT.col, AT.row)));
+    const named = hover();
+    expect(named, 'the premise: over the placement the hover names it').not.toBeNull();
+    s.on().onMouseLeave(mouse(-10, -10));
+    expect(hover(), 'leaving the canvas emptied the readout on the way to its own button').toEqual(named);
+  });
+
+  it('CONTROL: with another tool armed, hovering a placement writes nothing', async () => {
+    const s = await stampBoth();
+    ed().setTool('select');
+    s.on().onMouseMove(worldAt(tileCentre(0, AT.col, AT.row)));
+    expect(hover(), 'a tool whose only click is not a stamp reported a placement').toBeNull();
+  });
+
+  it('a sweep across the four tiles of one placement is ONE store write, not four', async () => {
+    const s = await stampBoth();
+    let writes = 0;
+    const unsubscribe = useEditorStore.subscribe((st, prev) => { if (st.linkHover !== prev.linkHover) writes++; });
+    try {
+      for (const [dc, dr] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+        s.on().onMouseMove(worldAt(tileCentre(0, AT.col + dc, AT.row + dr)));
+      }
+    } finally {
+      unsubscribe();
+    }
+    expect(hover()?.placementId, 'the premise: the sweep ended over the placement').toBe(placedAt(0)!.id);
+    expect(writes, 'the panel subscribes to this: a sweep across one placement re-rendered it per tile').toBe(1);
+  });
+
+  it('CONTROL: in the section the last stamp claimed, Detach unlinks the hovered placement and leaves the other section\'s', async () => {
+    const s = await stampBoth();
+    expect(ed().activeSectionIndex, 'the premise: the last stamp claimed section 1').toBe(1);
+    s.on().onMouseMove(worldAt(tileCentre(1, AT.col, AT.row)));
+    const { detach, readout } = renderPanel();
+    expect(readout, 'the premise: the panel names the hovered chunk').toContain('Hover chunk in section 1');
+    expect(detach.props.disabled, 'the premise: the panel offers Detach on the hovered placement').toBe(false);
+    (detach.props.onClick as () => void)();
+    expect(placedAt(1), 'Detach left the hovered placement linked').toBeNull();
+    expect(placedAt(0)?.chunkId, 'Detach also unlinked the other section\'s placement').toBe(CHUNK.s0);
+  });
+
+  it('DETACH-WRONG-SECTION: over a placement in ANOTHER section than the active one, Detach unlinks the placement the panel names', async () => {
+    // The hover never claims a section (nothing in its branch writes
+    // `activeSectionIndex`), so after a stamp in section 1 the author can hover
+    // section 0's placement and the panel names it: "Under cursor: <its chunk>
+    // (#id)", and the chip's title "Detach placement #id". The press must act on
+    // THAT placement. Both sections hold a placement with the same id, so a
+    // detach resolved in the active section instead unlinks the other one.
+    const s = await stampBoth();
+    expect(ed().activeSectionIndex, 'the premise: the last stamp claimed section 1').toBe(1);
+    s.on().onMouseMove(worldAt(tileCentre(0, AT.col, AT.row)));
+    expect(hover(), 'the premise: the hover names section 0\'s placement')
+      .toEqual({ sectionIndex: 0, placementId: placedAt(0)!.id, chunkId: CHUNK.s0 });
+    const { detach, readout } = renderPanel();
+    expect(readout, 'the premise: the panel names section 0\'s chunk under the cursor').toContain('Hover chunk in section 0');
+    expect(detach.props.disabled, 'the premise: the panel offers Detach on it').toBe(false);
+    (detach.props.onClick as () => void)();
+    // SOFT, so a failure reports BOTH halves: that the named placement kept its
+    // link, and whether the other section's lost its link instead.
+    expect.soft(placedAt(0), 'Detach left the placement the panel named linked').toBeNull();
+    expect.soft(placedAt(1)?.chunkId, 'Detach unlinked the ACTIVE section\'s placement with the same number instead')
+      .toBe(CHUNK.s1);
   });
 });
