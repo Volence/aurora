@@ -489,6 +489,7 @@ function driver(c) {
   const worldAt = (G, ax, ay) => ({ x: G.V.x + (ax - G.R.x) / G.V.zoom, y: G.V.y + (ay - G.R.y) / G.V.zoom });
   const hoverTo = async (p) => { await mouse('mouseMoved', p.x + 37, p.y + 23); await sleep(120); await mouse('mouseMoved', p.x, p.y); await sleep(400); };
   const active = () => c.json(String.raw`(() => { const a = document.activeElement; if (!a) return null;
+    if (a === document.body) return { tag: 'BODY', text: null, row: null, isBody: true };
     const row = a.parentElement && a.parentElement.firstElementChild ? (a.parentElement.firstElementChild.textContent || '').trim() : null;
     return { tag: a.tagName, text: (a.textContent || '').trim().slice(0, 40), row, isBody: a === document.body }; })()`);
   return {
@@ -678,7 +679,13 @@ async function m2Part(d, O) {
   const geomOk = same(aIn.cell, k) && same(aIn2.cell, k) && !same(aIn.tile, aIn2.tile) && same(aNext.cell, k1) && aIn.onMap && aIn2.onMap && aNext.onMap;
   const words = () => cellWords(d, O, [k, k1]);
   const w0 = await words();
+  // ⚠ DEV RUN 1: collisionSetup's LAST click is a shape button, which keeps
+  // focus, so Tab walked the shape grid for 150 presses and never came back to
+  // the Plane row. F-1's real sequence starts with a click on Plane A, so the
+  // part makes that click here, and records where it leaves focus.
+  const aAgain = await d.realClick(d.BTN_IN('Plane', 'A'), { scroll: true });
   const f0 = await d.active();
+  if (!aAgain?.hitOk) throw new Error(`the Plane A click missed: ${J(aAgain)}`);
   await d.mouse('mouseMoved', aIn.x, aIn.y);
   await d.mouse('mousePressed', aIn.x, aIn.y, 'left', 1); await sleep(150);
   const w1 = await words();
@@ -702,7 +709,9 @@ async function m2Part(d, O) {
     premise ? true : (reached ? false : 'UNMEASURABLE'),
     `dpr ${S.G.R.dpr}; rect ${J(S.G.R)}; view ${J(S.G.V)}; aims ${J({ aIn, aIn2, aNext })}; cell k on A after the press ${J(w1.a[0])}; `
     + `Tab presses ${reached ? n : `>${n - 1} (never reached)`}; first stops ${J(stops)}; focus before ${J(f0)}; clicks the Space produced ${J(clicks)}; plane ${pNow}; canvas unmoved ${unmoved}`);
-  note('M2.focus', `after the Space-pressed Plane B, document.activeElement is ${J(fAfter)} (M1's drop applies to a keyboard press as well)`);
+  note('M2.focus', reached
+    ? `the Plane A click left focus on ${J(f0)}; Tab from there reached Plane B in ${n} press(es); after the Space-pressed B, document.activeElement is ${J(fAfter)}`
+    : `the Plane A click left focus on ${J(f0)}; Tab never reached Plane B in ${n - 1} presses, so no Space was sent`);
   if (premise) {
     await d.mouse('mouseMoved', aIn2.x, aIn2.y, 'left', 1); await sleep(200);
     const w2 = await words();
