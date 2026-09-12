@@ -199,6 +199,37 @@ describe('reading a preset', () => {
       .toThrow(/wave 2 refuses anything but 1[\s\S]*contract change to both halves/);
   });
 
+  /**
+   * A DIFFERENT RULE from the row above, wearing nearly the same sentence.
+   * `preset.ts:2070` is `obj.schema !== 1`, so the ABSENT key and the WRONG
+   * value both reach it and both are told "wave 2 refuses anything but 1". The
+   * ONLY wording that separates them is the value the sentence quotes back —
+   * `JSON.stringify(obj.schema)` at :2072, which renders `undefined` for a key
+   * that is not there. So that is what this row matches on. A needle of
+   * /refuses anything but 1/ would be satisfied by the schema: 2 document too
+   * and would pin nothing the row above does not already pin, which is why the
+   * second expectation below is here: it fails if this needle ever widens far
+   * enough to catch the neighbouring rule.
+   *
+   * Why it is worth its own row: the vendored schema states the rule twice, as
+   * `required: ["schema", "id"]` and as `schema: {const: 1}`, and those are two
+   * clauses of the evaluator (json-schema-subset.ts:435-439 and :352-353). On
+   * the WRITE side they produce two different sentences; see the writing-a-
+   * preset row that pins the other half of this.
+   */
+  it('refuses a document with NO schema key, quoting the absence back', () => {
+    expect(() => parseEffectsPreset(withDoc((d) => { delete d.schema; }), 'minimal'))
+      .toThrow(/declares "schema": undefined/);
+    // DISCRIMINATION, not decoration: the row above's document is refused by
+    // the SAME line of code, and this needle must not be what catches it.
+    let wrongVersion = '';
+    try {
+      parseEffectsPreset(withDoc((d) => { d.schema = 2; }), 'minimal');
+    } catch (e) { wrongVersion = (e as Error).message; }
+    expect(wrongVersion).toMatch(/declares "schema": 2/);
+    expect(wrongVersion).not.toMatch(/declares "schema": undefined/);
+  });
+
   it('refuses a filename/id mismatch, because the id becomes a symbol', () => {
     expect(() => parseEffectsPreset(MINIMAL, 'other_stem'))
       .toThrow(/the filename stem and the id must match/);
@@ -334,6 +365,47 @@ describe('writing a preset', () => {
   it('REFUSES to write an invalid document rather than emitting one', () => {
     const bad = { schema: 1, id: 'minimal', bands: [] } as unknown as EffectsPreset;
     expect(() => serializeEffectsPreset(bad)).toThrow(/refusing to write preset/);
+  });
+
+  /**
+   * THE WRITE SIDE OF THE ABSENT KEY, and the gate the whole "no Aurora save
+   * can emit a schema-less preset" answer rests on: `save.ts:607` serializes
+   * every preset in the library and `aeon-save.ts:99` writes only what this
+   * function returns, so a throw here is why an in-memory preset that lost its
+   * key — a mutator bug, nothing guards command time — never reaches disk.
+   *
+   * `serializeEffectsPreset` has NO version check of its own (preset.ts:2165-
+   * 2176 runs the vendored schema and nothing else), so here the two clauses of
+   * the schema really are two code paths with two sentences:
+   *   absent value  -> `required`, json-schema-subset.ts:437,
+   *                    `<document>: missing required property "schema"`
+   *   wrong value   -> `const`,    json-schema-subset.ts:352-353,
+   *                    `/schema: expected the constant 1, got 2`
+   * and the `const` clause never fires for an absent key, because :441 only
+   * descends into a property that is `in obj`. This row matches the first
+   * sentence; the expectations after it prove that is not also the second.
+   */
+  it('REFUSES to write a preset with NO schema key, naming the MISSING key', () => {
+    const missing = JSON.parse(MINIMAL) as Record<string, unknown>;
+    delete missing.schema;
+    let message = '';
+    try {
+      serializeEffectsPreset(missing as unknown as EffectsPreset);
+    } catch (e) { message = (e as Error).message; }
+    expect(message).toMatch(/refusing to write preset "minimal"/);
+    expect(message).toMatch(/missing required property "schema"/);
+
+    // DISCRIMINATION: the wrong-VERSION document is refused by this same
+    // function, and by the other clause. If the needle above caught it too,
+    // this row would not be pinning the absence.
+    const wrongVersion = JSON.parse(MINIMAL) as Record<string, unknown>;
+    wrongVersion.schema = 2;
+    let versionMessage = '';
+    try {
+      serializeEffectsPreset(wrongVersion as unknown as EffectsPreset);
+    } catch (e) { versionMessage = (e as Error).message; }
+    expect(versionMessage).toMatch(/expected the constant 1, got 2/);
+    expect(versionMessage).not.toMatch(/missing required property "schema"/);
   });
 
   it('ROUND-TRIPS A DOCUMENT AURORA DID NOT AUTHOR, including an sh spelled 0/1', () => {
