@@ -113,6 +113,7 @@
     "harness:cdp-sweep-0911": "node scratchpad/cdp-sweep-0911-harness.mjs",
     "harness:cdp-sweep-2-0911": "node scratchpad/cdp-sweep-2-0911-harness.mjs",
     "harness:cdp-sweep-3-0912": "node scratchpad/cdp-sweep-3-0912-harness.mjs",
+    "harness:cdp-sweep-4-0912": "node scratchpad/cdp-sweep-4-0912-harness.mjs",
     "harness:coldread-c1": "node scratchpad/coldread-c1-harness.mjs",
     "harness:coldread-db": "node scratchpad/coldread-db-harness.mjs",
     "harness:coldread-fixes": "node scratchpad/coldread-fixes-harness.mjs",
