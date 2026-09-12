@@ -274,7 +274,20 @@ worse, but that is reasoning, not a measurement.
 
 ## `npm test`
 
-Filled in by the commit after this one, on the committed tree.
+Run in the foreground on the committed tree `1651e150`, which is the fix, every capture above
+and this packet. The full log is `docs/captures/2026-09-12-scene-selection-snaps-back/60-npm-test.log`.
+
+| Step | Result |
+|---|---|
+| full `npm test` | **exit 0**. **Test Files 615 passed, 3 skipped (618); Tests 9548 passed, 9 skipped (9557)**, 0 failed. failure-class: no failures in 618 modules. skip-report: every one of the 9 skips named its reason |
+| `src/renderer/state/__tests__/effects-scene-follow.test.ts`, inside that run | `✓ ... (22 tests)`, log line 1645 |
+| check-test-collection | 618 test-shaped files on disk, all 618 collected |
+| `npm run typecheck` (`tsc --noEmit`), a step of the chain | passed: the chain is `&&`-joined and went on to vitest |
+| check-harness-guards | `278 clean / 278 classified (267 .mjs + 11 .sh) · 0 failure(s) · 0 unmeasurable` |
+| check-cited-paths / check-doc-citations | OK. Every path this packet and the new comments cite is on disk, and every capture it cites is tracked |
+| the dash gates (tsx, src, test, scripts), guide-text, ledger-timestamps, object-stringify, peer-path-literals, pseudo-skip | all OK |
+
+No failures, so no failure names to list.
 
 ## Proposed ROADMAP row (for the overseer to write; `docs/ROADMAP.md` is not touched here)
 
@@ -330,5 +343,5 @@ Filled in by the commit after this one, on the committed tree.
 | `e9482f68` | the fix and its 22-row node file |
 | `c381efdd` | captures: master red, three green fix runs, the node plants |
 | `10d9c350` | SCRATCH: the fix reverted for the harness red-first. Dropped by `git reset --hard c381efdd` and NOT on the branch; recorded here only |
-| (this commit) | this packet, the remaining captures, and two comment corrections: the node file's header, and the dated note in `row-remap-control-harness.mjs` |
-| (next) | the `npm test` totals |
+| `1651e150` | this packet, the remaining captures, and two comment corrections: the node file's header, and the dated note in `row-remap-control-harness.mjs` |
+| the commit after `1651e150` | the `npm test` totals, the saved log `60-npm-test.log`, and this table naming its rows by SHA |
