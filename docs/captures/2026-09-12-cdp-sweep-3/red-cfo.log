@@ -1,0 +1,110 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557 — dist/main/index.mjs is 23s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557/src/renderer/state/aeon-open.ts)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T06:03:59.787Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T06:03:59.787Z), so window.__dbg is in this bundle
+=== cdp-sweep-3 2026-09-12 harness ===
+    PART         : classic
+    node         : v24.15.0
+    loadavg      : 4.16 5.61 5.25
+    ORACLE_SOCKET: /tmp/cdps3-sock-WUKzBQ/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-3-0912-harness-2817167-d7b9041b   (pinned by spawnGuarded, fresh per process)
+    PORT         : 9412   DISPLAY: xvfb-run -a (never :0)
+    captures     : docs/captures/2026-09-12-cdp-sweep-3   tag red-cfo
+    aeon tarball : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/aac06b57-255e-4170-b49c-c612f4f44934/scratchpad/tars/aeon-0eaf09a0.tar   commit 0eaf09a0d072b6f77019b9f0a8d06c64452464b4
+    s1 tarball   : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/aac06b57-255e-4170-b49c-c612f4f44934/scratchpad/tars/s1disasm-HEAD.tar   commit f6ece657c1cf253404312137dfcb8ec15fa42318
+    oracle       : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a399e93db15e1f557/src/core/editing/map-clipboard.ts bundled; PASTE_HINT "Click to paste · hold Alt for art only, Shift for collision only · X flips it left↔right, Y top↕bottom · Esc to stop"
+    copy A       : /tmp/cdps3-aeonA-ObT1qF   name "Sonic 4 (sweep3 A)"
+    copy X       : /tmp/cdps3-aeonX-RxMj0S   (zones[0].id deleted, engine "s4")
+    copy S1a     : /tmp/cdps3-s1a-UcN7ya
+    copy S1b     : /tmp/cdps3-s1b-FzrYoT
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-3-0912-harness-2817167-d7b9041b — see HAZARD 6
+    dpr at start : 1
+
+──── classic: cold start ────  typo path "/tmp/cdps3-s1a-UcN7ya-typo"; expected banner head "\"/tmp/cdps3-s1a-UcN7ya-typo\" is not a recognized project."; F-3 loader reason "Zone missing \"id\""
+PASS  [CFO.0a] COLD START: nothing open (classic closed, no aeon project), Home shows the no-project field, no banner   [load 3.98/5.52/5.22]
+        dpr 1; projStatus {"status":"closed","zones":0}; aeon {"open":false,"zone":null,"act":null,"sections":0,"gridWidth":null,"gridHeight":null,"tool":"view","dirty":false,"dirtyActs":[]}; home {"field":"","fieldLabel":"…or type a project directory path","chip":null,"name":null,"dir":null,"headerRect":null}
+PASS  [CFO.0b] S1a opened through Home's path box (real click, typed, Enter): Home is the S1 project page naming S1a, and the field EMPTIED on success (the control for "keeps the typo")   [load 3.98/5.52/5.22]
+        field aim {"x":785,"y":238,"hitOk":true,"dpr":1,"rect":{"x":472,"y":221,"w":626.64,"h":33}}; settled true after 2ms; home {"field":"","fieldLabel":"…or type another project directory path","chip":"S1","name":"Sonic 1 Disassembly (GitHub)","dir":"/tmp/cdps3-s1a-UcN7ya","headerRect":{"x":0,"y":0,"w":0,"h":0}}; projStatus {"status":"open","zones":18}
+PASS  [CFO.0c] Green Hill act 1 opened from Home's Levels card by a real click: its tab is listed and the act is loaded   [load 3.90/5.48/5.21]
+        cards [{"title":"Open Green Hill Zone Act 1","disabled":false},{"title":"Open Green Hill Zone Act 2","disabled":false},{"title":"Open Green Hill Zone Act 3","disabled":false},{"title":"Open Marble Zone Act 1","disabled":false},{"title":"Open Marble Zone Act 2","disabled":false},{"title":"Open Marble Zone Act 3","disabled":false},{"title":"Open Spring Yard Zone Act 1","disabled":false},{"title":"Open Spring Yard Zone Act 2","disabled":false},{"title":"Open Spring Yard Zone Act 3","disabled":false},{"title":"Open Labyrinth Zone Act 1","disabled":false},{"title":"Open Labyrinth Zone Act 2","disabled":false},{"title":"Open Labyrinth Zone Act 3","disabled":false},{"title":"Open Star Light Zone Act 1","disabled":false},{"title":"Open Star Light Zone Act 2","disabled":false},{"title":"Open Star Light Zone Act 3","disabled":false},{"title":"Open Scrap Brain Zone Act 1","disabled":false},{"title":"Open Scrap Brain Zone Act 2","disabled":false},{"title":"Open Scrap Brain Zone Act 3","disabled":false}]; aim {"x":578,"y":188,"hitOk":true,"dpr":1,"rect":{"x":464.5,"y":167,"w":226.66,"h":42}}; levelState {"status":"ready","zone":"ghz","act":1}; tabs ["Home","Green Hill Zone Act 1"]
+
+──── CFO F-1: a typo in the path box, Sonic 1 resident ────
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-banner-red-cfo.png  (clip {"x":0,"y":0,"width":1400,"height":68,"scale":1})
+   capture cfo-F1-home-header: element absent or empty null
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-field-red-cfo.png  (clip {"x":470,"y":267,"width":700,"height":55,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-tabstrip-red-cfo.png  (clip {"x":238,"y":64,"width":1162,"height":38,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-full-red-cfo.png
+PASS  [CFO.F1.a] F-1: the red banner is PAINTED and begins with the classic store's own not-recognized sentence for the typed path (no banner before the Enter)   [load 3.91/5.46/5.20]
+        dpr 1; banner before false; paint {"found":true,"text":"\"/tmp/cdps3-s1a-UcN7ya-typo\" is not a recognized project.\n• Sonic 1 disassembly expects: sonic.asm + artnem/ + map256/ + levels/\n• Aeon project expects: project.json (engine \"s4\")\nDismiss","rect":{"x":0,"y":0,"w":1400,"h":66},"rects":1,"visible":true,"hitInside":true,"inScrollerBox":null,"inViewport":true,"dpr":1}; text "\"/tmp/cdps3-s1a-UcN7ya-typo\" is not a recognized project.\n• Sonic 1 disassembly expects: sonic.asm + artnem/ + map256/ + levels/\n• Aeon project expects: project.json (engine \"s4\")"; captures ["docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-banner-red-cfo.png",null,"docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-field-red-cfo.png","docs/captures/2026-09-12-cdp-sweep-3/cfo-F1-tabstrip-red-cfo.png"]
+FAIL  [CFO.F1.b] F-1: Home STAYS on the S1 project page (chip S1, the S1 name, S1a's path, the switch field) and the classic project is still open   [load 3.91/5.46/5.20]
+        home {"field":"/tmp/cdps3-s1a-UcN7ya-typo","fieldLabel":"…or type a project directory path","chip":null,"name":null,"dir":null,"headerRect":null}; projStatus {"status":"closed","zones":0}
+PASS  [CFO.F1.c] F-1: the field KEEPS the typo   [load 3.91/5.46/5.20]
+        field "/tmp/cdps3-s1a-UcN7ya-typo"; typed ok true
+FAIL  [CFO.F1.d] F-1: the level tab is still there and its act is still loaded, and it NEVER left loaded while the open ran (the project never left open either: the mid-open trace)   [load 3.91/5.46/5.20]
+        tabs ["Home"]; levelState {"status":"idle","zone":null,"act":null}; trace open/ready/ghz1@14202 > opening/idle/nullnull@14208 > closed/idle/nullnull@14210
+
+──── CFO F-3: the path of an aeon checkout whose project.json fails to load ────
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F3-banner-red-cfo.png  (clip {"x":0,"y":0,"width":1400,"height":32,"scale":1})
+   capture cfo-F3-home-header: element absent or empty null
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F3-tabstrip-red-cfo.png  (clip {"x":238,"y":28,"width":1162,"height":38,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-3/cfo-F3-full-red-cfo.png
+PASS  [CFO.F3.0] CONTROL: the F-1 banner was dismissed by a real click and was absent before this Enter   [load 3.84/5.41/5.19]
+        {"was":true,"pressed":{"x":482,"y":33,"hitOk":true,"dpr":1,"rect":{"x":453.11,"y":24,"w":58,"h":18}},"goneAfter":true}
+PASS  [CFO.F3.a] F-3: the banner is painted and says the AEON LOADER's reason (s4-config.ts), not the not-recognized sentence   [load 3.84/5.41/5.19]
+        dpr 1; loader reason printed by the app: "Zone missing \"id\""; paint {"found":true,"text":"Zone missing \"id\"\nDismiss","rect":{"x":0,"y":0,"w":1400,"h":30},"rects":1,"visible":true,"hitInside":true,"inScrollerBox":null,"inViewport":true,"dpr":1}; typed true; captures ["docs/captures/2026-09-12-cdp-sweep-3/cfo-F3-banner-red-cfo.png",null,"docs/captures/2026-09-12-cdp-sweep-3/cfo-F3-tabstrip-red-cfo.png"]
+FAIL  [CFO.F3.b] F-3: Sonic 1 STAYS open (Home names S1a, classic open, the level tab and its act survive) and no aeon project was loaded   [load 3.84/5.41/5.19]
+        home {"field":"/tmp/cdps3-aeonX-RxMj0S","fieldLabel":"…or type a project directory path","chip":null,"name":null,"dir":null,"headerRect":null}; projStatus {"status":"closed","zones":0}; levelState {"status":"idle","zone":null,"act":null}; tabs ["Home"]; aeon {"open":false,"zone":null,"act":null,"sections":0,"gridWidth":null,"gridHeight":null,"tool":"view","dirty":false,"dirtyActs":[]}; trace closed/idle/nullnull@19022
+
+──── CFO F-4: S1a to S1b, then S1b to aeon ────
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F4a-home-header-red-cfo.png  (clip {"x":462,"y":80,"width":701,"height":31,"scale":1})
+PASS  [CFO.F4.a] F-4 CONTROL: a SUCCESSFUL Sonic 1 to Sonic 1 open switches (Home names S1b, classic open, no banner, the field emptied), and the mid-open trace SEES the act leave loaded   [load 3.77/5.37/5.18]
+        dismiss {"was":true,"pressed":{"x":156,"y":15,"hitOk":true,"dpr":1,"rect":{"x":126.73,"y":6,"w":58,"h":18}},"goneAfter":true}; home {"field":"","fieldLabel":"…or type another project directory path","chip":"S1","name":"Sonic 1 Disassembly (GitHub)","dir":"/tmp/cdps3-s1b-FzrYoT","headerRect":{"x":464.5,"y":82,"w":696,"h":27}}; trace closed/idle/nullnull@23804 > opening/idle/nullnull@23809 > open/loading/ghz1@23820 > open/ready/ghz1@23838; right after the open {"headerRectBeforeHomePress":{"x":0,"y":0,"w":0,"h":0},"tabs":["Home","Green Hill Zone Act 1"],"levelState":{"status":"ready","zone":"ghz","act":1}}; Home header before null; levelState after {"status":"ready","zone":"ghz","act":1}; tabs ["Home","Green Hill Zone Act 1"]; capture docs/captures/2026-09-12-cdp-sweep-3/cfo-F4a-home-header-red-cfo.png
+NOTE  [OBS-F4a] after the successful S1a to S1b switch the Green Hill tab stayed listed and act ghz 1 is loaded again (in S1b), and Home was not the active pane (header rect {"x":0,"y":0,"w":0,"h":0}): the shell reopened the same tab id in the new project. Observed, not judged.
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F4b-home-header-red-cfo.png  (clip {"x":470,"y":80,"width":700,"height":31,"scale":1})
+NOTE  [F4b] right after the aeon open, before pressing Home: {"headerRectBeforeHomePress":{"x":0,"y":0,"w":0,"h":0},"tabs":["Home","Oracle Jungle Zone · act1"]}; trace open/ready/ghz1@28880 > opening/idle/nullnull@28884 > closed/idle/nullnull@28888
+PASS  [CFO.F4.b] F-4 CONTROL: a SUCCESSFUL Sonic 1 to aeon open switches: Home names aeon copy A (chip AEON), classic closed, aeon open   [load 3.63/5.32/5.16]
+        home {"field":"","fieldLabel":"…or type another project directory path","chip":"AEON","name":"Sonic 4 (sweep3 A)","dir":null,"headerRect":{"x":472,"y":82,"w":696,"h":27}}; projStatus {"status":"closed","zones":0}; aeon {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}; title "Aurora - Sonic 4 (sweep3 A)"; capture docs/captures/2026-09-12-cdp-sweep-3/cfo-F4b-home-header-red-cfo.png
+
+──── CFO F-2: aeon open, then S1a, then F-1 again ────
+PASS  [CFO.F2.0] PREMISE: Sonic 1 opened over aeon copy A, and the aeon store STILL holds copy A underneath (the stale project F-2 is about exists)   [load 3.82/5.33/5.16]
+        {"home":{"field":"","fieldLabel":"…or type another project directory path","chip":"S1","name":"Sonic 1 Disassembly (GitHub)","dir":"/tmp/cdps3-s1a-UcN7ya","headerRect":{"x":464.5,"y":82,"w":696,"h":27}},"aeon":{"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]},"proj":{"status":"open","zones":18}}
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-banner-red-cfo.png  (clip {"x":0,"y":0,"width":1400,"height":68,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-home-header-red-cfo.png  (clip {"x":470,"y":146,"width":700,"height":31,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-tabstrip-red-cfo.png  (clip {"x":238,"y":64,"width":1162,"height":38,"scale":1})
+   shot: docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-full-red-cfo.png
+FAIL  [CFO.F2.a] F-2: after the failed open Home STILL names the Sonic 1 project (chip S1, S1 name, S1a), NOT aeon copy A; the banner is painted with the not-recognized sentence   [load 3.61/5.24/5.14]
+        dpr 1; level {"status":"ready","zone":"ghz","act":1}; banner "\"/tmp/cdps3-s1a-UcN7ya-typo\" is not a recognized project.\n• Sonic 1 disassembly expects: sonic.asm + artnem/ + map256/ + levels/\n• Aeon project expects: project.json (engine \"s4\")"; home {"field":"/tmp/cdps3-s1a-UcN7ya-typo","fieldLabel":"…or type another project directory path","chip":"AEON","name":"Sonic 4 (sweep3 A)","dir":null,"headerRect":{"x":472,"y":148,"w":696,"h":27}}; projStatus {"status":"closed","zones":0}; captures ["docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-banner-red-cfo.png","docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-home-header-red-cfo.png","docs/captures/2026-09-12-cdp-sweep-3/cfo-F2-tabstrip-red-cfo.png"]
+FAIL  [CFO.F2.b] F-2: and, as in F-1, the field keeps the typo and the level tab and its act survive   [load 3.61/5.24/5.14]
+        field "/tmp/cdps3-s1a-UcN7ya-typo"; tabs ["Home","Oracle Jungle Zone · act1"]; levelState {"status":"idle","zone":null,"act":null}; typed true; trace open/ready/ghz1@41869 > opening/idle/nullnull@41925 > closed/idle/nullnull@41929
+cleanup: tree under pid 2818505 (11 process(es)):
+           2818505 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           2818548 Xvfb :184 -screen 0 1680x1050x24 -nolisten tcp
+           2831664 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           2831681 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           2831699 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2831700 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2831724 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2831850 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2831855 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2831859 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           2831867 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 51 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 351 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PART=classic: 10/15 rows PASS · 5 FAIL · 0 UNMEASURABLE · 48.2s ════
+     loadavg at end 3.61 5.24 5.14
+FAILING:
+  [CFO.F1.b] F-1: Home STAYS on the S1 project page (chip S1, the S1 name, S1a's path, the switch field) and the classic project is still open
+  [CFO.F1.d] F-1: the level tab is still there and its act is still loaded, and it NEVER left loaded while the open ran (the project never left open either: the mid-open trace)
+  [CFO.F3.b] F-3: Sonic 1 STAYS open (Home names S1a, classic open, the level tab and its act survive) and no aeon project was loaded
+  [CFO.F2.a] F-2: after the failed open Home STILL names the Sonic 1 project (chip S1, S1 name, S1a), NOT aeon copy A; the banner is painted with the not-recognized sentence
+  [CFO.F2.b] F-2: and, as in F-1, the field keeps the typo and the level tab and its act survive
+END-OF-RUN
