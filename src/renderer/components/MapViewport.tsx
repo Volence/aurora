@@ -1466,9 +1466,22 @@ export default function MapViewport() {
         // `render` is told not to repeat it. The order is then the same one the
         // `bgVisible` arm already had, and the same one camera-preview.ts's
         // docblock describes: backdrop, composite, then the FOREGROUND over it.
+        //
+        // ⚠ `cssWidth, cssHeight`, NOT `rect.width, rect.height`. This clear is
+        // the only one in the pass that spanned the CONTAINER'S rect; every
+        // other one already spans the surface the transform maps onto — the
+        // no-act arm above, `drawCollisionPreview`'s `w / dpr, h / dpr`, and
+        // `SectionRenderer.render`'s `viewport.width/height`, which is built
+        // from these two. The backing store is `round(rect * dpr)` device px, so
+        // `rect * dpr` is SHORT of it by up to half a device pixel whenever that
+        // product rounds up, and the canvas's last device column and row were
+        // left partly uncleared — alpha 154 against 255 at 816 x 1.35, alpha 128
+        // at a container rect of 812.5 at dpr 1. Not a tolerance: the CSS extent
+        // of a surface is `canvas.width / dpr` by construction, which is what
+        // the two lines above it derive.
         if (cameraPreviewActive) {
           ctx.fillStyle = CANVAS_BLACK;
-          ctx.fillRect(0, 0, rect.width, rect.height);
+          ctx.fillRect(0, 0, cssWidth, cssHeight);
         }
         drawCamera();
       }

@@ -493,12 +493,22 @@ async function main() {
           check(`${P}.I2`, 'PIXEL IDENTITY against the baseline build: the two runs measured the same surface', false,
             `store ${G.storeW}x${G.storeH} here against ${b.store[0]}x${b.store[1]} in the baseline — NOT COMPARABLE, and not a verdict either way`);
         } else {
-          const same = b.onHash === on.hash && b.offHash === off.hash;
-          check(`${P}.I2`, `PIXEL IDENTITY at dpr ${G.dpr} in geometry ${P}: the whole backing store hashes the same as the baseline build (${baseline.head}), composite ON and OFF`,
-            same,
-            `composite ON  ${on.hash} here / ${b.onHash} baseline${b.onHash === on.hash ? ' SAME' : ' DIFFERENT'}; `
-            + `composite OFF ${off.hash} here / ${b.offHash} baseline${b.offHash === off.hash ? ' SAME' : ' DIFFERENT'}; `
-            + `translucent px ON ${on.n} here / ${b.onN} baseline; store ${G.storeW}x${G.storeH}; deficit ${dx.toFixed(4)}/${dy.toFixed(4)}; from ${SCAN_BASELINE}`);
+          // ⚠ NOT "THE SAME HASH". The required relation depends on what the BASELINE
+          // measured in this same geometry: where it found an uncleared edge the pixels
+          // MUST move (and the edge must be gone), and where it found none they must not
+          // move at all. Asserting blanket identity here made the fix's own run red in the
+          // five geometries it repaired — a row that cannot be green on either build.
+          const mustChange = b.onN > 0;
+          const onSame = b.onHash === on.hash;
+          const offSame = b.offHash === off.hash;
+          const okHere = mustChange ? (on.n === 0 && !onSame && offSame) : (onSame && offSame && on.n === 0);
+          check(`${P}.I2`, mustChange
+            ? `PIXEL CHANGE at dpr ${G.dpr} in geometry ${P}: the baseline build (${baseline.head}) left ${b.onN} translucent px here, so this build must clear them and its composite-ON pixels must differ — with the composite OFF nothing may move`
+            : `PIXEL IDENTITY at dpr ${G.dpr} in geometry ${P}: the baseline build (${baseline.head}) left NO uncleared edge here, so the whole backing store must hash the same, composite ON and OFF`,
+            okHere,
+            `composite ON  ${on.hash} here / ${b.onHash} baseline ${onSame ? 'SAME' : 'DIFFERENT'}; `
+            + `composite OFF ${off.hash} here / ${b.offHash} baseline ${offSame ? 'SAME' : 'DIFFERENT'}; `
+            + `translucent px ON ${on.n} here / ${b.onN} baseline; store ${G.storeW}x${G.storeH}; deficit ${dx.toFixed(4)}/${dy.toFixed(4)}; class ${classNow}; from ${SCAN_BASELINE}`);
         }
       }
       await realClick(SUBTAB('parallax')); await sleep(400);
