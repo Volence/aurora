@@ -151,8 +151,37 @@ describe('effects scene reader: identity and version', () => {
     expect(e!.message).toMatch(/no migration machinery/);
   });
 
-  it('refuses a missing schema key', () => {
-    expect(() => parseEffectsScene(withDoc(d => { delete d.schema; }), 'plain')).toThrow(EffectsSceneError);
+  /**
+   * A DIFFERENT RULE from the row above, wearing nearly the same sentence — and
+   * this row exists in its repaired form because the version it replaced COULD
+   * NOT FAIL. It was `.toThrow(EffectsSceneError)` and nothing more, and with
+   * the missing-key rule DELETED from production (`scene.ts:560` relaxed to
+   * `obj.schema !== undefined && obj.schema !== 1`) the whole file still ran
+   * 36 passed / 0 failed: the key-less document is still refused ONE LAYER
+   * DOWN, by the vendored schema's `required` clause at
+   * json-schema-subset.ts:437, so "something threw" was satisfied by a rule the
+   * row was not about. See docs/reviews/2026-09-12-scene-row-and-chip-font.md.
+   *
+   * So the needle has to be wording only THIS rule produces. `scene.ts:560` is
+   * `obj.schema !== 1`, so the ABSENT key and a WRONG VALUE both reach it and
+   * both are handed "wave 1 refuses anything but 1" — a needle spelled that way
+   * would be a second copy of the row above. The one thing that separates the
+   * two sentences is the value quoted back by `JSON.stringify(obj.schema)` at
+   * :562, which renders `undefined` for a key that is not there.
+   *
+   * The second half is DISCRIMINATION, not decoration: it feeds the other
+   * rule's document to the same function and asserts this needle does NOT catch
+   * it, so the row goes red if the needle ever widens onto its neighbour.
+   */
+  it('refuses a document with NO schema key, quoting the absence back', () => {
+    expect(() => parseEffectsScene(withDoc(d => { delete d.schema; }), 'plain'))
+      .toThrow(/declares "schema": undefined/);
+    let wrongVersion = '';
+    try {
+      parseEffectsScene(withDoc(d => { d.schema = 2; }), 'plain');
+    } catch (e) { wrongVersion = (e as Error).message; }
+    expect(wrongVersion).toMatch(/declares "schema": 2/);
+    expect(wrongVersion).not.toMatch(/declares "schema": undefined/);
   });
 
   it('refuses malformed JSON loudly instead of yielding an empty scene', () => {
@@ -452,6 +481,51 @@ describe('effects scene writer: round trip', () => {
       ...JSON.parse(MINIMAL), presets: [],
     } as unknown as EffectsScene;
     expect(() => serializeEffectsScene(unknownKey)).toThrow(/unknown property "presets"/);
+  });
+
+  /**
+   * THE WRITE SIDE OF THE ABSENT KEY. `save.ts:576` encodes whatever this
+   * function returns and does NOT catch its throw (`save.ts:544-547` says so in
+   * as many words), so this refusal is the entire reason an in-memory scene that
+   * lost its version key — a mutator bug; nothing guards it at command time —
+   * cannot reach disk.
+   *
+   * `serializeEffectsScene` has NO version check of its own (`scene.ts:641-649`
+   * runs the vendored schema and nothing else), so unlike the READ side the two
+   * clauses of the schema here really are two code paths with two sentences:
+   *   absent value -> `required`, json-schema-subset.ts:437,
+   *                   `<document>: missing required property "schema"`
+   *   wrong value  -> `const`,    json-schema-subset.ts:352-353,
+   *                   `/schema: expected the constant 1, got 2`
+   * and `const` can never fire for an absent key, because :441 only descends
+   * into a property that is `in obj`. This row matches the first sentence; the
+   * control after it proves that is not also the second.
+   *
+   * ONE PROPERTY PER ROW: this is NOT folded into the reading row above. Read
+   * and write are different functions, and on read the absence is not even
+   * caught by the schema — the version check at `scene.ts:560` fires first.
+   */
+  it('REFUSES to write a scene with NO schema key, naming the MISSING key', () => {
+    const missing = JSON.parse(MINIMAL) as Record<string, unknown>;
+    delete missing.schema;
+    let message = '';
+    try {
+      serializeEffectsScene(missing as unknown as EffectsScene);
+    } catch (e) { message = (e as Error).message; }
+    expect(message).toMatch(/refusing to write scene "plain"/);
+    expect(message).toMatch(/missing required property "schema"/);
+
+    // DISCRIMINATION: the wrong-VERSION document is refused by this same
+    // function, through the OTHER clause. If this row's needle caught it too,
+    // the row would not be pinning the absence of the key.
+    const wrongVersion = JSON.parse(MINIMAL) as Record<string, unknown>;
+    wrongVersion.schema = 2;
+    let versionMessage = '';
+    try {
+      serializeEffectsScene(wrongVersion as unknown as EffectsScene);
+    } catch (e) { versionMessage = (e as Error).message; }
+    expect(versionMessage).toMatch(/expected the constant 1, got 2/);
+    expect(versionMessage).not.toMatch(/missing required property "schema"/);
   });
 });
 
