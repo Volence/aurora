@@ -286,3 +286,244 @@ expectations from it rather than retyping it.
 ## 10. Commits
 
 `180142a6`, `67f5cb9e`, `d811f540`, `4f4a022e`, and this packet's commit.
+
+---
+
+## 11. Rework after review (2026-09-12)
+
+The coordinator reviewed tip `4bde0183` in a separate detached worktree. The code was
+ACCEPTED, and on the deviations its words were: "All six are RATIFIED, and the reasons in
+your packet are right." Two items came back on the same branch. Sections 1 to 10 above are
+left as they were written.
+
+### 11.1 Item 1: the aeon fixture read a peer's working tree (bar 19)
+
+**The finding, and it was right.** `switch-window-edit.test.ts` copied the resident aeon
+project out of `siblingPath('aeon')`, which is the aeon lane's live checkout, and opened that
+checkout directly as the target. A half-written `project.json` there would have turned these
+rows red with an error that names no peer.
+
+**Fixed in `84b7533e`.** Both aeon directories are now materialised from a committed revision:
+the resident one that gets edited (`aeon-resident`) and a separate target (`aeon-target`).
+- `git -C <aeon> rev-parse origin/master` is resolved to a SHA once, at collection.
+- `git -C <aeon> archive <sha> project.json games/sonic4/data` is read once and extracted into
+  each directory.
+- `GIT_*` variables are stripped, so a caller's `GIT_DIR` cannot redirect `-C`.
+- The SHA is named in every aeon row's describe name, in the skip reason, and in the failure
+  text. Archive and extract errors are prefixed "NOT AN AURORA REGRESSION".
+
+**The aeon path appears only as a `git -C` argument.** Every occurrence of `AEON_GIT` in the
+file (`grep -n AEON_GIT`):
+- line 84: comment;
+- line 85: comment;
+- line 88: `const AEON_GIT = siblingPath('aeon');`
+- line 95: the null check;
+- line 96: `spawnSync('git', ['-C', AEON_GIT, 'rev-parse', ...])`
+- line 102: skip-reason text;
+- line 124: `spawnSync('git', ['-C', AEON_GIT!, 'archive', ...])`
+
+No fs call names it. The only `siblingPath` call is line 88.
+
+**Cost, measured.** 9,973,760 archive bytes, archived once and extracted twice in 18 ms (load
+6.14 8.01 7.85, uptime 154708 s). Later runs took 28 ms, 18 ms and 19 ms. It is cheap, and no
+data was vendored.
+
+**`origin/master` moved inside this session.** It was `21cc137b` at my first read and
+`8061d1dd` by the first test run. That is the point of naming the SHA: each run says which
+committed tree it measured.
+
+**Proof that no working tree is read: an unreachable peer.** The run below used
+`EMPYREAN_SUITE_ROOT=/tmp/tmp.7VNGwU1IEZ` (an empty `mktemp -d`), at 05:37:17, load 8.87,
+and vitest exited 0:
+
+```
+ Test Files  1 passed (1)
+      Tests  54 passed | 47 skipped (101)
+skip-report: 47 SKIPPED test(s) in 1 file(s). A SKIP IS NOT A PASS:
+skip-report: OK. Every skip named its reason.
+    [meta] SKIPPED, NOT PASSED: cannot measure an aeon project switch. Its fixture is materialised
+    from a COMMITTED aeon revision (origin/master) by git archive, never from a working tree, and
+    `git -C /tmp/tmp.7VNGwU1IEZ/aeon rev-parse origin/master` gave no commit (exit 128: fatal:
+    cannot change to '/tmp/tmp.7VNGwU1IEZ/aeon': No such file or directory). This row measures
+    nothing
+```
+
+All 47 skips are the aeon scenario rows, each named `[aeon (no committed revision)]`: 24
+refusal rows, 3 document rows, 8 commit controls, 6 non-edit controls and the 6 (c3) rows. All
+54 classic rows ran green.
+
+**Red-first, re-run against the new fixture** (aeon `origin/master @ 8061d1dd6e92`). Each plant
+was shown against HEAD before its run and restored with `git checkout 84b7533e -- aeon-open.ts`.
+- **P1**, the aeon commit check disabled (`if (cancelled && false) {`). At 05:40:46, load 3.63:
+  `18 failed | 83 passed (101)`, all assertion failures. The reds were every aeon-commit refusal
+  row: classic to aeon (5), aeon to aeon clean (5), aeon to aeon after Discard & open (5), and
+  the composer document row (3). The coordinator measured 18 too.
+- **P2**, (c3)'s `markClean` removed. At 05:41:28, load 2.74: `3 failed | 98 passed (101)`. The
+  reds were the three (c3) property rows: not marked dirty, no edit count, no hard-dirty mark.
+- **Green after the restore**, at 05:42:00: `101 passed (101)`, with `git diff HEAD -- src/`
+  empty.
+
+### 11.2 Item 2: the on-screen check (bar 1)
+
+**What was added.**
+- `scratchpad/switch-window-onscreen-harness.mjs`, registered as
+  `harness:switch-window-onscreen`. `check-harness-guards` reports 276 of 276 clean.
+- Commits `51bf4063` (the harness), `f005d275` and `bb42d075` (fixes from runs 1 and 2),
+  `ca3cfa26` (captures, plus an unbroken comment path).
+
+**How it is set up.**
+- A `VITE_AURORA_DEBUG=1` build in this worktree, run with `ELECTRON_BIN` = the main tree's
+  electron and `AURORA_BUILT_TREE` = this worktree. Its first line is
+  `root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa071fe0726cde6e3`.
+- Copies from `git archive` of committed revisions only:
+  - s1disasm at its checkout's HEAD commit `f6ece657`, 25,804,800 archive bytes, extracted as
+    S1a and S1b;
+  - aeon at `origin/master` `8061d1dd`, 9,973,760 bytes.
+- `spawnGuarded` and `await killTree(child)`.
+- A private `ORACLE_SOCKET`, `xvfb-run -a`. No emulator.
+
+**The expected text comes from source.** `src/renderer/state/edit-consent.ts` is bundled with
+esbuild and `openCancelledMessage(['level'])` is called. The unsaved dot's accessible name is
+read out of `DirtyDot.tsx` with a regex that must match exactly once. No typed literal.
+
+**The way in.** The edit is issued in the same synchronous `Runtime.evaluate` as the open,
+before the open's first IPC await resolves:
+`const p = __dbg.openDir(S1b); __dbg.classic.stampLayoutCell('fg')`. The aeon row does the same
+with `__dbg.aeon.open`. That evaluate also reads the classic status right after the stamp, so
+every run proves the edit landed inside the window. The open's outcome is recorded on the page
+and polled, not awaited (see run 1).
+
+**The rows.**
+
+| row | what it requires |
+|---|---|
+| SW.0 | setup: S1a is open, Green Hill act 1 was opened by a real click on Home's card, and it is clean |
+| SW.a | classic to classic with the edit |
+| SW.a.0 | premise: the stamp landed inside the window |
+| SW.a.1 | no banner before the open; the open returns `'error'`; the banner is painted with the exact sentence |
+| SW.a.2 | Home still names S1a, with its act loaded |
+| SW.a.3 | the stamped cell is still in the document |
+| SW.a.4 | the level tab's unsaved dot is still painted |
+| SW.b | classic to aeon, the same five checks (SW.b.0 to SW.b.4) |
+| SW.c1 | CONTROL: classic to classic with no edit commits, and no banner appears |
+| SW.c2 | CONTROL: classic to aeon with no edit commits, and no banner appears |
+
+The banner is read absent before every open. "On screen" means the paint test: rects, a
+strict hit at the integer centre, the scroller box and the viewport.
+
+**Every run, reported.**
+
+| run | when (uptime, 1-minute load) | summary line | what it was |
+|---|---|---|---|
+| run 1 | 05:42:29, 2.18 | `6/13 rows PASS · 6 FAIL · 1 UNMEASURABLE · 15.2s` | **harness defects.** `openWithEdit` handed `c.json` an async IIFE, so CDP stringified the pending promise (`result {}`). SW.c2 then aborted with `Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}`. The app side was already right on screen: SW.a.1's banner was painted with the exact sentence, and SW.b.2 passed. Fixed in `f005d275`: opens are polled, never awaited. |
+| (refused) | 05:42:10 | none | not a run: `assertFreshBuild` refused because `aeon-open.ts` was 362 s newer than `dist/main/index.mjs`. My plant restores rewrote the file; I rebuilt. |
+| run 2 | 05:44:50, 0.90 | `8/13 rows PASS · 5 FAIL · 0 UNMEASURABLE · 18.5s` | **instrument defects**, see the two points below |
+| final 1 | 05:48:01, 5.31 | `13/13 rows PASS · 0 FAIL · 0 UNMEASURABLE · 18.5s · s1disasm f6ece657c1cf · aeon 8061d1dd6e92` | exit 0 |
+| final 2 | 05:48:38, 4.30 | `13/13 rows PASS · 0 FAIL · 0 UNMEASURABLE · 18.5s · s1disasm f6ece657c1cf · aeon 8061d1dd6e92` | exit 0 |
+| final 3 | 05:49:06, 3.68 | `13/13 rows PASS · 0 FAIL · 0 UNMEASURABLE · 18.5s · s1disasm f6ece657c1cf · aeon 8061d1dd6e92` | exit 0 |
+| red H1 | 05:50:03, 4.99 | `5/13 rows PASS · 8 FAIL · 0 UNMEASURABLE · 17.6s` | red-first, below |
+| restored | 05:51:01, 3.60 | `13/13 rows PASS · 0 FAIL · 0 UNMEASURABLE · 18.5s · s1disasm f6ece657c1cf · aeon 8061d1dd6e92` | exit 0 |
+
+**Run 2's two instrument defects, both fixed in `bb42d075`.**
+- `__dbg.classic.docHash()` hashes tiles, objects and palettes, not the layout planes
+  (`debug-hooks.ts`), so it stayed at `1538244046` while the stamp changed fg cell (0,0) from 0
+  to 1. The stamp's own report meanwhile read `cellAfter 1, docChanged true`. No hook reads a
+  layout cell. The cell is now read back by the next stamp's `from` (`stampLayoutCell` reads the
+  cell before it writes), required to be the same plane and coordinates and equal to the value
+  the in-window stamp wrote. That read writes, so it is taken only after the row's other
+  evidence, and the harness says so.
+- Home shows no directory for an aeon project (see the observation below), so SW.c2's
+  `dir === copy` read null over a committed open. SW.c2 now checks the AEON chip and the project
+  name read from the copy's own `project.json`.
+
+**Red-first for the harness rows (H1).**
+- The plant: both commit-point checks disabled (`if (cancelled && false)` in
+  `classicProjectStore.ts` and `aeon-open.ts`), shown against HEAD, then rebuilt.
+- The renderer bundle changed from `index-BufjRyjr.js` to `index-BpViN1ty.js`, so the app ran
+  the plant.
+- The result: all 8 SW.a and SW.b property rows red; SW.0, both premises and both controls
+  green. Quoted:
+  - SW.a.1: `open returned "opened"; paint {"found":false,"dpr":1}`
+  - SW.a.2: `home {"chip":"S1",...,"dir":"/tmp/swos-s1b-YIP6DT"}`
+  - SW.b.2: `paint {"found":false,"dpr":1}`
+  - SW.b.3: `home {"chip":"AEON","name":"Sonic 4","dir":null}; levelState {"status":"idle",...}`
+- The restore: `git checkout bb42d075 -- <both files>`, then a rebuild. The bundle came back as
+  `index-BufjRyjr.js`, byte-for-byte the unplanted name, and the "restored" run is 13/13.
+
+**The dpr and rects, from final run 1.** dpr 1 throughout.
+- The banner text: `rect {"x":12,"y":6,"w":641.3,"h":18}`, 1 rect, centre (333, 15),
+  `hitInside true`, `inViewport true`, text exactly the bundled sentence.
+- The Green Hill tab's unsaved dot: `rect {"x":452.14,"y":43.5,"w":6,"h":6}`, centre (455, 47),
+  `hitInside true`, `inScrollerBox true`.
+- The Dismiss aim: `{"x":690,"y":15,"hitOk":true}`.
+- The stamp: fg (0,0) from 0 to 1 inside the window, read back after the cancelled open as
+  `from 1` at fg (0,0), on both roads.
+
+**The pictures.**
+- `docs/captures/2026-09-12-switch-window-onscreen/sw-a-cancelled-final1.png`: the red banner
+  with the sentence, Home on S1a's path, the Green Hill Zone Act 1 tab with its dot. The
+  `sw-b-cancelled-final1.png` frame is byte-identical, because both rows end in the same visible
+  state.
+- `docs/captures/2026-09-12-switch-window-onscreen/sw-b-cancelled-redH1.png`: under H1 the aeon
+  project committed over the edit, Home is the AEON "Sonic 4" page, an "Opened Sonic 4" toast,
+  and no banner.
+- Also committed: `sw-c2-committed-final1.png`, `sw-a-cancelled-redH1.png` and
+  `sw-c2-committed-redH1.png`.
+
+### 11.3 The key question for (b), answered
+
+**The aeon loader's cancellation IS visible while a classic project is resident.** SW.b.2
+passed in final runs 1 to 3, in the restored run, and already in runs 1 and 2. It went red
+under H1. `App.tsx` renders `error || classicError` whatever the engine, so `projectStore.error`
+paints on the same banner. It is not silent on that road.
+
+**An observation, not this parcel's defect, and not filed.** Home shows no directory for an aeon
+project. `HomeTab.tsx` renders `{dir && ...}` from the classic store only, so an aeon project's
+page names the project ("Sonic 4") and not its path. Two checkouts of one aeon tree are
+therefore indistinguishable on Home. Recorded here so it is not rediscovered.
+
+### 11.4 Where the tree disagreed with the review message
+
+1. **"The stamped cell is still there" has no read-only instrument in the tree.** `docHash`
+   does not cover the layout planes, and no hook reads a layout cell. The read used writes (the
+   next stamp's `from`), taken after the row's evidence, as section 11.2 says. The alternative
+   was adding a hook to `debug-hooks.ts`, a `src` change for an instrument, which I did not
+   make.
+2. **The aeon-check plant turned 18 rows red, as the message says.** Mine went through the
+   new committed fixture.
+3. **"S1a is still the open project"** is read where the user reads it: Home's header, which
+   shows the classic directory. For the aeon control the header shows no directory, so SW.c2
+   reads the project name instead (section 11.3).
+
+### 11.5 Suite
+
+Run in the foreground at `ca3cfa26`, with `git status` clean.
+
+- `npm test` exited 0.
+- Test Files: `613 passed | 3 skipped (616)`.
+- Tests: `9347 passed | 9 skipped (9356)`. 0 failed.
+- failure-class: "no failures in this run (616 module(s) reported)".
+- skip-report: "OK. Every skip named its reason". The 9 skips are the pre-existing env-gated
+  rows.
+- In that run: `switch-window-edit.test.ts (101 tests)`, `project-open-door-census.test.ts (8 tests)`.
+- `check-harness-guards`: "276 clean / 276 classified". Every gate printed OK.
+- `uptime` before: `05:52:34 up 1 day, 19:14, load average: 1.88, 3.82, 5.37`; after:
+  `05:53:12 up 1 day, 19:15, load average: 8.12, 5.03, 5.70`.
+- `npx tsc --noEmit`: exit 0, no output.
+
+A first attempt at 05:51:36 exited 1 before vitest ran: `check-cited-paths` flagged the
+harness header, which wrapped its citation of the suite file across two comment lines. That
+was fixed in `ca3cfa26`.
+
+After the run, only this section was added. The doc gates were run over it before its commit.
+
+### 11.6 Rework commits
+
+| commit | what |
+|---|---|
+| `84b7533e` | the aeon fixture from a committed revision, never a working tree (bar 19) |
+| `51bf4063` | the on-screen harness and its registration |
+| `f005d275` | harness: run 1's two read defects |
+| `bb42d075` | harness: run 2's cell read-back and aeon Home read |
+| `ca3cfa26` | captures (final run 1 and H1), and the harness comment path |
+| this commit | this section |
