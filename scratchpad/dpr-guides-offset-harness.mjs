@@ -126,6 +126,18 @@ const GRAB_PX = 6;
  *  a device pixel of run width at 1.35, rounded up. */
 const DRAWN_TOL = 1.5;
 const FIXTURE_SCENE = 'ojz_act1_floor';
+/**
+ * Shift+Arrow steps the composite rows move the camera by (16 px each).
+ *
+ * ⚠ AT CAMERA X 0 THE COMPOSITE IS THE MAP. ojz_act1_floor's bands scroll by camX
+ * times a factor, so at camX 0 every band shows plane column c at frame column c,
+ * which is exactly what the map already draws there. Master run 3 of this file read
+ * the composite row's differing columns as [0, 1] and [320, 321] only: the frame's two
+ * edges, not the composite. The row was measuring the frame a second time. Four steps
+ * put the camera at 64, where a FACTOR_1_16 band shows plane column c - 60.
+ */
+const CAM_STEPS = 4;
+const CAM_STEP_PX = 16;
 /** The differencing baseline (see the header): written into the COPY, never the live tree. */
 const BASE_ID = 'dpr_base';
 const EFFECTS_REL = 'games/sonic4/data/editor/effects';
@@ -356,6 +368,21 @@ async function main() {
       }
       return { dragIndex: g.dragIndex, hoverIndex: g.hoverIndex, frameDragging: f.dragging, committed };
     };
+    /**
+     * Step the CAMERA (the frame's session X) with Shift+Arrow, the owner's own gesture
+     * while the composite is on (MapViewport's `cameraKeys`: 16 px per shift-step).
+     * Focus is dropped first so no focused control can take the key.
+     */
+    const cameraStep = async (key, times) => {
+      await c.evalExpr('(document.activeElement && document.activeElement.blur && document.activeElement.blur(), true)');
+      const vk = key === 'ArrowRight' ? 39 : 37;
+      for (let i = 0; i < times; i++) {
+        await c.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code: key, windowsVirtualKeyCode: vk, modifiers: 8 });
+        await c.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: vk, modifiers: 8 });
+        await sleep(120);
+      }
+      await sleep(300);
+    };
     const capture = async (name) => {
       const r = JSON.parse(await c.evalExpr(String.raw`(() => { const cv = document.getElementById('map-canvas');
         const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
@@ -418,6 +445,10 @@ async function main() {
 
     // ---- IDENTITY capture, at dpr 1 only, before any gesture ---------------
     const identityCaptures = async (phaseId) => {
+      // ⚠ ON THE PARALLAX SUB-TAB, EXPLICITLY. A phase ends on tileAnim, where the
+      // composite is off; master-real's emulated-1 identity capture ran there and
+      // its floor state had no composite in it at all.
+      await realClick(SUBTAB('parallax')); await sleep(400);
       await select(SCENE_ID);
       const lensSet = await c.evalExpr("(window.__dbg.aeon.setBandLensTarget({ kind: 'band', index: 0 }), true)").catch(() => false);
       await sleep(400); await repaint(); await park();
@@ -426,15 +457,22 @@ async function main() {
       await repaint(); await park();
       const a2 = await capture('identity-probe-b');
       await c.evalExpr('window.__dbg.aeon.setBandLensTarget(null)').catch(() => null);
-      await select(FIXTURE_SCENE); await park();
+      await select(FIXTURE_SCENE);
+      const xBefore = (await frame()).anchor.x;
+      await cameraStep('ArrowRight', CAM_STEPS); await repaint(); await park();
+      const fI = await frame();
       const cam = await c.json('window.__dbg.aeon.cameraPreview()');
       const b1 = await capture('identity-floor-a');
       await repaint(); await park();
       const b2 = await capture('identity-floor-b');
+      await cameraStep('ArrowLeft', CAM_STEPS); await repaint();
+      const xAfter = (await frame()).anchor.x;
       await select(SCENE_ID); await park();
-      check(`${phaseId}.I0`, '[anti-vacuous] the identity states draw what they are for: the band lens label, and the floor composite',
-        lensSet === true && lens.active === true && cam.active === true && cam.blits > 0,
-        `band lens ${J({ active: lens.active, cells: lens.cells, drawn: lens.drawn })}; camera preview ${J({ active: cam.active, sceneId: cam.sceneId, blits: cam.blits })}`);
+      check(`${phaseId}.I0`, '[anti-vacuous] the identity states draw what they are for: the band lens label, and the floor composite with the camera off 0',
+        lensSet === true && lens.active === true && cam.active === true && cam.blits > 0
+        && fI.anchor.x === xBefore + CAM_STEPS * CAM_STEP_PX && xAfter === xBefore,
+        `band lens ${J({ active: lens.active, cells: lens.cells, drawn: lens.drawn })}; camera preview ${J({ active: cam.active, sceneId: cam.sceneId, camX: cam.camX, blits: cam.blits })}; `
+        + `frame x ${xBefore} -> ${fI.anchor.x} -> ${xAfter}`);
       check(`${phaseId}.I1`, '[anti-vacuous] DETERMINISM: each identity state hashes the same on two repaints in one run',
         a1.hash === a2.hash && b1.hash === b2.hash,
         `probe ${a1.hash} / ${a2.hash} (${a1.w}x${a1.h}); floor ${b1.hash} / ${b2.hash}; ${a1.path}, ${b1.path}`);
@@ -612,36 +650,51 @@ async function main() {
         note(`${P}.9`, `n/a at dpr ${dpr}: the identity-transform position ${ghostR.toFixed(2)} is the reported edge ${fRight}`);
       }
 
-      // .10 the composite: parallax (on) against tileAnim (off), on the fixture scene.
-      await select(FIXTURE_SCENE); await park();
+      // .10 the composite: parallax (on) against tileAnim (off), on the fixture scene,
+      // with the camera stepped to 64 so the composite is NOT the map (see CAM_STEPS).
+      await select(FIXTURE_SCENE);
+      await realClick(SUBTAB('parallax')); await sleep(500);
+      const camX0 = (await frame()).anchor.x;
+      await cameraStep('ArrowRight', CAM_STEPS); await repaint(); await park();
       const fx = await frame();
+      const cam = await c.json('window.__dbg.aeon.cameraPreview()');
       const rowsY = [];
       for (let k = 1; k <= 9; k++) rowsY.push(Math.round(fx.rect.y + (fx.rect.h * k) / 10));
-      const offRows = [];
-      for (const y of rowsY) offRows.push(await readRow(y));
-      await realClick(SUBTAB('parallax')); await sleep(500); await repaint(); await park();
-      const cam = await c.json('window.__dbg.aeon.cameraPreview()');
       const onRows = [];
       for (const y of rowsY) onRows.push(await readRow(y));
       await realClick(SUBTAB('tileAnim')); await sleep(400); await repaint(); await park();
-      let minX = Infinity; let maxX = -Infinity; let n = 0;
+      const fxOff = await frame();
+      const offRows = [];
+      for (const y of rowsY) offRows.push(await readRow(y));
+      await realClick(SUBTAB('parallax')); await sleep(400);
+      await cameraStep('ArrowLeft', CAM_STEPS); await repaint();
+      const camX1 = (await frame()).anchor.x;
+      await realClick(SUBTAB('tileAnim')); await sleep(400); await repaint(); await park();
+      const fxR = fx.rect.x + fx.rect.w;
+      const inL = fx.rect.x + 3; const inR = fxR - 3;
+      let minX = Infinity; let maxX = -Infinity; let n = 0; let bestInterior = 0;
       const perRow = [];
       for (let k = 0; k < rowsY.length; k++) {
         const runs = diffRuns(onRows[k].px, offRows[k].px, onRows[k].scale);
         perRow.push(`${rowsY[k]}:${J(runs.map((r) => [r.from, r.to]))}`);
-        for (const r of runs) { minX = Math.min(minX, r.from); maxX = Math.max(maxX, r.to); n++; }
+        let interior = 0;
+        for (const r of runs) {
+          minX = Math.min(minX, r.from); maxX = Math.max(maxX, r.to); n++;
+          interior += Math.max(0, Math.min(r.to, inR) - Math.max(r.from, inL));
+        }
+        bestInterior = Math.max(bestInterior, interior / (inR - inL));
       }
       note(`${P}.10 runs`, `per row, CSS [from, to) of the differing columns: ${perRow.join(' ')}`);
-      const fxR = fx.rect.x + fx.rect.w;
-      if (n === 0 || cam.active !== true) {
-        check(`${P}.10`, 'UNMEASURABLE: the composite changed nothing in the frame, or was not active', false,
-          `camera preview ${J({ active: cam.active, blits: cam.blits, sceneId: cam.sceneId })}; runs ${n}`);
-      } else {
-        check(`${P}.10`, 'the camera preview composite fills the frame it is drawn in (its differing columns reach the right edge, and stop there)',
-          maxX >= fxR - 3 && maxX <= fxR + DRAWN_TOL && minX >= fx.rect.x - DRAWN_TOL,
-          `${FIXTURE_SCENE} frame ${J(fx.rect)} (right ${fxR}); composite ${J({ active: cam.active, blits: cam.blits })}; differing CSS columns span ${minX.toFixed(2)}..${maxX.toFixed(2)} over ${rowsY.length} rows ${J(rowsY)} (${n} runs); `
-          + `identity-transform prediction right ${(fxR / dpr).toFixed(2)}`);
-      }
+      check(`${P}.10a`, '[anti-vacuous] the camera moved off 0 and back, the composite is active, the frame is the same rect with it off, '
+        + 'and the composite differs from the map across at least a quarter of the frame\'s interior in some row',
+        fx.anchor.x === camX0 + CAM_STEPS * CAM_STEP_PX && camX1 === camX0 && cam.active === true && cam.blits > 0
+        && J(fxOff.rect) === J(fx.rect) && bestInterior >= 0.25,
+        `frame x ${camX0} -> ${fx.anchor.x} -> ${camX1}; composite ${J({ active: cam.active, camX: cam.camX, blits: cam.blits })}; `
+        + `rect on ${J(fx.rect)} off ${J(fxOff.rect)}; best interior coverage ${(bestInterior * 100).toFixed(1)}%`);
+      check(`${P}.10`, 'the camera preview composite fills the frame it is drawn in: its differing columns start at the left edge, reach the right edge, and nothing outside the frame differs',
+        n > 0 && minX >= fx.rect.x - DRAWN_TOL && minX <= fx.rect.x + 3 && maxX >= fxR - 3 && maxX <= fxR + DRAWN_TOL,
+        `${FIXTURE_SCENE} frame ${J(fx.rect)} (left ${fx.rect.x}, right ${fxR}); differing CSS columns span ${minX.toFixed(2)}..${maxX.toFixed(2)} over ${rowsY.length} rows ${J(rowsY)} (${n} runs); `
+        + `identity-transform prediction ${(fx.rect.x / dpr).toFixed(2)}..${(fxR / dpr).toFixed(2)}`);
       await select(SCENE_ID); await park();
       return { dpr, G };
     };
