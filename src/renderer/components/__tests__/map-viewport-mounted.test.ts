@@ -4165,3 +4165,155 @@ describe('the hover bar says where the cursor is: section, local tile and world 
     says(bar(s), ['Coll B #14'], 'with plane B alone shown the readout did not read plane B');
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// map-coverage-5 STARTS HERE. Same harness, same rules as map-coverage-3 above.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════════
+// A PAINT OR COLLISION STROKE CROSSING A SECTION BOUNDARY (`recordPaint`'s flush).
+//
+// COVERAGE. `recordPaint` states the rule: "A change of section or plane flushes
+// the stroke and starts a new one — one command per contiguous run, never one
+// spanning two sections." Every stroke row above runs on a one-section act,
+// where that flush cannot fire. A `set-tiles` or `set-collision-edit` command
+// names ONE `sectionIndex`, so a stroke that did not flush would carry section
+// 1's cells, and section 1's old words, into a command against section 0: undo
+// would write them into the wrong section and leave the right one painted.
+//
+// Section 1 has its own fills (`FG_S1`, and its own collision shapes below), so
+// every such wrong write is a wrong VALUE and `offFill` sees it.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('a stroke crossing a section boundary lands one command per section, undone newest first', () => {
+  /** The camera parked so the boundary sits mid-VIEWPORT, at client x 320. */
+  const VIEW = { vpX: SECTION_PIXEL_SIZE - 320, vpY: 0, zoom: 1 };
+  const worldAt = (p: { x: number; y: number }) => mouse(p.x - VIEW.vpX, p.y - VIEW.vpY);
+  const W = SECTION_TILES_WIDE;
+  const LAST = W - 1;
+  /** Section 1's collision shapes: neither act1's section-0 shapes nor PICK. */
+  const S1_SHAPE = { a: 5, b: 6 } as const;
+  const PICK = 9;
+
+  function sec(i: 0 | 1): Section {
+    const s = useProjectStore.getState().project?.zones[0]?.acts[0]?.sections[i];
+    if (!s) throw new Error(`map-viewport-mounted: act1 has no section ${i}; the two-section fixture moved`);
+    return s;
+  }
+  /** Indices of `words` off `fill`, ascending. */
+  const offFill = (words: ArrayLike<number>, fill: number): number[] => {
+    const out: number[] = [];
+    for (let i = 0; i < words.length; i++) if (words[i] !== fill) out.push(i);
+    return out;
+  };
+  const fgOff = (i: 0 | 1) => offFill(sec(i).tileGrid.nametable, i === 0 ? FG_FILL.act1 : FG_S1);
+  const collOff = (i: 0 | 1, plane: 'a' | 'b') => {
+    const words = plane === 'a' ? sec(i).collisionEdit : sec(i).collisionEditB;
+    if (!words) throw new Error(`map-viewport-mounted: plane ${plane} of section ${i} is unseeded`);
+    return offFill(words, collWord(i === 0 ? COLL_SHAPE.act1[plane] : S1_SHAPE[plane]));
+  };
+  /** Both planes of both sections, as one value a row compares whole. */
+  const allColl = () => ({
+    s0: { a: collOff(0, 'a'), b: collOff(0, 'b') },
+    s1: { a: collOff(1, 'a'), b: collOff(1, 'b') },
+  });
+
+  beforeEach(() => {
+    makeAct1TwoSections();
+    useViewStore.setState(VIEW);
+  });
+
+  afterEach(() => {
+    useViewStore.getState().setOverlay('showSolidBothPlanes', false);
+    useEditorStore.getState().setCollisionPaintBothPlanes(false);
+  });
+
+  it('a TILE stroke from section 0 into section 1 is two commands: the first undo takes back section 1 only', async () => {
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-tile');
+    ed.setEditingLayer('fg');
+    ed.setSelectedTileIndex(5);
+    const row = 3;
+    const s = await mountMap();
+    s.on().onMouseDown(worldAt(tileCentre(0, LAST - 1, row)));
+    s.on().onMouseMove(worldAt(tileCentre(0, LAST, row)));
+    s.on().onMouseMove(worldAt(tileCentre(1, 0, row)));
+    s.on().onMouseMove(worldAt(tileCentre(1, 1, row)));
+    const s0 = [row * W + LAST - 1, row * W + LAST];
+    const s1 = [row * W, row * W + 1];
+    expect([fgOff(0), fgOff(1)], 'the stroke did not paint both sides of the boundary, each in its own section')
+      .toEqual([s0, s1]);
+    win!.dispatch('mouseup', {});
+    focusedHistory()!.undo();
+    expect([fgOff(0), fgOff(1)], 'the first undo did not take back exactly the section-1 run, in section 1')
+      .toEqual([s0, []]);
+    focusedHistory()!.undo();
+    expect([fgOff(0), fgOff(1)], 'the second undo did not take back the section-0 run').toEqual([[], []]);
+    expect(focusedHistory()!.canUndo, 'the crossing stroke left more than two entries').toBe(false);
+  });
+
+  it('a BOTH-PLANES collision stroke from section 0 into section 1 is two commands, each putting back both planes of its own section', async () => {
+    seedCollision();
+    sec(1).collisionEdit = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(S1_SHAPE.a));
+    sec(1).collisionEditB = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(S1_SHAPE.b));
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-collision');
+    ed.setSelectedCollisionProfile(PICK);
+    ed.setSelectedCollisionSolidity('all');
+    ed.setCollisionPaintPlane('a');
+    ed.setCollisionPaintBothPlanes(true);
+    ed.setCollisionBrushSize(1);
+    ed.setCollisionCrossoverBrush('keep');
+    ed.setCollisionCrossoverSpanMode('cell');
+    const cr = 1;
+    const lastCell = W / 2 - 1;
+    const s = await mountMap();
+    s.on().onMouseDown(worldAt(tileCentre(0, 2 * lastCell, 2 * cr)));   // section 0's last cell
+    s.on().onMouseMove(worldAt(tileCentre(1, 0, 2 * cr)));             // section 1's first
+    const s0 = cellSubTiles(lastCell, cr);
+    const s1 = cellSubTiles(0, cr);
+    expect(allColl(), 'the stroke did not paint both planes on both sides of the boundary')
+      .toEqual({ s0: { a: s0, b: s0 }, s1: { a: s1, b: s1 } });
+    win!.dispatch('mouseup', {});
+    focusedHistory()!.undo();
+    expect(allColl(), 'the first undo did not take back exactly section 1, on both of its planes')
+      .toEqual({ s0: { a: s0, b: s0 }, s1: { a: [], b: [] } });
+    focusedHistory()!.undo();
+    expect(allColl(), 'the second undo did not take back section 0 on both planes')
+      .toEqual({ s0: { a: [], b: [] }, s1: { a: [], b: [] } });
+    expect(focusedHistory()!.canUndo, 'the crossing stroke left more than two entries').toBe(false);
+  });
+
+  it('a stroke that lands on the SAME cell of the next section paints it, rather than skipping it as the cell just painted', async () => {
+    // `paintCollisionCell`'s drag cache: "same cursor cell — skip". Its key
+    // starts with the section index, and that is the only thing separating
+    // cell (3, 1) of section 0 from cell (3, 1) of section 1. A pointer event
+    // can jump that far: at zoom 0.25 both cells are inside one 640px viewport.
+    const ZOOMED = { vpX: 0, vpY: 0, zoom: 0.25 };
+    useViewStore.setState(ZOOMED);
+    const at = (p: { x: number; y: number }) =>
+      mouse((p.x - ZOOMED.vpX) * ZOOMED.zoom, (p.y - ZOOMED.vpY) * ZOOMED.zoom);
+    seedCollision();
+    sec(1).collisionEdit = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(S1_SHAPE.a));
+    sec(1).collisionEditB = new Uint16Array(SECTION_PLANE_WORDS).fill(collWord(S1_SHAPE.b));
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-collision');
+    ed.setSelectedCollisionProfile(PICK);
+    ed.setSelectedCollisionSolidity('all');
+    ed.setCollisionPaintPlane('a');
+    ed.setCollisionBrushSize(1);
+    ed.setCollisionCrossoverBrush('keep');
+    ed.setCollisionCrossoverSpanMode('cell');
+    const cell = { cc: 3, cr: 1 };
+    const p0 = tileCentre(0, 2 * cell.cc, 2 * cell.cr);
+    const p1 = tileCentre(1, 2 * cell.cc, 2 * cell.cr);
+    expect([p0, p1].map((p) => Number.isInteger(p.x * ZOOMED.zoom) && p.x * ZOOMED.zoom < VIEWPORT.width),
+      'ANTI-VACUOUS: both cells are whole client pixels inside the viewport at this zoom').toEqual([true, true]);
+    const s = await mountMap();
+    s.on().onMouseDown(at(p0));
+    s.on().onMouseMove(at(p1));
+    expect([collOff(0, 'a'), collOff(1, 'a')],
+      'the same cell of the next section was skipped as the cell the stroke had just painted')
+      .toEqual([cellSubTiles(cell.cc, cell.cr), cellSubTiles(cell.cc, cell.cr)]);
+  });
+});
