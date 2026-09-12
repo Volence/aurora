@@ -1,0 +1,33 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa842f3d6dbaea7f8
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa842f3d6dbaea7f8
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa842f3d6dbaea7f8 — dist/main/index.mjs is 20s newer than the newest of 975 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa842f3d6dbaea7f8/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa842f3d6dbaea7f8/src/renderer/components/MapViewport.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T18:15:55.630Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T18:15:55.630Z), so window.__dbg is in this bundle
+=== map-behaviour-fixes 2026-09-12 harness ===
+    uptime       : 14:16:05 up 2 days,  3:38,  1 user,  load average: 16.38, 12.38, 9.28
+    PARTS        : bw
+    node         : v24.15.0
+    root         : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa842f3d6dbaea7f8
+    in-tree      : yes (the tree under test is /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa842f3d6dbaea7f8; this file lives in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa842f3d6dbaea7f8)
+    ORACLE_SOCKET: /tmp/mbfix-sock-KlPTGo/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-2138512-99b1a85f
+    PORT         : 9433   DISPLAY: xvfb-run -a (never :0)
+    oracle       : literals from HEAD 602d57ffab4c779813883d17a0851afe4eb25e06; collision-paint, collision-cell, s4-types, collision-word, collision-cell-word bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa842f3d6dbaea7f8/src; brush sizes [1,7,15,25]; section 256x256 tiles
+    harness      : blob 673b939abe3833d898b4cfa60baeedfd6a920466 (as committed at HEAD)
+    src on disk  : DIFFERS FROM HEAD (a mutation?):
+                   M  src/renderer/components/MapViewport.tsx
+    aeon source  : AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/d0edb1a3-f310-475e-a7d9-8c253f046739/scratchpad/aeon-red-bw-1789236963425265642   (live sibling /home/volence/sonic_hacks/aeon: refused if equal)
+    copy         : /tmp/mbfix-aeon-CtOwoy   project "Sonic 4"
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-2138512-99b1a85f — see HAZARD 6
+    X pointer    : PARKED outside the window: display :218 (Xvfb pid 2138813); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed   click log: installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
