@@ -58,12 +58,21 @@ function chunkName(chunkId: string): string {
   return chunk?.name ?? chunkId;
 }
 
-function runDetach(placementId: number): void {
-  const target = activeSection();
+/**
+ * Detach placement `placementId` of section `sectionIndex`: the section the
+ * HOVER named, not the active one (DETACH-WRONG-SECTION). The readout and the
+ * chip's title name the hovered placement from `hover.sectionIndex`, and the
+ * hover never claims a section, so after a stamp in another section the active
+ * index points elsewhere. Placement ids are per section from 1, so resolving
+ * the id in the active section unlinked a DIFFERENT placement with the same
+ * number. "Detach all in section" stays on the active section: it says which.
+ */
+function runDetach(sectionIndex: number, placementId: number): void {
+  const section = getCurrentAct(useProjectStore.getState())?.sections[sectionIndex] ?? null;
   const level = getActiveLevel(useProjectStore.getState());
-  if (!target || !level) return;
+  if (!section || !level) return;
   const cmd = buildDetachCommand({
-    section: target.section, sectionIndex: target.sectionIndex, placementId,
+    section, sectionIndex, placementId,
     description: `Detach placement ${placementId} from its chunk`,
   });
   // Null means the placement is already gone (detached twice, or painted over
@@ -141,7 +150,7 @@ export default function ChunkLinkOptions(): React.ReactElement {
             title={hovered
               ? `Detach placement #${hovered.id}: its tiles stay exactly as they are, but stop following the chunk`
               : 'Hover a stamped region on the map to name a placement'}
-            onClick={hovered ? () => runDetach(hovered.id) : undefined}
+            onClick={hover && hovered ? () => runDetach(hover.sectionIndex, hovered.id) : undefined}
             disabled={!hovered}
           >Detach</Chip>
         </div>
