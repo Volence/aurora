@@ -1037,6 +1037,57 @@
           "step": 1
         }
       }
+    },
+    {
+      "name": "a document declaring a schema version other than 1",
+      "expect": "fail",
+      "why": "the document schema's `schema` property is `const: 1`. A consumer meeting a version it was not built against must refuse rather than guess at it, which is what aeon's load_preset says in its own refusal text. Perturbs the bands-only PASS document in exactly one way. Proven red first: with expect pass this case reported '1 was expected'.",
+      "doc": {
+        "schema": 2,
+        "id": "ojz_sec1_tint",
+        "name": "OJZ act 1 section 1 - horizon tint",
+        "bands": [
+          {
+            "top": 64,
+            "bot": 96,
+            "sh": false,
+            "on": {
+              "cram": {
+                "addr": 34,
+                "colours": [
+                  546,
+                  306
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a document with no schema key at all",
+      "expect": "fail",
+      "why": "`schema` is in the document schema's `required` list, and the property's own description says an absent key is refused. This is a DIFFERENT rule from the wrong-value case above and fails on a different keyword, so one can be lost while the other still passes: a consumer whose codec routes both through a single `!== 1` test, or whose test asserts only that something threw, is satisfied by an unrelated rule and pins neither. Proven red first: with expect pass this case reported \"'schema' is a required property\".",
+      "doc": {
+        "id": "ojz_sec1_tint",
+        "name": "OJZ act 1 section 1 - horizon tint",
+        "bands": [
+          {
+            "top": 64,
+            "bot": 96,
+            "sh": false,
+            "on": {
+              "cram": {
+                "addr": 34,
+                "colours": [
+                  546,
+                  306
+                ]
+              }
+            }
+          }
+        ]
+      }
     }
   ]
 }
