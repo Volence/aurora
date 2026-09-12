@@ -190,7 +190,7 @@ describe('harness selectors follow the app, not the other way round', () => {
       // for; the id it holds is what the app is asked about.
       expect(mapBody?.[1], `the helper declares ${name} and then routes it to no tab, so `
         + 'openEffectsSection would open the section without activating its tab').toContain(name);
-      expect(routed.get(id), `the helper routes ${id} to a tab the app does not put it on — the `
+      expect(routed.get(id), `the helper routes ${id} to a tab the app does not put it on: the `
         + 'app moved the section and the helper still names the old tab')
         .toBe(tabOf.get(id));
       // And the section really is rendered by one of the effects panels.
