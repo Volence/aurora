@@ -447,14 +447,28 @@ async function main() {
      * different sub-tabs now. This is that round trip, in one place, so no step
      * can measure a canvas that is not mounted or type into a card that is not.
      */
+    const selectedNow = () => c.evalExpr('window.__dbg.aeon.selectedScene()');
     const onParallax = async (expr) => {
+      // WHICH STEP OF THE ROUND TRIP MOVED THE SELECTION, when one did
+      // (2026-09-12; a NOTE, not a row). The first re-aimed run found the panel
+      // on another scene after this round trip, and a value typed into a layer
+      // card lands in whatever scene is selected.
+      const trail = [['before', await selectedNow()]];
       await c.evalExpr(SUBTAB('parallax'));
       await sleep(600);
+      trail.push(['parallax shown', await selectedNow()]);
       await c.evalExpr(OPEN_SCENE_FORM);
       await sleep(300);
+      trail.push(['scene form open', await selectedNow()]);
       const r = await c.evalExpr(expr);
+      trail.push(['edit made', await selectedNow()]);
       await c.evalExpr(SUBTAB('colour'));
       await sleep(800);
+      trail.push(['colour shown', await selectedNow()]);
+      if (trail.some(([, s]) => s !== trail[0][1])) {
+        note('the selected scene MOVED during a parallax round trip: '
+          + trail.map(([k, s]) => `${k}=${s}`).join(' -> '));
+      }
       return r;
     };
     const scenes0 = await c.json('window.__dbg.aeon.scenes()');
