@@ -426,7 +426,9 @@ export const EDITOR_METHODS: EditorMethod[] = [
   // what an MCP client actually reads, so the plural wins here.
   { name: 'list_effects_presets', kind: 'list-effects-presets', result: 'json', params: {},
     description: 'List the project\'s raster band PRESETS (documents under data/editor/effects/presets/): '
-      + 'each preset\'s id, name and band count. A preset is NOT a scene: a scene is the parallax '
+      + 'each preset\'s id, name, band count and program: which of bands, ramp, base_swap or boundary '
+      + 'it carries. A preset carries exactly one program, so a preset whose program is not bands '
+      + 'reports a band count of 0 and is not empty. A preset is NOT a scene: a scene is the parallax '
       + 'config under data/editor/effects/, a preset is the raster band program in the presets/ '
       + 'subdirectory, and a "bands" key in a scene file is refused. Also reports preset files that '
       + 'exist but could NOT be read: those ids are unusable and Aurora will not overwrite them. '

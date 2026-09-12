@@ -400,8 +400,10 @@ describe('list_effects_presets reads the binding back', () => {
   it('keeps everything the reply already carried', async () => {
     const r = await ask({ kind: 'list-effects-presets' }) as Record<string, unknown>;
     expect(r.presets).toEqual([
-      { id: 'glare', name: 'Glare', bands: glare().bands!.length },
-      { id: 'dusk', name: 'Dusk', bands: dusk().bands!.length },
+      // `program`: both fixtures carry a `bands` key (the bands-not-required
+      // audit added the column; agent-handler.effects-preset.test.ts owns it).
+      { id: 'glare', name: 'Glare', bands: glare().bands!.length, program: 'bands' },
+      { id: 'dusk', name: 'Dusk', bands: dusk().bands!.length, program: 'bands' },
     ]);
     expect(r.unreadable).toEqual([
       { path: 'data/editor/effects/presets/broken.json', reason: 'not valid JSON' },

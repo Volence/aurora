@@ -41,7 +41,10 @@ import type { Color } from '../../../core/model/s4-types';
 import type { EffectsPreset, EffectsPresetLibrary } from '../../../core/formats/effects/preset';
 import {
   EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ON_ARMS,
+  EFFECTS_PRESET_PROGRAM_ARMS, parseEffectsPreset,
 } from '../../../core/formats/effects/preset';
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { PRESET_LIMITS } from '../../providers/effects-preset';
 
 const black = (): Color => ({ r: 0, g: 0, b: 0, a: 255 });
@@ -148,7 +151,7 @@ describe('list_effects_presets', () => {
       // `name` is an OBJECT here, and the reply reports null rather than the
       // panel's `label` collapse: an agent must be able to tell "no string name"
       // from "named after itself", which `presetListEntries` deliberately cannot.
-      { id: 'glare', name: null, bands: glare().bands!.length },
+      { id: 'glare', name: null, bands: glare().bands!.length, program: 'bands' },
     ]);
     expect(r.unreadable).toEqual([
       { path: 'data/editor/effects/presets/broken.json', reason: 'not valid JSON' },
@@ -188,6 +191,90 @@ describe('list_effects_presets', () => {
     expect(unbound, 'PRESET_LIMITS no longer carries the `unbound` limit this reply reads').toBeTruthy();
     expect(unbound!.body.length, 'the limit body is empty: this row would assert nothing').toBeGreaterThan(40);
     expect(r.sectionBinding).toBe(unbound!.body);
+  });
+});
+
+// ═══ THE BANDS-NOT-REQUIRED AUDIT (2026-09-11) ═══════════════════════════════
+//
+// The contract's top-level `required` is ["schema", "id"] and its `oneOf` takes
+// EXACTLY ONE of bands | ramp | base_swap | boundary. A ramp preset has no
+// `bands` key, so `(p.bands ?? []).length` reported it as `bands: 0` with
+// nothing beside it. That is the "0 bands" the PANEL's own list row was fixed
+// for (`presetListSummary`'s docblock: it "reads as a broken or half-authored
+// preset rather than a different kind of one"), still standing on the agent's
+// copy of the same list. An agent could not tell a ramp preset from an empty
+// band list, and the schema says an empty band list cannot exist (`bands` has
+// `minItems: 1`).
+//
+// THE FIX IS THE PANEL'S OWN: `program` is `presetProgramArm`, the value
+// `PresetListEntry.channel` already carries. The count is left alone. Zero IS
+// the number of bands, and the program is what makes that zero readable.
+//
+// REAL DOCUMENTS: aeon's two shipped ramp presets and its base_swap preset as
+// Aurora vendors them (preset-canonical-golden.json, ojz_sec6_baseswap.json;
+// aeon f8beaad0, both ramps' content equal to aeon origin/master 7577daee on
+// 2026-09-11), plus the contract's boundary vector, since aeon ships no
+// boundary PRESET file.
+const FIXTURES = resolve(__dirname, '../../../../test/fixtures/effects');
+
+/** The ONE program arm a raw document carries, read off the schema's own arm list. */
+function rawArm(stem: string, raw: Record<string, unknown>): string {
+  const arms = EFFECTS_PRESET_PROGRAM_ARMS.filter((a) => a in raw);
+  if (arms.length !== 1) throw new Error(`${stem} carries ${arms.length} program arms, not one`);
+  return arms[0];
+}
+
+function realNonBandsPresets(): { preset: EffectsPreset; arm: string }[] {
+  const golden = JSON.parse(readFileSync(join(FIXTURES, 'preset-canonical-golden.json'), 'utf8')) as {
+    documents: Record<string, string>;
+  };
+  const vectors = JSON.parse(readFileSync(join(FIXTURES, 'effects-preset-vectors.json'), 'utf8')) as {
+    cases: { expect: string; doc: unknown }[];
+  };
+  const boundary = vectors.cases.find((c) => c.expect === 'pass'
+    && typeof c.doc === 'object' && c.doc !== null && 'boundary' in c.doc);
+  if (!boundary) throw new Error('the contract vectors carry no passing boundary document');
+  const bdoc = boundary.doc as { id: string };
+  const texts: [string, unknown][] = [
+    ['ramp_probe', golden.documents.ramp_probe],
+    ['aurora_ramp_witness', golden.documents.aurora_ramp_witness],
+    ['ojz_sec6_baseswap', readFileSync(join(FIXTURES, 'ojz_sec6_baseswap.json'), 'utf8')],
+    [bdoc.id, JSON.stringify(bdoc)],
+  ];
+  return texts.map(([stem, text]) => {
+    if (typeof text !== 'string') throw new Error(`fixture document ${stem} is missing`);
+    return {
+      preset: parseEffectsPreset(text, stem),
+      arm: rawArm(stem, JSON.parse(text) as Record<string, unknown>),
+    };
+  });
+}
+
+describe('list_effects_presets on presets that carry no bands', () => {
+  beforeEach(() => open());
+
+  it('names each non-bands preset\'s PROGRAM, so its `bands: 0` cannot read as an empty band list', async () => {
+    const docs = realNonBandsPresets();
+    // ANTI-VACUOUS: every arm the schema declares other than bands is in the set.
+    expect(new Set(docs.map((d) => d.arm)))
+      .toEqual(new Set(EFFECTS_PRESET_PROGRAM_ARMS.filter((a) => a !== 'bands')));
+    open({ presets: docs.map((d) => d.preset), unreadable: [], notices: [], loadedPaths: [] });
+    const r = await ask({ kind: 'list-effects-presets' }) as { presets: Record<string, unknown>[] };
+    expect(r.presets).toHaveLength(docs.length);
+    for (const d of docs) {
+      const row = r.presets.find((p) => p.id === d.preset.id);
+      expect(row, `${d.preset.id} is missing from the reply`).toBeTruthy();
+      expect(row!.program, `${d.preset.id} carries ${d.arm}`).toBe(d.arm);
+      expect(row!.bands).toBe(0);
+    }
+  });
+
+  it('CONTROL: a bands preset reports program "bands" beside its real count', async () => {
+    expect('bands' in glare()).toBe(true);
+    open({ presets: [glare()], unreadable: [], notices: [], loadedPaths: [] });
+    const r = await ask({ kind: 'list-effects-presets' }) as { presets: Record<string, unknown>[] };
+    expect(r.presets[0].program).toBe('bands');
+    expect(r.presets[0].bands).toBe(glare().bands!.length);
   });
 });
 
