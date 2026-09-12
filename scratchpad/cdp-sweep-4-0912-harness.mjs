@@ -1486,7 +1486,12 @@ async function effectsPart(d, O, S) {
       && !!fL.rect && Math.abs(fL.rect.x - want0.x) < 0.01 && Math.abs(fL.rect.y - want0.y) < 0.01 && !!eF && eF.n > 20 && eF.ok / eF.n >= 0.9 && eF.outN > 0 && eF.outSame === eF.outN,
     `scene v_offset ${vo}; frame report ${J(fL)}; want x ${want0.x} y ${want0.y}; view ${J(sess)}; edge ${J(eF)}; captures ${refF.path}, ${shotF.path}`);
   // The drag: the RIGHT edge (not near a guide), 24 right and 16 down.
-  const gxF = Math.round(GF.R.x + fL.rect.x + fL.rect.w); const gyF = Math.round(GF.R.y + fL.rect.y + fL.rect.h / 2 + 30);
+  // ⚠ RED RUN red-sf-gate ABORTED HERE: with no frame drawn `fL.rect` is null
+  // and the part threw, so ESC and BAND never ran. With no frame the press goes
+  // to the rect frameAnchorFor derives, where there is nothing to grab, and
+  // SF.b fails as a row.
+  const fRect = fL.rect ?? { x: want0.x, y: want0.y, w: 320 * V.zoom, h: 224 * V.zoom };
+  const gxF = Math.round(GF.R.x + fRect.x + fRect.w); const gyF = Math.round(GF.R.y + fRect.y + fRect.h / 2 + 30);
   const sessBefore = await c.json('window.__dbg.view()');
   const sfBefore = await c.json('window.__dbg.aeon.screenFrame()');
   await d.mouse('mouseMoved', gxF, gyF); await sleep(150);
@@ -1501,8 +1506,8 @@ async function effectsPart(d, O, S) {
   const shotF2 = await d.grab(frameClip, 'sf-locked-frame-after-drag');
   const wantVo = vo + Math.round(16 / V.zoom);
   const wantX = Math.round(24 / V.zoom);
-  const rowNew = Math.round(GF.R.y + (wantVo - V.y) * V.zoom + fL.rect.h);
-  const colNew = Math.round(GF.R.x + (wantX - V.x) * V.zoom + fL.rect.w);
+  const rowNew = Math.round(GF.R.y + (wantVo - V.y) * V.zoom + fRect.h);
+  const colNew = Math.round(GF.R.x + (wantX - V.x) * V.zoom + fRect.w);
   await d.chord('z', CTRL);
   const docF3 = await sceneDoc('ojz_act1_floor');
   const fL3 = await c.json('window.__dbg.aeon.screenFrame()');
