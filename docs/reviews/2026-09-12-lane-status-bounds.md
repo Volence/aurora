@@ -73,9 +73,13 @@ not the subject". This gate holds the file, so its number **is** the subject.
 ```
 30afaf84  lane-status: assert the three contract size bounds, each reporting independently
 976fc7ba  lane-status: cite hub_check.py by its peer-qualified path so check-cited-paths can judge it
+ffbf7252  packet: LANE-STATUS-CHECK-BOUNDS, the contract read at a SHA and five ablations
+92412d2c  check-doc-citations: exempt the bounds packet's docs/lane-status.json citations as provenance
 ```
 
-Tip at the time of writing: `976fc7ba36a59de7c7598d14b916f893dffc1ace` on `parcel/lane-status-bounds`.
+`976fc7ba` and `92412d2c` are both repairs of a red `npm test`, and in both the gate was right;
+they are written up in §9 because a change that has to touch two other gates to land is telling you
+something about itself.
 
 ### The measurement decisions, and why each is the one the contract means
 
@@ -270,7 +274,54 @@ the next write rather than after it.
 
 ---
 
-## 8. Nothing was stopped on
+## 8. `npm test` aggregate
+
+Run foreground, output to a file, **exit code read directly and not through a pipe**:
+
+```
+$ VITEST_MAX_WORKERS=4 npm test > .../npm-test-final2.log 2>&1 ; echo "NPM_TEST_EXIT=$?"
+NPM_TEST_EXIT=0
+
+ Test Files  616 passed | 3 skipped (619)
+      Tests  9574 passed | 9 skipped (9583)
+ ✓ test/config/lane-status-bounds.test.ts (21 tests) 257ms
+```
+
+All fifteen static gates in the chain report OK, `typecheck` passes, and the failure-class reporter
+reports no failures across 619 modules. The 9 skips are all pre-existing and each names its reason
+(three band-art foreground rows wanting `AURORA_FG_GATE_FILE`, the opt-in bench, two live-emulator
+rows, two rows whose `s4_engine` tree is gone from this machine, and the `sibling-root` step-3 row
+that can only be measured from the main checkout). **None of them is mine**, and none is in this
+parcel's area.
+
+Two earlier runs of the same chain were RED, both on gates unrelated to the bounds and both
+correct to stop; see §9.
+
+## 9. Two gates stopped this change, and both were right
+
+Recorded because the repairs are small and the pattern is not: a citation can be **true and the
+wrong shape**, and neither gate could have been satisfied by softening it.
+
+1. **`check-cited-paths`** (commit `976fc7ba`). Two comments cited empyrean's `hub_check.py` by a
+   bare repo-relative path with no `empyrean/` on the front. That file lives in the empyrean
+   checkout, so the gate read the citation as a promise a reader cannot keep: someone following it
+   would have looked in aurora, found nothing, and had no way to tell a wrong filename from a
+   deleted file. Qualified to `empyrean/scripts/hub_check.py`, which that gate classifies as a peer
+   citation it cannot resolve and never fails on. The citation was right the whole time and pointed
+   the reader into the wrong tree. **This very paragraph tripped the gate again** on the first
+   attempt, by reproducing the bad shape while describing it, which is a fair demonstration that
+   the rule is about the SHAPE on the line and not about the author's intent.
+2. **`check-doc-citations`** (commit `92412d2c`). Four lines of **this packet** cite
+   `docs/lane-status.json`, which is gitignored, so no reader can open it. That gate's own bar
+   allows a citation that is "recording what was lost, quoting a run, or stating provenance", and
+   §4 is the purest instance of the third: it is a finding **about** that file being unopenable, and
+   every sentence in it has to name the path to say anything. One exemption row, same token and
+   same reason as the `2026-09-09-audit-briefing.md` row directly above it in that table. The gate
+   requires every exemption to still fire, so the row goes red the day this packet stops citing the
+   file. Repair was not available: untracked **by contract**, which is the finding's premise rather
+   than an accident of this checkout.
+
+## 10. Nothing was stopped on
 
 No BLOCKED items. No emulator was used and nothing here needs runtime. The two deliberate
 non-actions, both argued above rather than quietly taken: the script is not in the `npm test`
