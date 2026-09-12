@@ -339,7 +339,29 @@ The rest checked out against the tree:
 
 ## Totals
 
-(Filled in after the full-suite run on the final tree; see the commit that follows this one.)
+Measured in the foreground on `3bdc6d81`, which is this packet and its captures on top of all
+the harness work. The commit after it only fills in this section.
+
+| Run | Result |
+|---|---|
+| full `npm test` | exit 0: **Test Files 612 passed, 3 skipped (615); Tests 9244 passed, 9 skipped (9253)**, 0 failed. check-test-collection: 615 test-shaped files on disk, all 615 collected. |
+| `test/harness-effects-control-aims.test.ts`, inside that run | 7 of 7 |
+| `npx tsc --noEmit` | exit 0, 0 errors. That run was on `1fe9e18e`, and nothing TypeScript changed after it; the suite's own typecheck step passed again on `3bdc6d81`. |
+| `check-harness-guards`, inside that run | 274 clean of 274 classified, 0 failures, 0 unmeasurable |
+| `check-doc-citations` / `check-cited-paths` | OK on the committed packet: every cited capture is tracked |
+
+No gate refused on the way. `git diff --stat d73ae428 -- src` is empty: `src/` is unchanged on
+this branch.
+
+**Commits on `parcel/timeline-rig-reaim`, oldest first:**
+
+| Commit | Purpose |
+|---|---|
+| `091c5475` | the vsplit and Program aims read from source; the strict aim; the three other silent misses; the node pin |
+| `115f92b5` | 6a prints the document and the selection beside the report; the stop line stops assigning blame |
+| `a8b54581` | `onParallax` records which step of its round trip moved the selected scene |
+| `1fe9e18e` | captures: the drift before, the selection trace, and the three planted aims |
+| `3bdc6d81` | this packet, the six final logs and the two screenshots |
 
 ## Open
 
