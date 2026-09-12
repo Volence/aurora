@@ -637,8 +637,20 @@ export function sectionArmExclusivityRefusal(
     + `patched: ${arm.patched}. aeon's preset() refuses a raster: beside a patched:, because they `
     + 'are the same channel and whichever installs last destroys the other (engine/effects/preset.emp: '
     + '"ep_raster and ep_patched are mutually exclusive"). A preset document authored here '
-    + `carries bands, bands lower to a raster program, and effects_seam_gate.py requires it be `
-    + `threaded through ${chooserFn}(sec: ${sectionIndex}). So binding one here would have to take `
+    // ⚠ "ONE PROGRAM", NOT "BANDS". This said "carries bands, bands lower to a
+    // raster program" from the day the root became an exactly-one `oneOf`, and
+    // a document authored here may carry a ramp or a base swap — both of which
+    // lower to `raster:` exactly as a band list does, so the conclusion held and
+    // the premise was stale (bands-not-required audit, 2026-09-11, F4). The
+    // three nouns are `PROGRAM_ARM_NOUNS`' spellings, typed here because this
+    // module must stay importable without the preset codec; the renderer's
+    // non-bands preset rows hold them to that map. A `boundary` document lowers
+    // to `patched:` and is chosen by `<act>_sec_patched`, so the threading
+    // clause below is still the wrong sentence for one — that is condition 2's
+    // recorded defect (the CONDITION 2 note further down), not this wording's.
+    + 'carries one program; a band list, a ramp or a base swap lowers to a raster program, and '
+    + `effects_seam_gate.py requires it be threaded through ${chooserFn}(sec: ${sectionIndex}). `
+    + 'So binding one here would have to take '
     + `${arm.patched} out of section ${sectionIndex} first. That is a property of the `
     + 'mechanism and not a choice about this section (aeon, 2026-09-10: "THAT IS A STRUCTURAL GAP '
     + 'AND NOT A CHOICE"), and it is the only kind of thing that greys this control out: a section '

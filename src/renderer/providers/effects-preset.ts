@@ -5503,7 +5503,7 @@ export function bandControlsRefusal(preset: EffectsPreset): string | null {
  * schema's own `oneOf` at module load, so a fifth arm is a data change that says
  * so out loud.
  */
-const PROGRAM_ARM_NOUNS: Record<string, string> = {
+export const PROGRAM_ARM_NOUNS: Readonly<Record<string, string>> = {
   bands: 'band list',
   ramp: 'ramp',
   base_swap: 'base swap',

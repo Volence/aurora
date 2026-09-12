@@ -80,7 +80,7 @@ import {
   publishRasterTimelinePointer, inactiveRasterTimelineReport,
   presetEdgeAt, presetBandAt, presetDragFor, stripYToLine,
   RASTER_TIMELINE_W, RASTER_TIMELINE_H, RASTER_TIMELINE_GRAMMAR,
-  RASTER_TIMELINE_GESTURES,
+  rasterTimelineGestures,
   type RasterTimelinePresetDrag,
 } from '../../canvas/raster-timeline';
 import type { EffectsSceneLibrary } from '../../../core/formats/effects/scene';
@@ -187,6 +187,12 @@ export default function RasterTimelineStrip(): React.ReactElement {
     return rasterTimelineView(scene, cameraPreviewPlan(scene, cam.x, cam.y), preset, drag);
   })();
   const presetRows = view?.presetBands ?? [];
+  // The gesture sentence, or null when there is no band to gesture at — ONE
+  // derivation for the canvas `title` and the hints under it. Null for no
+  // preset AND for a preset that carries no bands (F2 of the bands-not-required
+  // audit): "Drag a band edge in the left column" over a ramp is a false
+  // instruction, and a tooltip and a hint that disagreed about it would be two.
+  const gestures = rasterTimelineGestures(view?.presetProgram ?? null);
 
   // Why the dragged edge has stopped, or null. ONE derivation, the provider's,
   // read by the plate on the canvas and by the hint under it.
@@ -340,6 +346,7 @@ export default function RasterTimelineStrip(): React.ReactElement {
       bands: view.bands,
       splits: view.splits,
       presetId: view.presetId,
+      presetProgram: view.presetProgram,
       presetBands: view.presetBands,
       notices: view.notices,
       absent: view.absent,
@@ -380,7 +387,7 @@ export default function RasterTimelineStrip(): React.ReactElement {
               onPointerCancel={abandon}
               onPointerLeave={() => { if (drag === null) setHover(null); }}
               onDoubleClick={onDoubleClick}
-              title={preset === null ? undefined : RASTER_TIMELINE_GESTURES}
+              title={gestures ?? undefined}
               // ⚠ FIXED INTRINSIC SIZE, CSS-SCALED AT MOST. The backing store is
               // constant, so the strip's pixels are in strip space with no
               // `devicePixelRatio` factor — the class of off-by-one that cost a
@@ -424,11 +431,13 @@ export default function RasterTimelineStrip(): React.ReactElement {
                 Two sentences because they answer two questions — one about the
                 mouse, one about the hardware — and only the second one is
                 surprising enough to be worth an author's second read. Shown only
-                when there IS a preset: an instruction for a column that is not
-                on screen is noise. */}
-            {preset !== null && (
+                when there IS a band column to work: an instruction for a column
+                that is not on screen is noise, and one for a column that is on
+                screen and EMPTY (a ramp, base_swap or boundary preset) is a
+                false instruction — `rasterTimelineGestures` is null for both. */}
+            {gestures !== null && (
               <>
-                <Hint under style={{ marginBottom: 0 }}>{RASTER_TIMELINE_GESTURES}</Hint>
+                <Hint under style={{ marginBottom: 0 }}>{gestures}</Hint>
                 <Hint under style={{ marginBottom: 0 }}>{BAND_SPLIT_LAW}</Hint>
               </>
             )}

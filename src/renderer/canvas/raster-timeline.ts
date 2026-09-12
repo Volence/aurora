@@ -131,6 +131,7 @@
 
 import type { EffectsScene, EffectsLayer } from '../../core/formats/effects/scene';
 import type { EffectsPreset, EffectsPresetBand } from '../../core/formats/effects/preset';
+import { presetProgramArm } from '../../core/formats/effects/preset';
 import { bandArm, bandCollisionAdvisory, clampBandEdge } from '../providers/effects-preset';
 import { factorLabel } from '../../core/formats/effects/scene-ui';
 import type { CameraPreviewPlan, CameraPreviewBand } from './camera-preview';
@@ -305,6 +306,16 @@ export interface RasterTimelineView {
   splits: RasterTimelineSplitRow[];
   /** The preset whose bands the left column is drawing, or null. */
   presetId: string | null;
+  /**
+   * WHICH PROGRAM that preset carries (`presetProgramArm`), or null with no
+   * preset. The column draws `bands` and nothing else; every other arm is a
+   * document this strip has nothing to draw for, and the caption, the honesty
+   * line and the gesture hint all read THIS rather than `presetId`, because a
+   * selected preset and a drawn one stopped being the same thing when the
+   * schema's root became an exactly-one `oneOf` (bands-not-required audit,
+   * 2026-09-11, F2).
+   */
+  presetProgram: string | null;
   presetBands: RasterTimelinePresetBandRow[];
   /** Sentences the strip must say for this scene. Empty is the common case. */
   notices: string[];
@@ -409,12 +420,62 @@ export function splitRefusal(
  * below says WHY the two mechanisms are not interchangeable, in prose beside the
  * strip where a sentence has room to be a sentence.
  */
-export function rasterTimelineAbsences(hasPreset = false): string[] {
+export function rasterTimelineAbsences(bandsDrawn = false): string[] {
   // ⚠ THE FLAG IS NOT A COSMETIC. "palette bands" was true of every build until
-  // row 94 and is now true only when there is no preset to draw — and an honesty
-  // line that keeps naming something the strip IS showing teaches an author to
-  // stop reading it, which costs the two entries that are still true.
-  return hasPreset ? ['per-line deform'] : ['palette bands', 'per-line deform'];
+  // row 94 and is now true only when the column has no bands to draw — and an
+  // honesty line that keeps naming something the strip IS showing teaches an
+  // author to stop reading it, which costs the two entries that are still true.
+  //
+  // ⚠ "NO BANDS TO DRAW" IS NOT "NO PRESET". This flag was `preset !== null`
+  // until the bands-not-required audit (2026-09-11, F2): a ramp, base_swap or
+  // boundary preset is a selected preset with NO `bands` key, so it got the line
+  // a fully drawn band preset gets while the column drew nothing. The caller
+  // now passes `presetProgramArm(preset) === 'bands'`, which is the same
+  // positive test `bandControlsRefusal` and `presetListSummary` settled on.
+  return bandsDrawn ? ['per-line deform'] : ['palette bands', 'per-line deform'];
+}
+
+/**
+ * THE PRESET COLUMN'S CAPTION — three states, and each is a claim.
+ *
+ *   • `no preset`  — nothing is selected, so there is no column;
+ *   • `bands`      — the selected preset carries bands and the column draws them;
+ *   • `no bands`   — a preset IS selected and carries a different program
+ *                    (ramp, base_swap, boundary, or any arm added later), so
+ *                    the column has nothing to draw.
+ *
+ * ⚠ THE THIRD STATE USED TO SAY `bands`. That is the `0 bands` defect
+ * `presetListSummary` fixed on the panel's list row, drawn instead of printed:
+ * a caption that names bands over a column with none reads as an empty band
+ * list, which the schema (`minItems: 1`) says cannot exist. The word is the
+ * NEGATIVE of the column's name rather than the program's noun because the
+ * caption slot is `RASTER_TIMELINE_STRIP_X - RASTER_TIMELINE_PRESET_X` px wide
+ * and "patchable palette boundary" is not, and a noun-when-it-fits rule is the
+ * per-arm branch whose fourth arm always ends up reading `0 bands` again. The
+ * program IS named on this tab — the list row, the Program row and
+ * `bandControlsRefusal` all say it — and this strip's job is only to be true
+ * about what it draws. Tested positively (`=== 'bands'`), so a fifth arm lands
+ * in the third state without a code change.
+ */
+export function rasterTimelinePresetCaption(
+  view: Pick<RasterTimelineView, 'presetId' | 'presetProgram'>,
+): string {
+  if (view.presetId === null) return 'no preset';
+  return view.presetProgram === 'bands' ? 'bands' : 'no bands';
+}
+
+/**
+ * The gesture sentence for this view, or null when there is no band to gesture at.
+ *
+ * ONE derivation for the canvas `title` and the hint under it, so the tooltip
+ * and the prose cannot disagree about whether there is an edge to drag. Null
+ * with no preset (an instruction for a column that is not on screen is noise)
+ * AND null for a preset that carries no bands: "Drag a band edge in the left
+ * column" over a column with no band is a false instruction, and it was the
+ * fourth thing F2 found on this strip.
+ */
+export function rasterTimelineGestures(presetProgram: string | null): string | null {
+  return presetProgram === 'bands' ? RASTER_TIMELINE_GESTURES : null;
 }
 
 /**
@@ -597,6 +658,10 @@ export function rasterTimelineView(
   }
 
   const presetBands = rasterTimelinePresetRows(preset, drag);
+  // The ARM, not the raster channel: a boundary document carries a program and
+  // no raster channel, and this strip draws neither. See `presetRasterChannel`'s
+  // docblock for why the two nulls are different documents.
+  const presetProgram = preset === null ? null : presetProgramArm(preset);
 
   const notices: string[] = [];
   const spaceNote = rasterTimelineSpaceNotice(scene);
@@ -612,8 +677,8 @@ export function rasterTimelineView(
 
   return {
     sceneId: scene.id, space, bands, splits,
-    presetId: preset?.id ?? null, presetBands,
-    notices, absent: rasterTimelineAbsences(preset !== null),
+    presetId: preset?.id ?? null, presetProgram, presetBands,
+    notices, absent: rasterTimelineAbsences(presetProgram === 'bands'),
   };
 }
 
@@ -691,8 +756,22 @@ export function drawRasterTimeline(
   // ── the ruler, and the two columns named ────────────────────────────────
   ctx.fillStyle = RULER_TEXT;
   ctx.fillText(`screen lines 0..${RASTER_TIMELINE_LINES - 1}`, 2, 7);
-  ctx.fillStyle = view.presetId === null ? RULER_TICK : PRESET_EDGE;
-  ctx.fillText(view.presetId === null ? 'no preset' : 'bands', RASTER_TIMELINE_PRESET_X, 18);
+  // The column's own hue only while the column HAS something in it; the two
+  // empty states share the ruler's dim register, so "no bands" is not mistaken
+  // for a heading over content.
+  ctx.fillStyle = view.presetProgram === 'bands' ? PRESET_EDGE : RULER_TICK;
+  // ⚠ RIGHT-ALIGNED TO THE COLUMN'S RIGHT EDGE, so the caption grows LEFT into
+  // the ruler gutter and never RIGHT into "layers". The slot between the two
+  // captions is `RASTER_TIMELINE_STRIP_X - RASTER_TIMELINE_PRESET_X` = 32px and
+  // a two-word caption is wider than that at 9px: left-aligned, "no bands"
+  // measured 37px on the 2026-09-11 capture and its last letters sat under
+  // "layers" (docs/captures/2026-09-11-raster-timeline-program). "no preset"
+  // is a character longer and had the same latent collision, unseen because a
+  // project with no preset at all is rare. Anchored at x=60 the widest caption
+  // starts at ~22px; the ruler's numerals end at ~17px.
+  ctx.textAlign = 'right';
+  ctx.fillText(rasterTimelinePresetCaption(view), RASTER_TIMELINE_PRESET_X + RASTER_TIMELINE_PRESET_W, 18);
+  ctx.textAlign = 'left';
   ctx.fillStyle = RULER_TEXT;
   ctx.fillText('layers', x, 18);
   for (let line = 0; line <= RASTER_TIMELINE_LINES; line += RULER_STEP) {
@@ -899,6 +978,8 @@ export interface RasterTimelineReport {
   bands: RasterTimelineBandRow[];
   splits: RasterTimelineSplitRow[];
   presetId: string | null;
+  /** The selected preset's program arm, so a harness can tell "no bands" from "no preset". */
+  presetProgram: string | null;
   presetBands: RasterTimelinePresetBandRow[];
   notices: string[];
   absent: string[];
@@ -953,7 +1034,7 @@ const INACTIVE: RasterTimelinePublish = {
   lines: RASTER_TIMELINE_LINES, scale: RASTER_TIMELINE_SCALE,
   originY: RASTER_TIMELINE_ORIGIN_Y, stripX: RASTER_TIMELINE_STRIP_X, stripW: RASTER_TIMELINE_STRIP_W,
   presetX: RASTER_TIMELINE_PRESET_X, presetW: RASTER_TIMELINE_PRESET_W, grabPx: BAND_EDGE_GRAB_PX,
-  bands: [], splits: [], presetId: null, presetBands: [], notices: [], absent: [],
+  bands: [], splits: [], presetId: null, presetProgram: null, presetBands: [], notices: [], absent: [],
   fills: 0, markers: 0, presetFills: 0, presetHandles: 0,
   client: null, drag: null, heldText: null,
 };
