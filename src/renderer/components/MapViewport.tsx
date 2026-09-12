@@ -3033,6 +3033,26 @@ export default function MapViewport() {
     useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
   }
 
+  /**
+   * Tell the Chunk links panel which placement is under a tile (d-18): the ONE
+   * writer of `linkHover` on the map, called by the stamp tool's hover and by
+   * its press. Read through `chunkOriginAt`, never a second copy of the plane
+   * arithmetic; `setLinkHover` de-duplicates.
+   *
+   * THE PRESS CALLS IT TOO (hub ruling M6, docs/reviews/2026-09-12-rulings-asked.md).
+   * A stamp makes a placement under a pointer that has not moved, and the hover
+   * used to be written only on a move, so the panel said "no chunk link" over
+   * the chunk just stamped until the pointer moved (map-coverage-5).
+   */
+  function reportLinkHover(info: { sectionIndex: number; col: number; row: number }): void {
+    const hoverSection = getSectionByIndex(info.sectionIndex);
+    if (!hoverSection) return;
+    const origin = chunkOriginAt(hoverSection, info.row * SECTION_TILES_WIDE + info.col);
+    useEditorStore.getState().setLinkHover(origin
+      ? { sectionIndex: info.sectionIndex, placementId: origin.id, chunkId: origin.chunkId }
+      : null);
+  }
+
   function getSectionByIndex(idx: number): Section | null {
     const state = useProjectStore.getState();
     const act = getCurrentAct(state);
@@ -3641,6 +3661,11 @@ export default function MapViewport() {
       // reaches into the command by hand. A stamp's undo was invisible for the
       // same reason a paste's was.
       if (cmd) executeCommand(cmd, level);
+      // The pointer has not moved, and the placement under it just changed:
+      // say so NOW, not on the next mousemove (hub ruling M6). Read AFTER the
+      // command, so a detached stamp (no placement) and a refused one report
+      // what is really there rather than what the stamp meant to make.
+      reportLinkHover(info);
       useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
       e.preventDefault();
       return;
@@ -3981,13 +4006,7 @@ export default function MapViewport() {
     if (tool === 'stamp-chunk') {
       const world = screenToWorld(e.clientX, e.clientY);
       const info = worldToSectionTile(world.x, world.y);
-      const hoverSection = info ? getSectionByIndex(info.sectionIndex) : null;
-      if (info && hoverSection) {
-        const origin = chunkOriginAt(hoverSection, info.row * SECTION_TILES_WIDE + info.col);
-        useEditorStore.getState().setLinkHover(origin
-          ? { sectionIndex: info.sectionIndex, placementId: origin.id, chunkId: origin.chunkId }
-          : null);
-      }
+      if (info) reportLinkHover(info);
     }
 
     // Stamp ghost: track where the chunk would land, snapped to its own size.

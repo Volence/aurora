@@ -4666,7 +4666,15 @@ describe('the stamp tool reports the placement under the pointer, and Detach act
 
   it('over a placement in section 1 it names section 1, that placement and its chunk, not section 0\'s at the same spot', async () => {
     const s = await stampBoth();
-    expect(hover(), 'the premise: a stamp click writes no hover of its own').toBeNull();
+    // ⚠ THIS PREMISE WAS "a stamp click writes no hover of its own" UNTIL HUB
+    // RULING M6, which is exactly the behaviour that ruling removed: the last
+    // stamp press now names its own placement (the M6 row below). So the move
+    // is made to CHANGE something: off onto an unlinked tile first, then back.
+    expect(hover(), 'the premise (M6): the last stamp press named its own placement')
+      .toEqual({ sectionIndex: 1, placementId: placedAt(1)!.id, chunkId: CHUNK.s1 });
+    expect(placedAt(1, AT.col + 2, AT.row), 'ANTI-VACUOUS: the tile beside the placement is unlinked').toBeNull();
+    s.on().onMouseMove(worldAt(tileCentre(1, AT.col + 2, AT.row)));
+    expect(hover(), 'the premise: beside the placement the hover is null').toBeNull();
     // The placement's LAST tile, (col + 1, row + 1): a read that dropped the
     // offset inside the chunk, or swapped row and column, lands elsewhere.
     s.on().onMouseMove(worldAt(tileCentre(1, AT.col + 1, AT.row + 1)));
@@ -4698,9 +4706,15 @@ describe('the stamp tool reports the placement under the pointer, and Detach act
 
   it('CONTROL: with another tool armed, hovering a placement writes nothing', async () => {
     const s = await stampBoth();
+    // Since hub ruling M6 the last stamp PRESS leaves its own placement in the
+    // hover, so "writes nothing" is "leaves that value alone": a write here
+    // would name section 0's placement, which is another section.
+    const before = hover();
+    expect(before, 'the premise (M6): the last stamp press named section 1\'s placement')
+      .toEqual({ sectionIndex: 1, placementId: placedAt(1)!.id, chunkId: CHUNK.s1 });
     ed().setTool('select');
     s.on().onMouseMove(worldAt(tileCentre(0, AT.col, AT.row)));
-    expect(hover(), 'a tool whose only click is not a stamp reported a placement').toBeNull();
+    expect(hover(), 'a tool whose only click is not a stamp reported a placement').toEqual(before);
   });
 
   it('a sweep across the four tiles of one placement is ONE store write, not four', async () => {
@@ -4751,5 +4765,25 @@ describe('the stamp tool reports the placement under the pointer, and Detach act
     expect.soft(placedAt(0), 'Detach left the placement the panel named linked').toBeNull();
     expect.soft(placedAt(1)?.chunkId, 'Detach unlinked the ACTIVE section\'s placement with the same number instead')
       .toBe(CHUNK.s1);
+  });
+
+  it('M6: a stamp press names the placement it just made, under a pointer that has not moved', async () => {
+    // Hub ruling M6 (docs/reviews/2026-09-12-rulings-asked.md): "Refresh it."
+    // map-coverage-5: "A click that creates a placement under a still pointer
+    // leaves the panel saying 'no chunk link' until the pointer moves."
+    const s = await mountMap();
+    expect(placedAt(0), 'the premise: nothing is placed at AT in section 0 yet').toBeNull();
+    expect(hover(), 'the premise: the hover starts empty').toBeNull();
+    ed().setSelectedChunkId(CHUNK.s0);
+    s.on().onMouseDown(worldAt(tileCentre(0, AT.col, AT.row)));   // the press, and NO move
+    win!.dispatch('mouseup', {});
+    ed().setSelectedChunkId(null);   // the panel reads no pick; see stampBoth
+    expect(placedAt(0)?.chunkId, 'the premise: the stamp landed').toBe(CHUNK.s0);
+    expect(hover(), 'the stamp press left the link hover stale under a still pointer')
+      .toEqual({ sectionIndex: 0, placementId: placedAt(0)!.id, chunkId: CHUNK.s0 });
+    const { readout, detach } = renderPanel();
+    expect(readout, 'the panel still says there is no chunk link over the chunk just stamped')
+      .toContain('Hover chunk in section 0');
+    expect(detach.props.disabled, 'Detach is not offered on the placement just stamped').toBe(false);
   });
 });
