@@ -3440,6 +3440,36 @@ describe('collision paint: Alt propagates, a wide brush covers an area, and the 
     expect(painted(), 'the brush wrapped past the section edge, or stopped short of it').toEqual(asc(cells));
   });
 
+  it('M4: the brush SIZE is LATCHED at the press: a size picked mid-drag leaves the stroke alone, and the next press takes it', async () => {
+    // Hub ruling M4 (docs/reviews/2026-09-12-rulings-asked.md): "Latch it at the
+    // press, like its neighbours." map-coverage-4 found the size read live per
+    // cell while Alt, both planes and the crossover brush were latched at the press.
+    const N = 3;
+    const reach = (N - 1) / 2;
+    const P = { cc: 4, cr: 4 };
+    const Q = { cc: 5, cr: 4 };
+    const area = (at: { cc: number; cr: number }): number[] => {
+      const out: number[] = [];
+      for (let cr = at.cr - reach; cr <= at.cr + reach; cr++) {
+        for (let cc = at.cc - reach; cc <= at.cc + reach; cc++) out.push(...cellSubTiles(cc, cr));
+      }
+      return asc(out);
+    };
+    const twoCells = asc([...cellSubTiles(P.cc, P.cr), ...cellSubTiles(Q.cc, Q.cr)]);
+    expect(area(Q), 'ANTI-VACUOUS: the N by N area must be more than the two 1 by 1 cells').not.toEqual(twoCells);
+    const s = await mountMap();
+    s.on().onMouseDown(collCell(P.cc, P.cr));            // pressed with brush 1 (beforeEach)
+    useEditorStore.getState().setCollisionBrushSize(N);  // Tab to a Brush button, Space: the drag is held
+    s.on().onMouseMove(collCell(Q.cc, Q.cr));
+    expect(painted(), 'a size picked mid-drag changed the area for the rest of the stroke').toEqual(twoCells);
+    win!.dispatch('mouseup', {});
+    focusedHistory()!.undo();
+    expect(painted(), 'the premise of the second half: one undo took the stroke back').toHaveLength(0);
+    s.on().onMouseDown(collCell(Q.cc, Q.cr));
+    win!.dispatch('mouseup', {});
+    expect(painted(), 'the NEXT press did not take the size picked during the last stroke').toEqual(area(Q));
+  });
+
   it('HAND-OFF marks every sub-tile of the cell to leave the plane it is painted on: A hands to B, B to A', async () => {
     // layer-transition.ts: "`hand-off` ... the SAME armed brush does the right
     // thing on either plane" (handOffFrom).

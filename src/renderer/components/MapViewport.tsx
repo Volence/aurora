@@ -436,6 +436,12 @@ export default function MapViewport() {
    *  the 8px sub-column under the cursor, which is the only width at which a
    *  two-way pair changes the player's path (core/collision/layer-transition.ts). */
   const paintCrossoverSpanMode = useRef<CrossoverSpanMode>('cell');
+  /** The collision brush SIZE, latched at mousedown with its neighbours (hub
+   *  ruling M4, docs/reviews/2026-09-12-rulings-asked.md). It used to be read
+   *  live per cell, so a size picked mid-drag (Tab to a Brush button, Space)
+   *  changed the area for the rest of the stroke while Alt, both planes and the
+   *  crossover brush held (map-coverage-4). The next stroke takes the new size. */
+  const paintBrushSize = useRef(1);
   // Marquee tool: the drag-start tile + section, fixed for the whole drag so the
   // marquee always resolves against the section the drag STARTED in even if the
   // cursor wanders over another section's world space.
@@ -2953,7 +2959,11 @@ export default function MapViewport() {
       shape: est.selectedCollisionProfile, entryFlipX: est.selectedCollisionEntryFlipX,
       userXFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
     });
-    const brush = useEditorStore.getState().collisionBrushSize;
+    // The size LATCHED at the press (`paintBrushSize`, hub ruling M4), not the
+    // store's live value: a size picked mid-drag waits for the next stroke.
+    // The hover preview still reads the live size, because it previews the
+    // NEXT press; during a drag the move handler never reaches it.
+    const brush = paintBrushSize.current;
     const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
 
     // Cheap no-op guard for the expensive reuse scan: if the clicked block is
@@ -3657,6 +3667,7 @@ export default function MapViewport() {
       paintBothPlanes.current = useEditorStore.getState().collisionPaintBothPlanes;
       paintCrossover.current = useEditorStore.getState().collisionCrossoverBrush;
       paintCrossoverSpanMode.current = useEditorStore.getState().collisionCrossoverSpanMode;
+      paintBrushSize.current = useEditorStore.getState().collisionBrushSize;
       paintCollisionCell(info, paintPropagate.current);
       isPaintDragging.current = true;
       e.preventDefault();
