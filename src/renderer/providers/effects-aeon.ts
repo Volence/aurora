@@ -3566,6 +3566,78 @@ export function sceneSelectionFollow(
 }
 
 /**
+ * WHICH SECTION THE SCENE SELECTION FOLLOWS, as the five facts that make two
+ * active sections the same one. (SCENE-SELECTION-SNAPS-BACK, 2026-09-12.)
+ *
+ * The follow used to be a component effect keyed on `[activeSectionIndex,
+ * sceneRef]`. An effect also runs on MOUNT, and the Effects sub-tabs unmount the
+ * panels they hide, so every return to Parallax re-selected the section's scene
+ * and undid the scene the author had picked. Its own comment promised the
+ * opposite. A mount is not a change of section, so the mount is not an input
+ * here at all: `state/effects-scene-follow` compares one of these with the last
+ * one it saw, on every store change, whether or not the panel is on screen.
+ *
+ * ⚠ THE SAME SECTION IS NOT THE SAME SECTION NUMBER. Section 0 of another act,
+ * another zone or another checkout is a different section, so all three are
+ * here beside the index.
+ *
+ * ⚠ THE PROJECT IS ITS DIRECTORY, NOT ITS OBJECT OR ITS `config`. The project
+ * object is replaced by edits (`addChunks` and its two siblings), and `config`
+ * is a fresh object on every open, a same-directory reopen included. A
+ * same-directory reopen is the one path that re-parses the scene library, and
+ * it re-parses the SAME scenes, so it must not yank a selection the author
+ * moved. Two checkouts of one tree have two directories and do follow.
+ *
+ * ⚠ `sceneRef` IS HERE, and it is the section's own field: assigning this
+ * section a scene under SECTION ASSIGNMENT (or undoing that) is the author
+ * saying which document the section uses, and the form follows.
+ */
+export interface SectionIdentity {
+  /** `S4Project.basePath`, or null with no project open. */
+  projectPath: string | null;
+  zoneId: string | null;
+  actId: string | null;
+  sectionIndex: number;
+  /** The active section's `sceneRef`, or null (act default, or no section). */
+  sceneRef: string | null;
+}
+
+/** True when the two name the same section, bound to the same scene. */
+export function sameSectionIdentity(a: SectionIdentity, b: SectionIdentity): boolean {
+  return a.projectPath === b.projectPath
+    && a.zoneId === b.zoneId
+    && a.actId === b.actId
+    && a.sectionIndex === b.sectionIndex
+    && a.sceneRef === b.sceneRef;
+}
+
+/**
+ * ONE STEP OF THE FOLLOW: the scene id to select now, or `null` to leave the
+ * selection alone.
+ *
+ *   - `last` null is the first step ever taken, which is an arrival: it follows.
+ *   - The same identity as `last` never moves the selection. That is every
+ *     remount, every sub-tab or facet round trip, every edit to a scene, and
+ *     every re-parse of the library. It is what keeps a scene the author picked.
+ *   - A different identity follows to the section's scene when there is one
+ *     (`sceneSelectionFollow`'s rules: nothing for the act default or for a ref
+ *     no readable scene claims) and it is not already selected.
+ *
+ * The library is read only when the identity changed, so the per-store-change
+ * cost of the common case is five comparisons.
+ */
+export function sceneSelectionFollowStep(
+  last: SectionIdentity | null, next: SectionIdentity,
+  library: EffectsSceneLibrary | null, selected: string | null,
+): string | null {
+  if (last !== null && sameSectionIdentity(last, next)) return null;
+  if (library === null) return null;
+  const follow = sceneSelectionFollow(library, { sceneRef: next.sceneRef });
+  if (follow === null || follow === selected) return null;
+  return follow;
+}
+
+/**
  * WHAT THE SELECTED SCENE HAS TO DO WITH THE ACTIVE SECTION, in one sentence,
  * or `null` when the answer is "it is that section's scene".
  *

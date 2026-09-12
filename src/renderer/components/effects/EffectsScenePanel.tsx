@@ -83,7 +83,7 @@ import {
   vsplitLockAdvisoryParts, sceneVsplitLockAdvisoryParts,
   layerCountLine, vFactorHint,
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
-  sceneSelectionFollow, sceneSelectionRelation,
+  sceneSelectionRelation,
   sectionSceneCommand, createSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   layerExtrasLine,
@@ -492,27 +492,18 @@ export default function EffectsScenePanel(): React.ReactElement {
   //
   // ⚠ IT DOES NOT PIN THE SELECTION. Scenes are free-standing documents and
   // authoring one that no section binds yet is a legitimate act (it is what
-  // `New` does). `activeSectionIndex` and the section's own `sceneRef` are the
-  // only deps, so clicking another scene in the list below is never undone —
-  // and `sceneSelectionRelation` states the divergence for as long as it lasts.
+  // `New` does). Only a change of the active section's identity moves it, so
+  // clicking another scene in the list below is never undone, and
+  // `sceneSelectionRelation` states the divergence for as long as it lasts.
   //
-  // ⚠ `sceneRef` IS A DEP, not just the index: assigning this section a scene
-  // under SECTION ASSIGNMENT is the author saying which document this section
-  // uses, and leaving the form on the old one would rebuild the same defect one
-  // control over. `sceneSelectionFollow` returns null for the act default and
-  // for a ref no readable scene claims — there is nothing to move to, and
-  // inventing a target is the defect.
-  const boundSceneRef = section?.sceneRef ?? null;
-  const follow = sceneSelectionFollow(library, section);
-  React.useEffect(() => {
-    if (follow === null) return;
-    if (useEditorStore.getState().selectedEffectsSceneId === follow) return;
-    setSelectedId(follow);
-    // `follow` is derived from exactly these two and the library's id set; the
-    // library is deliberately absent, so a reload that re-parses the same
-    // scenes cannot yank a selection the author moved.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSectionIndex, boundSceneRef]);
+  // ⚠ AND IT IS NOT IN THIS COMPONENT ANY MORE (SCENE-SELECTION-SNAPS-BACK).
+  // It was a `useEffect` keyed on the section index and `sceneRef`, and an
+  // effect also runs on MOUNT. The sub-tabs unmount this panel, so every return
+  // to Parallax re-selected the section's scene and broke the promise above.
+  // The follow is now `state/effects-scene-follow`, a store subscription that
+  // fires on a change of project, zone, act, section or that section's
+  // `sceneRef`, on screen or off, and never on a mount. SECTION ASSIGNMENT
+  // still moves the form: `sceneRef` is part of the identity it compares.
 
   // WHAT THE SELECTED SCENE HAS TO DO WITH THE ACTIVE SECTION. `text` is null
   // in the state this panel arrives in and stays in — see the provider for why
@@ -591,7 +582,7 @@ export default function EffectsScenePanel(): React.ReactElement {
 
             ⚠ IT COSTS THE COLUMN NOTHING IN THE ORDINARY STATE. `text` is null
             whenever the selected scene IS the active section's, which the
-            follow effect above makes the arrival state, so this renders no box
+            follow (state/effects-scene-follow) makes the arrival state, so this renders no box
             at all on a panel whose LAYERS list is fighting for every pixel. It
             appears only after the author has selected a scene the section does
             not use, or landed on a section that binds none.
