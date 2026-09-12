@@ -1,0 +1,66 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801 — dist/main/index.mjs is 0s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801/src/renderer/components/MapViewport.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T09:21:58.842Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T09:21:58.842Z), so window.__dbg is in this bundle
+=== map-behaviour-fixes 2026-09-12 harness ===
+    uptime       : 05:21:58 up 1 day, 18:43,  1 user,  load average: 4.46, 7.38, 6.67
+    PARTS        : m2
+    node         : v24.15.0
+    root         : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801
+    in-tree      : yes (the tree under test is /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801; this file lives in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801)
+    ORACLE_SOCKET: /tmp/mbfix-sock-yLXG0G/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-4041538-527c7b91
+    PORT         : 9433   DISPLAY: xvfb-run -a (never :0)
+    oracle       : literals from HEAD 5947cd8189d8fee514b6d966015458a9277bd27c; collision-paint, collision-cell, s4-types bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-afd0676f1b4d73801/src; brush sizes [1,7,15,25]; section 256x256 tiles
+    harness      : blob 61817b2ec3413e09dce79ecb9ebf9e19a9273ed8 (as committed at HEAD)
+    src on disk  : DIFFERS FROM HEAD (a mutation?):
+                   M src/renderer/components/MapViewport.tsx
+    aeon source  : AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8299620c-3035-4bfb-a837-5016aacc03ce/scratchpad/aeon-copy   (live sibling /home/volence/sonic_hacks/aeon: refused if equal)
+    copy         : /tmp/mbfix-aeon-JzvldN   project "Sonic 4"
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-4041538-527c7b91 — see HAZARD 6
+    X pointer    : PARKED outside the window: display :218 (Xvfb pid 4042298); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed   click log: installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1, by a real click on its Explorer row   [load 4.96/7.39/6.68]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row "Oracle Jungle Zone · act1" aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+════════ PART m2 ════════
+   GEOMETRY [m2] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}
+PASS  [M2.0] PREMISE: the press painted cell k on plane A; with the stroke held, Tab reached Plane B and a real Space pressed it (a click reached Plane B) and the aimed plane is B; the canvas did not move; the two aims inside cell k are ONE 16px cell and TWO 8px tiles   [load 4.65/7.24/6.64]
+        dpr 1; rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}; aims {"aIn":{"x":324,"y":146,"world":{"x":20,"y":36},"cell":{"cc":1,"cr":2},"tile":{"col":2,"row":4},"onMap":true},"aIn2":{"x":340,"y":162,"world":{"x":28,"y":44},"cell":{"cc":1,"cr":2},"tile":{"col":3,"row":5},"onMap":true},"aNext":{"x":364,"y":154,"world":{"x":40,"y":40},"cell":{"cc":2,"cr":2},"tile":{"col":5,"row":5},"onMap":true}}; cell k on A after the press [12290,12290,12290,12290]; Tab presses 2; first stops ["BUTTON:A:Plane","BUTTON:B:Plane"]; focus before {"tag":"BODY","text":null,"row":null,"isBody":true}; clicks the Space produced [{"target":"BUTTON","text":"B","row":"Plane","detail":0}]; plane b; canvas unmoved true
+NOTE  [M2.focus] the Plane A click left focus on {"tag":"BODY","text":null,"row":null,"isBody":true}; Tab from there reached Plane B in 2 press(es); after the Space-pressed B, document.activeElement is {"tag":"BODY","text":null,"row":null,"isBody":true}
+FAIL  [M2.a] after the switch, a move INSIDE THE SAME 16px cell paints that cell on plane B (all four sub-tiles), and plane A keeps it   [load 4.65/7.24/6.64]
+        cell k on B [0,0,0,0]; on A [12290,12290,12290,12290]; before {"a":[0,0,0,0],"b":[0,0,0,0]}
+PASS  [M2.b] CONTROL (M3, ruled "leave it"): the stroke went on onto the next cell on B, and landed as recordPaint's plane clause says: two commands, the first Ctrl+Z takes back the B run only, the second the A run   [load 4.65/7.24/6.64]
+        after release {"a":[[12290,12290,12290,12290],[0,0,0,0]],"b":[[0,0,0,0],[12290,12290,12290,12290]]}; after one Ctrl+Z {"a":[[12290,12290,12290,12290],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0]]}; after two {"a":[[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0]]}; before {"a":[[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0]]}
+NOTE  [m2.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 4042288 (11 process(es)):
+           4042288 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           4042298 Xvfb :218 -screen 0 1680x1050x24 -nolisten tcp
+           4051779 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           4051787 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           4051790 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           4051791 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           4051794 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           4051831 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           4051837 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           4051842 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           4051851 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 51 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 351 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=m2: 3/4 rows PASS · 1 FAIL · 0 UNMEASURABLE · 19.0s ════
+     uptime at end 05:22:17 up 1 day, 18:44,  1 user,  load average: 4.65, 7.24, 6.64
+FAILING:
+  [M2.a] after the switch, a move INSIDE THE SAME 16px cell paints that cell on plane B (all four sub-tiles), and plane A keeps it
+END-OF-RUN
