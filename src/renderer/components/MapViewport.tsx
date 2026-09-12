@@ -442,6 +442,15 @@ export default function MapViewport() {
    *  changed the area for the rest of the stroke while Alt, both planes and the
    *  crossover brush held (map-coverage-4). The next stroke takes the new size. */
   const paintBrushSize = useRef(1);
+  /** The collision brush WORD (shape, the picked entry's mirror flag, Flip H,
+   *  Flip V and the floor type, packed by `selectedCollisionWord`), latched at
+   *  mousedown with its neighbours (hub ruling BRUSH-WORD-LATCH, empyrean
+   *  OVERSEER-LOG 2026-09-12T09:39:48Z, option (a)). It used to be built from
+   *  the store per cell, so a shape picked mid-drag (Space on a focused shape
+   *  button) painted cells 3 and 4 of one stroke with another word
+   *  (cdp-sweep-4 section 5.4 O2). The next stroke takes the new word.
+   *  `null` means no collision press has latched one: see `paintCollisionCell`. */
+  const paintBrushWord = useRef<number | null>(null);
   // Marquee tool: the drag-start tile + section, fixed for the whole drag so the
   // marquee always resolves against the section the drag STARTED in even if the
   // cursor wanders over another section's world space.
@@ -2909,6 +2918,18 @@ export default function MapViewport() {
     return getStoreActiveLevel(useProjectStore.getState());
   }
 
+  /** The collision brush word the palette selects NOW. Called by the
+   *  paint-collision press, which latches it (`paintBrushWord`), and by
+   *  `paintCollisionCell`'s no-press fallback; the hover preview builds its own
+   *  word, live on purpose. */
+  function brushWordNow(): number {
+    const est = useEditorStore.getState();
+    return selectedCollisionWord({
+      shape: est.selectedCollisionProfile, entryFlipX: est.selectedCollisionEntryFlipX,
+      userXFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
+    });
+  }
+
   // Paint collision at the 16px block under `info` with the selected profile.
   // Default: only the clicked block ("just here"). `propagate` (Alt): every
   // block in the section with the SAME tiles (reuse), explicit opt-in. The
@@ -2961,11 +2982,15 @@ export default function MapViewport() {
 
     // The painted value is a packed 16-bit cell word: selected shape + flip +
     // solidity. Air (shape 0 / erase) is always the bare 0 word, never solidity bits.
-    const est = useEditorStore.getState();
-    const word = selectedCollisionWord({
-      shape: est.selectedCollisionProfile, entryFlipX: est.selectedCollisionEntryFlipX,
-      userXFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
-    });
+    // The word LATCHED at the press (`paintBrushWord`, hub ruling
+    // BRUSH-WORD-LATCH), not the store's live selection: a shape, flip or
+    // floor type picked mid-drag waits for the next stroke, as the size does.
+    // The hover preview still builds the live word, because it previews the
+    // NEXT press. `?? brushWordNow()` answers only a drag this mount never
+    // pressed with the collision tool (a tile stroke whose tool changed under
+    // the held button): it paints the live selection, as every cell did before
+    // the latch, never a made-up air word that would erase.
+    const word = paintBrushWord.current ?? brushWordNow();
     // The size LATCHED at the press (`paintBrushSize`, hub ruling M4), not the
     // store's live value: a size picked mid-drag waits for the next stroke.
     // The hover preview still reads the live size, because it previews the
@@ -3700,6 +3725,7 @@ export default function MapViewport() {
       paintCrossover.current = useEditorStore.getState().collisionCrossoverBrush;
       paintCrossoverSpanMode.current = useEditorStore.getState().collisionCrossoverSpanMode;
       paintBrushSize.current = useEditorStore.getState().collisionBrushSize;
+      paintBrushWord.current = brushWordNow(); // shape, flip, floor type (BRUSH-WORD-LATCH)
       paintCollisionCell(info, paintPropagate.current);
       isPaintDragging.current = true;
       e.preventDefault();
