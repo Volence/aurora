@@ -146,15 +146,23 @@ const MENTION: Record<Gesture, RegExp> = {
   alt: /\bAlt\b/,
   shift: /\bShift\b/,
 };
-function readHint(hint: string): { advertised: Gesture[]; refused: Gesture[]; saying: (g: Gesture) => string } {
+function readHint(hint: string): {
+  advertised: Gesture[]; refused: Gesture[]; nothing: Gesture[]; saying: (g: Gesture) => string;
+} {
   const segments = hint.split(' · ');
   const refusing = (s: string) => /\brefused\b/.test(s);
+  // A segment naming gestures as pasting NOTHING offers them no more than a
+  // refusal does (PASTE-SAME-ZONE-ART-ONLY-SHIFT, whose rows are in
+  // paste-status-bar-and-art-only.test.ts).
+  const pastesNothing = (s: string) => !refusing(s) && /\bnothing\b/i.test(s);
+  const offering = (s: string) => !refusing(s) && !pastesNothing(s);
   const named = (pick: (s: string) => boolean) =>
     GESTURES.filter((g) => segments.some((s) => pick(s) && MENTION[g].test(s)));
   return {
-    advertised: named((s) => !refusing(s)),
+    advertised: named(offering),
     refused: named(refusing),
-    saying: (g) => segments.filter((s) => !refusing(s) && MENTION[g].test(s)).join(' · '),
+    nothing: named(pastesNothing),
+    saying: (g) => segments.filter((s) => offering(s) && MENTION[g].test(s)).join(' · '),
   };
 }
 
@@ -220,15 +228,17 @@ describe('the paste hint line says what a click will actually do here (PASTE-HIN
     }
   });
 
-  it('CONTROL: in the zone the copy was made in, the hint is the one the panel always carried', () => {
-    for (const make of [withCollision, artOnly]) {
-      for (const sticky of LAYERS) {
-        openZone(HERE, 'a');
-        const clip = make();
-        arm(clip, sticky);
-        const { hint } = render();
-        expect(hint, `home, art only ${clip.artOnly}, setting ${sticky}: the same-zone hint changed`).toBe(LANDED_HINT);
-      }
+  it('CONTROL: in the zone the copy was made in, with a clipboard that carries collision, the hint is the one the panel always carried', () => {
+    // An ART-ONLY clipboard left this row deliberately
+    // (PASTE-SAME-ZONE-ART-ONLY-SHIFT): at home Shift+click, and a plain click
+    // with Layers on Collision, write nothing, so the landed line offered them
+    // falsely. Its rows are in paste-status-bar-and-art-only.test.ts.
+    for (const sticky of LAYERS) {
+      openZone(HERE, 'a');
+      const clip = withCollision();
+      arm(clip, sticky);
+      const { hint } = render();
+      expect(hint, `home, with collision, setting ${sticky}: the same-zone hint changed`).toBe(LANDED_HINT);
     }
     // ANTI-VACUOUS FOR THE READER: over the landed hint, `readHint` sees all
     // three gestures offered and none refused, and the click agrees for a
@@ -274,25 +284,28 @@ describe('the hint comes from the offer, over every fit (added with the fix)', (
         for (const sticky of LAYERS) {
           const offer = pasteLayerOffer(clip, fit, sticky);
           const at = `${where}, art only ${clip.artOnly}, setting ${sticky}`;
-          if (LAYERS.every((v) => offer.refusals[v] === null)) {
-            // The brief's scope: where every choice lands the line is as it was.
+          const lands = GESTURES.filter((g) => landsAt(clip, fit, gestureLayers(g, sticky)));
+          if (lands.length === GESTURES.length) {
+            // Where every GESTURE lands the line is as it was. Keyed on the
+            // gestures since PASTE-SAME-ZONE-ART-ONLY-SHIFT: every choice's
+            // verdict null is not enough, because a gesture can go unrefused
+            // and still write nothing (Shift+click over an art-only copy).
             expect(offer.hint, at).toBe(LANDED_HINT);
             continue;
           }
-          const lands = GESTURES.filter((g) => landsAt(clip, fit, gestureLayers(g, sticky)));
           const read = readHint(offer.hint);
           expect(read.advertised, `${at}: "${offer.hint}"`).toEqual(lands);
           expect(offer.hint, `${at}: the flip keys or Esc left the hint`).toContain(LANDED_TAIL);
           if (lands.length > 0) {
             partial++;
-            // "Refused" is TRUE of each gesture it names: the click refuses it,
-            // and does not merely find nothing to write (a different toast).
-            const notLanding = GESTURES.filter((g) => !lands.includes(g));
-            expect(read.refused, `${at}: "${offer.hint}"`).toEqual(notLanding);
-            for (const g of notLanding) {
-              expect(pasteRefusal(fit, effectivePasteLayers(clip, gestureLayers(g, sticky))),
-                `${at}: the hint calls ${g} refused where the click has nothing to write instead`).not.toBeNull();
-            }
+            // Each gesture that does not land is named as the click takes it:
+            // "refused" only where the click refuses it, and as pasting nothing
+            // where it merely finds nothing to write (a different toast).
+            const refusedByClick = GESTURES.filter((g) => !lands.includes(g)
+              && pasteRefusal(fit, effectivePasteLayers(clip, gestureLayers(g, sticky))) !== null);
+            const writesNothing = GESTURES.filter((g) => !lands.includes(g) && !refusedByClick.includes(g));
+            expect(read.refused, `${at}: "${offer.hint}"`).toEqual(refusedByClick);
+            expect(read.nothing, `${at}: "${offer.hint}"`).toEqual(writesNothing);
             for (const g of lands) {
               const what = WHAT[effectivePasteLayers(clip, gestureLayers(g, sticky))!];
               if (what) expect(read.saying(g), `${at}: what ${g} pastes`).toContain(what);

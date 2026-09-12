@@ -12,6 +12,7 @@ import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
 import { danglingBgRef } from '../../core/formats/bg-library';
 import AetherStatus from '../components/AetherStatus';
+import { useArmedPasteOffer } from '../components/armed-paste-offer';
 
 /** Aeon's trailing status content. An element, not a component, because it takes
  *  no props and never varies — hoisting it keeps the port's identity stable. */
@@ -77,7 +78,18 @@ export function useAeonMapStatusPort(): MapStatusPort {
     [project, currentZoneId],
   );
   const chunkCount = project?.chunkLibrary.length ?? 0;
-  const contextInfo = tool === 'stamp-chunk' ? stampContext(chunkCount, selectedChunkId) : '';
+  // WHILE PASTING, WHAT A CLICK DOES HERE (PASTE-STATUS-BAR-HINT). The armed
+  // offer's own line, from the same reads the Paste panel's hint is built from
+  // (`useArmedPasteOffer`), so the bar and the panel cannot name different
+  // gestures. The neutral bar's paste line could not know: in another zone the
+  // click refuses the tiles, so a plain click (Layers on Both or Art) and
+  // Alt+click are refused there. Pasting beats the stamp's line too, as it beats
+  // the tool label (Ctrl+V does not switch tools): with a paste pending a click
+  // pastes, and "Alt: art only" named a gesture the click refuses.
+  const pasteOffer = useArmedPasteOffer();
+  const contextInfo = pasting
+    ? (pasteOffer?.statusHint ?? '')
+    : tool === 'stamp-chunk' ? stampContext(chunkCount, selectedChunkId) : '';
   // Read off getState() like `zoneName` above, and re-derived whenever the
   // project identity or the active section moves — an in-place ref edit lands
   // through the same `project` subscription every other read here uses.

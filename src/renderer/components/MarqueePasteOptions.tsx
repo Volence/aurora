@@ -5,8 +5,9 @@ import { useToastStore } from '../state/toastStore';
 import type { PasteLayers, MarqueeGranularity } from '../../core/editing/map-clipboard';
 import {
   isBlockAligned, selectionSizeLabel, artOnlyReason, copyFromSection,
-  effectiveGranularity, pasteFit, pasteLayerOffer, PASTE_LAYER_LABEL, PASTE_HINT,
+  effectiveGranularity, PASTE_LAYER_LABEL, PASTE_HINT,
 } from '../../core/editing/map-clipboard';
+import { useArmedPasteOffer } from './armed-paste-offer';
 import { selectionToChunk } from '../../core/editing/selection-to-chunk';
 import { regionPreviewCanvas } from '../canvas/region-preview';
 import { performMapFlip, resolveFlip } from './map-flip';
@@ -165,12 +166,10 @@ export default function MarqueePasteOptions() {
   // refuses. Only while PASTING: otherwise these buttons describe the selection,
   // and the next Ctrl+C replaces the clipboard anyway. The setting is never
   // changed here: a refused choice the author picked shows as picked and
-  // unavailable, and the notice says why.
-  const project = useProjectStore((s) => s.project);
-  const openTileset = useProjectStore((s) => getCurrentZone(s)?.tileset);
-  const offer = pasting && clipboard
-    ? pasteLayerOffer(clipboard, pasteFit(clipboard, openTileset, project), pasteLayers)
-    : null;
+  // unavailable, and the notice says why. The store reads behind the offer are
+  // `useArmedPasteOffer`'s, shared with the map status bar, whose paste line is
+  // built from the same gestures as this panel's hint (PASTE-STATUS-BAR-HINT).
+  const offer = useArmedPasteOffer();
 
   // Default name uses the selection's own units — `selectionSizeLabel` prints
   // blocks for an aligned rect and tiles for one that has no block size.
