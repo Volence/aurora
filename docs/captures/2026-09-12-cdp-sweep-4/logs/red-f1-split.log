@@ -1,0 +1,68 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a — dist/main/index.mjs is 0s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src/renderer/components/MapViewport.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T08:12:54.802Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T08:12:54.802Z), so window.__dbg is in this bundle
+=== cdp-sweep-4 2026-09-12 harness ===
+    PARTS        : plane
+    node         : v24.15.0
+    loadavg      : 4.91 5.38 5.73
+    ORACLE_SOCKET: /tmp/cdps4-sock-UmyFS5/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-1989570-092e7a10
+    PORT         : 9431   DISPLAY: xvfb-run -a (never :0)
+    captures     : docs/captures/2026-09-12-cdp-sweep-4   tag red-f1-split
+    aeon tarball : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/e7b24bf1-afc7-4de1-b841-c92c59c89418/scratchpad/aeon-a38ce7c9.tar   commit a38ce7c961ef83136ac2f7c35e09b2ded7a109ea
+    oracle       : literals from HEAD e2dfd6b0811b359d22e8b3895c11e746ca3b7edf; four modules bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src
+    harness      : blob c0943d5a25d80990884b01198255bdd2a2312dc6 (as committed at HEAD)
+    src on disk  : DIFFERS FROM HEAD (a plant?):
+                   M src/renderer/components/MapViewport.tsx
+    copy         : /tmp/cdps4-aeon-42MfJK   name "Sonic 4 (sweep4)"   bg-override bands 1
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-1989570-092e7a10 — see HAZARD 6
+    X pointer    : PARKED outside the window: display :184 (Xvfb pid 1989643); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1 by a real Explorer click, and its scene library carries the three locked scenes and the unlocked control   [load 6.03/5.61/5.80]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}; scenes ["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start","sweep4_unlocked"]
+
+════════ PART plane ════════
+   GEOMETRY [plane] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}
+PASS  [F1.a] after a REAL click on Plane A, focus is on that button (the Plane buttons do not call actAndDropFocus) and the plane is A   [load 5.95/5.60/5.79]
+        dpr 1; facet true; shape true; Keep true; brush 1 true; aim {"x":1222,"y":112,"hitOk":true,"dpr":1,"rect":{"x":1209,"y":103,"w":26,"h":18}}; activeElement {"tag":"BUTTON","text":"A","row":"Plane","isBody":false}; brush {"plane":"a","bothPlanes":false,"crossover":"keep","crossoverSpanMode":"cell","word":12290}; cells from {"cc":3,"cr":3}
+PASS  [F1.b] with the press HELD on the map (and the stroke painting cells 1 and 2 on A) focus is STILL on Plane A: the collision press calls preventDefault   [load 5.95/5.60/5.79]
+        activeElement {"tag":"BUTTON","text":"A","row":"Plane","isBody":false}; plane A cells 1,2 [[12290,12290,12290,12290],[12290,12290,12290,12290]]
+PASS  [F1.c] Tab, with the button still held: focus moves to Plane B   [load 5.95/5.60/5.79]
+        activeElement {"tag":"BUTTON","text":"B","row":"Plane","isBody":false}
+PASS  [F1.d] Space fires B (pickPlane: the store's plane is B) WITHOUT ending the drag: moving on with the button held paints cells 3 and 4 on plane B   [load 5.95/5.60/5.79]
+        plane b; activeElement {"tag":"BUTTON","text":"B","row":"Plane","isBody":false}; plane B cells 3,4 [[12290,12290,12290,12290],[12290,12290,12290,12290]]
+FAIL  [F1.e] the stroke landed as TWO commands, newest first (recordPaint's plane clause): A holds cells 1,2 and B cells 3,4; the first Ctrl+Z takes back only the B run; the second takes back the A run   [load 5.95/5.60/5.79]
+        after release {"a":[[12290,12290,12290,12290],[12290,12290,12290,12290],[12290,12290,12290,12290],[12290,12290,12290,12290]],"b":[[0,0,0,0],[0,0,0,0],[12290,12290,12290,12290],[12290,12290,12290,12290]]}; after one undo {"a":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0],[12290,12290,12290,12290],[12290,12290,12290,12290]]}; after two {"a":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0],[12290,12290,12290,12290],[12290,12290,12290,12290]]}; before {"a":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]}
+NOTE  [plane.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 1989633 (11 process(es)):
+           1989633 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           1989643 Xvfb :184 -screen 0 1680x1050x24 -nolisten tcp
+           1989980 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           1989989 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           1989993 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1989994 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           1989996 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           1990077 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1990083 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1990085 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           1990095 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 350 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=plane: 5/6 rows PASS · 1 FAIL · 0 UNMEASURABLE · 0 FINDING (not counted) · 18.8s ════
+     loadavg at end 6.27 5.68 5.82
+FAILING:
+  [F1.e] the stroke landed as TWO commands, newest first (recordPaint's plane clause): A holds cells 1,2 and B cells 3,4; the first Ctrl+Z takes back only the B run; the second takes back the A run
+END-OF-RUN

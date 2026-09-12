@@ -1,0 +1,72 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a — dist/main/index.mjs is 0s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src/renderer/components/MapViewport.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T08:11:12.310Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T08:11:12.310Z), so window.__dbg is in this bundle
+=== cdp-sweep-4 2026-09-12 harness ===
+    PARTS        : collision
+    node         : v24.15.0
+    loadavg      : 6.21 5.36 5.75
+    ORACLE_SOCKET: /tmp/cdps4-sock-Eb1gfx/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-1553026-b139450f
+    PORT         : 9431   DISPLAY: xvfb-run -a (never :0)
+    captures     : docs/captures/2026-09-12-cdp-sweep-4   tag red-xo-primary
+    aeon tarball : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/e7b24bf1-afc7-4de1-b841-c92c59c89418/scratchpad/aeon-a38ce7c9.tar   commit a38ce7c961ef83136ac2f7c35e09b2ded7a109ea
+    oracle       : literals from HEAD e2dfd6b0811b359d22e8b3895c11e746ca3b7edf; four modules bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src
+    harness      : blob c0943d5a25d80990884b01198255bdd2a2312dc6 (as committed at HEAD)
+    src on disk  : DIFFERS FROM HEAD (a plant?):
+                   M src/renderer/components/MapViewport.tsx
+    copy         : /tmp/cdps4-aeon-PSUyBW   name "Sonic 4 (sweep4)"   bg-override bands 1
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-1553026-b139450f — see HAZARD 6
+    X pointer    : PARKED outside the window: display :184 (Xvfb pid 1553243); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1 by a real Explorer click, and its scene library carries the three locked scenes and the unlocked control   [load 5.72/5.28/5.72]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}; scenes ["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start","sweep4_unlocked"]
+
+════════ PART collision ════════
+   GEOMETRY [collision] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":4}
+PASS  [XO.0] PREMISE: the Collision facet by a real click, paint-collision armed, a shape picked, the Loop brush on Hand-off and the Mark width on Half, all by real clicks (the Mark row renders only while the brush authors)   [load 5.50/5.25/5.70]
+        dpr 1; brush {"plane":"a","bothPlanes":false,"crossover":"hand-off","crossoverSpanMode":"half","word":12289}; aims {"fc":{"x":522,"y":54,"hitOk":true,"dpr":1,"rect":{"x":488.92,"y":44.5,"w":65.58,"h":18}},"shapeBtn":{"x":1293,"y":461,"hitOk":true,"dpr":1,"rect":{"x":1279,"y":442,"w":28,"h":37}},"loopHand":{"x":1279,"y":148,"hitOk":true,"dpr":1,"rect":{"x":1248.7,"y":139,"w":60.75,"h":18}},"half":{"x":1305,"y":170,"hitOk":true,"dpr":1,"rect":{"x":1276.19,"y":161,"w":57.69,"h":18}}}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/xo-ref-other-cell-red-xo-primary.png  (clip {"x":466,"y":192,"width":84,"height":84,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/xo-hover-left-half-red-xo-primary.png  (clip {"x":466,"y":192,"width":84,"height":84,"scale":1})
+PASS  [XO.a] LEFT HALF hovered: crossoverSpanForCursor('half', col 6) = "left"; every interior column inside crossoverPreviewRects' box is CROSSOVER_FILL on the layer, no column outside it is, and the screen is the layer over the reference   [load 5.38/5.22/5.69]
+        aim {"x":492,"y":234}; derived rects [{"x":476,"y":202,"w":32,"h":32},{"x":476,"y":234,"w":32,"h":32}] (union {"x":476,"y":202,"w":32,"h":64}); column profile {"inCols":27,"inOk":27,"outCols":27,"outOk":27,"bad":[]}; halves {"left":{"n":1508,"or":1508,"dor":1508},"right":{"n":1508,"or":0,"dor":0}}; screen = over(layer, reference) {"n":7056,"ok":7056,"ratio":1,"bad":[]}; captures docs/captures/2026-09-12-cdp-sweep-4/xo-ref-other-cell-red-xo-primary.png, docs/captures/2026-09-12-cdp-sweep-4/xo-hover-left-half-red-xo-primary.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/xo-hover-right-half-red-xo-primary.png  (clip {"x":466,"y":192,"width":84,"height":84,"scale":1})
+PASS  [XO.b] RIGHT HALF hovered: the span is "right" and the fill moves to the columns of the right half's rects, the screen still the layer over the reference   [load 5.38/5.22/5.69]
+        aim {"x":524,"y":234}; derived rects [{"x":508,"y":202,"w":32,"h":32},{"x":508,"y":234,"w":32,"h":32}] (union {"x":508,"y":202,"w":32,"h":64}); column profile {"inCols":27,"inOk":27,"outCols":27,"outOk":27,"bad":[]}; halves {"left":{"n":1508,"or":0,"dor":0},"right":{"n":1508,"or":1508,"dor":1508}}; screen {"n":7056,"ok":7056,"ratio":1,"bad":[]}; capture docs/captures/2026-09-12-cdp-sweep-4/xo-hover-right-half-red-xo-primary.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/xo-hover-keep-red-xo-primary.png  (clip {"x":466,"y":192,"width":84,"height":84,"scale":1})
+PASS  [XO.c] CONTROL: Loop on Keep (crossoverBrushAuthors false): no crossover fill anywhere in the hovered cell   [load 5.38/5.22/5.69]
+        brush {"plane":"a","bothPlanes":false,"crossover":"keep","crossoverSpanMode":"half","word":12289}; halves {"left":{"n":1508,"or":0,"dor":0},"right":{"n":1508,"or":0,"dor":0}}; screen {"n":7056,"ok":7056,"ratio":1,"bad":[]}; capture docs/captures/2026-09-12-cdp-sweep-4/xo-hover-keep-red-xo-primary.png
+FAIL  [XO.p] the collision hover preview itself is drawn at the hovered cell: the COLLISION_PREVIEW_PRIMARY outline on its four edges (HEAD colour)   [load 5.38/5.22/5.69]
+        cell {"x":476,"y":202,"w":64,"h":64}; primary edge pixels 0/76; first misses [{"xx":480,"yy":202,"q":{"r":255,"g":150,"b":60,"a":255}},{"xx":480,"yy":265,"q":{"r":255,"g":150,"b":60,"a":255}},{"xx":483,"yy":202,"q":{"r":255,"g":150,"b":60,"a":255}},{"xx":483,"yy":265,"q":{"r":255,"g":150,"b":60,"a":255}}]
+NOTE  [collision.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 1553226 (11 process(es)):
+           1553226 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           1553243 Xvfb :184 -screen 0 1680x1050x24 -nolisten tcp
+           1570979 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           1571017 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           1571058 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1571060 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           1571106 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           1572174 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1572212 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1572262 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           1572448 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 51 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 351 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=collision: 5/6 rows PASS · 1 FAIL · 0 UNMEASURABLE · 0 FINDING (not counted) · 18.3s ════
+     loadavg at end 5.38 5.22 5.69
+FAILING:
+  [XO.p] the collision hover preview itself is drawn at the hovered cell: the COLLISION_PREVIEW_PRIMARY outline on its four edges (HEAD colour)
+END-OF-RUN

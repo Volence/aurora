@@ -1,0 +1,74 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a — dist/main/index.mjs is 0s newer than the newest of 968 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src/renderer/components/MapViewport.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T08:06:40.623Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T08:06:40.623Z), so window.__dbg is in this bundle
+=== cdp-sweep-4 2026-09-12 harness ===
+    PARTS        : stamp
+    node         : v24.15.0
+    loadavg      : 4.89 5.80 6.06
+    ORACLE_SOCKET: /tmp/cdps4-sock-eeJTMg/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-4172121-fe6cce8d
+    PORT         : 9431   DISPLAY: xvfb-run -a (never :0)
+    captures     : docs/captures/2026-09-12-cdp-sweep-4   tag red-sg-linkhover
+    aeon tarball : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/e7b24bf1-afc7-4de1-b841-c92c59c89418/scratchpad/aeon-a38ce7c9.tar   commit a38ce7c961ef83136ac2f7c35e09b2ded7a109ea
+    oracle       : literals from HEAD ffc3b1804223f4c541333a208bcc36d3820612b0; four modules bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a51810ef480d8f06a/src
+    src on disk  : DIFFERS FROM HEAD (a plant?):
+                   M src/renderer/components/MapViewport.tsx
+    copy         : /tmp/cdps4-aeon-8U83VD   name "Sonic 4 (sweep4)"   bg-override bands 1
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/cdp-sweep-4-0912-harness-4172121-fe6cce8d — see HAZARD 6
+    X pointer    : PARKED outside the window: display :184 (Xvfb pid 4174107); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1 by a real Explorer click, and its scene library carries the three locked scenes and the unlocked control   [load 4.59/5.71/6.03]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}; scenes ["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start","sweep4_unlocked"]
+
+════════ PART stamp ════════
+   GEOMETRY [stamp] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+   clip: docs/captures/2026-09-12-cdp-sweep-4/sg-ref-no-ghost-red-sg-linkhover.png  (clip {"x":524,"y":186,"width":160,"height":160,"scale":1})
+   clip: docs/captures/2026-09-12-cdp-sweep-4/sg-ghost-during-link-hover-red-sg-linkhover.png  (clip {"x":524,"y":186,"width":160,"height":160,"scale":1})
+PASS  [SG.0] PREMISE: the stamp tool armed; a REAL click stamped chunk X (a new placement in section 0); chunk Y picked by a real click in the grid; and the link hover NAMES the new placement of X   [load 4.74/5.70/6.02]
+        dpr 1; X {"aim":{"x":1301,"y":434,"hitOk":true,"dpr":1,"rect":{"x":1257,"y":390,"w":88,"h":88}},"id":"OJZ_01"} ({"name":"OJZ $01","widthTiles":16,"heightTiles":16,"nonzeroTiles":211}); spot {"bc":32,"br":16,"linked":0} of [{"bc":32,"br":16,"linked":0},{"bc":48,"br":16,"linked":0},{"bc":32,"br":32,"linked":0},{"bc":16,"br":16,"linked":0}]; added [{"id":1,"chunkId":"OJZ_01","baseCol":32,"baseRow":16,"collision":true}]; Y {"id":"OJZ_02","aim":{"x":1209,"y":434,"hitOk":true,"dpr":1,"rect":{"x":1165,"y":390,"w":88,"h":88}},"info":{"name":"OJZ $02","widthTiles":16,"heightTiles":16,"nonzeroTiles":256}}; linkHover {"sectionIndex":0,"placementId":1,"chunkId":"OJZ_01"}; selected "OJZ_02"
+FAIL  [SG.a] DURING THE LINK HOVER the stamp ghost is drawn: its layer holds chunk Y's art at the ghost alpha (0.55 = 140/255, HEAD) inside the snapped rect, the SELECTION_MARQUEE outline on its edge, nothing outside; and on screen the rect changed against the no-ghost reference while the ring around it did not   [load 4.74/5.70/6.02]
+        ghost rect (derived: base {"col":32,"row":16} of Y 16x16 from the integer aim {"x":640,"y":238}) {"x":540,"y":202,"w":128,"h":128}; layer: inside 0/14884 at alpha 140; edge 0/976 SELECTION_MARQUEE; ring 0/7104 inked; screen vs reference: changed inside 0, changed in the ring 0; screen = over(layer, reference) {"n":25600,"ok":25600,"ratio":1,"bad":[]}; captures docs/captures/2026-09-12-cdp-sweep-4/sg-ref-no-ghost-red-sg-linkhover.png, docs/captures/2026-09-12-cdp-sweep-4/sg-ghost-during-link-hover-red-sg-linkhover.png
+   clip: docs/captures/2026-09-12-cdp-sweep-4/cl-readout-and-detach-hovered-red-sg-linkhover.png  (clip {"x":1165,"y":598,"width":222,"height":28,"scale":1})
+PASS  [CL.a] the readout is ON SCREEN naming the hovered placement ("Under cursor: <X's name> (#id)"), in the textBase token (ChunkLinkOptions: hovered ? T.textBase : T.textLo) at the tXs size, unclipped   [load 4.74/5.70/6.02]
+        MEASURED: {"found":true,"tag":"SPAN","text":"Under cursor: OJZ $01 (#1)","title":null,"disabled":false,"rect":{"x":1169,"y":602.34,"w":136.59,"h":15},"fontSize":"11px","color":"rgb(184, 190, 206)","background":"rgba(0, 0, 0, 0)","opacity":"1","scrollW":137,"clientW":137,"hitInside":true,"inScroller":true,"scroller":{"x":1160,"w":240,"y":74,"h":721},"inViewport":true}; want "Under cursor: OJZ $01 (#1)"; colour token textBase = rgb(184, 190, 206); size token = 11px; panel background under it rgb(10,12,18); WCAG contrast 10.51. LOOK CALL FOR THE OWNER: capture docs/captures/2026-09-12-cdp-sweep-4/cl-readout-and-detach-hovered-red-sg-linkhover.png
+PASS  [CL.b] the Detach chip is ON SCREEN and ENABLED while a placement is named, its title naming that placement (disabled={!hovered}, the title template, HEAD)   [load 4.74/5.70/6.02]
+        MEASURED: {"found":true,"tag":"BUTTON","text":"Detach","title":"Detach placement #1: its tiles stay exactly as they are, but stop following the chunk","disabled":false,"rect":{"x":1309.59,"y":600.34,"w":57.09,"h":19},"fontSize":"13px","color":"rgb(184, 190, 206)","background":"rgb(26, 30, 42)","opacity":"1","scrollW":55,"clientW":55,"hitInside":true,"inScroller":true,"scroller":{"x":1160,"w":240,"y":74,"h":721},"inViewport":true}; want title "Detach placement #1: its tiles stay exactly as they are, but stop following the chunk"; chip background (screen) rgb(26,30,42); WCAG contrast text/chip 8.94. LOOK CALL FOR THE OWNER: capture docs/captures/2026-09-12-cdp-sweep-4/cl-readout-and-detach-hovered-red-sg-linkhover.png
+PASS  [SG.b] CONTROL, NOT during a link hover: over an unlinked tile the hover writes null and the ghost is drawn at ITS snapped rect all the same (so SG.a is about the link-hover arm)   [load 4.74/5.70/6.02]
+        tile {"col":67,"row":18} aim {"x":824,"y":222}; linkHover null; ghost rect {"x":796,"y":202,"w":128,"h":128}; ghost-alpha pixels 9246/14884
+   clip: docs/captures/2026-09-12-cdp-sweep-4/cl-readout-and-detach-unlinked-red-sg-linkhover.png  (clip {"x":1165,"y":599,"width":222,"height":30,"scale":1})
+PASS  [CL.c] CONTROL: over the unlinked tile the readout says "Under cursor: no chunk link" in the textLo token and Detach is disabled   [load 4.74/5.70/6.02]
+        readout {"found":true,"tag":"SPAN","text":"Under cursor: no chunk link","title":null,"disabled":false,"rect":{"x":1169,"y":603.34,"w":143.19,"h":15},"fontSize":"11px","color":"rgb(110, 117, 137)","background":"rgba(0, 0, 0, 0)","opacity":"1","scrollW":143,"clientW":143,"hitInside":true,"inScroller":true,"scroller":{"x":1160,"w":240,"y":74,"h":721},"inViewport":true}; chip {"tag":"SPAN","disabled":false,"title":"Hover a stamped region on the map to name a placement","opacity":"0.5"}; capture docs/captures/2026-09-12-cdp-sweep-4/cl-readout-and-detach-unlinked-red-sg-linkhover.png
+NOTE  [SG.cleanup] Ctrl+Z after the part: placements in section 0 1 -> 0
+NOTE  [stamp.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 4174037 (11 process(es)):
+           4174037 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           4174107 Xvfb :184 -screen 0 1680x1050x24 -nolisten tcp
+           4189486 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           4189494 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           4189531 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           4189532 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           4189544 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           4190869 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           4190913 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           4190965 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           4191000 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 350 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=stamp: 6/7 rows PASS · 1 FAIL · 0 UNMEASURABLE · 0 FINDING (not counted) · 19.8s ════
+     loadavg at end 4.74 5.70 6.02
+FAILING:
+  [SG.a] DURING THE LINK HOVER the stamp ghost is drawn: its layer holds chunk Y's art at the ghost alpha (0.55 = 140/255, HEAD) inside the snapped rect, the SELECTION_MARQUEE outline on its edge, nothing outside; and on screen the rect changed against the no-ghost reference while the ring around it did not
+END-OF-RUN
