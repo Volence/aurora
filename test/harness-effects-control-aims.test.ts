@@ -85,7 +85,7 @@ describe('the program arms the ramp-control rig aims its switch by', () => {
 describe('the band-controls refusal the ramp-control rig requires', () => {
   const ID = 'aurora_local_rampctl_probe';
   const withArm = (arm: string): EffectsPreset => {
-    const p = newPreset(ID) as Record<string, unknown>;
+    const p = newPreset(ID) as unknown as Record<string, unknown>;
     delete p.bands;
     if (arm === 'ramp') p.ramp = newRamp();
     else if (arm === 'base_swap') p.base_swap = newBaseSwap();
