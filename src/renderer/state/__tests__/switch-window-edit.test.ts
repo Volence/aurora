@@ -30,12 +30,17 @@
 //
 // TREES. Classic: two copies of the pinned s1disasm this repo vendors
 // (`referencePath(S1_PINNED)`), copied because an open seeds `.aurora/` into the
-// directory. Aeon: a copy of the sibling checkout's `project.json` and
-// `games/sonic4/data` as the project being LEFT (it is the one edited), and the
-// sibling checkout itself, read only, as a target. Every write on these roads is
-// refused outside the work directory. The aeon rows skip, with the reason, on a
-// machine without the sibling aeon checkout; the classic rows need nothing
-// outside this repo.
+// directory. Aeon: TWO directories, the project being LEFT (it is the one edited)
+// and a separate target, both materialised from a COMMITTED revision of the aeon
+// checkout, never from its working tree (review bar 19,
+// docs/OVERSEER-REVIEW-BARS.md): `git -C <aeon> rev-parse origin/master` is
+// resolved to a SHA once, and `git -C <aeon> archive <sha> project.json
+// games/sonic4/data` is extracted into each. The aeon path appears ONLY as a
+// `git -C` argument, so an aeon lane's uncommitted edits cannot move these rows.
+// The SHA is in every aeon row's name, in the skip reason and in the failure
+// text. Every write on these roads is refused outside the work directory. With
+// no committed aeon revision to read, the aeon rows skip LOUDLY with the reason;
+// the classic rows need nothing outside this repo.
 //
 // ONE PROPERTY PER TEST. Each scenario runs ONCE, in its describe's beforeAll,
 // and each row asserts one property of that run; a scenario that cannot run
@@ -48,6 +53,7 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as nodePath from 'node:path';
 import * as os from 'node:os';
+import { spawnSync } from 'node:child_process';
 
 import { openProjectPath } from '../../hooks/useProject';
 import { useClassicProjectStore } from '../classicProjectStore';
@@ -69,21 +75,74 @@ import { canvasDocTab } from '../../shell/tabs';
 import { handleAgentRequest } from '../../agent/agent-handler';
 import { createDoc } from '../../../core/art/composer-buffer';
 import { siblingPath } from '../../../../test/support/sibling-root.mjs';
-import { referencePath, S1_PINNED, whenPresent } from '../../../../test/support/fixture-tree';
+import { referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 
 // -- trees -----------------------------------------------------------------------
 
 const S1_PIN_SRC = referencePath(S1_PINNED);
-const AEON_LIVE = siblingPath('aeon');
-const AEON_MARKER = AEON_LIVE ? nodePath.join(AEON_LIVE, 'project.json') : null;
-const AEON_PRESENT = AEON_MARKER !== null && fs.existsSync(AEON_MARKER);
-const REQUIRES_AEON = whenPresent(AEON_MARKER, 'an aeon project switch (the sibling aeon checkout)');
+
+// THE AEON FIXTURE, from a committed revision only (review bar 19). `AEON_GIT` is
+// the aeon checkout's location and is used for nothing but `git -C AEON_GIT ...`:
+// no fs call in this file names it, so what its working tree holds right now
+// cannot reach a row.
+const AEON_GIT = siblingPath('aeon');
+const AEON_REF = 'origin/master';
+const AEON_PATHS = ['project.json', 'games/sonic4/data'];
+/** git with no inherited GIT_* variables, so a caller's GIT_DIR cannot redirect `-C`. */
+const GIT_ENV = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+
+function resolveAeonRev(): { sha: string | null; reason: string } {
+  if (AEON_GIT === null) return { sha: null, reason: 'no suite root could be resolved for the aeon checkout' };
+  const r = spawnSync('git', ['-C', AEON_GIT, 'rev-parse', '--verify', '--quiet', `${AEON_REF}^{commit}`],
+    { encoding: 'utf8', env: GIT_ENV });
+  const sha = r.status === 0 ? r.stdout.trim() : '';
+  if (!/^[0-9a-f]{40}$/.test(sha)) {
+    return {
+      sha: null,
+      reason: `\`git -C ${AEON_GIT} rev-parse ${AEON_REF}\` gave no commit (exit ${r.status}`
+        + `${r.stderr ? `: ${r.stderr.trim()}` : ''})`,
+    };
+  }
+  return { sha, reason: '' };
+}
+const AEON_REV = resolveAeonRev();
+const AEON_LABEL = AEON_REV.sha ? `aeon ${AEON_REF} @ ${AEON_REV.sha.slice(0, 12)}` : 'aeon (no committed revision)';
+const REQUIRES_AEON = {
+  skip: AEON_REV.sha === null,
+  meta: {
+    skipReason: 'SKIPPED, NOT PASSED: cannot measure an aeon project switch. Its fixture is '
+      + `materialised from a COMMITTED aeon revision (${AEON_REF}) by git archive, never from a `
+      + `working tree, and ${AEON_REV.reason}. This row measures nothing`,
+  },
+};
+
+/** `git -C <aeon> archive <sha> project.json games/sonic4/data`, read once. */
+let aeonArchive: Buffer | null = null;
+/** Extract the committed aeon revision into `dest`. Loud, naming the SHA, on any failure. */
+function materialiseAeon(dest: string): void {
+  if (aeonArchive === null) {
+    const a = spawnSync('git', ['-C', AEON_GIT!, 'archive', AEON_REV.sha!, ...AEON_PATHS],
+      { maxBuffer: 1 << 30, env: GIT_ENV });
+    if (a.status !== 0) {
+      throw new Error(`NOT AN AURORA REGRESSION: git archive of ${AEON_LABEL} (${AEON_PATHS.join(', ')}) `
+        + `exited ${a.status}: ${String(a.stderr).trim()}`);
+    }
+    aeonArchive = a.stdout;
+  }
+  fs.mkdirSync(dest, { recursive: true });
+  const x = spawnSync('tar', ['-x', '-C', dest], { input: aeonArchive, maxBuffer: 1 << 20 });
+  if (x.status !== 0) {
+    throw new Error(`tar could not extract ${AEON_LABEL} into ${dest}: exit ${x.status}: ${String(x.stderr).trim()}`);
+  }
+}
 
 let WORK = '';
 const S1_A = (): string => nodePath.join(WORK, 's1-a');
 const S1_B = (): string => nodePath.join(WORK, 's1-b');
-const AEON_COPY = (): string => nodePath.join(WORK, 'aeon-copy');
-const AEON_TARGET = (): string => AEON_LIVE ?? '(unresolved)';
+/** The aeon project being LEFT (the edited one), from the committed revision. */
+const AEON_COPY = (): string => nodePath.join(WORK, 'aeon-resident');
+/** A SEPARATE aeon target, from the same committed revision. */
+const AEON_TARGET = (): string => nodePath.join(WORK, 'aeon-target');
 
 // -- the IPC boundary, answered from node's fs, each directory holdable ------------
 
@@ -193,7 +252,7 @@ const ENGINE_OF: Record<Engine, OpenEngine> = { classic: 's1', aeon: 'aeon' };
 
 function openFailure(): string {
   return `classic error: ${useClassicProjectStore.getState().error ?? '(none)'}; `
-    + `aeon error: ${useProjectStore.getState().error ?? '(none)'}`;
+    + `aeon error: ${useProjectStore.getState().error ?? '(none)'}; aeon fixture: ${AEON_LABEL}`;
 }
 
 // The aeon edit: palette line 1, colour 1, through executeAmbientCommand (undoable),
@@ -368,7 +427,7 @@ function scenario(
       return r;
     });
   };
-  if (needsAeon) describe(name, REQUIRES_AEON, body);
+  if (needsAeon) describe(`${name} [${AEON_LABEL}]`, REQUIRES_AEON, body);
   else describe(name, body);
 }
 
@@ -490,11 +549,16 @@ describe('SWITCH-WINDOW-EDIT-DROPPED · an edit made while a project switch load
     WORK = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'aurora-switch-window-'));
     fs.cpSync(S1_PIN_SRC, S1_A(), { recursive: true });
     fs.cpSync(S1_PIN_SRC, S1_B(), { recursive: true });
-    if (AEON_PRESENT) {
-      fs.mkdirSync(nodePath.join(AEON_COPY(), 'games', 'sonic4'), { recursive: true });
-      fs.copyFileSync(nodePath.join(AEON_LIVE!, 'project.json'), nodePath.join(AEON_COPY(), 'project.json'));
-      fs.cpSync(nodePath.join(AEON_LIVE!, 'games', 'sonic4', 'data'),
-        nodePath.join(AEON_COPY(), 'games', 'sonic4', 'data'), { recursive: true });
+    if (AEON_REV.sha !== null) {
+      // The cost, printed: one git archive of the committed paths, two extractions.
+      const t0 = performance.now();
+      materialiseAeon(AEON_COPY());
+      materialiseAeon(AEON_TARGET());
+      const [l1, l5, l15] = os.loadavg();
+      process.stdout.write(`\nSWITCH-WINDOW aeon fixture: ${AEON_LABEL}, ${AEON_PATHS.join(' + ')}, `
+        + `${aeonArchive!.length} archive bytes, archived once and extracted twice in `
+        + `${(performance.now() - t0).toFixed(0)} ms (loadavg ${l1.toFixed(2)} ${l5.toFixed(2)} ${l15.toFixed(2)}, `
+        + `uptime ${Math.round(os.uptime())} s)\n`);
     }
     vi.stubGlobal('window', { api: nodeApi() });
   });
