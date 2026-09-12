@@ -26,3 +26,19 @@ export interface VsplitAims {
 
 export declare function vsplitAims(root: string): VsplitAims;
 export declare function programArms(root: string): readonly string[];
+
+export declare const BAND_REFUSAL_SOURCE: string;
+
+export interface BandRefusal {
+  /** `PROGRAM_ARM_NOUNS[arm]`, as the composing module spells it. */
+  readonly noun: string;
+  /** The sentence's first clause: single-line, and a prefix of `needles[0]`. */
+  readonly search: string;
+  /** Every contiguous run of the composed sentence this reader can resolve. */
+  readonly needles: readonly string[];
+  /** Which function the sentence was read out of, for a miss message. */
+  readonly where: string;
+}
+
+export declare function bandRefusalNeedles(
+  root: string, arm: string, presetId: string): BandRefusal;
