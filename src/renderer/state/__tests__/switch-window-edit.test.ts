@@ -255,6 +255,11 @@ interface Seen {
   value: number | null;
   dirty: boolean;
   canUndo: boolean | null;
+  /** The classic level store's status. A classic commit resets it to 'idle'; a
+   *  refusal leaves the loaded act 'ready'. For a same-directory re-validate
+   *  this is what tells a commit from a refusal: the directory is the same
+   *  either way. */
+  actStatus: string;
   classicError: string | null;
   aeonError: string | null;
 }
@@ -269,6 +274,7 @@ function seen(engine: Engine, undoId: string | null): Seen {
     value: valueOf(engine),
     dirty: dirtyOf(engine),
     canUndo: undoId ? documentHistoryHub.historyFor(undoId).canUndo : null,
+    actStatus: useClassicLevelStore.getState().status,
     classicError: c.error,
     aeonError: p.error,
   };
@@ -398,6 +404,9 @@ function refusedRows(run: () => SwitchRun, p: Refused): void {
     const r = run();
     expect(r.after.engine).toBe(ENGINE_OF[p.engine]);
     expect(p.engine === 'classic' ? r.after.classicDir : r.after.aeonBase).toBe(p.residentDir());
+    // The directory alone cannot tell a same-directory re-validate's refusal from
+    // its commit; the loaded act can (a classic commit resets the level store).
+    if (p.engine === 'classic') expect(r.after.actStatus, 'its act is still loaded').toBe('ready');
   });
 
   it('the mid-window edit is still there', () => {
@@ -423,6 +432,11 @@ function committedRows(
     const r = run();
     expect(r.after.engine).toBe(ENGINE_OF[p.engine]);
     expect(p.engine === 'classic' ? r.after.classicDir : r.after.aeonBase).toBe(p.target());
+    // A classic commit drops the act of the project it left, which is the only
+    // visible difference a same-directory re-validate's commit makes.
+    if (p.engine === 'classic') {
+      expect(r.after.actStatus, 'the commit dropped the act it replaced').toBe('idle');
+    }
   });
 
   it('and reports success, with no cancellation', () => {
