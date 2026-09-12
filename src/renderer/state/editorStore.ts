@@ -718,6 +718,23 @@ export function focusedHistory(): UndoStack | null {
   return docId ? documentHistoryHub.historyFor(docId) : null;
 }
 
+/**
+ * THE AEON EDIT SERIAL (SWITCH-WINDOW-EDIT-DROPPED). One up for every
+ * `markDirty` and every `markUndone`, whatever either decides about the dirty
+ * maps, and for nothing else. A project switch reads it at consent and again at
+ * its commit (state/edit-consent.ts): a difference means the aeon project was
+ * edited after the user agreed to the switch, and the switch does not commit
+ * over it.
+ *
+ * NOT `dirtyActs`, which cannot answer that: it goes DOWN on an undo
+ * (`markUndone`) and to `{}` on a save or a discard, so an edit followed by an
+ * undo reads as nothing happening. `markClean` and `markActsClean` do not move
+ * this; a save or a discard is not an edit. Module level, so no `setState` of
+ * the store can rewind it.
+ */
+let editSerial = 0;
+export function aeonEditSerial(): number { return editSerial; }
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   tool: 'view',
   selection: null,
@@ -884,7 +901,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       && prev.placementId === linkHover.placementId) return {};
     return { linkHover };
   }),
-  markDirty: (opts) => set((s) => {
+  // Every call is an edit, whichever branch below it takes: see `editSerial`.
+  markDirty: (opts) => { editSerial += 1; set((s) => {
     const p = useProjectStore.getState();
     if (!p.currentZoneId || !p.currentActId) return { dirty: true };
     const key = `${p.currentZoneId}/${p.currentActId}`;
@@ -911,8 +929,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // a markDirty call whose outcome is CLEAN, and `dirty: true` here was what
     // kept the dot on after it.
     return { dirty: Object.keys(dirtyActs).length > 0, dirtyActs, hardDirtyActs };
-  }),
-  markUndone: () => set((s) => {
+  }); },
+  // An undo changes the document even where it leaves the dirty maps alone (the
+  // hard-dirty branch below): see `editSerial`.
+  markUndone: () => { editSerial += 1; set((s) => {
     const p = useProjectStore.getState();
     if (!p.currentZoneId || !p.currentActId) return {};
     const key = `${p.currentZoneId}/${p.currentActId}`;
@@ -925,7 +945,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const dirtyActs = { ...s.dirtyActs, [key]: (s.dirtyActs[key] ?? 0) - 1 };
     if (dirtyActs[key] === 0) delete dirtyActs[key];
     return { dirtyActs, dirty: Object.keys(dirtyActs).length > 0 };
-  }),
+  }); },
   markClean: () => set({ dirty: false, dirtyActs: {}, hardDirtyActs: {} }),
   markActsClean: (keys, atGen) => {
     const s = get();

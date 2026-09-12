@@ -125,21 +125,32 @@ const DOORS: Record<string, string> = {
     + '"Open Project…" buttons and the Home "Switch project" (App.tsx passes openProject), '
     + 'the recents rows and the command palette\'s recent: commands (openProjectByPath), and '
     + 'the palette\'s open-project command (openProjectDialog). It awaits confirmProjectOpen() '
-    + 'before touching either store, which is why seat B\'s F8 is not reachable from the UI.',
+    + 'before touching either store, which is why seat B\'s F8 is not reachable from the UI. '
+    + 'The moment the guard answers it takes the switch\'s consent token (state/edit-consent.ts) '
+    + 'and hands it to BOTH primitives, so an edit landing while the new project loads cancels '
+    + 'the commit instead of being dropped by it (SWITCH-WINDOW-EDIT-DROPPED).',
   'renderer/debug-hooks.ts':
     'THE DOOR SEAT B DROVE, and the reason its F8 is discounted. __dbg.openDir and '
     + '__dbg.aeon.open call the primitives raw, with no guard, in VITE_AURORA_DEBUG builds '
-    + 'only. Not a user gesture; every CDP harness in this repo uses it.',
+    + 'only. Not a user gesture; every CDP harness in this repo uses it. With no dialog, its '
+    + 'consent token is taken by the primitive at its start: what was dirty before the call '
+    + 'is discarded as it always was, an edit made during the load cancels the commit.',
   'renderer/agent/agent-handler.ts':
     'THE AGENT DOOR. No UI to confirm through, so classic-open-project refuses outright on '
     + 'any resident dirt (unsavedAgentRefusal) rather than asking. Guarded by refusal, not '
-    + 'by dialog. See shell/__tests__/agent-open-refusal.test.ts.',
+    + 'by dialog. See shell/__tests__/agent-open-refusal.test.ts. Its refusal is synchronous, '
+    + 'so the consent token openDirectory takes at its start is the door\'s start: an agent '
+    + 'edit (its own or another request\'s) landing during the open cancels the commit.',
   'renderer/components/setup/ProjectSetupTab.tsx':
     'RE-VALIDATE, NOT A SWITCH. It re-opens the directory that is ALREADY open, so the '
-    + 'session key is unchanged and resetProjectRuntime never fires; no document session '
-    + 'ends and nothing is destroyed. It saves the classic project first and aborts on a '
-    + 'failed save. If it ever gains a different-directory argument it becomes a real '
-    + 'switch and needs the guard.',
+    + 'session key is unchanged and resetProjectRuntime never fires: no sprite, canvas or '
+    + 'composer document is closed. But the re-open UNLOADS THE LEVEL. It asks first when the '
+    + 'level is dirty and aborts on a failed save, which covers the edits made before Apply; an '
+    + 'edit made DURING the save, the sidecar write or the re-open was dropped with no dialog '
+    + '(docs/reviews/2026-09-12-switch-window-measure.md, row "same-dir re-validate"). It now '
+    + 'takes a consent token at its dialog\'s answer (at its start, with no dialog) and passes '
+    + 'it to openDirectory, which refuses to commit over an edit made since. If it ever gains '
+    + 'a different-directory argument it becomes a real switch and needs the guard.',
 };
 
 /**
@@ -233,5 +244,33 @@ describe('F8 §2 · the census the verdict rests on, executed instead of asserte
     expect(guardAt).toBeLessThan(openAt);
     // And it must be able to abort: a guard whose answer is dropped is decoration.
     expect(text).toMatch(/if\s*\(!\(await confirmProjectOpen\(\)\)\)\s*return;/);
+  });
+
+  // SWITCH-WINDOW-EDIT-DROPPED. A door WITH a dialog must take its consent token
+  // at the answer and pass it: left out, the primitive takes one at its own start,
+  // which is after the save and the sidecar write, so an edit made during those
+  // would count as consented to. Source shape, the weaker evidence: what the token
+  // does is measured behaviourally in state/__tests__/switch-window-edit.test.ts,
+  // which cannot mount the Setup tab (node only, no React DOM).
+  it('the user road takes its consent token after the guard and passes it to both primitives', () => {
+    const text = readFileSync(join(RENDERER, 'hooks', 'useProject.ts'), 'utf8');
+    const guardAt = text.indexOf('await confirmProjectOpen()');
+    const tokenAt = text.indexOf('= captureEditConsent()');
+    expect(tokenAt, 'useProject.openProjectPath must take a consent token').toBeGreaterThan(-1);
+    expect(tokenAt, 'and only once the guard has answered').toBeGreaterThan(guardAt);
+    expect(tokenAt, 'and before the first primitive is asked').toBeLessThan(text.search(CALL_RE));
+    expect(text).toMatch(/\.openDirectory\(\s*dir\s*,\s*consent\s*\)/);
+    expect(text).toMatch(/(?<![\w.])openAeonProject\(\s*dir\s*,\s*consent\s*\)/);
+  });
+
+  it('the Setup door retakes its token at its dialog answer and passes it to openDirectory', () => {
+    const text = readFileSync(join(RENDERER, 'components', 'setup', 'ProjectSetupTab.tsx'), 'utf8');
+    const askAt = text.indexOf('await useConfirmStore.getState().ask(');
+    const retakeAt = text.indexOf('consent = captureEditConsent()', askAt);
+    expect(askAt, 'premise: the Setup door still asks').toBeGreaterThan(-1);
+    expect(retakeAt, 'the token is retaken after the ask').toBeGreaterThan(askAt);
+    expect(retakeAt, 'and before the save it may run')
+      .toBeLessThan(text.indexOf('saveClassicProject()', askAt));
+    expect(text).toMatch(/\.openDirectory\(\s*dir\s*,\s*consent\s*\)/);
   });
 });

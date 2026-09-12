@@ -14,6 +14,7 @@ import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useProjectStore } from '../../state/projectStore';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
+import { captureEditConsent } from '../../state/edit-consent';
 import { buildSetupRows, pendingEditCount, planSetupSidecarWrite, type SetupRow } from './setup-model';
 import { SIDECAR_REL_PATH, sidecarMayBeOverwritten } from '../../../core/project/mapping';
 import { joinPath } from '../../../core/project/join-path';
@@ -169,6 +170,12 @@ export default function ProjectSetupTab() {
   const writable = sidecarMayBeOverwritten(sidecar);
 
   const apply = async () => {
+    // THE CONSENT TOKEN (state/edit-consent.ts, SWITCH-WINDOW-EDIT-DROPPED): the
+    // edit counters when this door was told to go ahead. With no dialog that is
+    // now; with one, it is the answer. The re-open below UNLOADS THE LEVEL, so an
+    // edit landing after this (during the save, the sidecar write or the re-open)
+    // makes openDirectory refuse to commit rather than reload over it.
+    let consent = captureEditConsent();
     if (classicDirty) {
       const a = await useConfirmStore.getState().ask({
         title: 'Unsaved level changes',
@@ -180,6 +187,9 @@ export default function ProjectSetupTab() {
         ],
       });
       if (a === 'cancel') return;
+      // At the answer, before the save: a save moves no edit counter, so an edit
+      // made while it writes is one the answer did not cover, and it cancels.
+      consent = captureEditConsent();
       if (a === 'save') {
         const { saveClassicProject } = await import('../../state/classic-save');
         const result = await saveClassicProject();
@@ -208,7 +218,7 @@ export default function ProjectSetupTab() {
       await window.api.writeBinaryFile(dir, SIDECAR_REL_PATH, plan.bytes.buffer as ArrayBuffer);
       setEdits({});
       resetChecks(); // row lights fall back to the fresh report status, not stale live-check colors
-      const outcome = await useClassicProjectStore.getState().openDirectory(dir);
+      const outcome = await useClassicProjectStore.getState().openDirectory(dir, consent);
       useToastStore.getState().addToast(
         outcome === 'opened' ? 'Setup applied: project re-validated' : 'Setup written, but re-open failed',
         outcome === 'opened' ? 'success' : 'error',

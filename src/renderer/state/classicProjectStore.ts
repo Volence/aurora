@@ -40,6 +40,10 @@ import { ipcClassicBridge, type ClassicBridge } from './classic-bridge';
 // openAct/editableTileRange over there), never at module-eval time, so the
 // cycle resolves fine regardless of which module's top level runs first.
 import { useClassicLevelStore } from './classicLevelStore';
+import { captureEditConsent, editedSinceConsentMessage, type EditConsent } from './edit-consent';
+// open-project imports this store back; both only reach across inside function
+// bodies, so the cycle resolves the same way the classicLevelStore one above does.
+import { openProjectDir } from './open-project';
 
 export type ClassicStatus = 'closed' | 'opening' | 'open';
 
@@ -69,7 +73,13 @@ interface ClassicProjectState {
   /** Parsed .aurora/project.json + issues, from the opened handle (null when closed/aeon). */
   sidecar: SidecarState | null;
 
-  openDirectory: (dir: string) => Promise<OpenOutcome>;
+  /**
+   * `consent` is the edit counters as they stood when this switch was agreed to
+   * (state/edit-consent.ts). A door with a dialog takes it at the answer and
+   * passes it; a door with none leaves it out, and it is taken here, at the
+   * primitive's start, which for such a door is the same instant.
+   */
+  openDirectory: (dir: string, consent?: EditConsent) => Promise<OpenOutcome>;
   clearError: () => void;
   reset: () => void;
 }
@@ -99,7 +109,9 @@ const CLOSED = {
 export const useClassicProjectStore = create<ClassicProjectState>((set, get) => ({
   ...CLOSED,
 
-  openDirectory: async (dir: string): Promise<OpenOutcome> => {
+  openDirectory: async (
+    dir: string, consent: EditConsent = captureEditConsent(),
+  ): Promise<OpenOutcome> => {
     // A FAILED OPEN LEAVES A RESIDENT PROJECT OPEN (CLASSIC-FAILED-OPEN-CLOSES-
     // PROJECT), which is what the aeon loader has always done: its setLoading /
     // setError leave `config` and `project` in place. This used to begin with
@@ -164,6 +176,29 @@ export const useClassicProjectStore = create<ClassicProjectState>((set, get) => 
             } catch { /* planner defaults cover it; the setup tab shows the sidecar state */ }
           }
         }
+        // AN EDIT SINCE CONSENT CANCELS THE SWITCH (SWITCH-WINDOW-EDIT-DROPPED).
+        // Every await of this open is above this line, so this is the last
+        // instant the project being left is still the one on screen, and
+        // everything below is synchronous. While the bridge was reading, that
+        // project stayed editable (nothing reads a "switch in flight" signal, and
+        // agent requests are not serialized behind an open); the reset below
+        // would unload an edit made in that window with no dialog. So the open
+        // fails instead, the way a failed open fails: `fail` keeps a resident
+        // project with its edits, dirty flag and undo. What this commit discards:
+        //   classicLevel  the reset below drops the loaded act.
+        //   aeonProject   only when no classic project is resident: then aeon is
+        //                 the open engine, and committing masks it behind classic
+        //                 precedence where the aeon saver cannot reach it. Under a
+        //                 resident classic project it is masked already, and this
+        //                 commit changes nothing for it.
+        //   documents / composer  when the session key changes, which is what
+        //                 makes session-lifecycle run resetProjectRuntime. A
+        //                 re-validate of the same directory keeps them.
+        const keyChanges = openProjectDir() !== dir;
+        const cancelled = editedSinceConsentMessage(consent, {
+          classicLevel: true, aeonProject: !resident, documents: keyChanges, composer: keyChanges,
+        });
+        if (cancelled) return fail(cancelled);
         // The switch commits HERE, so the previous project's loaded doc goes
         // here: a surviving doc would hold a handle into the project being left.
         // (It used to go at the top, which is also what made a failed open drop

@@ -195,7 +195,9 @@ describe('HOME-PATH-FIELD-KEEPS-OLD-PATH · the opener reports what happened', (
     await expect(openProjectPath('/p/aeon')).resolves.toBe(true);
     vi.mocked(openAeonProject).mockResolvedValueOnce(false);
     await expect(openProjectPath('/p/aeon')).resolves.toBe(false);
-    expect(vi.mocked(openAeonProject).mock.calls).toEqual([['/p/aeon'], ['/p/aeon']]);
+    // The directory each call was asked for. The second argument is the switch's
+    // consent token (state/edit-consent.ts), which this row is not about.
+    expect(vi.mocked(openAeonProject).mock.calls.map((c) => c[0])).toEqual(['/p/aeon', '/p/aeon']);
   });
 
   it('a guard that says no resolves undefined and asks the bridge nothing', async () => {

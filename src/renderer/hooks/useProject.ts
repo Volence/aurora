@@ -3,6 +3,7 @@ import { useClassicProjectStore } from '../state/classicProjectStore';
 import { openAeonProject } from '../state/aeon-open';
 import { confirmProjectOpen } from '../shell/project-open-guard';
 import { recordRecentProject } from '../state/recents';
+import { captureEditConsent } from '../state/edit-consent';
 
 /**
  * Open a directory. A single project-registry fingerprint (Task 17) routes it:
@@ -26,8 +27,17 @@ export async function openProjectPath(dir: string): Promise<boolean | undefined>
   // re-snapshot flow lives in project-open-guard.ts (confirmProjectOpen) so it's
   // unit-testable without a React hook / jsdom. This function is just the glue.
   if (!(await confirmProjectOpen())) return;
+  // THE CONSENT TOKEN (state/edit-consent.ts), taken the moment the guard's
+  // answer is in hand and handed to BOTH primitives, so an edit that lands on
+  // the project being left anywhere in the load below (the classic bridge's
+  // reads, the aeon loader's, the recents IPC) cancels the commit instead of
+  // being thrown away by it. Nothing sits between the guard's `return true` and
+  // this line but the await's own resumption: the microtasks that drain there
+  // are the ones the guard's answer itself triggered (a dialog click, or its
+  // save's last IPC reply), and no edit hangs off those.
+  const consent = captureEditConsent();
   const classic = useClassicProjectStore.getState();
-  const outcome = await classic.openDirectory(dir);
+  const outcome = await classic.openDirectory(dir, consent);
   if (outcome === 'opened') {
     // Register in recent-projects, mirroring the aeon path (openAeonProject
     // calls addRecentProject on success). Reopening a classic recent routes
@@ -36,7 +46,7 @@ export async function openProjectPath(dir: string): Promise<boolean | undefined>
     await recordRecentProject(dir, name);
     return true;
   } else if (outcome === 'not-classic') {
-    return openAeonProject(dir);
+    return openAeonProject(dir, consent);
   }
   return false;
 }
