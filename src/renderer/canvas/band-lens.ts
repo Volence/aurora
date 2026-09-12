@@ -151,14 +151,20 @@ export function drawBandLens(
  * COSTS NOTHING WHEN THERE IS NO LENS. Everything here is inside the draw pass's
  * `if (lens)`, which needs the effects facet AND a mark — item 42's rule that
  * per-band chrome must not be a tax on every repaint for every author.
+ *
+ * `dpr` is the canvas's, required. `anchor` is in CSS px (`bandLensAnchor`), and so is
+ * the wash it labels (`drawBandLens` draws under the canvas's CSS transform). This used
+ * to reset to identity, which at a scale factor above 1 put the plate at 1/dpr of the
+ * coverage it points at (docs/reviews/2026-09-12-dpr-guides-offset.md).
  */
 export function drawBandLensLabel(
-  ctx: CanvasRenderingContext2D, vp: LensViewport, lines: readonly string[],
+  ctx: CanvasRenderingContext2D, dpr: number, vp: LensViewport, lines: readonly string[],
   anchor?: { x: number; y: number } | null,
 ): void {
   if (lines.length === 0) return;
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // The map canvas's own CSS transform, restated absolutely.
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.font = '10px system-ui, sans-serif';
   ctx.textBaseline = 'middle';
   const SWATCH = 9;

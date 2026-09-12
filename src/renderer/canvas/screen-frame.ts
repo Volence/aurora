@@ -43,6 +43,7 @@
 
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../../core/model/screen';
 import { worldYToCanvasY } from './effects-guides';
+import { snapStroke, snapLength } from './device-grid';
 import {
   SCREEN_FRAME_LINE, SCREEN_FRAME_ACTIVE, SCREEN_FRAME_LABEL_BG, SCREEN_FRAME_LABEL_TEXT,
 } from './canvas-colors';
@@ -129,20 +130,27 @@ export interface ScreenFrameDrawOptions {
 /**
  * Draw the frame over the already-composed map. NO CLOCK, NO STATE (file
  * docblock). Returns the rect it drew, for the report.
+ *
+ * `dpr` is the canvas's, required, for the reason `drawLayerGuides` gives: this used
+ * to reset to identity and so drew its edges at 1/dpr of where `screenFrameEdgeAt`
+ * grabs them (cdp-sweep-4 OBS.DPR, docs/reviews/2026-09-12-dpr-guides-offset.md).
  */
 export function drawScreenFrame(
-  ctx: CanvasRenderingContext2D, vp: FrameViewport, anchor: ScreenFrameAnchor,
+  ctx: CanvasRenderingContext2D, dpr: number, vp: FrameViewport, anchor: ScreenFrameAnchor,
   opts: ScreenFrameDrawOptions = {},
 ): FrameRect {
   const r = screenFrameRect(anchor, vp);
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  // Half-pixel offsets so the 1px stroke sits on one device row, not two.
-  const x = Math.round(r.x) + 0.5;
-  const y = Math.round(r.y) + 0.5;
-  const w = Math.round(r.w);
-  const h = Math.round(r.h);
-  ctx.lineWidth = opts.active ? 2 : 1;
+  // The map canvas's own CSS transform, restated absolutely.
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Edges on device half-pixels and a size in whole device pixels, so the 1px
+  // stroke sits on one device row, not two (canvas/device-grid.ts).
+  const lw = opts.active ? 2 : 1;
+  const x = snapStroke(r.x, lw, dpr).at;
+  const y = snapStroke(r.y, lw, dpr).at;
+  const w = snapLength(r.w, dpr);
+  const h = snapLength(r.h, dpr);
+  ctx.lineWidth = snapStroke(r.x, lw, dpr).width;
   ctx.strokeStyle = opts.active ? SCREEN_FRAME_ACTIVE : SCREEN_FRAME_LINE;
   ctx.setLineDash([]);
   ctx.strokeRect(x, y, w, h);

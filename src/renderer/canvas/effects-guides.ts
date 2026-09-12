@@ -43,6 +43,7 @@ import {
   EFFECTS_SURFACE_LINE, EFFECTS_SURFACE_CASING,
   EFFECTS_SURFACE_LABEL_BG, EFFECTS_SURFACE_LABEL_TEXT,
 } from './canvas-colors';
+import { snapStroke, snapLength } from './device-grid';
 
 /** The map viewport, in the shape the draw pass already has one. */
 export interface GuideViewport {
@@ -376,20 +377,23 @@ export function surfaceCaption(rows: readonly SurfaceGeometry[]): string | null 
  * visible, which is the case the seed value produces: the rowRemap parcel seeded
  * `plane_y` from the strip's own top, so the two coincide on a fresh document and
  * the referent would be invisible on the one scene most likely to be opened.
+ *
+ * `dpr` IS THE CANVAS'S, and it is required: see `drawLayerGuides`.
  */
 export function drawSurfaceMarks(
-  ctx: CanvasRenderingContext2D, vp: GuideViewport, rows: readonly SurfaceGeometry[],
+  ctx: CanvasRenderingContext2D, dpr: number, vp: GuideViewport, rows: readonly SurfaceGeometry[],
 ): void {
   if (rows.length === 0) return;
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // The map canvas's own CSS transform, restated absolutely (see drawLayerGuides).
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.font = '10px system-ui, sans-serif';
   ctx.textBaseline = 'middle';
   for (const row of rows) {
     if (!row.onScreen) continue;
-    // Half-pixel offset, same reason as the guides: a 1px line on an integer
-    // coordinate straddles two device rows and smears.
-    const y = Math.round(row.canvasY) + 0.5;
+    // On a device half-pixel, same reason as the guides: a 1px line on an integer
+    // device coordinate straddles two device rows and smears (canvas/device-grid.ts).
+    const y = snapStroke(row.canvasY, 1, dpr).at;
 
     // The casing first, unbroken, so the dashes read on white art as well as on
     // black. A dashed white line alone vanishes over OJZ's bright water tiles,
@@ -397,14 +401,14 @@ export function drawSurfaceMarks(
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(vp.width, y);
-    ctx.lineWidth = 3;
+    ctx.lineWidth = snapStroke(row.canvasY, 3, dpr).width;
     ctx.strokeStyle = EFFECTS_SURFACE_CASING;
     ctx.stroke();
 
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(vp.width, y);
-    ctx.lineWidth = 1;
+    ctx.lineWidth = snapStroke(row.canvasY, 1, dpr).width;
     ctx.strokeStyle = EFFECTS_SURFACE_LINE;
     // A long dash, not the guides' short one: the two dash patterns are what
     // separate a referent from a division at a glance, before either label is
@@ -481,15 +485,16 @@ const NOTICE_LINE_H = 13;
  * failure mode that would return this parcel to silence.
  */
 function drawNoticePlate(
-  ctx: CanvasRenderingContext2D, vp: GuideViewport, row: GuideGeometry, text: string,
+  ctx: CanvasRenderingContext2D, dpr: number, vp: GuideViewport, row: GuideGeometry, text: string,
 ): void {
   const maxW = Math.max(120, Math.min(NOTICE_MAX_W, vp.width - 24));
   const lines = wrapNoticeText(ctx, text, maxW - 12);
   const w = Math.min(maxW, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 12);
   const h = lines.length * NOTICE_LINE_H + 8;
   const below = row.canvasY + 8;
-  const y = Math.round(below + h <= vp.height - 4 ? below : Math.max(4, row.canvasY - h - 8));
-  const x = Math.round(Math.max(4, Math.min(vp.width - w - 4, 8)));
+  // Whole DEVICE pixels, which is what `Math.round` meant here at dpr 1 (device-grid.ts).
+  const y = snapLength(below + h <= vp.height - 4 ? below : Math.max(4, row.canvasY - h - 8), dpr);
+  const x = snapLength(Math.max(4, Math.min(vp.width - w - 4, 8)), dpr);
 
   ctx.fillStyle = EFFECTS_GUIDE_REFUSED_BG;
   ctx.fillRect(x, y, w, h);
@@ -514,27 +519,43 @@ function drawNoticePlate(
  * A DISABLED LAYER STILL DRAWS ONE. It is still a world-Y division the author is
  * editing and the panel still lists it; a canvas that hides it disagrees with
  * the panel about what the scene contains. It draws dashed and dim instead.
+ *
+ * ═══ `dpr` IS THE CANVAS'S, AND THERE IS NO DEFAULT ═══
+ *
+ * The number `redraw` sized the backing store with and passed to `setTransform`. This
+ * used to reset the context to IDENTITY for crisp lines and then draw CSS coordinates,
+ * which on a dpr-scaled backing store put every guide at 1/dpr of the row its hit test
+ * (`guideAtCanvasY`, CSS px) grabs: cdp-sweep-4's OBS.DPR, fixed by
+ * docs/reviews/2026-09-12-dpr-guides-offset.md. It now draws in the canvas's CSS frame
+ * and snaps in device space instead (canvas/device-grid.ts), so the line you see is the
+ * line you grab and stays one device row thick. The parameter sits straight after `ctx`
+ * with no default, so a caller that forgets the scale does not compile, rather than
+ * quietly drawing at 1, which is the defect.
  */
 export function drawLayerGuides(
-  ctx: CanvasRenderingContext2D, vp: GuideViewport,
+  ctx: CanvasRenderingContext2D, dpr: number, vp: GuideViewport,
   layers: readonly EffectsLayer[], opts: GuideDrawOptions = {},
 ): void {
   const rows = layerGuideGeometry(layers, vp, opts);
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // ABSOLUTE, not inherited: the canvas's own CSS transform restated, so whatever a
+  // previous pass left on the context cannot move the guides off their hit test.
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.font = '10px system-ui, sans-serif';
   ctx.textBaseline = 'middle';
   for (const row of rows) {
     if (!row.onScreen) continue;
     const active = opts.dragIndex === row.index || opts.hoverIndex === row.index;
-    // Half-pixel offset: a 1px line on an integer coordinate straddles two
-    // device rows and renders as a 2px smear.
-    const y = Math.round(row.canvasY) + 0.5;
+    // Centre on a device half-pixel, width in whole device pixels: a 1px line on
+    // an integer device coordinate straddles two device rows and renders as a 2px
+    // smear (canvas/device-grid.ts).
+    const stroke = snapStroke(row.canvasY, active || row.notice !== null ? 2 : 1, dpr);
+    const y = stroke.at;
 
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(vp.width, y);
-    ctx.lineWidth = active || row.notice !== null ? 2 : 1;
+    ctx.lineWidth = stroke.width;
     // REFUSAL OUTRANKS SELECTION. A guide that is both hovered and unbakeable
     // must read as unbakeable: "which line am I touching" is answerable from the
     // cursor, "which line kills the build" is answerable from nothing else.
@@ -577,7 +598,7 @@ export function drawLayerGuides(
     const refusedCount = rows.filter((r) => r.notice !== null).length;
     const head = `L${noticeRow.index} ${noticeRow.notice.text}`
       + (refusedCount > 1 ? ` (${refusedCount} layers are refused; the rest are marked)` : '');
-    drawNoticePlate(ctx, vp, noticeRow, head);
+    drawNoticePlate(ctx, dpr, vp, noticeRow, head);
   }
   // The space, said once on the layer itself: a set of lines that stay put
   // while the act pans under them needs a sentence explaining why, or it
