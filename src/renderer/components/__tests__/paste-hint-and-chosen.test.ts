@@ -1,6 +1,6 @@
 // PASTE-HINT-LINE-MISLEADS and ART-ONLY-COLLISION-NO-CHOSEN, the two follow-ups
 // booked when PASTE-LAYERS-GREY-OUT landed
-// (docs/reviews/2026-09-11-paste-hint-and-chosen.md; the parcel they follow is
+// (docs/reviews/2026-09-12-paste-hint-and-chosen.md; the parcel they follow is
 // docs/reviews/2026-09-11-paste-layers-grey-out.md, whose rows sit beside this
 // file in paste-layers-grey-out.test.ts).
 //
