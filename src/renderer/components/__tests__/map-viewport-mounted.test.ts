@@ -4337,13 +4337,16 @@ describe('a stroke crossing a section boundary lands one command per section, un
 // writer of that field is the Collision palette's Plane A and B buttons
 // (`pickPlane`). A MOUSE click on one cannot land mid-drag: the release is
 // heard on the window and ends the stroke before the click exists. The
-// KEYBOARD can: a clicked palette button keeps focus (measured, O48b, recorded
-// in `ui/act-and-drop-focus.ts`; these two do not drop it), the collision press
-// calls `preventDefault` and MapViewport never takes focus, and no window key
-// handler claims Tab or Space. So Tab from A to B, then Space, presses B with
-// the drag still held. Space dispatches the button's `click`, and these rows run
-// that button's own `onClick`, found by type and label in the real panel. The
-// focus half is a browser fact and is not measured here.
+// KEYBOARD can: the collision press calls `preventDefault` and MapViewport never
+// takes focus, and no window key handler claims Tab or Space, so a focused Plane
+// button takes a Space with the drag still held. Until hub ruling M1
+// (docs/reviews/2026-09-12-rulings-asked.md) a plain CLICK left the button
+// focused, so a bare Space re-pressed it; the two buttons now act and drop
+// focus (`ui/act-and-drop-focus.ts`, the M1 row below). That closes the bare
+// Space, and leaves the deliberate route: Tab to B, then Space. Space
+// dispatches the button's `click`, and these rows run that button's own
+// `onClick`, found by type and label in the real panel. The focus half is a
+// browser fact and is measured by `harness:map-behaviour-fixes`, not here.
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('a collision stroke whose plane changes mid-drag lands one command per plane, undone newest first', () => {
@@ -4378,8 +4381,13 @@ describe('a collision stroke whose plane changes mid-drag lands one command per 
   }
 
   let panel: Hooked<{ variant: 'map' }> | null = null;
+  /** What the Plane buttons did, in order: `blur:<label>` when a handler blurred
+   *  the element it was pressed on, `plane:<id>` when the aimed plane moved. */
+  let log: string[] = [];
   /** The map variant of the Collision palette over the live stores, and its two
-   *  Plane buttons' own click handlers. */
+   *  Plane buttons' own click handlers, each handed a click event whose
+   *  `currentTarget` records a blur (a handler wired through `actAndDropFocus`
+   *  reads it; one that ignores its event never touches it). */
   function renderPalette(): { A: () => void; B: () => void } {
     panel?.unmount();
     panel = renderHooked(
@@ -4388,7 +4396,8 @@ describe('a collision stroke whose plane changes mid-drag lands one command per 
     const press = (label: 'A' | 'B') => {
       const found = buttons.filter((b) => b.props.children === label);
       expect(found, `HARNESS: the palette rendered no single Plane ${label} button`).toHaveLength(1);
-      return () => (found[0].props.onClick as () => void)();
+      const click = { currentTarget: { blur: () => { log.push(`blur:${label}`); } } };
+      return () => (found[0].props.onClick as (e: unknown) => void)(click);
     };
     return { A: press('A'), B: press('B') };
   }
@@ -4405,6 +4414,7 @@ describe('a collision stroke whose plane changes mid-drag lands one command per 
     ed.setCollisionBrushSize(1);
     ed.setCollisionCrossoverBrush('keep');
     ed.setCollisionCrossoverSpanMode('cell');
+    log = [];
   });
 
   afterEach(() => {
@@ -4413,6 +4423,27 @@ describe('a collision stroke whose plane changes mid-drag lands one command per 
     panel?.unmount();
     panel = null;
     useEditorStore.getState().setCollisionPaintPlane('a');
+  });
+
+  it('M1: each Plane button drops focus FIRST, then moves the plane, so a Space after the click has nothing to press', () => {
+    // Hub ruling M1 (docs/reviews/2026-09-12-rulings-asked.md): "Drop focus
+    // after the click, as d-27 did for Reset and Clear." `actAndDropFocus`
+    // blurs BEFORE it acts (its own header says why), so the order is part of
+    // the claim. Whether the blur lands in a browser is `harness:map-behaviour-fixes`
+    // row M1.a; this row is the half the suite can see: the handler reads its
+    // event and blurs the element it was pressed on.
+    const unsubscribe = useEditorStore.subscribe((st, prev) => {
+      if (st.collisionPaintPlane !== prev.collisionPaintPlane) log.push(`plane:${st.collisionPaintPlane}`);
+    });
+    try {
+      const plane = renderPalette();
+      plane.B();
+      plane.A();
+    } finally {
+      unsubscribe();
+    }
+    expect(log, 'a Plane button moved the plane without dropping its own focus, or dropped it after')
+      .toEqual(['blur:B', 'plane:b', 'blur:A', 'plane:a']);
   });
 
   it('a stroke whose plane changes from A to B mid-drag is two commands: the first undo takes back the plane-B run only', async () => {

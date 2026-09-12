@@ -38,6 +38,15 @@
 // does not repeat the action, it RETARGETS it at the neighbour: hold Space on
 // "remove layer 2" and layers 2, 3 and 4 go, one keystroke each.
 //
+// THE FIRST NON-DESTRUCTIVE CALLERS: the collision palette's Plane A and B
+// buttons (hub ruling M1, docs/reviews/2026-09-12-rulings-asked.md, 2026-09-12).
+// Picking a plane destroys nothing, but the map's collision press never takes
+// focus, so a kept focus handed Space to the plane buttons for the length of a
+// held stroke, and a plane change mid-stroke splits it into two undo entries
+// (MapViewport `recordPaint`). The reason to drop focus is the same as above:
+// a keystroke meant for nothing re-fires a button the author has finished with.
+// Row M1 of `scratchpad/map-behaviour-fixes-harness.mjs` presses the real Space.
+//
 // WHAT THIS IS NOT. Not a confirmation, not a dialog, not a toast — those were
 // the options d-27 did not pick. Clicking again still works normally: a click
 // focuses the button afresh, so a keyboard-only author reaches it again with
