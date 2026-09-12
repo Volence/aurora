@@ -85,6 +85,10 @@ import { join } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
+import {
+  AIM_MISSED, AIM_ONE_FN, aimOne, clickOneByText, showSubTabOrThrow, openSectionOrThrow,
+} from './lib/strict-aim.mjs';
+import { programArms } from './lib/effects-control-aims.mjs';
 
 const PORT = Number(process.env.PORT ?? 9487);
 const ROOT = AURORA_DIR;
@@ -94,6 +98,15 @@ const MAIN = RUN.main;
 const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = join(ROOT, 'scratchpad/shots-ramp-control');
 mkdirSync(SHOTS, { recursive: true });
+
+// ── THE PROGRAM SWITCH IS AIMED BY ITS OPTIONS, NOT BY ITS LABEL ─────────────
+//
+// Until 2026-09-12 its handle was "the select in the Field row labelled
+// Raster". The row has been labelled `Program` since EW-BOUNDARY-PANEL, so the
+// handle went null: [f0] printed `raster select = null` and cv-a/cv-z read as
+// a dead conversion. The arms are the preset schema's own `oneOf`, read out of
+// the BUILT tree this run drives (`RUN.root`); see `lib/effects-control-aims.mjs`.
+const PROGRAM_ARMS = programArms(RUN.root);
 
 // ═══ THE DISPLAY GEOMETRY IS TWO NUMBERS AND THIS RUN TYPES NEITHER ═══
 //
@@ -431,39 +444,13 @@ const SET_INPUT = (selector, value) => String.raw`
   return 'ok';
 })()`;
 
-const CLICK_BY_TEXT = (re, tag = 'button') => String.raw`
-(() => {
-  const el = [...document.querySelectorAll(${JSON.stringify(tag)})]
-    .find((e) => ${re}.test(((e.textContent || '') + ' ' + (e.getAttribute('aria-label') || '')).trim()));
-  if (!el) return false;
-  el.click();
-  return true;
-})()`;
-
-const SUBTAB = (id) => String.raw`
-(() => {
-  const t = document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]');
-  if (!t) return 'no-sub-tab';
-  t.click();
-  return 'ok';
-})()`;
-
-const OPEN_SECTION = (re, proofSelector) => String.raw`
-(() => {
-  const open = () => !!(${proofSelector});
-  if (open()) return 'already-open';
-  const hdr = [...document.querySelectorAll('div')]
-    .filter((d) => d.style && d.style.cursor === 'pointer' && ${re}.test((d.textContent || '').trim()))
-    .pop();
-  if (!hdr) {
-    const seen = [...document.querySelectorAll('div')]
-      .filter((d) => d.style && d.style.cursor === 'pointer')
-      .map((d) => (d.textContent || '').trim().slice(0, 56));
-    return 'no-header; headers on screen: ' + JSON.stringify(seen);
-  }
-  hdr.click();
-  return 'clicked';
-})()`;
+/**
+ * Show an effects job, or STOP naming it (`lib/strict-aim.mjs`). It returned
+ * 'no-sub-tab' until 2026-09-12, which no call site read. The section doors
+ * that used to sit beside it (by header text) are now `openSectionOrThrow` by
+ * CollapsibleSection id, at their call sites below.
+ */
+const SUBTAB = (id) => showSubTabOrThrow(id);
 
 /**
  * THE IN-PAGE HANDLE TABLE.
@@ -477,22 +464,45 @@ const OPEN_SECTION = (re, proofSelector) => String.raw`
  */
 const INSTALL_HANDLES = String.raw`
 (() => {
-  const rowFor = (label) => [...document.querySelectorAll('span')]
+  // ⚠ EVERY HANDLE RESOLVES TO EXACTLY ONE ELEMENT OR STOPS THE RUN
+  // (2026-09-12, lib/strict-aim.mjs). These were ".find(...) || null", and a
+  // null handle came out rows later as a FAIL that read as the app's.
+  const one = ${AIM_ONE_FN};
+  const ARMS = ${JSON.stringify(PROGRAM_ARMS)};
+  const rowsFor = (label) => [...document.querySelectorAll('span')]
     .filter((s) => (s.textContent || '').trim() === label && s.parentElement)
     .map((s) => s.parentElement)
-    .find((row) => row.querySelector('input, select')) || null;
-  const fieldInput = (label) => { const r = rowFor(label); return r ? r.querySelector('input') : null; };
+    .filter((row) => row.querySelector('input, select'));
+  const fieldInput = (label) => {
+    const row = one('the Field row labelled "' + label + '"', 'the preset card (BandPresetPanel.tsx)',
+      rowsFor(label));
+    return one('the <input> in the Field row labelled "' + label + '"', 'that row',
+      row.querySelectorAll('input'));
+  };
   window.__rp = {
     el(h) {
-      if (h === 'rasterSelect') { const r = rowFor('Raster'); return r ? r.querySelector('select') : null; }
+      // THE PROGRAM SWITCH, BY WHAT IT OFFERS and not by its label, which
+      // moved from "Raster" to "Program" and took this handle to null. It is
+      // the one select whose option values are exactly the contract's arms.
+      if (h === 'rasterSelect') {
+        return one('the program <select>, option values exactly [' + ARMS.join(', ') + ']',
+          'the preset card; arms read from the preset schema oneOf',
+          [...document.querySelectorAll('select')].filter((s) => {
+            const v = [...s.options].map((o) => o.value).sort();
+            return v.length === ARMS.length && v.every((x, k) => x === ARMS[k]);
+          }));
+      }
       if (h === 'top') return fieldInput('Top');
       if (h === 'lines') return fieldInput('Lines');
       if (h === 'addr') return fieldInput('addr');
       if (h === 'start') return fieldInput('Start');
       if (h === 'step') return fieldInput('Step');
-      if (h === 'addBand') return [...document.querySelectorAll('button')]
-        .find((b) => /^Add raster band$/.test((b.textContent || '').trim())) || null;
-      return null;
+      if (h === 'addBand') {
+        return one('the "Add raster band" <button>', 'the preset card',
+          [...document.querySelectorAll('button')]
+            .filter((b) => /^Add raster band$/.test((b.textContent || '').trim())));
+      }
+      throw new Error('${AIM_MISSED}: unknown handle "' + h + '"; looked in the handle table');
     },
     /** Every visible text node in the panel column, for a PAINTED-sentence row. */
     painted() {
@@ -625,23 +635,34 @@ async function main() {
     // FIXTURE — a bands preset of this run's own making
     // ══════════════════════════════════════════════════════════════════════
     console.log('\n=== FIXTURE: a fresh BANDS preset, created through the panel ===');
-    await c.evalExpr(CLICK_BY_TEXT('/^Effects$/'));
+    // ⚠ EVERY DOOR BELOW STOPS ON A MISS (2026-09-12), and the two sections
+    // are opened by the CollapsibleSection ids the app routes on
+    // (`providers/effects-sub-tabs.ts`), not by their header text.
+    await c.evalExpr(clickOneByText('/^Effects$/', 'button', 'the facet bar'));
     await sleep(1500);
     await c.evalExpr(SUBTAB('colour'));
     await sleep(1300);
-    await c.evalExpr(OPEN_SECTION(String.raw`/^Raster band presets\b/`,
-      `document.querySelector('input[placeholder="new_preset_id"]')`));
+    note('presets list', await c.evalExpr(openSectionOrThrow('aeon.effects.presets')));
     await sleep(900);
-    await c.evalExpr(SET_INPUT(`document.querySelector('input[placeholder="new_preset_id"]')`, PRESET_ID));
+    await c.evalExpr(SET_INPUT(aimOne('the new-preset id box, input[placeholder="new_preset_id"]',
+      'the presets section', `document.querySelectorAll('input[placeholder="new_preset_id"]')`), PRESET_ID));
     await sleep(400);
-    await c.evalExpr(CLICK_BY_TEXT('/^New$/'));
+    await c.evalExpr(clickOneByText('/^New$/', 'button', 'the presets section'));
     await sleep(1400);
     await c.evalExpr(`window.__dbg.aeon.selectPreset(${JSON.stringify(PRESET_ID)})`);
     await sleep(900);
-    await c.evalExpr(OPEN_SECTION(String.raw`/^Preset: ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
-      `[...document.querySelectorAll('button')].some(b => (b.textContent||'').trim() === 'Add raster band')`));
+    note('preset card', await c.evalExpr(openSectionOrThrow('aeon.effects.preset.bands')));
     await sleep(900);
     await c.evalExpr(INSTALL_HANDLES);
+    // THE GEOMETRY THIS RUN SAW, printed once beside its rows: Xvfb's scale
+    // factor has been seen at 1 and at 1.35 on this host, and a fractional
+    // rect reads as an off-by-one.
+    note('run geometry', JSON.stringify(await c.json(`(() => {
+      const cv = document.querySelector('canvas#effects-raster-timeline');
+      const r = cv ? cv.getBoundingClientRect() : null;
+      return { dpr: window.devicePixelRatio, viewport: [innerWidth, innerHeight],
+               stripCanvas: r ? { x: r.x, y: r.y, w: r.width, h: r.height } : 'not mounted' };
+    })()`)));
 
     const bandsDoc = await doc(c);
     const addPre = await readHandle(c, 'addBand');
@@ -1140,6 +1161,12 @@ async function main() {
 }
 
 main().catch(async (e) => {
-  console.error(`\nHARNESS ERROR: ${e && e.message ? e.message : e}`);
+  const msg = e && e.message ? e.message : String(e);
+  console.error(`\nHARNESS ERROR: ${msg}`);
+  // A STOP IS REPORTED WITH THE ROWS IT CUT OFF, so a stopped run cannot be
+  // read as a short green one, and a missed aim says whose problem it is.
+  console.error(`STOPPED after ${results.length} rows (${results.filter((r) => r.ok).length} passed)`
+    + (msg.includes(AIM_MISSED) ? ', on a MISSED AIM (the harness, not the app)' : ''));
+  if (fails.length) console.error('FAILED before the stop:\n  ' + fails.join('\n  '));
   process.exitCode = 1;
 });
