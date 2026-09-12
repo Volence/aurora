@@ -22,8 +22,8 @@ import { readFileSync } from 'node:fs';
 // afterwards.
 //
 // 12 KB IS 12 * 1024, NOT 12,000. The contract writes "12 KB" in prose, which is
-// ambiguous on its own; its own executable reader settles it. empyrean
-// `scripts/hub_check.py` at the same revision declares
+// ambiguous on its own; its own executable reader settles it.
+// `empyrean/scripts/hub_check.py` at the same revision declares
 // `MAX_TITLE, MAX_ROWS, SOFT_BYTES = 240, 20, 12 * 1024`. Two readers of one
 // contract that disagree about a bound is worse than either bound.
 //

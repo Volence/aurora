@@ -166,7 +166,7 @@ describe('check-lane-status size bounds: the baseline and where the numbers come
     expect(BOUNDS.title).toBe(Number(m![1]));
     expect(BOUNDS.rows).toBe(Number(m![2]));
     // KB here is KiB. The contract writes "12 KB" in prose; its own executable
-    // reader, empyrean scripts/hub_check.py, declares 12 * 1024. Two readers of
+    // reader, `empyrean/scripts/hub_check.py`, declares 12 * 1024. Two readers of
     // one contract disagreeing about a bound is worse than either bound.
     expect(BOUNDS.bytes).toBe(Number(m![3]) * 1024);
   });
