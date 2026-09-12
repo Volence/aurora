@@ -81,6 +81,7 @@ import { selectionToChunk } from '../../../core/editing/selection-to-chunk';
 import { chunkOriginAt } from '../../../core/editing/chunk-links';
 import { SCREEN_WIDTH } from '../../../core/model/screen';
 import ChunkLinkOptions from '../ChunkLinkOptions';
+import CollisionPalette from '../CollisionPalette';
 import { Chip } from '../ui';
 
 // ── the fixture ────────────────────────────────────────────────────────────────
@@ -4318,6 +4319,142 @@ describe('a stroke crossing a section boundary lands one command per section, un
     expect([collOff(0, 'a'), collOff(1, 'a')],
       'the same cell of the next section was skipped as the cell the stroke had just painted')
       .toEqual([cellSubTiles(cell.cc, cell.cr), cellSubTiles(cell.cc, cell.cr)]);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE PLANE ARM OF THE SAME FLUSH.
+//
+// COVERAGE. `recordPaint` states it in the sentence the block above covers the
+// other half of: "A change of section or plane flushes the stroke and starts a
+// new one — one command per contiguous run." The plane half is the last clause
+// of `sameRun`, `(cur.kind !== 'collision' || cur.plane === plane)`. Nothing ran
+// it: every collision stroke row above keeps one plane for the whole drag.
+//
+// WHY A PLANE CAN CHANGE UNDER A HELD DRAG. `paintCollisionCell` reads
+// `collisionPaintPlane` from the store PER CELL. Alt, both planes and the
+// crossover brush are latched at the press, and the plane is not. The one UI
+// writer of that field is the Collision palette's Plane A and B buttons
+// (`pickPlane`). A MOUSE click on one cannot land mid-drag: the release is
+// heard on the window and ends the stroke before the click exists. The
+// KEYBOARD can: a clicked palette button keeps focus (measured, O48b, recorded
+// in `ui/act-and-drop-focus.ts`; these two do not drop it), the collision press
+// calls `preventDefault` and MapViewport never takes focus, and no window key
+// handler claims Tab or Space. So Tab from A to B, then Space, presses B with
+// the drag still held. Space dispatches the button's `click`, and these rows run
+// that button's own `onClick`, found by type and label in the real panel. The
+// focus half is a browser fact and is not measured here.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('a collision stroke whose plane changes mid-drag lands one command per plane, undone newest first', () => {
+  /** A shape no fixture plane carries, so every write is a visible change. */
+  const PICK = 9;
+  /** The cell row every drag runs along. Cells 1 to 4 sit well inside VIEWPORT. */
+  const CR = 1;
+  /** The tables the palette needs to render its Plane row at all: without them
+   *  it returns a "not found" note. No shapes, so its shape grid is empty and
+   *  nothing in these rows reads a profile. */
+  const PROFILES = { profiles: [], engine: 's4', solidCount: 1 };
+
+  /** Sub-tile indices of cells `ccs` along row CR, ascending. */
+  const cells = (...ccs: number[]) => ccs.flatMap((cc) => cellSubTiles(cc, CR)).sort((a, b) => a - b);
+  /** Both of act1's planes, painted indices only, as one value a row compares whole. */
+  const planes = () => ({
+    a: collPainted('act1', 'a').map(([i]) => i),
+    b: collPainted('act1', 'b').map(([i]) => i),
+  });
+
+  /** Every element of `type` in a subtree, as data. */
+  function elementsOf(
+    node: unknown, type: unknown, out: Array<React.ReactElement<Record<string, unknown>>> = [],
+  ): Array<React.ReactElement<Record<string, unknown>>> {
+    if (Array.isArray(node)) { for (const c of node) elementsOf(c, type, out); return out; }
+    if (!node || typeof node !== 'object') return out;
+    const el = node as React.ReactElement<Record<string, unknown>>;
+    if (el.type === type) out.push(el);
+    const children = (el.props as { children?: unknown } | undefined)?.children;
+    if (children !== undefined) elementsOf(children, type, out);
+    return out;
+  }
+
+  let panel: Hooked<{ variant: 'map' }> | null = null;
+  /** The map variant of the Collision palette over the live stores, and its two
+   *  Plane buttons' own click handlers. */
+  function renderPalette(): { A: () => void; B: () => void } {
+    panel?.unmount();
+    panel = renderHooked(
+      CollisionPalette as unknown as (p: { variant: 'map' }) => React.ReactElement, { variant: 'map' });
+    const buttons = elementsOf(panel.el(), 'button');
+    const press = (label: 'A' | 'B') => {
+      const found = buttons.filter((b) => b.props.children === label);
+      expect(found, `HARNESS: the palette rendered no single Plane ${label} button`).toHaveLength(1);
+      return () => (found[0].props.onClick as () => void)();
+    };
+    return { A: press('A'), B: press('B') };
+  }
+
+  beforeEach(() => {
+    seedCollision();
+    useProjectStore.setState({ collisionProfiles: PROFILES as never });
+    const ed = useEditorStore.getState();
+    ed.setTool('paint-collision');
+    ed.setSelectedCollisionProfile(PICK);
+    ed.setSelectedCollisionSolidity('all');
+    ed.setCollisionPaintPlane('a');
+    ed.setCollisionPaintBothPlanes(false);
+    ed.setCollisionBrushSize(1);
+    ed.setCollisionCrossoverBrush('keep');
+    ed.setCollisionCrossoverSpanMode('cell');
+  });
+
+  afterEach(() => {
+    // The palette's mount effect claims the collision overlay and its cleanup
+    // hands it back, so the panel comes down before the next row reads a view.
+    panel?.unmount();
+    panel = null;
+    useEditorStore.getState().setCollisionPaintPlane('a');
+  });
+
+  it('a stroke whose plane changes from A to B mid-drag is two commands: the first undo takes back the plane-B run only', async () => {
+    const s = await mountMap();
+    const plane = renderPalette();
+    s.on().onMouseDown(collCell(1, CR));
+    s.on().onMouseMove(collCell(2, CR));
+    plane.B();                                   // Tab to B, Space: the drag is still held
+    expect(useEditorStore.getState().collisionPaintPlane,
+      'ANTI-VACUOUS: the palette\'s B button did not move the aimed plane').toBe('b');
+    s.on().onMouseMove(collCell(3, CR));
+    s.on().onMouseMove(collCell(4, CR));
+    const onA = cells(1, 2);
+    const onB = cells(3, 4);
+    expect(planes(), 'the stroke did not paint each run on the plane aimed at when it was painted')
+      .toEqual({ a: onA, b: onB });
+    win!.dispatch('mouseup', {});
+    focusedHistory()!.undo();
+    expect(planes(), 'the first undo did not take back exactly the plane-B run, on plane B')
+      .toEqual({ a: onA, b: [] });
+    focusedHistory()!.undo();
+    expect(planes(), 'the second undo did not take back the plane-A run').toEqual({ a: [], b: [] });
+    expect(focusedHistory()!.canUndo, 'the stroke left more than two entries').toBe(false);
+  });
+
+  it('CONTROL: the same drag, pressing the plane already aimed at, is ONE command', async () => {
+    // The same palette press at the same moment, with no change of plane: the
+    // store write, the overlay claim and the re-render all happen, and the
+    // stroke must not split on any of them.
+    const s = await mountMap();
+    const plane = renderPalette();
+    s.on().onMouseDown(collCell(1, CR));
+    s.on().onMouseMove(collCell(2, CR));
+    plane.A();
+    expect(useEditorStore.getState().collisionPaintPlane, 'the premise: the plane is still A').toBe('a');
+    s.on().onMouseMove(collCell(3, CR));
+    s.on().onMouseMove(collCell(4, CR));
+    expect(planes(), 'the drag did not paint all four cells on plane A').toEqual({ a: cells(1, 2, 3, 4), b: [] });
+    win!.dispatch('mouseup', {});
+    focusedHistory()!.undo();
+    expect(planes(), 'one undo did not take the whole stroke back').toEqual({ a: [], b: [] });
+    expect(focusedHistory()!.canUndo, 'a one-plane stroke left more than one entry').toBe(false);
   });
 });
 
