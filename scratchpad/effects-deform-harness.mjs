@@ -103,6 +103,8 @@ import { dirname, join } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { SECTION_SCENE_FORM, openEffectsSectionState, openEffectsSectionOrThrow }
+  from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9397);
 // SELF-LOCATING, never a pinned path: run from the main clone this must serve
@@ -145,6 +147,87 @@ const LAYER_DEFAULTS = {
   dsb: SCHEMA.$defs.layer.properties.dsb.default,
   phase: SCHEMA.$defs.layer.properties.phase.default,
 };
+/**
+ * `SceneDeform.Shared`'s own keys — `table` and the speed beside it.
+ *
+ * DERIVED, because `'speed'` used to be typed into three expectations here and
+ * a typed key is the same defect one axis over from a typed sentence.
+ */
+const SHARED_KEYS = (() => {
+  const shared = SCHEMA.$defs.sceneDeform.oneOf
+    .find((b) => b?.properties?.shared)?.properties?.shared?.required;
+  if (!Array.isArray(shared) || !shared.includes('speed')) {
+    throw new Error('CANNOT MEASURE: $defs/sceneDeform no longer declares a `shared` branch with '
+      + 'a required `speed`, so this harness cannot derive the non-table parameter of an '
+      + 'attachment and would have to type one.');
+  }
+  return shared;
+})();
+/** The non-table member of that pair — the parameter every attachment carries. */
+const SPEED = SHARED_KEYS.find((k) => k !== 'table');
+if (SPEED === undefined) throw new Error('CANNOT MEASURE: $defs/sceneDeform `shared` has no key '
+  + 'beside `table`, so there is no speed parameter to expect');
+
+/**
+ * ═══ READING A CONTROL'S CONTRACT KEY OFF ITS `title`, WITHOUT THE PUNCTUATION ═══
+ *
+ * ⚠ THE SECOND HALF OF EFFECTS-RIGS-AIM-MISS (2026-09-12), and it is the same
+ * commit as the first. Rows [4b] [4e] [4f] [5a] read a control's key as
+ * `title.slice(prefix.length).trim().split(' ')[0]`, i.e. "everything up to the
+ * first space". That worked only while every glossed title read
+ *
+ *     deform_fg speed <em dash> how fast the sample point walks the table
+ *
+ * because the dash is its own word. The 2026-09-05 dash sweep (`d70da895` for
+ * the provider, `24541886` for the panels, `2434f9d9` for the rest) gave every
+ * contract-key tooltip a COLON instead, and glued it to the key:
+ *
+ *     deform_fg speed: how fast the sample point walks the table
+ *
+ * The extractor then answered `'speed:'`. [4e] compared `["focal","max_offset",
+ * "speed:"]` against the schema and went red; [4b]'s filter demanded
+ * `/^[a-z][a-z0-9_]*$/` so `speed:` and `period:` were DROPPED ENTIRELY and the
+ * row reported the app rendering one control where the schema asks for three.
+ * Both were reporting a missing control on a panel that renders all of them.
+ *
+ * ⚠ AND [4f]'s AIM WAS THE SAME DASH, SPELLED OUT: `/^deform_fg bin —/`. The
+ * path input was never found, so the illegal path was never typed, so the
+ * refusal was correctly absent — a row that looked like a missing REFUSAL and
+ * was a missing GESTURE. [5a] then counted 3 undos against 5 because two of its
+ * five gestures had silently not happened.
+ *
+ * ═══ WHAT REPLACES IT ═══
+ *
+ * The key is CONTRACT and the punctuation after it is PROSE, so the reader
+ * matches the key and refuses to care what follows. The candidate keys are the
+ * SCHEMA's own — every `tableRef` branch's parameters, plus `SceneDeform`'s
+ * `speed`, plus the two non-parameter rows (`table`, `bin`) — never a list
+ * typed here. Longest-first, so `max_offset` is never read as `max`.
+ *
+ * It does NOT stop asserting that the app glosses these keys: [4b] still
+ * requires any parameter drawn as a PICKER to carry the divisor rule in its own
+ * title, which is the clause the dash sweep did not touch.
+ */
+const CONTRACT_KEYS = [...new Set([
+  ...FORM_IDS.flatMap((f) => paramsOf(f)), ...SHARED_KEYS, 'bin',
+])].sort((a, b) => b.length - a.length);
+/** The contract key a control's `title` names under `prefix`, or null. */
+function keyOfTitle(title, prefix) {
+  if (typeof title !== 'string' || !title.startsWith(`${prefix} `)) return null;
+  const rest = title.slice(prefix.length + 1);
+  return CONTRACT_KEYS.find((k) => rest.startsWith(k)
+    && !/^[a-z0-9_]/.test(rest.slice(k.length))) ?? null;
+}
+/**
+ * The one control under `prefix` whose contract key is `key`, as a CDP
+ * expression — the selector side of `keyOfTitle`, and for the same reason.
+ * Every character of the pattern is a prefix or a schema key; the boundary is
+ * "not another key character", never a punctuation mark.
+ */
+const CONTROL_WITH_KEY = (tag, prefix, key) =>
+  `[...document.querySelectorAll(${JSON.stringify(tag)})]`
+  + `.find(e => new RegExp(${JSON.stringify(`^${prefix} ${key}(?![a-z0-9_])`)}).test(e.title || ''))`;
+
 const MASK_VALUES = SCHEMA.properties.left_column_mask.enum;
 const MASK_DEFAULT = SCHEMA.properties.left_column_mask.default;
 const SEED_PERIOD = TABLE_BRANCHES[0].properties.period.maximum;
@@ -525,18 +608,19 @@ function panelIsDrawn(text) {
  * state has to be opened the way an author opens it: one click on the header.
  * Idempotent — it returns 'already-open' when the form is showing.
  */
-const OPEN_SCENE_FORM = String.raw`
-(() => {
-  const has = () => [...document.querySelectorAll('input')]
-    .some((e) => (e.title || '').startsWith('v_offset'));
-  if (has()) return 'already-open';
-  const hdr = [...document.querySelectorAll('div')]
-    .filter((d) => d.style && d.style.cursor === 'pointer'
-                && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
-  if (!hdr) return 'no-scene-header';
-  hdr.click();
-  return 'clicked';
-})()`;
+// \u26a0 RE-AIMED (EFFECTS-RIGS-AIM-MISS, 2026-09-12), and the old aim is quoted in
+// `scratchpad/lib/effects-sections.mjs` beside `SECTION_SCENE_FORM`. This used
+// to hunt a `div` with `cursor: pointer` whose text matched `/^SCENE\s*\u2014/i`.
+// That em dash died in `24541886` on 2026-09-05 (the effects dash sweep: every
+// section header took a colon), so the opener returned `'no-scene-header'` on
+// every run, the form stayed shut, and the whole of this file measured a panel
+// with no scene controls in it \u2014 reporting that at row `[0a]` as a wrong BUILD.
+//
+// The needle is not repaired, it is RETIRED: the title is composed as
+// `Scene: ${selected.id}` and changes with the document under test, so there
+// was never a stable string to type. `data-section` is what the app routes on.
+const openSceneForm = (c, settleMs = 900) =>
+  openEffectsSectionOrThrow(c, SECTION_SCENE_FORM, { settleMs });
 
 async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
@@ -595,10 +679,14 @@ async function main() {
       headings.includes('Scenes'), JSON.stringify(headings));
     // The scene form arrives collapsed since d-26b's sub-tabs; every deform row
     // is a control inside it.
-    const openedForm = await c.evalExpr(OPEN_SCENE_FORM);
-    await sleep(900);
+    const openedForm = await openEffectsSectionState(c, SECTION_SCENE_FORM, { settleMs: 900 });
     check('2c', 'the Scene form is open — it arrives collapsed since d-26b [instrument]',
-      openedForm === 'clicked' || openedForm === 'already-open', `open → ${openedForm}`);
+      openedForm.ok === true
+      && (openedForm.section === 'clicked' || openedForm.section === 'already-open'),
+      `open → ${JSON.stringify(openedForm)} via [data-section="${SECTION_SCENE_FORM}"]. `
+      + 'The verdict is the APP\'s own data-section-collapsed read back AFTER the click, not the '
+      + 'click\'s return value: a header whose handler was removed still takes a click.');
+    if (!openedForm.ok) throw new Error(openedForm.why);
 
     // ---- 3. Author a scene through the real form. ------------------------
     const scenes0 = await c.json('window.__dbg.aeon.scenes()');
@@ -668,9 +756,12 @@ async function main() {
     // somebody typed. This is the row that separates "the document is right"
     // from "the author can see and change it".
     let rows = await c.json(CONTROLS_TITLED('deform_fg'));
+    // ⚠ KEYS, NOT "THE FIRST WORD" — see `keyOfTitle`'s docblock. The old
+    // `split(' ')[0]` answered `speed:` from the day the dash sweep landed.
     const paramTitles = (rs, prefix) => rs
       .filter((r) => r.tag === 'INPUT')
-      .map((r) => r.title.slice(prefix.length).trim().split(' ')[0]);
+      .map((r) => keyOfTitle(r.title, prefix))
+      .filter((k) => k !== null);
     // ⚠ "ONE SPINNER PER PARAMETER" IS NOT THE RULE ANY MORE — repaired in the
     // O50 triage, 2026-09-03. This row filtered `tag === 'INPUT'` and so counted
     // only NumberFields. ROADMAP row 63 moved `period` to a `<Select>`, on the
@@ -697,9 +788,8 @@ async function main() {
     // all) and the `table` form picker, which [4c] asserts separately. `bin` is
     // a path, not a numeric parameter, and belongs to one branch only.
     const paramControls = (rs, prefix) => rs
-      .map((r) => ({ tag: r.tag, key: r.title.slice(prefix.length).trim().split(' ')[0],
-                     title: r.title }))
-      .filter((r) => /^[a-z][a-z0-9_]*$/.test(r.key) && r.key !== 'table' && r.key !== 'bin');
+      .map((r) => ({ tag: r.tag, key: keyOfTitle(r.title, prefix), title: r.title }))
+      .filter((r) => r.key !== null && r.key !== 'table' && r.key !== 'bin');
     const fgParams = paramControls(rows, 'deform_fg');
     const pickerJustified = fgParams
       .filter((r) => r.tag === 'SELECT')
@@ -707,7 +797,7 @@ async function main() {
     check('4b', 'the table sub-form RENDERS one CONTROL per schema parameter of the seeded form, '
       + 'plus speed — and any parameter offered as a PICKER rather than a spinner carries the '
       + 'engine rule that justifies it (row 63: a set, not a range)',
-      fgParams.map((r) => r.key).join(',') === [...paramsOf(FIRST_FORM), 'speed'].join(',')
+      fgParams.map((r) => r.key).join(',') === [...paramsOf(FIRST_FORM), SPEED].join(',')
       && pickerJustified,
       `rendered=${JSON.stringify(fgParams.map((r) => `${r.key}:${r.tag}`))} `
       + `schema ${FIRST_FORM} requires ${JSON.stringify(paramsOf(FIRST_FORM))} (+ speed)`
@@ -737,7 +827,7 @@ async function main() {
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     check('4e', `switching the table to ${OTHER} redraws the spinners as ITS parameters `
       + 'and rewrites the document to match',
-      paramTitles(rows, 'deform_fg').join(',') === [...paramsOf(OTHER), 'speed'].join(',')
+      paramTitles(rows, 'deform_fg').join(',') === [...paramsOf(OTHER), SPEED].join(',')
       && sceneOf(doc).deform_fg.shared.table.generator === OTHER
       && paramsOf(OTHER).every((k) => k in sceneOf(doc).deform_fg.shared.table),
       `rendered=${JSON.stringify(paramTitles(rows, 'deform_fg'))} `
@@ -750,7 +840,7 @@ async function main() {
       'bin'));
     await sleep(500);
     await c.evalExpr(SET_INPUT(
-      `[...document.querySelectorAll('input')].find(e => /^deform_fg bin —/.test(e.title||''))`,
+      CONTROL_WITH_KEY('input', 'deform_fg', 'bin'),
       '../escape.bin'));
     await sleep(600);
     let text = await c.evalExpr(PANEL_TEXT);
@@ -762,7 +852,7 @@ async function main() {
       `refusal on screen=${/not a legal table path/.test(text)} `
       + `document bin=${JSON.stringify(sceneOf(doc).deform_fg.shared.table.bin)}`);
     await c.evalExpr(SET_INPUT(
-      `[...document.querySelectorAll('input')].find(e => /^deform_fg bin —/.test(e.title||''))`,
+      CONTROL_WITH_KEY('input', 'deform_fg', 'bin'),
       'tables/canopy.bin'));
     await sleep(600);
     text = await c.evalExpr(PANEL_TEXT);
@@ -1186,8 +1276,7 @@ async function main() {
     // find them after opening a project: the pill, then the collapsed form.
     await c.evalExpr(clickByText('/^Effects$/'));
     await sleep(1200);
-    const reopenedForm = await c.evalExpr(OPEN_SCENE_FORM);
-    await sleep(900);
+    const reopenedForm = await openSceneForm(c);
 
     const libraryPresets = JSON.parse(await c.evalExpr('window.__dbg.aeon.presetsJson()'));
     const unreadablePresets = await c.json('window.__dbg.aeon.unreadablePresets()');
@@ -1207,7 +1296,8 @@ async function main() {
       && !libraryPresets.some((p) => p.id === WITNESS.danglingPreset)
       && unreadableRef === WITNESS.unreadablePreset
       && unreadablePresets.some((u) => u.path.endsWith(`/${WITNESS.unreadablePreset}.json`))
-      && (reopenedForm === 'clicked' || reopenedForm === 'already-open'),
+      && (reopenedForm.section === 'clicked' || reopenedForm.section === 'already-open')
+      && reopenedForm.collapsed === 'false',
       `state=${JSON.stringify(fst)}\n        `
       + `ramp preset in library = ${rampPreset === null ? 'NONE' : rampPreset.id} `
       + `(chosen because its document carries a \`ramp\`, not by id)\n        `
@@ -1215,7 +1305,7 @@ async function main() {
       + `present in library=${libraryPresets.some((p) => p.id === WITNESS.danglingPreset)}\n        `
       + `rasterRef(${WITNESS.unreadableSection})=${JSON.stringify(unreadableRef)} `
       + `unreadable=${JSON.stringify(unreadablePresets)}\n        `
-      + `scene form=${reopenedForm}`);
+      + `scene form=${JSON.stringify(reopenedForm)}`);
     if (rampPreset === null) throw new Error('the fixture project has no ramp preset to narrow');
 
     // ---- The scene, authored through the form. ---------------------------
@@ -1296,8 +1386,7 @@ async function main() {
     const boundRamp = await c.evalExpr(SET_INPUT(RASTER_REF_SELECT, rampPreset.id));
     await sleep(700);
     await subTab('parallax');
-    await c.evalExpr(OPEN_SCENE_FORM);
-    await sleep(700);
+    await openSceneForm(c, 700);
     const boundScene = await c.evalExpr(SET_INPUT(SCENE_REF_SELECT, WITNESS.sceneId));
     await sleep(700);
     const narrowBindings = {
@@ -1346,8 +1435,7 @@ async function main() {
     await sleep(700);
     for (const index of [WITNESS.danglingSection, WITNESS.unreadableSection]) {
       await focusSection(index);
-      await c.evalExpr(OPEN_SCENE_FORM);
-      await sleep(500);
+      await openSceneForm(c, 500);
       await c.evalExpr(SET_INPUT(SCENE_REF_SELECT, WITNESS.sceneId));
       await sleep(700);
     }

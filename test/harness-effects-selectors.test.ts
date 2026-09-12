@@ -48,7 +48,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { EFFECTS_SUB_TABS } from '../src/renderer/providers/effects-sub-tabs';
@@ -58,6 +58,8 @@ const HELPER = join(ROOT, 'scratchpad/lib/effects-sections.mjs');
 const PANEL = join(ROOT, 'src/renderer/components/effects/BgAnimBandPanel.tsx');
 const SECTION_COMPONENT = join(ROOT, 'src/renderer/components/ui/CollapsibleSection.tsx');
 const SUB_TAB_BAR = join(ROOT, 'src/renderer/components/effects/EffectsSubTabBar.tsx');
+/** Every panel in the facet — which one renders a section is DERIVED, not pinned. */
+const EFFECTS_PANELS = join(ROOT, 'src/renderer/components/effects');
 
 /**
  * THE LABELS THE TILE-ANIMATION RENAME RETIRED, and what each became.
@@ -138,6 +140,18 @@ function retiredHits(files: readonly string[]): Hit[] {
 }
 
 describe('harness selectors follow the app, not the other way round', () => {
+  /**
+   * ⚠ GENERALISED BY EFFECTS-RIGS-AIM-MISS (2026-09-12), and the pin it dropped
+   * is the point. This row used to assert `toBe('tileAnim')` and
+   * `PANEL.toContain(id)` against ONE panel file, because the helper held only
+   * the two tile-animation sections. That is a pin copied from the population
+   * of the day: the moment the helper gained `aeon.effects.scene` — which lives
+   * on `parallax`, in `EffectsScenePanel.tsx` — the row would have gone red
+   * about a correct entry. Both the owning tab and the owning panel are now
+   * DERIVED: the tab from the app's own `EFFECTS_SUB_TABS`, the panel by
+   * searching every effects panel for the id. The claim is unchanged and is now
+   * the claim for every section the helper carries, not for two of them.
+   */
   it('the helper agrees with the app about which sub-tab owns which section', () => {
     const helper = readFileSync(HELPER, 'utf8');
     const declared = [...helper.matchAll(/^export const (SECTION_[A-Z_]+) = '([^']+)';/gm)]
@@ -148,12 +162,26 @@ describe('harness selectors follow the app, not the other way round', () => {
     const tabOf = new Map<string, string>();
     for (const tab of EFFECTS_SUB_TABS) for (const s of tab.sections) tabOf.set(s, tab.id);
 
-    // The helper's own map, read out of it rather than restated here.
+    // The helper's own map, read out of it rather than restated here — and its
+    // VALUES resolved through the helper's own tab constants, so an entry that
+    // names the wrong tab is caught rather than merely an entry that is absent.
     const mapBody = /export const SECTION_SUB_TAB = \{([\s\S]*?)\n\};/.exec(helper);
     expect(mapBody, 'the helper no longer declares SECTION_SUB_TAB in the shape this row reads')
       .not.toBeNull();
+    const constOf = new Map<string, string>(
+      [...helper.matchAll(/^export const ([A-Z][A-Z0-9_]*) = '([^']+)';/gm)]
+        .map((m) => [m[1], m[2]]));
+    const routed = new Map<string, string>(
+      [...(mapBody?.[1] ?? '').matchAll(/\[([A-Z][A-Z0-9_]*)\]:\s*([A-Z][A-Z0-9_]*),/g)]
+        .map((m) => [constOf.get(m[1]) ?? `<unresolved ${m[1]}>`,
+          constOf.get(m[2]) ?? `<unresolved ${m[2]}>`]));
 
-    const panel = readFileSync(PANEL, 'utf8');
+    const panels = readdirSync(EFFECTS_PANELS)
+      .filter((f) => f.endsWith('.tsx'))
+      .map((f) => ({ file: f, src: readFileSync(join(EFFECTS_PANELS, f), 'utf8') }));
+    expect(panels.length, 'no effects panel sources found, so the id-is-rendered half of this row '
+      + 'measured nothing').toBeGreaterThan(0);
+
     for (const { name, id } of declared) {
       expect(tabOf.get(id), `the helper opens section ${JSON.stringify(id)} but the app's `
         + 'EFFECTS_SUB_TABS gives it to no tab, so activating a tab cannot mount it')
@@ -162,11 +190,14 @@ describe('harness selectors follow the app, not the other way round', () => {
       // for; the id it holds is what the app is asked about.
       expect(mapBody?.[1], `the helper declares ${name} and then routes it to no tab, so `
         + 'openEffectsSection would open the section without activating its tab').toContain(name);
-      expect(tabOf.get(id), `the app moved ${id} to another tab and the helper still names `
-        + 'the old one').toBe('tileAnim');
-      // And the section really is the panel's.
-      expect(panel, `no CollapsibleSection in BgAnimBandPanel.tsx carries id ${JSON.stringify(id)}`)
-        .toContain(`id="${id}"`);
+      expect(routed.get(id), `the helper routes ${id} to a tab the app does not put it on: the `
+        + 'app moved the section and the helper still names the old tab')
+        .toBe(tabOf.get(id));
+      // And the section really is rendered by one of the effects panels.
+      const owners = panels.filter((p) => p.src.includes(`id="${id}"`)).map((p) => p.file);
+      expect(owners, `no CollapsibleSection under ${EFFECTS_PANELS} carries id `
+        + `${JSON.stringify(id)}, so the helper opens a door the app does not render`)
+        .not.toEqual([]);
     }
   });
 
