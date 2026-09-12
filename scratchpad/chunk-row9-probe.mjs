@@ -820,11 +820,35 @@ async function runPropagationRows(c, ctx) {
     };
   })()`;
   console.log(`  PROBE before DOWN: ${JSON.stringify(await c.json(probeCell))}`);
+  await c.evalExpr('(() => { window.__dirtyTrace = []; return "cleared"; })()');
+  const snapAll = `(() => {
+    const h = window.__dbg.aeon, o = h.artChunkOpen(), out = [];
+    for (let y = 0; y < o.heightTiles; y++) for (let x = 0; x < o.widthTiles; x++) {
+      const c = h.artDocCellAt(x, y);
+      out.push(c.atlasTile + '/' + c.localId + '/' + c.pal + '/' + (c.hf?1:0)
+        + (c.vf?1:0) + (c.pri?1:0));
+    }
+    return out;
+  })()`;
+  const cellsBefore = await c.json(snapAll);
   await mouse(c, 'mouseMoved', px, py);
   await mouse(c, 'mousePressed', px, py);
   console.log(`  PROBE after DOWN:  ${JSON.stringify(await c.json(probeCell))}`);
+  const cellsAfterDown = await c.json(snapAll);
+  const diffAt = (a, b) => a.flatMap((v, i) => v === b[i]
+    ? [] : [`(${i % 16},${(i / 16) | 0}) ${v} -> ${b[i]}`]);
+  console.log(`  PROBE doc cells changed by the DOWN: `
+    + `${JSON.stringify(diffAt(cellsBefore, cellsAfterDown))}`);
+  console.log(`  PROBE aim: click=(${px},${py}) canvasOrigin=(${geo.left},${geo.top}) `
+    + `zoom=${zoom} => doc px (${px - geo.left},${py - geo.top}) `
+    + `=> cell (${((px - geo.left) / zoom) >> 3},${((py - geo.top) / zoom) >> 3}), intended (${cell.cx},${cell.cy})`);
   await mouse(c, 'mouseReleased', px, py);
   console.log(`  PROBE after UP:    ${JSON.stringify(await c.json(probeCell))}`);
+  console.log(`  PROBE doc cells changed by DOWN+UP together: `
+    + `${JSON.stringify(diffAt(cellsBefore, await c.json(snapAll)))}`);
+  const trace = await c.json('(window.__dirtyTrace || ["no-trace-hook"])');
+  console.log(`  PROBE dirty callers during the click (${trace.length}):`);
+  for (const t of trace) console.log(`    ${String(t).split('\n').slice(0, 6).join('\n    ')}`);
   const probeImmediate = await c.json(`(() => ({
     cell: window.__dbg.aeon.artDocCellAt(${cell.cx}, ${cell.cy}),
     chunk: window.__dbg.aeon.chunkInfo(${JSON.stringify(chunkId)}),
