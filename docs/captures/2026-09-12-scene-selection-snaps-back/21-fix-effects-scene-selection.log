@@ -1,0 +1,79 @@
+=== run: effects-scene-selection-harness label=fix-c2
+=== at: 2026-09-12T10:09:55-04:00
+=== worktree HEAD: e9482f68c596aecc85fd263ef412c7394f3792b9 branch: parcel/scene-selection-snaps-back
+=== AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/0eb36743-1a69-4f1f-b7e4-62a77c584915/scratchpad/runs/fix-c2-20260912T100955-2876380/aeon (fresh cp -a of snapshot taken 2026-09-12T09:54:05-04:00)
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+=== effects-scene-selection harness (cold read C2) ===
+    node        : v24.15.0   PLANT=(none)
+    loadavg     : 4.30 2.85 2.29
+    AEON_DIR    : /tmp/claude-1000/-home-volence-sonic-hacks-aurora/0eb36743-1a69-4f1f-b7e4-62a77c584915/scratchpad/runs/fix-c2-20260912T100955-2876380/aeon
+    DISPLAY     : :94
+    INDEPENDENT DERIVATION (this process, from the copy's own files):
+      scenes[0] (the old fallback) : ojz_act1_depth
+      section 0 sceneRef           : ojz_act1_start
+      section 4 sceneRef           : ojz_act1_depth
+      section 5 sceneRef           : null (act default)
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/effects-scene-selection-harness-2876388-e72b5cc7 — see HAZARD 6
+PASS  [0a] window.__dbg exists (this is a VITE_AURORA_DEBUG=1 build)
+PASS  [1a] the COPIED aeon project is open, with the nine sections this act has
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  [1b] the Effects facet mounts
+PASS  [1c] the Parallax sub-tab is the one showing (the scene job)
+PASS  [2a] the STRIP names section 0's own scene, matching this process's parse of the sidecar
+        strip = "scene ojz_act1_start · raster hand-authored"   independent: section 0 -> ojz_act1_start
+PASS  [2b] THE FORM UNDER THE STRIP IS NOW SECTION 0'S SCENE — highlighted row, scene form title and store all name it, and it is NOT the old scenes[0] fallback
+        store=ojz_act1_start  formTitle="scene: ojz_act1_start"  highlighted=["ojz_act1_start"]
+        the fallback this replaces would have shown scenes[0] = ojz_act1_depth
+PASS  [2c] and NOTHING is said about it: the relation hint is absent when the two agree, so it costs the LAYERS list no permanent height
+        no [data-testid="effects-scene-relation"] node
+PASS  [3z] the SCENES row for ojz_act1_depth is aimable and the aim RESOLVES TO IT (a synthetic click on nothing would leave every reading below on the previous screen)
+        {"found":true,"x":1251,"y":411,"dpr":1,"aimIsTarget":true,"hitTag":"SPAN"}
+PASS  [3a] AFTER A REAL PRESS ON ANOTHER SCENE the relation sentence appears, painted inside the scroller and hit-testable, naming BOTH documents and who else uses the one being edited
+        "Section 0 uses ojz_act1_start. Edits below change ojz_act1_depth, which section 4 uses."
+        paint = {"top":497,"bottom":530,"height":33,"insideScroller":true,"hitInside":true,"visible":true,"rects":1}
+        ⚠ the two that do NOT discriminate are in that object and are not gated on: checkVisibility=true rects=1
+        independent: section 0 -> ojz_act1_start, section 4 -> ojz_act1_depth
+PASS  [3b] the strip did NOT move: it still names section 0 and section 0's scene, so the sentence is about a real disagreement and not about the strip following the click
+        strip = "scene ojz_act1_start · raster hand-authored"
+PASS  [4a] the SCENES section and the LAYERS list are TWO elements, not one selector resolving twice (heights AND character counts differ)
+        SCENES h=153 chars=325   LAYERS h=165 chars=9024
+PASS  [4b] THE COST: zero in the agreeing state, and the diverged state pays for the sentence out of the LAYERS list exactly once
+        agreeing   SCENES 153px (325 chars)   LAYERS 165px (9024 chars)
+        diverged   SCENES 196px (413 chars)   LAYERS 160px (11294 chars)
+        Δ SCENES = 43px   Δ LAYERS = -5px   (the agreeing state is the one the panel arrives in and stays in)
+PASS  [5a] PICKING A SECTION PICKS ITS SCENE: the selection MOVES from ojz_act1_depth to section 8's own scene, the form title follows it, and the sentence goes away
+        was ojz_act1_depth -> now section=8 store=ojz_act1_floor formTitle="scene: ojz_act1_floor" highlighted=["ojz_act1_floor"] relation=null
+        independent: section 8 sceneRef = ojz_act1_floor
+PASS  [5b] A SECTION BOUND TO NOTHING does not drag the form anywhere and SAYS SO: the act default case is stated, not silently shown as if it were the section's scene
+        "Section 5 uses the act default scene. Edits below change ojz_act1_floor, which section 8 uses."
+        independent: section 5 sceneRef = null
+PASS  [5c] no en dash or em dash reaches the screen (six gates in this repo, and this is the painted one)
+        "Section 5 uses the act default scene. Edits below change ojz_act1_floor, which section 8 uses."
+
+    screenshots : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d/scratchpad/shots-effects-scene-selection/c2-arrival-agrees.png
+                  /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d/scratchpad/shots-effects-scene-selection/c2-diverged-says-so.png
+cleanup: tree under pid 2876397 (11 process(es)):
+           2876397 /bin/sh /usr/bin/xvfb-run -n 94 -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora
+           2876406 Xvfb :94 -screen 0 1680x1050x24 -nolisten tcp
+           2876553 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           2876560 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           2876563 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2876564 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2876566 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2876592 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2876598 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2876601 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           2876609 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 51 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 351 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ 15/15 rows · 19.0s ════
+=== END exit=0 at 2026-09-12T10:10:14-04:00

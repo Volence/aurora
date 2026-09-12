@@ -12,8 +12,10 @@
 // ⚠ WHAT THIS FILE CANNOT SEE. The defect was a React effect running on a
 // panel MOUNT. There is no mount here; the subscription has no mount to run on,
 // which is the point of the design, but a regression that put the follow back
-// into a component would not be caught by these rows. `harness:raster-timeline`
-// rows 6a/6b/7 and `harness:scene-selection-roundtrip` are the runtime proof.
+// into a component would not be caught by these rows. The runtime proof is
+// `harness:raster-timeline`: rows 6a and 6b and the row-7 stop are red on master
+// and green on the fix. `harness:effects-scene-selection` holds C2's arrival and
+// section follow.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useProjectStore } from '../projectStore';

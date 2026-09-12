@@ -1,0 +1,22 @@
+commit 10d9c35000f81743d67bc4167cf1c164338d1488
+Author: Volence <steve@volence.dev>
+Date:   Sat Sep 12 10:13:18 2026 -0400
+
+    SCRATCH, NOT FOR LANDING: the fix e9482f68 reverted, for harness red-first
+    
+    Only the fix's app code goes back to master a04c3c0e:
+      - App.tsx, EffectsScenePanel.tsx and effects-aeon.ts are master's again.
+      - state/effects-scene-follow.ts is removed.
+    The node test file stays: it is not the fix, and it is not in the bundle.
+    
+    This commit exists so the harness can run on a build made from a COMMITTED
+    state with the fix out. It is then dropped by resetting the branch to the
+    commit before it, and its SHA is recorded in the review packet.
+    
+    Claude-Session: https://claude.ai/code/session_01MhhEwKMr8HBieqDNxRNY8Y
+
+ src/renderer/App.tsx                               |  4 -
+ .../components/effects/EffectsScenePanel.tsx       | 35 +++++---
+ src/renderer/providers/effects-aeon.ts             | 72 ----------------
+ src/renderer/state/effects-scene-follow.ts         | 99 ----------------------
+ 4 files changed, 22 insertions(+), 188 deletions(-)

@@ -1,0 +1,47 @@
+=== run: timeline-edit-harness label=reverted-sweep
+=== at: 2026-09-12T10:15:40-04:00
+=== worktree HEAD: 10d9c35000f81743d67bc4167cf1c164338d1488 branch: parcel/scene-selection-snaps-back
+=== AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/0eb36743-1a69-4f1f-b7e4-62a77c584915/scratchpad/runs/reverted-sweep-20260912T101540-2891851/aeon (fresh cp -a of snapshot taken 2026-09-12T09:54:05-04:00)
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+env: PORT 9439  DISPLAY :95  ELECTRON /home/volence/sonic_hacks/aurora/node_modules/.bin/electron
+     AEON_DIR /tmp/claude-1000/-home-volence-sonic-hacks-aurora/0eb36743-1a69-4f1f-b7e4-62a77c584915/scratchpad/runs/reverted-sweep-20260912T101540-2891851/aeon
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/timeline-edit-harness-2891859-b187b705 — see HAZARD 6
+PASS  [0a] the build under test has BOTH probes this run reads
+        /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d/dist
+        aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  [1a] ANTI-VACUOUS: the aeon project is open, with sections
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  [1b] the facet bar offers an Effects pill
+PASS  [2a] ANTI-VACUOUS: a scene exists, so the strip has something to mount for
+        before=["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start"]
+NOTE       presets already in this tree before the run: ["aurora_ramp_witness","authored_probe","ojz_sec3_shimmer","ojz_sec5_showcase","ojz_sec6_baseswap","ramp_probe"]
+FAIL  [3z] the preset section EXPANDED, so its controls exist to be driven
+MISS       3 preset id field: "no-element"
+MISS       3 preset New: "no-element"
+FAIL  [3a] ANTI-VACUOUS: the preset this harness authored exists in the model
+        after=["aurora_ramp_witness","authored_probe","ojz_sec3_shimmer","ojz_sec5_showcase","ojz_sec6_baseswap","ramp_probe"]
+cleanup: tree under pid 2891867 (11 process(es)):
+           2891867 /bin/sh /usr/bin/xvfb-run -n 95 -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora
+           2891876 Xvfb :95 -screen 0 1680x1050x24 -nolisten tcp
+           2891951 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           2891958 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           2891961 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2891962 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2891964 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2891990 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2891996 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2891999 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           2892007 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 350 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+Error: preset not created — every row below is vacuous
+    at main (file:///home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d/scratchpad/timeline-edit-harness.mjs:535:39)
+=== END exit=1 at 2026-09-12T10:15:55-04:00

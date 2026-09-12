@@ -1,0 +1,97 @@
+=== run: raster-timeline-harness label=restored-r1
+=== at: 2026-09-12T10:16:56-04:00
+=== worktree HEAD: c381efdde8c8de984d10a8fba85ebe815b8fac5d branch: parcel/scene-selection-snaps-back
+=== AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/0eb36743-1a69-4f1f-b7e4-62a77c584915/scratchpad/runs/restored-r1-20260912T101656-2894488/aeon (fresh cp -a of snapshot taken 2026-09-12T09:54:05-04:00)
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/raster-timeline-harness-2894496-672512ff — see HAZARD 6
+PASS  [0a] the build under test has the raster-timeline probe at all
+        /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a21b0e1d3a0074b6d/dist
+        aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  [1a] ANTI-VACUOUS: the aeon project is open, with sections
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  [1b] the facet bar offers an Effects pill
+NOTE       timeline report on arrival: {"active":true,"sceneId":"ojz_act1_start","paints":1}
+PASS  [2a] the strip publishes its own constants, so no aim below is typed
+        lines=224 scale=1 originY=26 stripX=66 stripW=26
+NOTE       fixture scenes before this run: ["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start"]
+PASS  [3a] ANTI-VACUOUS: the scene this harness authored exists in the model
+        after=["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start","raster_strip_probe"]
+PASS  [3b] ANTI-VACUOUS: the panel selected it, so the strip has a scene to draw
+PASS  [3c] the real Add-layer button gave the scene three layers
+        layers=3
+PASS  [4a] THE VACUITY GUARD: two splits at DISTINCT NON-TRIVIAL tops 96 and 176
+        [{"world_y":0,"fa":"FACTOR_1","fb":"FACTOR_1"},{"world_y":96,"fa":"FACTOR_1","fb":"FACTOR_1","vsplit":{"at":300}},{"world_y":176,"fa":"FACTOR_1","fb":"FACTOR_1","vsplit":{"at":44}}]
+PASS  [4b] the scene is LOCKED, so a layer top HAS a screen line at all
+        v_factor=15
+NOTE       dpr=1  strip client rect={"x":1109,"y":1638.40625,"w":258,"h":279.828125,"bw":258,"bh":280}
+NOTE       ⚠ backing store 258x280 is FIXED and independent of dpr — every getImageData aim below is in that space, with no rounding anywhere.
+PASS  [5a] the strip reports ACTIVE for this scene, and it painted
+        active=true scene=raster_strip_probe paints=2
+PASS  [5b] it planned exactly the two splits, at the ENGINE's fire lines
+        [{"layer":1,"line":96,"at":300,"y":122,"refusal":null},{"layer":2,"line":176,"at":44,"y":202,"refusal":null}]
+PASS  [5b2] and it DREW them — one rule stroked per split, one fill per band
+        markers=2 fills=3 bands=3
+NOTE       AIM: split A line 96 -> strip y 122;  split B line 176 -> y 202;  sampled x 78..95 (right of the 66..92 band column)
+PASS  [5cA] PIXELS: split A's marker IS at line 96 and is NOT at 93 or 99
+        at 96: 245,170,67x14 242,161,57x4
+        at 93: 36,91,102x14 10,12,18x4
+        at 99: 14,20,26x14 11,13,18x4
+PASS  [5cB] PIXELS: split B's marker IS at line 176 and is NOT at 173 or 179
+        at 176: 245,171,68x14 242,161,57x4
+        at 173: 24,53,62x14 10,12,18x4
+        at 179: 16,27,33x14 11,13,18x4
+PASS  [5d] the strip is ON SCREEN and NOT COVERED — the page hit-tests to this canvas
+        {"isSelf":true,"hitId":"effects-raster-timeline","visible":true,"w":258,"h":279.828125,"px":1238,"py":559,"inViewport":true,"viewport":[1400,872]}
+        shot → scratchpad/shots-raster-timeline/01-strip-two-splits.png
+PASS  [6a] moving the top 96 -> 120 moved the SPLIT's fire line with it
+        line=120; strip scene=raster_strip_probe splits=[{"layer":1,"line":120,"at":300,"y":146,"refusal":null},{"layer":2,"line":176,"at":44,"y":202,"refusal":null}]; selected=raster_strip_probe; raster_strip_probe layers=[{"world_y":0,"fa":"FACTOR_1","fb":"FACTOR_1"},{"world_y":120,"fa":"FACTOR_1","fb":"FACTOR_1","vsplit":{"at":300}},{"world_y":176,"fa":"FACTOR_1","fb":"FACTOR_1","vsplit":{"at":44}}]
+PASS  [6b] PIXELS: the marker is now at line 120 and GONE from 96 — 24 strip px, derived from the app's own scale 1
+        at 120: 245,170,67x14 242,161,57x4
+        at 96: 36,91,102x14 10,12,18x4
+PASS  [7a] the document took the new payload (at 300 -> 301) and the strip REPAINTED
+        at=301 paints 3 -> 4
+PASS  [7b] THE CATCHER: the fire line did NOT move — `at` is a payload, not a position
+        line=120 (a build drawing `at` would say 301)
+PASS  [7c] PIXELS: the marker is STILL at 120 after the payload changed, and there is none at line 44 (the other split's payload)
+        at 120: 245,170,67x14 242,161,57x4
+        at 44: 36,91,102x14 10,12,18x4
+        shot → scratchpad/shots-raster-timeline/02-payload-changed-marker-did-not-move.png
+PASS  [8a] v_offset 40 lifted both fire lines by exactly 40 (aeon: screen = plane line less v_offset)
+        lines=[80,136] expected 80,136
+PASS  [8b] PIXELS: the marker moved up 40 lines and vacated 120
+        at 80: 245,170,67x14 242,161,57x4
+        at 120: 24,53,62x14 10,12,18x4
+        shot → scratchpad/shots-raster-timeline/03-v-offset-shifted.png
+PASS  [9a] THE CONTROL: with both splits dropped, the strip has no markers and no marker pixels
+        splits=0 markers=0 every probed line clean
+PASS  [9b] and the bands are still drawn — dropping a split is not dropping the strip
+        active=true fills=3
+        shot → scratchpad/shots-raster-timeline/04-for-the-owner.png
+PASS  [9c] BLANKET: no probe in this run came back `no-element` or null
+        clean
+NOTE       scenes after cleanup: ["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start"]
+cleanup: tree under pid 2894504 (11 process(es)):
+           2894504 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           2894514 Xvfb :218 -screen 0 1680x1050x24 -nolisten tcp
+           2894658 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           2894665 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           2894668 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2894669 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2894671 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2894697 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2894703 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2894706 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           2894714 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 49 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 349 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+25/25 rows passed
+=== END exit=0 at 2026-09-12T10:17:40-04:00
