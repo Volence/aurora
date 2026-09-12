@@ -76,6 +76,19 @@ export default function HomeTab({ onOpenProject, onOpenRecent, onOpenPath }: Hom
   const config = useProjectStore((s) => s.config);
 
   const noProject = !classicOpen && !config;
+
+  // THE TYPED PATH IS HOME'S, NOT EITHER FIELD'S (CLASSIC-PATH-FIELD-RESIDENT).
+  // The path field renders at two positions, one per page below, and a classic
+  // open flips between them: `openDirectory` sets the classic store to
+  // 'opening' (CLOSED fields) before it asks the bridge, so with no aeon config
+  // underneath `noProject` goes true for the length of the open and stays true
+  // after a failure. React mounts a fresh field at the other position, so a
+  // value held in the field itself was lost on exactly the open that failed,
+  // the one where the person needs it back to fix a typo. Held here it
+  // survives the flip: HomeTab is kept alive (App.tsx, display:none) and this
+  // hook runs above the branch, so both positions read and write one value.
+  // WHEN it changes is unchanged and is typed-path-open.ts's rule.
+  const [typedPath, setTypedPath] = useState('');
   // Current project's identity, for excluding it from the with-project recents
   // list below (classic → workspace dir; aeon → config.basePath).
   const currentPath = classicOpen ? dir : (config?.basePath ?? null);
@@ -103,7 +116,8 @@ export default function HomeTab({ onOpenProject, onOpenRecent, onOpenPath }: Hom
               lands on. It is here rather than behind a disclosure because the
               reader who needs it is the one for whom the button above did
               nothing, and a fallback you have to discover is not a fallback. */}
-          <OpenByPath onOpenPath={onOpenPath} label="…or type a project directory path" />
+          <OpenByPath onOpenPath={onOpenPath} label="…or type a project directory path"
+            text={typedPath} setText={setTypedPath} />
           <GuideCards />
           {recents.length > 0 && (
             <>
@@ -215,7 +229,8 @@ export default function HomeTab({ onOpenProject, onOpenRecent, onOpenPath }: Hom
             a broken portal is as stuck as one with none, and the reason it is
             outside the card grid is that a text field is not a card: it does not
             open one named thing, it takes an argument. */}
-        <OpenByPath onOpenPath={onOpenPath} label="…or type another project directory path" />
+        <OpenByPath onOpenPath={onOpenPath} label="…or type another project directory path"
+          text={typedPath} setText={setTypedPath} />
       </div>
     </div>
   );

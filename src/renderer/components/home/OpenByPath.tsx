@@ -55,10 +55,19 @@ export interface OpenByPathProps {
   onOpenPath: TypedPathOpener;
   /** Shown above the field. Differs between "no project yet" and "switch". */
   label: string;
+  /**
+   * The field's value and its setter, owned by HomeTab rather than here
+   * (CLASSIC-PATH-FIELD-RESIDENT). Home renders this field at two positions and
+   * a classic open flips between them mid-open, which mounts a fresh instance;
+   * a value held in this component was empty on the other side of the flip,
+   * so a failed open with a Sonic 1 project resident lost the typo. HomeTab is
+   * kept alive and holds one value for both positions.
+   */
+  text: string;
+  setText: React.Dispatch<React.SetStateAction<string>>;
 }
 
-export default function OpenByPath({ onOpenPath, label }: OpenByPathProps): React.ReactElement {
-  const [text, setText] = useState('');
+export default function OpenByPath({ onOpenPath, label, text, setText }: OpenByPathProps): React.ReactElement {
   // The parser's own sentence, held until the next keystroke. Rendered in place
   // rather than toasted: a toast for a refusal about the field you are looking
   // at makes you read somewhere else and then expires, and this app's own
@@ -75,7 +84,8 @@ export default function OpenByPath({ onOpenPath, label }: OpenByPathProps): Reac
   const [refusal, setRefusal] = useState<string | null>(null);
 
   // The decision lives in typed-path-open.ts, where a node-only suite can
-  // execute it; this component owns only the value, the key and the placement.
+  // execute it; this component owns only the key and the placement, and the
+  // value is HomeTab's (see `text` above).
   // `setText` goes in so a SUCCESSFUL open can empty the field
   // (HOME-PATH-FIELD-KEEPS-OLD-PATH); Enter and the Open button are the only two
   // ways to commit it, and both come here.
