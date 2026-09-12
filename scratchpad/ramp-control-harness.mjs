@@ -1166,7 +1166,10 @@ main().catch(async (e) => {
   // A STOP IS REPORTED WITH THE ROWS IT CUT OFF, so a stopped run cannot be
   // read as a short green one, and a missed aim says whose problem it is.
   console.error(`STOPPED after ${results.length} rows (${results.filter((r) => r.ok).length} passed)`
-    + (msg.includes(AIM_MISSED) ? ', on a MISSED AIM (the harness, not the app)' : ''));
+    + (msg.includes(AIM_MISSED)
+      ? ', on a MISSED AIM: an element this run needed was not there. Check the aim first (a '
+        + 'renamed control), then the app state that should have produced it'
+      : ''));
   if (fails.length) console.error('FAILED before the stop:\n  ' + fails.join('\n  '));
   process.exitCode = 1;
 });

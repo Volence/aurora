@@ -579,8 +579,16 @@ async function main() {
     watchMiss('6 top L1', await onParallax(SET_INPUT(byTitle('input', 'Layer 1 Screen line'), TOP_A2)));
     await sleep(700);
     rep = await c.json('window.__dbg.aeon.rasterTimeline()');
+    // THE DOCUMENT AND THE SELECTION BESIDE THE REPORT (2026-09-12, detail
+    // only; the condition is unchanged), so a split that VANISHED from the
+    // document can be told apart from one the strip failed to plan, and both
+    // from a strip now drawing some other scene.
+    const after6 = sceneOf(JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()')));
+    const selected6 = await c.evalExpr('window.__dbg.aeon.selectedScene()');
     check('6a', `moving the top ${TOP_A} -> ${TOP_A2} moved the SPLIT's fire line with it`,
-      rep.splits[0]?.line === TOP_A2, `line=${rep.splits[0]?.line}`);
+      rep.splits[0]?.line === TOP_A2,
+      `line=${rep.splits[0]?.line}; strip scene=${rep.sceneId} splits=${JSON.stringify(rep.splits)}; `
+      + `selected=${selected6}; ${SCENE_ID} layers=${JSON.stringify(after6?.layers)}`);
     const onNew = await sample2(c, rep, TOP_A2, SX, SLEN);
     const onOld = await sample2(c, rep, TOP_A, SX, SLEN);
     check('6b', `PIXELS: the marker is now at line ${TOP_A2} and GONE from ${TOP_A} `
@@ -706,7 +714,10 @@ main().catch((e) => {
   const msg = e && e.message ? e.message : String(e);
   const passed = results.filter((r) => r.ok).length;
   console.error(`\nSTOPPED after ${results.length} rows (${passed} passed)`
-    + (msg.includes(AIM_MISSED) ? ', on a MISSED AIM (the harness, not the app):' : ':'));
+    + (msg.includes(AIM_MISSED)
+      ? ', on a MISSED AIM: an element this run needed was not there. Check the aim first (a '
+        + 'renamed control), then the app state that should have produced it:'
+      : ':'));
   console.error(`  ${msg.split('\n')[0]}`);
   if (fails.length) console.error('FAILED before the stop:\n  ' + fails.join('\n  '));
   process.exit(1);
