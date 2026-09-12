@@ -293,7 +293,18 @@ async function main() {
       await mouse('mouseReleased', p.x, p.y, 'left', 0); await sleep(400);
       return p;
     };
-    const park = async () => { await mouse('mouseMoved', 2, 2); await sleep(250); };
+    // ⚠ OVER A NEUTRAL CANVAS POINT FIRST, THEN OFF THE CANVAS. The guide and frame
+    // hovers are recomputed on a CANVAS mousemove only, so a release on the frame's
+    // edge followed by a jump straight to (2, 2) leaves the frame drawn ACTIVE (2 px,
+    // brighter) into the next measurement. Master run 2 of this file read the
+    // composite row one column wide at dpr 1 for exactly that reason. The neutral
+    // point is clear of every guide and frame edge any scene here draws.
+    const park = async () => {
+      const r = await c.json(`(() => { const cv = document.getElementById('map-canvas'); if (!cv) return null;
+        const b = cv.getBoundingClientRect(); return { left: b.left, top: b.top, width: b.width }; })()`);
+      if (r) { await mouse('mouseMoved', Math.round(r.left + Math.min(600, r.width - 30)), Math.round(r.top + 250)); await sleep(200); }
+      await mouse('mouseMoved', 2, 2); await sleep(250);
+    };
     const guides = () => c.json('window.__dbg.aeon.guides()');
     const frame = () => c.json('window.__dbg.aeon.screenFrame()');
     const view = () => c.json('window.__dbg.view()');
@@ -321,15 +332,29 @@ async function main() {
       await c.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'z', code: 'KeyZ', windowsVirtualKeyCode: 90, modifiers: 2 });
       await sleep(500);
     };
-    /** A press held, nudged 1 px so the draw pass repaints, read, moved back, released. */
+    /**
+     * A press held, nudged 1 px so the draw pass repaints, read, moved back, released.
+     *
+     * ⚠ A RELEASE WHERE IT PRESSED CAN STILL COMMIT, and it did on master run 2: the
+     * aim at a drawn run's centre (200.5 + rect.top 106 = 306.5) rounds to client 307,
+     * canvas row 201, so a grabbed guide released there writes 201 over 200, and every
+     * later row read the wrong top. So the probe undoes whatever it committed and says so.
+     */
     const pressProbe = async (x, y, dx, dy) => {
+      const before = (await docScene(SCENE_ID))?.layers.map((l) => l.world_y);
       await mouse('mouseMoved', x, y); await sleep(150);
       await mouse('mousePressed', x, y, 'left', 1); await sleep(200);
       await mouse('mouseMoved', x + dx, y + dy, 'left', 1); await sleep(300);
       const g = await guides(); const f = await frame();
       await mouse('mouseMoved', x, y, 'left', 1); await sleep(200);
       await mouse('mouseReleased', x, y, 'left', 0); await sleep(350);
-      return { dragIndex: g.dragIndex, hoverIndex: g.hoverIndex, frameDragging: f.dragging };
+      const after = (await docScene(SCENE_ID))?.layers.map((l) => l.world_y);
+      let committed = null;
+      if (J(after) !== J(before)) {
+        await undo();
+        committed = { from: before, to: after, afterUndo: (await docScene(SCENE_ID))?.layers.map((l) => l.world_y) };
+      }
+      return { dragIndex: g.dragIndex, hoverIndex: g.hoverIndex, frameDragging: f.dragging, committed };
     };
     const capture = async (name) => {
       const r = JSON.parse(await c.evalExpr(String.raw`(() => { const cv = document.getElementById('map-canvas');
@@ -600,9 +625,13 @@ async function main() {
       for (const y of rowsY) onRows.push(await readRow(y));
       await realClick(SUBTAB('tileAnim')); await sleep(400); await repaint(); await park();
       let minX = Infinity; let maxX = -Infinity; let n = 0;
+      const perRow = [];
       for (let k = 0; k < rowsY.length; k++) {
-        for (const r of diffRuns(onRows[k].px, offRows[k].px, onRows[k].scale)) { minX = Math.min(minX, r.from); maxX = Math.max(maxX, r.to); n++; }
+        const runs = diffRuns(onRows[k].px, offRows[k].px, onRows[k].scale);
+        perRow.push(`${rowsY[k]}:${J(runs.map((r) => [r.from, r.to]))}`);
+        for (const r of runs) { minX = Math.min(minX, r.from); maxX = Math.max(maxX, r.to); n++; }
       }
+      note(`${P}.10 runs`, `per row, CSS [from, to) of the differing columns: ${perRow.join(' ')}`);
       const fxR = fx.rect.x + fx.rect.w;
       if (n === 0 || cam.active !== true) {
         check(`${P}.10`, 'UNMEASURABLE: the composite changed nothing in the frame, or was not active', false,
