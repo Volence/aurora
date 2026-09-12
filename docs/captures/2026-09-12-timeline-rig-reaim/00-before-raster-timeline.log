@@ -1,0 +1,55 @@
+
+> aurora@0.1.0 harness:raster-timeline
+> node scratchpad/raster-timeline-harness.mjs
+
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/raster-timeline-harness-990845-cf246ac3 — see HAZARD 6
+PASS  [0a] the build under test has the raster-timeline probe at all
+        /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0/dist
+        aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  [1a] ANTI-VACUOUS: the aeon project is open, with sections
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  [1b] the facet bar offers an Effects pill
+NOTE       timeline report on arrival: {"active":true,"sceneId":"ojz_act1_start","paints":1}
+PASS  [2a] the strip publishes its own constants, so no aim below is typed
+        lines=224 scale=1 originY=26 stripX=66 stripW=26
+NOTE       fixture scenes before this run: ["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start"]
+PASS  [3a] ANTI-VACUOUS: the scene this harness authored exists in the model
+        after=["ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start","raster_strip_probe"]
+PASS  [3b] ANTI-VACUOUS: the panel selected it, so the strip has a scene to draw
+PASS  [3c] the real Add-layer button gave the scene three layers
+        layers=3
+FAIL  [4a] THE VACUITY GUARD: two splits at DISTINCT NON-TRIVIAL tops 96 and 176
+        [{"world_y":0,"fa":"FACTOR_1","fb":"FACTOR_1"},{"world_y":96,"fa":"FACTOR_1","fb":"FACTOR_1"},{"world_y":176,"fa":"FACTOR_1","fb":"FACTOR_1"}]
+PASS  [4b] the scene is LOCKED, so a layer top HAS a screen line at all
+        v_factor=15
+NOTE       dpr=1  strip client rect={"x":1109,"y":1638.40625,"w":258,"h":279.828125,"bw":258,"bh":280}
+NOTE       ⚠ backing store 258x280 is FIXED and independent of dpr — every getImageData aim below is in that space, with no rounding anywhere.
+PASS  [5a] the strip reports ACTIVE for this scene, and it painted
+        active=true scene=raster_strip_probe paints=2
+FAIL  [5b] it planned exactly the two splits, at the ENGINE's fire lines
+        []
+FAIL  [5b2] and it DREW them — one rule stroked per split, one fill per band
+        markers=0 fills=3 bands=3
+NOTE       AIM: split A line 96 -> strip y 122;  split B line 176 -> y 202;  sampled x 78..95 (right of the 66..92 band column)
+FAIL  [5cA] PIXELS: split A's marker IS at line 96 and is NOT at 93 or 99
+        at 96: 66,178,195x14 10,12,18x4
+        at 93: 36,91,102x14 10,12,18x4
+        at 99: 24,53,62x14 10,12,18x4
+FAIL  [5cB] PIXELS: split B's marker IS at line 176 and is NOT at 173 or 179
+        at 176: 69,188,205x14 10,12,18x4
+        at 173: 24,53,62x14 10,12,18x4
+        at 179: 36,91,102x14 10,12,18x4
+PASS  [5d] the strip is ON SCREEN and NOT COVERED — the page hit-tests to this canvas
+        {"isSelf":true,"hitId":"effects-raster-timeline","visible":true,"w":258,"h":279.828125,"px":1238,"py":559,"inViewport":true,"viewport":[1400,872]}
+        shot → scratchpad/shots-raster-timeline/01-strip-two-splits.png
+TypeError: Cannot read properties of undefined (reading 'line')
+    at main (file:///home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aecbd3eeb84d4b6b0/scratchpad/raster-timeline-harness.mjs:550:21)
