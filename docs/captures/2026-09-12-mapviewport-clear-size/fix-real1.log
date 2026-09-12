@@ -1,0 +1,232 @@
+
+> aurora@0.1.0 harness:mapviewport-clear-size
+> node scratchpad/mapviewport-clear-size-harness.mjs
+
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a — dist/main/index.mjs is 0s newer than the newest of 975 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/src/renderer/components/MapViewport.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T19:53:38.883Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-12T19:53:38.883Z), so window.__dbg is in this bundle
+NOTE       environment
+        uptime 191743s, load 4.26 4.75 4.83; built tree /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a at HEAD f3dd024ca684fabc108832de800eed454cf6e5b4; dist/main mtime 2026-09-12T19:53:38.731Z; aeon copy /tmp/claude-1000/-home-volence-sonic-hacks-aurora/15448e71-11ce-4b29-a52c-785a44883df8/scratchpad/aeon-copy; SCALE=1.35 EMULATE=1.35 TAG=fix-real1
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2045868 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2045868,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/mapviewport-clear-size-harness-3679270-b1ee30ed — see HAZARD 6
+NOTE       pixel-identity baseline
+        /tmp/claude-1000/-home-volence-sonic-hacks-aurora/15448e71-11ce-4b29-a52c-785a44883df8/scratchpad/scan-master-real2.json, written by a run of f3dd024ca684fabc108832de800eed454cf6e5b4 (master-real2), geometries ["N","E","I05","I075","I0875","I09375","I025"]
+PASS  [0a] [anti-vacuous] the build under test has the camera-preview and overlay probes
+        /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/dist
+        aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  [1a] [anti-vacuous] the aeon COPY is open, with sections
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  [1b] [anti-vacuous] the Effects facet was entered by a real click
+        {"x":404,"y":54,"hitOk":true}
+PASS  [1c] the branch under test is the one running: Bg Plane overlay OFF, editing layer not bg, and the camera preview composite ACTIVE with real blits
+        overlays.showBgPlane false; editingLayer fg; camera preview {"active":true,"sceneId":"ojz_act1_floor","blits":2}
+PASS  [2a] the forced factor took: devicePixelRatio reads 1.35 with --force-device-scale-factor=1.35
+        devicePixelRatio 1.350000023841858
+
+=== GEOMETRY N: REAL forced factor (--force-device-scale-factor=1.35): dpr 1.350000023841858
+    dpr 1.350000023841858; map container rect 661.1920776367188 x 620.3934936523438; canvas rect 661.1920776367188 x 620.3934936523438; backing store 893 x 838; uptime 191760s, load 5.54 5.00 4.91
+    DERIVED: rect*dpr = 892.6093 x 837.5312; round -> 893 x 838; container-rect clear leaves 0.3907 x 0.4688 device px uncovered (predicted last-column alpha 155, last-row alpha 135)
+PASS  [N.0] [anti-vacuous] the backing store is round(rect * dpr) in both axes, which is where this geometry's expectation comes from
+        store 893x838; round(rect*dpr) 893x838; rect 661.1920776367188x620.3934936523438; dpr 1.350000023841858
+PASS  [N.1] [anti-vacuous] the camera preview composite is ACTIVE in this geometry, so the clear under test is the one that ran
+        {"active":true,"sceneId":"ojz_act1_floor","camX":0,"blits":2}
+NOTE       N.2 scan (composite ON)
+        0 of 748334 pixels below alpha 255; alpha range [null,null]; 0 distinct columns []; 0 distinct rows []; 0 of them outside the last column and last row; first null; last column alpha [{"y":0,"a":255},{"y":209,"a":255},{"y":419,"a":255},{"y":837,"a":255}]; last row alpha [{"x":0,"a":255},{"x":223,"a":255},{"x":446,"a":255},{"x":892,"a":255}]; hash 6e492d8b1ea95548; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-on-N-fix-real1.png
+PASS  [N.2x] [anti-vacuous] this geometry is still the class it was set up as (any) when its rows run
+        deficit x 0.3907 y 0.4688 device px (MIN_DEFICIT 0.25); this geometry exercises; declared any
+PASS  [N.2] the map canvas is FULLY CLEARED with the composite on: every device pixel of the backing store is opaque
+        0 pixel(s) below alpha 255 (min null); columns [] of 0..892; rows [] of 0..837; 0 outside the last column/row; predicted by the container-rect spelling: alpha 155 down column 892, alpha 135 along row 837
+PASS  [N.I1] [anti-vacuous] DETERMINISM: the backing store hashes the same on two reads of one paint, so a hash difference between builds is the code and not the run
+        6e492d8b1ea95548 / 6e492d8b1ea95548; 0 / 0 translucent px
+NOTE       N.3 scan (composite OFF)
+        0 of 748334 pixels below alpha 255; alpha range [null,null]; first null; last column alpha [{"y":0,"a":255},{"y":209,"a":255},{"y":419,"a":255},{"y":837,"a":255}]; hash 7f17bed6f6e7b55f; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-off-N-fix-real1.png
+PASS  [N.3] [control] with the composite OFF the same scan is fully opaque: SectionRenderer.render's clear already spans the backing store, so the change under test does nothing here
+        camera preview {"active":false}; 0 pixel(s) below alpha 255 (min null); geometry unchanged {"dpr":1.350000023841858,"width":661.1920776367188,"height":620.3934936523438,"canvasW":661.1920776367188,"canvasH":620.3934936523438,"storeW":893,"storeH":838}
+PASS  [N.I2] PIXEL CHANGE at dpr 1.350000023841858 in geometry N: the baseline build (f3dd024ca684fabc108832de800eed454cf6e5b4) left 717 translucent px here, so this build must clear them and its composite-ON pixels must differ — with the composite OFF nothing may move
+        composite ON  6e492d8b1ea95548 here / b983cd6c8234b17f baseline DIFFERENT; composite OFF 7f17bed6f6e7b55f here / 7f17bed6f6e7b55f baseline SAME; translucent px ON 0 here / 717 baseline; store 893x838; deficit 0.3907/0.4688; class exercises; from /tmp/claude-1000/-home-volence-sonic-hacks-aurora/15448e71-11ce-4b29-a52c-785a44883df8/scratchpad/scan-master-real2.json
+PASS  [3a] [anti-vacuous] the emulation took: devicePixelRatio reads 1
+        dpr 0.9999999848780803
+
+=== GEOMETRY E: EMULATED (Emulation.setDeviceMetricsOverride deviceScaleFactor 1): dpr 0.9999999848780803
+    dpr 0.9999999848780803; map container rect 661.1920776367188 x 620.3934936523438; canvas rect 661.1920776367188 x 620.3934936523438; backing store 661 x 620; uptime 191767s, load 5.49 5.00 4.91
+    DERIVED: rect*dpr = 661.1921 x 620.3935; round -> 661 x 620; container-rect clear leaves -0.1921 x -0.3935 device px uncovered (predicted last-column alpha n/a, last-row alpha n/a)
+PASS  [E.0] [anti-vacuous] the backing store is round(rect * dpr) in both axes, which is where this geometry's expectation comes from
+        store 661x620; round(rect*dpr) 661x620; rect 661.1920776367188x620.3934936523438; dpr 0.9999999848780803
+PASS  [E.1] [anti-vacuous] the camera preview composite is ACTIVE in this geometry, so the clear under test is the one that ran
+        {"active":true,"sceneId":"ojz_act1_floor","camX":0,"blits":2}
+NOTE       E.2 scan (composite ON)
+        0 of 409820 pixels below alpha 255; alpha range [null,null]; 0 distinct columns []; 0 distinct rows []; 0 of them outside the last column and last row; first null; last column alpha [{"y":0,"a":255},{"y":155,"a":255},{"y":310,"a":255},{"y":619,"a":255}]; last row alpha [{"x":0,"a":255},{"x":165,"a":255},{"x":330,"a":255},{"x":660,"a":255}]; hash 04c56e3969902ca0; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-on-E-fix-real1.png
+PASS  [E.2x] [anti-vacuous] this geometry is still the class it was set up as (any) when its rows run
+        deficit x -0.1921 y -0.3935 device px (MIN_DEFICIT 0.25); this geometry overshoots; declared any
+PASS  [E.2] the map canvas is FULLY CLEARED with the composite on: every device pixel of the backing store is opaque [NOT EXERCISED HERE: this geometry has no positive deficit, so the container-rect clear overshoots and the canvas clips it, and this row cannot tell the two spellings apart]
+        0 pixel(s) below alpha 255 (min null); columns [] of 0..660; rows [] of 0..619; 0 outside the last column/row; predicted by the container-rect spelling: alpha n/a down column 660, alpha n/a along row 619
+PASS  [E.I1] [anti-vacuous] DETERMINISM: the backing store hashes the same on two reads of one paint, so a hash difference between builds is the code and not the run
+        04c56e3969902ca0 / 04c56e3969902ca0; 0 / 0 translucent px
+NOTE       E.3 scan (composite OFF)
+        0 of 409820 pixels below alpha 255; alpha range [null,null]; first null; last column alpha [{"y":0,"a":255},{"y":155,"a":255},{"y":310,"a":255},{"y":619,"a":255}]; hash 81114b70caea626d; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-off-E-fix-real1.png
+PASS  [E.3] [control] with the composite OFF the same scan is fully opaque: SectionRenderer.render's clear already spans the backing store, so the change under test does nothing here
+        camera preview {"active":false}; 0 pixel(s) below alpha 255 (min null); geometry unchanged {"dpr":0.9999999848780803,"width":661.1920776367188,"height":620.3934936523438,"canvasW":661.1920776367188,"canvasH":620.3934936523438,"storeW":661,"storeH":620}
+PASS  [E.I2] PIXEL IDENTITY at dpr 0.9999999848780803 in geometry E: the baseline build (f3dd024ca684fabc108832de800eed454cf6e5b4) left NO uncleared edge here, so the whole backing store must hash the same, composite ON and OFF
+        composite ON  04c56e3969902ca0 here / 04c56e3969902ca0 baseline SAME; composite OFF 81114b70caea626d here / 81114b70caea626d baseline SAME; translucent px ON 0 here / 0 baseline; store 661x620; deficit -0.1921/-0.3935; class overshoots; from /tmp/claude-1000/-home-volence-sonic-hacks-aurora/15448e71-11ce-4b29-a52c-785a44883df8/scratchpad/scan-master-real2.json
+NOTE       emulation cleared
+        devicePixelRatio 1.350000023841858 (native 1.350000023841858); {"dpr":1.350000023841858,"width":661.1920776367188,"height":620.3934936523438,"canvasW":661.1920776367188,"canvasH":620.3934936523438,"storeW":893,"storeH":838}
+
+=== GEOMETRY I05: IMPOSED container rect (flex:none; width:657.5px; height:616.5px -> 657.5 x 616.4930419921875) at dpr 1.350000023841858 — deficit 0.3750 x -0.2656 device px, class exercises
+    dpr 1.350000023841858; map container rect 657.5 x 616.4930419921875; canvas rect 657.5 x 616.4930419921875; backing store 888 x 832; uptime 191776s, load 5.19 4.95 4.90
+    DERIVED: rect*dpr = 887.6250 x 832.2656; round -> 888 x 832; container-rect clear leaves 0.3750 x -0.2656 device px uncovered (predicted last-column alpha 159, last-row alpha n/a)
+PASS  [I05.0] [anti-vacuous] the backing store is round(rect * dpr) in both axes, which is where this geometry's expectation comes from
+        store 888x832; round(rect*dpr) 888x832; rect 657.5x616.4930419921875; dpr 1.350000023841858
+PASS  [I05.1] [anti-vacuous] the camera preview composite is ACTIVE in this geometry, so the clear under test is the one that ran
+        {"active":true,"sceneId":"ojz_act1_floor","camX":0,"blits":2}
+NOTE       I05.2 scan (composite ON)
+        0 of 738816 pixels below alpha 255; alpha range [null,null]; 0 distinct columns []; 0 distinct rows []; 0 of them outside the last column and last row; first null; last column alpha [{"y":0,"a":255},{"y":208,"a":255},{"y":416,"a":255},{"y":831,"a":255}]; last row alpha [{"x":0,"a":255},{"x":222,"a":255},{"x":444,"a":255},{"x":887,"a":255}]; hash 1d9cd35b4bf67c74; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-on-I05-fix-real1.png
+PASS  [I05.2x] [anti-vacuous] this geometry is still the class it was set up as (exercises) when its rows run
+        deficit x 0.3750 y -0.2656 device px (MIN_DEFICIT 0.25); this geometry exercises; declared exercises
+PASS  [I05.2] the map canvas is FULLY CLEARED with the composite on: every device pixel of the backing store is opaque
+        0 pixel(s) below alpha 255 (min null); columns [] of 0..887; rows [] of 0..831; 0 outside the last column/row; predicted by the container-rect spelling: alpha 159 down column 887, alpha n/a along row 831
+PASS  [I05.I1] [anti-vacuous] DETERMINISM: the backing store hashes the same on two reads of one paint, so a hash difference between builds is the code and not the run
+        1d9cd35b4bf67c74 / 1d9cd35b4bf67c74; 0 / 0 translucent px
+NOTE       I05.3 scan (composite OFF)
+        0 of 738816 pixels below alpha 255; alpha range [null,null]; first null; last column alpha [{"y":0,"a":255},{"y":208,"a":255},{"y":416,"a":255},{"y":831,"a":255}]; hash d07c8fdef9604b73; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-off-I05-fix-real1.png
+PASS  [I05.3] [control] with the composite OFF the same scan is fully opaque: SectionRenderer.render's clear already spans the backing store, so the change under test does nothing here
+        camera preview {"active":false}; 0 pixel(s) below alpha 255 (min null); geometry unchanged {"dpr":1.350000023841858,"width":657.5,"height":616.4930419921875,"canvasW":657.5,"canvasH":616.4930419921875,"storeW":888,"storeH":832}
+PASS  [I05.I2] PIXEL CHANGE at dpr 1.350000023841858 in geometry I05: the baseline build (f3dd024ca684fabc108832de800eed454cf6e5b4) left 720 translucent px here, so this build must clear them and its composite-ON pixels must differ — with the composite OFF nothing may move
+        composite ON  1d9cd35b4bf67c74 here / 866a12d5f91650fc baseline DIFFERENT; composite OFF d07c8fdef9604b73 here / d07c8fdef9604b73 baseline SAME; translucent px ON 0 here / 720 baseline; store 888x832; deficit 0.3750/-0.2656; class exercises; from /tmp/claude-1000/-home-volence-sonic-hacks-aurora/15448e71-11ce-4b29-a52c-785a44883df8/scratchpad/scan-master-real2.json
+
+=== GEOMETRY I075: IMPOSED container rect (flex:none; width:657.75px; height:616.75px -> 657.7430419921875 x 616.7476806640625) at dpr 1.350000023841858 — deficit 0.0469 x 0.3906 device px, class exercises
+    dpr 1.350000023841858; map container rect 657.7430419921875 x 616.7476806640625; canvas rect 657.7430419921875 x 616.7476806640625; backing store 888 x 833; uptime 191783s, load 5.01 4.91 4.89
+    DERIVED: rect*dpr = 887.9531 x 832.6094; round -> 888 x 833; container-rect clear leaves 0.0469 x 0.3906 device px uncovered (predicted last-column alpha 243, last-row alpha 155)
+PASS  [I075.0] [anti-vacuous] the backing store is round(rect * dpr) in both axes, which is where this geometry's expectation comes from
+        store 888x833; round(rect*dpr) 888x833; rect 657.7430419921875x616.7476806640625; dpr 1.350000023841858
+PASS  [I075.1] [anti-vacuous] the camera preview composite is ACTIVE in this geometry, so the clear under test is the one that ran
+        {"active":true,"sceneId":"ojz_act1_floor","camX":0,"blits":2}
+NOTE       I075.2 scan (composite ON)
+        0 of 739704 pixels below alpha 255; alpha range [null,null]; 0 distinct columns []; 0 distinct rows []; 0 of them outside the last column and last row; first null; last column alpha [{"y":0,"a":255},{"y":208,"a":255},{"y":416,"a":255},{"y":832,"a":255}]; last row alpha [{"x":0,"a":255},{"x":222,"a":255},{"x":444,"a":255},{"x":887,"a":255}]; hash 598499d092578f05; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-on-I075-fix-real1.png
+PASS  [I075.2x] [anti-vacuous] this geometry is still the class it was set up as (exercises) when its rows run
+        deficit x 0.0469 y 0.3906 device px (MIN_DEFICIT 0.25); this geometry exercises; declared exercises
+PASS  [I075.2] the map canvas is FULLY CLEARED with the composite on: every device pixel of the backing store is opaque
+        0 pixel(s) below alpha 255 (min null); columns [] of 0..887; rows [] of 0..832; 0 outside the last column/row; predicted by the container-rect spelling: alpha 243 down column 887, alpha 155 along row 832
+PASS  [I075.I1] [anti-vacuous] DETERMINISM: the backing store hashes the same on two reads of one paint, so a hash difference between builds is the code and not the run
+        598499d092578f05 / 598499d092578f05; 0 / 0 translucent px
+NOTE       I075.3 scan (composite OFF)
+        0 of 739704 pixels below alpha 255; alpha range [null,null]; first null; last column alpha [{"y":0,"a":255},{"y":208,"a":255},{"y":416,"a":255},{"y":832,"a":255}]; hash 54013d11b36280ca; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-off-I075-fix-real1.png
+PASS  [I075.3] [control] with the composite OFF the same scan is fully opaque: SectionRenderer.render's clear already spans the backing store, so the change under test does nothing here
+        camera preview {"active":false}; 0 pixel(s) below alpha 255 (min null); geometry unchanged {"dpr":1.350000023841858,"width":657.7430419921875,"height":616.7476806640625,"canvasW":657.7430419921875,"canvasH":616.7476806640625,"storeW":888,"storeH":833}
+PASS  [I075.I2] PIXEL CHANGE at dpr 1.350000023841858 in geometry I075: the baseline build (f3dd024ca684fabc108832de800eed454cf6e5b4) left 720 translucent px here, so this build must clear them and its composite-ON pixels must differ — with the composite OFF nothing may move
+        composite ON  598499d092578f05 here / 71454218d4c27b7d baseline DIFFERENT; composite OFF 54013d11b36280ca here / 54013d11b36280ca baseline SAME; translucent px ON 0 here / 720 baseline; store 888x833; deficit 0.0469/0.3906; class exercises; from /tmp/claude-1000/-home-volence-sonic-hacks-aurora/15448e71-11ce-4b29-a52c-785a44883df8/scratchpad/scan-master-real2.json
+
+=== GEOMETRY I0875: IMPOSED container rect (flex:none; width:657.875px; height:616.875px -> 657.870361328125 x 616.875) at dpr 1.350000023841858 — deficit -0.1250 x 0.2187 device px, class sub-raster
+    dpr 1.350000023841858; map container rect 657.870361328125 x 616.875; canvas rect 657.870361328125 x 616.875; backing store 888 x 833; uptime 191790s, load 5.35 4.98 4.91
+    DERIVED: rect*dpr = 888.1250 x 832.7813; round -> 888 x 833; container-rect clear leaves -0.1250 x 0.2187 device px uncovered (predicted last-column alpha n/a, last-row alpha 199)
+PASS  [I0875.0] [anti-vacuous] the backing store is round(rect * dpr) in both axes, which is where this geometry's expectation comes from
+        store 888x833; round(rect*dpr) 888x833; rect 657.870361328125x616.875; dpr 1.350000023841858
+PASS  [I0875.1] [anti-vacuous] the camera preview composite is ACTIVE in this geometry, so the clear under test is the one that ran
+        {"active":true,"sceneId":"ojz_act1_floor","camX":0,"blits":2}
+NOTE       I0875.2 scan (composite ON)
+        0 of 739704 pixels below alpha 255; alpha range [null,null]; 0 distinct columns []; 0 distinct rows []; 0 of them outside the last column and last row; first null; last column alpha [{"y":0,"a":255},{"y":208,"a":255},{"y":416,"a":255},{"y":832,"a":255}]; last row alpha [{"x":0,"a":255},{"x":222,"a":255},{"x":444,"a":255},{"x":887,"a":255}]; hash 598499d092578f05; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-on-I0875-fix-real1.png
+PASS  [I0875.2x] [anti-vacuous] this geometry is still the class it was set up as (sub-raster) when its rows run
+        deficit x -0.1250 y 0.2187 device px (MIN_DEFICIT 0.25); this geometry sub-raster; declared sub-raster
+PASS  [I0875.2] the map canvas is FULLY CLEARED with the composite on: every device pixel of the backing store is opaque [SUB-RASTER: the deficit here is 0.2187 device px, below the 0.25 this rasteriser has been measured to resolve, so a green here is NOT evidence that the clear is right]
+        0 pixel(s) below alpha 255 (min null); columns [] of 0..887; rows [] of 0..832; 0 outside the last column/row; predicted by the container-rect spelling: alpha n/a down column 887, alpha 199 along row 832
+PASS  [I0875.I1] [anti-vacuous] DETERMINISM: the backing store hashes the same on two reads of one paint, so a hash difference between builds is the code and not the run
+        598499d092578f05 / 598499d092578f05; 0 / 0 translucent px
+NOTE       I0875.3 scan (composite OFF)
+        0 of 739704 pixels below alpha 255; alpha range [null,null]; first null; last column alpha [{"y":0,"a":255},{"y":208,"a":255},{"y":416,"a":255},{"y":832,"a":255}]; hash 54013d11b36280ca; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-off-I0875-fix-real1.png
+PASS  [I0875.3] [control] with the composite OFF the same scan is fully opaque: SectionRenderer.render's clear already spans the backing store, so the change under test does nothing here
+        camera preview {"active":false}; 0 pixel(s) below alpha 255 (min null); geometry unchanged {"dpr":1.350000023841858,"width":657.870361328125,"height":616.875,"canvasW":657.870361328125,"canvasH":616.875,"storeW":888,"storeH":833}
+PASS  [I0875.I2] PIXEL IDENTITY at dpr 1.350000023841858 in geometry I0875: the baseline build (f3dd024ca684fabc108832de800eed454cf6e5b4) left NO uncleared edge here, so the whole backing store must hash the same, composite ON and OFF
+        composite ON  598499d092578f05 here / 598499d092578f05 baseline SAME; composite OFF 54013d11b36280ca here / 54013d11b36280ca baseline SAME; translucent px ON 0 here / 0 baseline; store 888x833; deficit -0.1250/0.2187; class sub-raster; from /tmp/claude-1000/-home-volence-sonic-hacks-aurora/15448e71-11ce-4b29-a52c-785a44883df8/scratchpad/scan-master-real2.json
+
+=== GEOMETRY I09375: IMPOSED container rect (flex:none; width:657.9375px; height:616.9375px -> 657.92822265625 x 616.932861328125) at dpr 1.350000023841858 — deficit -0.2031 x 0.1406 device px, class sub-raster
+    dpr 1.350000023841858; map container rect 657.92822265625 x 616.932861328125; canvas rect 657.92822265625 x 616.932861328125; backing store 888 x 833; uptime 191797s, load 5.40 5.00 4.91
+    DERIVED: rect*dpr = 888.2031 x 832.8594; round -> 888 x 833; container-rect clear leaves -0.2031 x 0.1406 device px uncovered (predicted last-column alpha n/a, last-row alpha 219)
+PASS  [I09375.0] [anti-vacuous] the backing store is round(rect * dpr) in both axes, which is where this geometry's expectation comes from
+        store 888x833; round(rect*dpr) 888x833; rect 657.92822265625x616.932861328125; dpr 1.350000023841858
+PASS  [I09375.1] [anti-vacuous] the camera preview composite is ACTIVE in this geometry, so the clear under test is the one that ran
+        {"active":true,"sceneId":"ojz_act1_floor","camX":0,"blits":2}
+NOTE       I09375.2 scan (composite ON)
+        0 of 739704 pixels below alpha 255; alpha range [null,null]; 0 distinct columns []; 0 distinct rows []; 0 of them outside the last column and last row; first null; last column alpha [{"y":0,"a":255},{"y":208,"a":255},{"y":416,"a":255},{"y":832,"a":255}]; last row alpha [{"x":0,"a":255},{"x":222,"a":255},{"x":444,"a":255},{"x":887,"a":255}]; hash 598499d092578f05; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-on-I09375-fix-real1.png
+PASS  [I09375.2x] [anti-vacuous] this geometry is still the class it was set up as (sub-raster) when its rows run
+        deficit x -0.2031 y 0.1406 device px (MIN_DEFICIT 0.25); this geometry sub-raster; declared sub-raster
+PASS  [I09375.2] the map canvas is FULLY CLEARED with the composite on: every device pixel of the backing store is opaque [SUB-RASTER: the deficit here is 0.1406 device px, below the 0.25 this rasteriser has been measured to resolve, so a green here is NOT evidence that the clear is right]
+        0 pixel(s) below alpha 255 (min null); columns [] of 0..887; rows [] of 0..832; 0 outside the last column/row; predicted by the container-rect spelling: alpha n/a down column 887, alpha 219 along row 832
+PASS  [I09375.I1] [anti-vacuous] DETERMINISM: the backing store hashes the same on two reads of one paint, so a hash difference between builds is the code and not the run
+        598499d092578f05 / 598499d092578f05; 0 / 0 translucent px
+NOTE       I09375.3 scan (composite OFF)
+        0 of 739704 pixels below alpha 255; alpha range [null,null]; first null; last column alpha [{"y":0,"a":255},{"y":208,"a":255},{"y":416,"a":255},{"y":832,"a":255}]; hash 54013d11b36280ca; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-off-I09375-fix-real1.png
+PASS  [I09375.3] [control] with the composite OFF the same scan is fully opaque: SectionRenderer.render's clear already spans the backing store, so the change under test does nothing here
+        camera preview {"active":false}; 0 pixel(s) below alpha 255 (min null); geometry unchanged {"dpr":1.350000023841858,"width":657.92822265625,"height":616.932861328125,"canvasW":657.92822265625,"canvasH":616.932861328125,"storeW":888,"storeH":833}
+PASS  [I09375.I2] PIXEL IDENTITY at dpr 1.350000023841858 in geometry I09375: the baseline build (f3dd024ca684fabc108832de800eed454cf6e5b4) left NO uncleared edge here, so the whole backing store must hash the same, composite ON and OFF
+        composite ON  598499d092578f05 here / 598499d092578f05 baseline SAME; composite OFF 54013d11b36280ca here / 54013d11b36280ca baseline SAME; translucent px ON 0 here / 0 baseline; store 888x833; deficit -0.2031/0.1406; class sub-raster; from /tmp/claude-1000/-home-volence-sonic-hacks-aurora/15448e71-11ce-4b29-a52c-785a44883df8/scratchpad/scan-master-real2.json
+
+=== GEOMETRY I025: IMPOSED container rect (flex:none; width:657.25px; height:616.25px -> 657.245361328125 x 616.25) at dpr 1.350000023841858 — deficit -0.2813 x 0.0625 device px, class sub-raster
+    dpr 1.350000023841858; map container rect 657.245361328125 x 616.25; canvas rect 657.245361328125 x 616.25; backing store 887 x 832; uptime 191804s, load 7.16 5.38 5.04
+    DERIVED: rect*dpr = 887.2813 x 831.9375; round -> 887 x 832; container-rect clear leaves -0.2813 x 0.0625 device px uncovered (predicted last-column alpha n/a, last-row alpha 239)
+PASS  [I025.0] [anti-vacuous] the backing store is round(rect * dpr) in both axes, which is where this geometry's expectation comes from
+        store 887x832; round(rect*dpr) 887x832; rect 657.245361328125x616.25; dpr 1.350000023841858
+PASS  [I025.1] [anti-vacuous] the camera preview composite is ACTIVE in this geometry, so the clear under test is the one that ran
+        {"active":true,"sceneId":"ojz_act1_floor","camX":0,"blits":2}
+NOTE       I025.2 scan (composite ON)
+        0 of 737984 pixels below alpha 255; alpha range [null,null]; 0 distinct columns []; 0 distinct rows []; 0 of them outside the last column and last row; first null; last column alpha [{"y":0,"a":255},{"y":208,"a":255},{"y":416,"a":255},{"y":831,"a":255}]; last row alpha [{"x":0,"a":255},{"x":221,"a":255},{"x":443,"a":255},{"x":886,"a":255}]; hash 109c8045526010fa; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-on-I025-fix-real1.png
+PASS  [I025.2x] [anti-vacuous] this geometry is still the class it was set up as (sub-raster) when its rows run
+        deficit x -0.2813 y 0.0625 device px (MIN_DEFICIT 0.25); this geometry sub-raster; declared sub-raster
+PASS  [I025.2] the map canvas is FULLY CLEARED with the composite on: every device pixel of the backing store is opaque [SUB-RASTER: the deficit here is 0.0625 device px, below the 0.25 this rasteriser has been measured to resolve, so a green here is NOT evidence that the clear is right]
+        0 pixel(s) below alpha 255 (min null); columns [] of 0..886; rows [] of 0..831; 0 outside the last column/row; predicted by the container-rect spelling: alpha n/a down column 886, alpha 239 along row 831
+PASS  [I025.I1] [anti-vacuous] DETERMINISM: the backing store hashes the same on two reads of one paint, so a hash difference between builds is the code and not the run
+        109c8045526010fa / 109c8045526010fa; 0 / 0 translucent px
+NOTE       I025.3 scan (composite OFF)
+        0 of 737984 pixels below alpha 255; alpha range [null,null]; first null; last column alpha [{"y":0,"a":255},{"y":208,"a":255},{"y":416,"a":255},{"y":831,"a":255}]; hash 2dfe5c90487e31e5; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a/scratchpad/shots-mapviewport-clear-size/composite-off-I025-fix-real1.png
+PASS  [I025.3] [control] with the composite OFF the same scan is fully opaque: SectionRenderer.render's clear already spans the backing store, so the change under test does nothing here
+        camera preview {"active":false}; 0 pixel(s) below alpha 255 (min null); geometry unchanged {"dpr":1.350000023841858,"width":657.245361328125,"height":616.25,"canvasW":657.245361328125,"canvasH":616.25,"storeW":887,"storeH":832}
+PASS  [I025.I2] PIXEL IDENTITY at dpr 1.350000023841858 in geometry I025: the baseline build (f3dd024ca684fabc108832de800eed454cf6e5b4) left NO uncleared edge here, so the whole backing store must hash the same, composite ON and OFF
+        composite ON  109c8045526010fa here / 109c8045526010fa baseline SAME; composite OFF 2dfe5c90487e31e5 here / 2dfe5c90487e31e5 baseline SAME; translucent px ON 0 here / 0 baseline; store 887x832; deficit -0.2813/0.0625; class sub-raster; from /tmp/claude-1000/-home-volence-sonic-hacks-aurora/15448e71-11ce-4b29-a52c-785a44883df8/scratchpad/scan-master-real2.json
+PASS  [4a] [anti-vacuous] the imposed container style was put back whole, so the geometries after it are the window's own again
+        restored {"width":661.1920776367188,"height":620.3934936523438,"cssText":"flex: 1 1 0%; position: relative; overflow: hidden; background: var(--void); cursor: grab;"}; geometry now {"dpr":1.350000023841858,"width":661.1920776367188,"height":620.3934936523438,"canvasW":661.1920776367188,"canvasH":620.3934936523438,"storeW":893,"storeH":838}; before imposing {"width":661.1920776367188,"height":620.3934936523438}
+PASS  [9a] at least one geometry in this run EXERCISED the defect, so the run is evidence about it
+        3 of 7 geometries had a deficit >= 0.25 device px
+PASS  [9b] against the baseline build (f3dd024ca684fabc108832de800eed454cf6e5b4): every geometry the baseline showed a partly-uncleared edge in is fully cleared here AND its pixels moved; every geometry the baseline showed none in is byte-identical here
+        N: baseline 717 translucent px -> here 0; composite-ON hash CHANGED; composite-OFF hash same; as required
+        E: baseline 0 translucent px -> here 0; composite-ON hash same; composite-OFF hash same; as required
+        I05: baseline 720 translucent px -> here 0; composite-ON hash CHANGED; composite-OFF hash same; as required
+        I075: baseline 720 translucent px -> here 0; composite-ON hash CHANGED; composite-OFF hash same; as required
+        I0875: baseline 0 translucent px -> here 0; composite-ON hash same; composite-OFF hash same; as required
+        I09375: baseline 0 translucent px -> here 0; composite-ON hash same; composite-OFF hash same; as required
+        I025: baseline 0 translucent px -> here 0; composite-ON hash same; composite-OFF hash same; as required
+NOTE       geometry summary
+        N: dpr 1.350000023841858 rect [661.1920776367188,620.3934936523438] store [893,838] deficit 0.3907/0.4688 EXERCISES -> composite-on 0 translucent px (min alpha null, 0 outside the last column/row, hash 6e492d8b1ea95548), composite-off 0 (hash 7f17bed6f6e7b55f)
+        E: dpr 0.9999999848780803 rect [661.1920776367188,620.3934936523438] store [661,620] deficit -0.1921/-0.3935 OVERSHOOTS -> composite-on 0 translucent px (min alpha null, 0 outside the last column/row, hash 04c56e3969902ca0), composite-off 0 (hash 81114b70caea626d)
+        I05: dpr 1.350000023841858 rect [657.5,616.4930419921875] store [888,832] deficit 0.3750/-0.2656 EXERCISES -> composite-on 0 translucent px (min alpha null, 0 outside the last column/row, hash 1d9cd35b4bf67c74), composite-off 0 (hash d07c8fdef9604b73)
+        I075: dpr 1.350000023841858 rect [657.7430419921875,616.7476806640625] store [888,833] deficit 0.0469/0.3906 EXERCISES -> composite-on 0 translucent px (min alpha null, 0 outside the last column/row, hash 598499d092578f05), composite-off 0 (hash 54013d11b36280ca)
+        I0875: dpr 1.350000023841858 rect [657.870361328125,616.875] store [888,833] deficit -0.1250/0.2187 SUB-RASTER -> composite-on 0 translucent px (min alpha null, 0 outside the last column/row, hash 598499d092578f05), composite-off 0 (hash 54013d11b36280ca)
+        I09375: dpr 1.350000023841858 rect [657.92822265625,616.932861328125] store [888,833] deficit -0.2031/0.1406 SUB-RASTER -> composite-on 0 translucent px (min alpha null, 0 outside the last column/row, hash 598499d092578f05), composite-off 0 (hash 54013d11b36280ca)
+        I025: dpr 1.350000023841858 rect [657.245361328125,616.25] store [887,832] deficit -0.2813/0.0625 SUB-RASTER -> composite-on 0 translucent px (min alpha null, 0 outside the last column/row, hash 109c8045526010fa), composite-off 0 (hash 2dfe5c90487e31e5)
+NOTE       the deficit this rasteriser resolves
+        deficit 0.4688 -> 0 translucent px; deficit -0.1921 -> 0 translucent px; deficit 0.3750 -> 0 translucent px; deficit 0.3906 -> 0 translucent px; deficit 0.2187 -> 0 translucent px; deficit 0.1406 -> 0 translucent px; deficit 0.0625 -> 0 translucent px  (MIN_DEFICIT is 0.25; a positive deficit that leaves 0 px is BELOW what this rasteriser resolves, and a green row in such a geometry is not evidence)
+NOTE       pixel-identity record written
+        /tmp/claude-1000/-home-volence-sonic-hacks-aurora/15448e71-11ce-4b29-a52c-785a44883df8/scratchpad/scan-fix-real1.json
+
+58/58 rows passed
+NOTE       environment at end
+        uptime 191808s, load 7.16 5.38 5.04
+cleanup: tree under pid 3679445 (11 process(es)):
+           3679445 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           3679455 Xvfb :218 -screen 0 1680x1050x24 -nolisten tcp
+           3696138 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           3696209 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           3696374 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3696375 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --force
+           3696626 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --force
+           3697515 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3697592 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3697675 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           3697824 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --force
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server still up, tree gone in 51 ms; teardown 401 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none

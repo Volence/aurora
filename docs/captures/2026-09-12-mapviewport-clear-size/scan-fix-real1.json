@@ -1,0 +1,413 @@
+{
+ "tag": "fix-real1",
+ "head": "f3dd024ca684fabc108832de800eed454cf6e5b4",
+ "root": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a",
+ "geoms": {
+  "N": {
+   "P": "N",
+   "label": "REAL forced factor (--force-device-scale-factor=1.35): dpr 1.350000023841858",
+   "dpr": 1.350000023841858,
+   "rect": [
+    661.1920776367188,
+    620.3934936523438
+   ],
+   "store": [
+    893,
+    838
+   ],
+   "dx": 0.39067942638212116,
+   "dy": 0.46876877800241346,
+   "klass": "exercises",
+   "onN": 0,
+   "offN": 0,
+   "onMinA": null,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 255
+    },
+    {
+     "y": 209,
+     "a": 255
+    },
+    {
+     "y": 419,
+     "a": 255
+    },
+    {
+     "y": 837,
+     "a": 255
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 255
+    },
+    {
+     "x": 223,
+     "a": 255
+    },
+    {
+     "x": 446,
+     "a": 255
+    },
+    {
+     "x": 892,
+     "a": 255
+    }
+   ],
+   "onHash": "6e492d8b1ea95548",
+   "offHash": "7f17bed6f6e7b55f"
+  },
+  "E": {
+   "P": "E",
+   "label": "EMULATED (Emulation.setDeviceMetricsOverride deviceScaleFactor 1): dpr 0.9999999848780803",
+   "dpr": 0.9999999848780803,
+   "rect": [
+    661.1920776367188,
+    620.3934936523438
+   ],
+   "store": [
+    661,
+    620
+   ],
+   "dx": -0.19206763822523953,
+   "dy": -0.3934842708031283,
+   "klass": "overshoots",
+   "onN": 0,
+   "offN": 0,
+   "onMinA": null,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 255
+    },
+    {
+     "y": 155,
+     "a": 255
+    },
+    {
+     "y": 310,
+     "a": 255
+    },
+    {
+     "y": 619,
+     "a": 255
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 255
+    },
+    {
+     "x": 165,
+     "a": 255
+    },
+    {
+     "x": 330,
+     "a": 255
+    },
+    {
+     "x": 660,
+     "a": 255
+    }
+   ],
+   "onHash": "04c56e3969902ca0",
+   "offHash": "81114b70caea626d"
+  },
+  "I05": {
+   "P": "I05",
+   "label": "IMPOSED container rect (flex:none; width:657.5px; height:616.5px -> 657.5 x 616.4930419921875) at dpr 1.350000023841858 — deficit 0.3750 x -0.2656 device px, class exercises",
+   "dpr": 1.350000023841858,
+   "rect": [
+    657.5,
+    616.4930419921875
+   ],
+   "store": [
+    888,
+    832
+   ],
+   "dx": 0.3749843239784241,
+   "dy": -0.2656213877926348,
+   "klass": "exercises",
+   "onN": 0,
+   "offN": 0,
+   "onMinA": null,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 255
+    },
+    {
+     "y": 208,
+     "a": 255
+    },
+    {
+     "y": 416,
+     "a": 255
+    },
+    {
+     "y": 831,
+     "a": 255
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 255
+    },
+    {
+     "x": 222,
+     "a": 255
+    },
+    {
+     "x": 444,
+     "a": 255
+    },
+    {
+     "x": 887,
+     "a": 255
+    }
+   ],
+   "onHash": "1d9cd35b4bf67c74",
+   "offHash": "d07c8fdef9604b73"
+  },
+  "I075": {
+   "P": "I075",
+   "label": "IMPOSED container rect (flex:none; width:657.75px; height:616.75px -> 657.7430419921875 x 616.7476806640625) at dpr 1.350000023841858 — deficit 0.0469 x 0.3906 device px, class exercises",
+   "dpr": 1.350000023841858,
+   "rect": [
+    657.7430419921875,
+    616.7476806640625
+   ],
+   "store": [
+    888,
+    833
+   ],
+   "dx": 0.04687762873072643,
+   "dy": 0.3906163991050562,
+   "klass": "exercises",
+   "onN": 0,
+   "offN": 0,
+   "onMinA": null,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 255
+    },
+    {
+     "y": 208,
+     "a": 255
+    },
+    {
+     "y": 416,
+     "a": 255
+    },
+    {
+     "y": 832,
+     "a": 255
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 255
+    },
+    {
+     "x": 222,
+     "a": 255
+    },
+    {
+     "x": 444,
+     "a": 255
+    },
+    {
+     "x": 887,
+     "a": 255
+    }
+   ],
+   "onHash": "598499d092578f05",
+   "offHash": "54013d11b36280ca"
+  },
+  "I0875": {
+   "P": "I0875",
+   "label": "IMPOSED container rect (flex:none; width:657.875px; height:616.875px -> 657.870361328125 x 616.875) at dpr 1.350000023841858 — deficit -0.1250 x 0.2187 device px, class sub-raster",
+   "dpr": 1.350000023841858,
+   "rect": [
+    657.870361328125,
+    616.875
+   ],
+   "store": [
+    888,
+    833
+   ],
+   "dx": -0.1250034778204281,
+   "dy": 0.21873529255390167,
+   "klass": "sub-raster",
+   "onN": 0,
+   "offN": 0,
+   "onMinA": null,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 255
+    },
+    {
+     "y": 208,
+     "a": 255
+    },
+    {
+     "y": 416,
+     "a": 255
+    },
+    {
+     "y": 832,
+     "a": 255
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 255
+    },
+    {
+     "x": 222,
+     "a": 255
+    },
+    {
+     "x": 444,
+     "a": 255
+    },
+    {
+     "x": 887,
+     "a": 255
+    }
+   ],
+   "onHash": "598499d092578f05",
+   "offHash": "54013d11b36280ca"
+  },
+  "I09375": {
+   "P": "I09375",
+   "label": "IMPOSED container rect (flex:none; width:657.9375px; height:616.9375px -> 657.92822265625 x 616.932861328125) at dpr 1.350000023841858 — deficit -0.2031 x 0.1406 device px, class sub-raster",
+   "dpr": 1.350000023841858,
+   "rect": [
+    657.92822265625,
+    616.932861328125
+   ],
+   "store": [
+    888,
+    833
+   ],
+   "dx": -0.20311627216869965,
+   "dy": 0.1406224982056301,
+   "klass": "sub-raster",
+   "onN": 0,
+   "offN": 0,
+   "onMinA": null,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 255
+    },
+    {
+     "y": 208,
+     "a": 255
+    },
+    {
+     "y": 416,
+     "a": 255
+    },
+    {
+     "y": 832,
+     "a": 255
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 255
+    },
+    {
+     "x": 222,
+     "a": 255
+    },
+    {
+     "x": 444,
+     "a": 255
+    },
+    {
+     "x": 887,
+     "a": 255
+    }
+   ],
+   "onHash": "598499d092578f05",
+   "offHash": "54013d11b36280ca"
+  },
+  "I025": {
+   "P": "I025",
+   "label": "IMPOSED container rect (flex:none; width:657.25px; height:616.25px -> 657.245361328125 x 616.25) at dpr 1.350000023841858 — deficit -0.2813 x 0.0625 device px, class sub-raster",
+   "dpr": 1.350000023841858,
+   "rect": [
+    657.245361328125,
+    616.25
+   ],
+   "store": [
+    887,
+    832
+   ],
+   "dx": -0.2812534629192669,
+   "dy": 0.062485307455062866,
+   "klass": "sub-raster",
+   "onN": 0,
+   "offN": 0,
+   "onMinA": null,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 255
+    },
+    {
+     "y": 208,
+     "a": 255
+    },
+    {
+     "y": 416,
+     "a": 255
+    },
+    {
+     "y": 831,
+     "a": 255
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 255
+    },
+    {
+     "x": 221,
+     "a": 255
+    },
+    {
+     "x": 443,
+     "a": 255
+    },
+    {
+     "x": 886,
+     "a": 255
+    }
+   ],
+   "onHash": "109c8045526010fa",
+   "offHash": "2dfe5c90487e31e5"
+  }
+ }
+}

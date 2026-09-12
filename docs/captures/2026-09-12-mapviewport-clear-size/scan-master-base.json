@@ -1,0 +1,413 @@
+{
+ "tag": "master-base",
+ "head": "be194de8cdebaf5a57d62993db4ed26a524a06b7",
+ "root": "/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a5e320627e9bd860a",
+ "geoms": {
+  "N": {
+   "P": "N",
+   "label": "native (Xvfb default, no switch): dpr 1",
+   "dpr": 1,
+   "rect": [
+    816,
+    742
+   ],
+   "store": [
+    816,
+    742
+   ],
+   "dx": 0,
+   "dy": 0,
+   "klass": "overshoots",
+   "onN": 0,
+   "offN": 0,
+   "onMinA": null,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 255
+    },
+    {
+     "y": 185,
+     "a": 255
+    },
+    {
+     "y": 371,
+     "a": 255
+    },
+    {
+     "y": 741,
+     "a": 255
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 255
+    },
+    {
+     "x": 204,
+     "a": 255
+    },
+    {
+     "x": 408,
+     "a": 255
+    },
+    {
+     "x": 815,
+     "a": 255
+    }
+   ],
+   "onHash": "df1c41559d327f80",
+   "offHash": "61e4ac79091d1d4c"
+  },
+  "E": {
+   "P": "E",
+   "label": "EMULATED (Emulation.setDeviceMetricsOverride deviceScaleFactor 1.35): dpr 1.350000023841858",
+   "dpr": 1.350000023841858,
+   "rect": [
+    816,
+    742
+   ],
+   "store": [
+    1102,
+    1002
+   ],
+   "dx": 0.3999805450439453,
+   "dy": 0.29998230934143066,
+   "klass": "exercises",
+   "onN": 1800,
+   "offN": 0,
+   "onMinA": 107,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 247
+    },
+    {
+     "y": 250,
+     "a": 154
+    },
+    {
+     "y": 501,
+     "a": 154
+    },
+    {
+     "y": 1001,
+     "a": 107
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 230
+    },
+    {
+     "x": 275,
+     "a": 179
+    },
+    {
+     "x": 551,
+     "a": 179
+    },
+    {
+     "x": 1101,
+     "a": 107
+    }
+   ],
+   "onHash": "be90560f941dbba8",
+   "offHash": "83d262b95bc34738"
+  },
+  "I05": {
+   "P": "I05",
+   "label": "IMPOSED container rect (flex:none; width:812.5px; height:738.5px -> 812.5 x 738.5) at dpr 1 — deficit 0.5000 x 0.5000 device px, class exercises",
+   "dpr": 1,
+   "rect": [
+    812.5,
+    738.5
+   ],
+   "store": [
+    813,
+    739
+   ],
+   "dx": 0.5,
+   "dy": 0.5,
+   "klass": "exercises",
+   "onN": 1343,
+   "offN": 0,
+   "onMinA": 64,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 244
+    },
+    {
+     "y": 184,
+     "a": 128
+    },
+    {
+     "y": 369,
+     "a": 128
+    },
+    {
+     "y": 738,
+     "a": 64
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 210
+    },
+    {
+     "x": 203,
+     "a": 128
+    },
+    {
+     "x": 406,
+     "a": 128
+    },
+    {
+     "x": 812,
+     "a": 64
+    }
+   ],
+   "onHash": "13c41ed5521a5b14",
+   "offHash": "82f1a4f9a3a83216"
+  },
+  "I075": {
+   "P": "I075",
+   "label": "IMPOSED container rect (flex:none; width:812.75px; height:738.75px -> 812.75 x 738.75) at dpr 1 — deficit 0.2500 x 0.2500 device px, class exercises",
+   "dpr": 1,
+   "rect": [
+    812.75,
+    738.75
+   ],
+   "store": [
+    813,
+    739
+   ],
+   "dx": 0.25,
+   "dy": 0.25,
+   "klass": "exercises",
+   "onN": 1343,
+   "offN": 0,
+   "onMinA": 144,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 250
+    },
+    {
+     "y": 184,
+     "a": 192
+    },
+    {
+     "y": 369,
+     "a": 192
+    },
+    {
+     "y": 738,
+     "a": 144
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 233
+    },
+    {
+     "x": 203,
+     "a": 192
+    },
+    {
+     "x": 406,
+     "a": 192
+    },
+    {
+     "x": 812,
+     "a": 144
+    }
+   ],
+   "onHash": "8cc4949964c875a8",
+   "offHash": "82f1a4f9a3a83216"
+  },
+  "I0875": {
+   "P": "I0875",
+   "label": "IMPOSED container rect (flex:none; width:812.875px; height:738.875px -> 812.875 x 738.875) at dpr 1 — deficit 0.1250 x 0.1250 device px, class sub-raster",
+   "dpr": 1,
+   "rect": [
+    812.875,
+    738.875
+   ],
+   "store": [
+    813,
+    739
+   ],
+   "dx": 0.125,
+   "dy": 0.125,
+   "klass": "sub-raster",
+   "onN": 1343,
+   "offN": 0,
+   "onMinA": 196,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 252
+    },
+    {
+     "y": 184,
+     "a": 224
+    },
+    {
+     "y": 369,
+     "a": 224
+    },
+    {
+     "y": 738,
+     "a": 196
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 244
+    },
+    {
+     "x": 203,
+     "a": 224
+    },
+    {
+     "x": 406,
+     "a": 224
+    },
+    {
+     "x": 812,
+     "a": 196
+    }
+   ],
+   "onHash": "ce2a54ae42e27425",
+   "offHash": "82f1a4f9a3a83216"
+  },
+  "I09375": {
+   "P": "I09375",
+   "label": "IMPOSED container rect (flex:none; width:812.9375px; height:738.9375px -> 812.9375 x 738.9375) at dpr 1 — deficit 0.0625 x 0.0625 device px, class sub-raster",
+   "dpr": 1,
+   "rect": [
+    812.9375,
+    738.9375
+   ],
+   "store": [
+    813,
+    739
+   ],
+   "dx": 0.0625,
+   "dy": 0.0625,
+   "klass": "sub-raster",
+   "onN": 1343,
+   "offN": 0,
+   "onMinA": 225,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 254
+    },
+    {
+     "y": 184,
+     "a": 240
+    },
+    {
+     "y": 369,
+     "a": 240
+    },
+    {
+     "y": 738,
+     "a": 225
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 249
+    },
+    {
+     "x": 203,
+     "a": 240
+    },
+    {
+     "x": 406,
+     "a": 240
+    },
+    {
+     "x": 812,
+     "a": 225
+    }
+   ],
+   "onHash": "e2a756c7800d4376",
+   "offHash": "82f1a4f9a3a83216"
+  },
+  "I025": {
+   "P": "I025",
+   "label": "IMPOSED container rect (flex:none; width:812.25px; height:738.25px -> 812.25 x 738.25) at dpr 1 — deficit -0.2500 x -0.2500 device px, class overshoots",
+   "dpr": 1,
+   "rect": [
+    812.25,
+    738.25
+   ],
+   "store": [
+    812,
+    738
+   ],
+   "dx": -0.25,
+   "dy": -0.25,
+   "klass": "overshoots",
+   "onN": 0,
+   "offN": 0,
+   "onMinA": null,
+   "onOutside": 0,
+   "onLastCol": [
+    {
+     "y": 0,
+     "a": 255
+    },
+    {
+     "y": 184,
+     "a": 255
+    },
+    {
+     "y": 369,
+     "a": 255
+    },
+    {
+     "y": 737,
+     "a": 255
+    }
+   ],
+   "onLastRow": [
+    {
+     "x": 0,
+     "a": 255
+    },
+    {
+     "x": 203,
+     "a": 255
+    },
+    {
+     "x": 406,
+     "a": 255
+    },
+    {
+     "x": 811,
+     "a": 255
+    }
+   ],
+   "onHash": "45ae5beb09eaa7c6",
+   "offHash": "de4a2cb7aa241b02"
+  }
+ }
+}
