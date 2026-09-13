@@ -9,7 +9,7 @@ import type { Color } from '../../../core/model/s4-types';
 import { T } from '../ui';
 import PaletteGrid, { type PaletteGridShell, type PaletteSwatchProps } from '../art-shared/PaletteGrid';
 import {
-  useAeonPaletteGridPort, zoneCopyTargetRefusal, ZONE_LINE0_REFUSAL,
+  useAeonPaletteGridPort, whenZoneLineAdmitted, isZoneSharedLine, ZONE_SHARED_LINE_NOTE,
 } from '../../providers/palette-aeon';
 import PaletteCopyMenu, { type CopyMenuItem } from './PaletteCopyMenu';
 
@@ -34,8 +34,9 @@ function sameColors(a: Color[], b: Color[]): boolean {
  * modes, because the differences between them are exactly the two things a port
  * already carries — the policy and the commit path:
  *
- *  1. Art / Palette facet   — the 4 zone lines; line 0 is sprite-reserved (locked).
- *  2. Sprite pane, zone     — the same 4 lines with line 0 UNLOCKED, and a click
+ *  1. Art / Palette facet   — the 4 zone lines; line 0 is the shared Sonic and
+ *                             Tails palette, editable behind a warning.
+ *  2. Sprite pane, zone     — the same 4 lines and the same warning, and a click
  *                             binding the sprite's zoneLine.
  *  3. Sprite pane, standalone — ONE row of the sprite doc's 16 private colours,
  *                             committed to the sprite's own undo stack. The port
@@ -68,20 +69,27 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }): Reac
   // renders without a zone. Every other path needs the zone's palette lines.
   const lines = zone ? zone.palette.lines : [];
 
-  /** Copy a single color into a zone line index, via the undoable set-palette-line command. */
+  /** Copy a single color into a zone line index, via the undoable set-palette-line command.
+   *
+   *  THROUGH THE SAME DOOR AS THE SLIDERS (`whenZoneLineAdmitted`): a copy into
+   *  the shared line 0 lands in one gesture with no slider to notice, so it is
+   *  the last place the warning may be skipped. State is read AFTER the answer,
+   *  so a copy that waited on the dialog writes against the palette as it is. */
   function applyZoneSwatchCopy(line: number, idx: number, src: Color): void {
     if (idx <= 0) return;
-    const state = useProjectStore.getState();
-    const z = getCurrentZone(state);
-    const level = getActiveLevel(state);
-    if (!z || !level) return;
-    const old = z.palette.lines[line].colors.map((c) => ({ ...c }));
-    const edited = copySwatchInto(old, idx, src);
-    if (sameColors(edited, old)) return;
-    executeAmbientCommand({
-      type: 'set-palette-line', line, oldColors: old, newColors: edited,
-      sectionIndex: -1, description: `copy color into line ${line} idx ${idx}`,
-    }, level);
+    whenZoneLineAdmitted(line, () => {
+      const state = useProjectStore.getState();
+      const z = getCurrentZone(state);
+      const level = getActiveLevel(state);
+      if (!z || !level) return;
+      const old = z.palette.lines[line].colors.map((c) => ({ ...c }));
+      const edited = copySwatchInto(old, idx, src);
+      if (sameColors(edited, old)) return;
+      executeAmbientCommand({
+        type: 'set-palette-line', line, oldColors: old, newColors: edited,
+        sectionIndex: -1, description: `copy color into line ${line} idx ${idx}`,
+      }, level);
+    });
   }
 
   /** Copy 16 colors (1-15) into a zone line, via set-palette-line.
@@ -91,17 +99,19 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }): Reac
    *  document — which owns no aeon command history, so routing by focus threw
    *  inside the event handler. */
   function applyZoneLineCopy(line: number, src: Color[]): void {
-    const state = useProjectStore.getState();
-    const z = getCurrentZone(state);
-    const level = getActiveLevel(state);
-    if (!z || !level) return;
-    const old = z.palette.lines[line].colors.map((c) => ({ ...c }));
-    const edited = copyLineInto(old, src);
-    if (sameColors(edited, old)) return;
-    executeAmbientCommand({
-      type: 'set-palette-line', line, oldColors: old, newColors: edited,
-      sectionIndex: -1, description: `copy palette line into ${line}`,
-    }, level);
+    whenZoneLineAdmitted(line, () => {
+      const state = useProjectStore.getState();
+      const z = getCurrentZone(state);
+      const level = getActiveLevel(state);
+      if (!z || !level) return;
+      const old = z.palette.lines[line].colors.map((c) => ({ ...c }));
+      const edited = copyLineInto(old, src);
+      if (sameColors(edited, old)) return;
+      executeAmbientCommand({
+        type: 'set-palette-line', line, oldColors: old, newColors: edited,
+        sectionIndex: -1, description: `copy palette line into ${line}`,
+      }, level);
+    });
   }
 
   /** Copy a single color into the standalone palette, via setStandalonePalette (sprite undo). */
@@ -121,10 +131,11 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }): Reac
     useSpriteStore.getState().setStandalonePalette(edited);
   }
 
-  /** Usage note for a zone line: line 0 always shared; 1-3 show tile counts.
-   *  Takes precomputed counts so a menu open scans the act's nametables once. */
+  /** Usage note for a zone line: the shared line says whose it is; the zone's
+   *  own lines show tile counts. Takes precomputed counts so a menu open scans
+   *  the act's nametables once. */
   function zoneLineNote(line: number, counts: Map<number, number>): string | undefined {
-    if (line === 0) return 'player';
+    if (isZoneSharedLine(line)) return ZONE_SHARED_LINE_NOTE;
     const uses = counts.get(line) ?? 0;
     return uses > 0 ? `${uses.toLocaleString()} tiles` : undefined;
   }
@@ -135,28 +146,19 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }): Reac
     return act ? paletteLineUsageCounts(act) : new Map<number, number>();
   }
 
-  /** A zone line is off-limits as a copy participant when the port's own policy
-   *  refuses it — the SAME rule, read from the same place, so the copy bridge and
-   *  the swatch grid cannot come apart.
-   *
-   *  ⚠ THE `&& !inSprite` THAT USED TO BE HERE IS GONE (2026-09-10). It let the
-   *  copy menu and the swatch drop paint over zone line 0 whenever the palette
-   *  was open in the sprite pane, which is a second door onto exactly the write
-   *  AEON_ZONE_PALETTE_POLICY refuses — and a quieter one, because a copy lands
-   *  in one gesture with no slider to notice. Line 0 is Sonic and Tails across
-   *  the whole game; see ZONE_LINE0_REFUSAL. */
-  function zoneLineLocked(line: number): boolean {
-    return zoneCopyTargetRefusal(line, standaloneSprite) !== null;
-  }
-
   /** Build "Copy to ▸" targets for a single swatch (index-preserving). `srcLine`
    *  is the source zone line, or -1 when the source is the standalone palette.
-   *  The standalone palette is a target only in sprite mode. */
+   *  The standalone palette is a target only in sprite mode.
+   *
+   *  Every zone line is a target, the shared line 0 included: the WRITE asks
+   *  the warning (applyZoneSwatchCopy / applyZoneLineCopy), so the copy bridge
+   *  has no rule of its own to drift from the grid's. Its own rule was the
+   *  second door until 2026-09-10 (`line === 0 && !inSprite`). */
   function swatchMenuItems(srcLine: number, idx: number, src: Color): CopyMenuItem[] {
     const items: CopyMenuItem[] = [];
     const counts = actLineCounts();
     for (let l = 0; l < lines.length; l++) {
-      if (l === srcLine || zoneLineLocked(l)) continue; // skip source + locked line 0
+      if (l === srcLine) continue; // skip the source
       items.push({ label: `Zone line ${l} · idx ${idx}`, note: zoneLineNote(l, counts), onSelect: () => applyZoneSwatchCopy(l, idx, src) });
     }
     if (inSprite && srcLine !== -1) {
@@ -170,7 +172,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }): Reac
     const items: CopyMenuItem[] = [];
     const counts = actLineCounts();
     for (let l = 0; l < lines.length; l++) {
-      if (l === srcLine || zoneLineLocked(l)) continue;
+      if (l === srcLine) continue;
       items.push({ label: `Zone line ${l}`, note: zoneLineNote(l, counts), onSelect: () => applyZoneLineCopy(l, src) });
     }
     if (inSprite && srcLine !== -1) {
@@ -203,7 +205,8 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }): Reac
   }
   function endDrag(): void { dragPayload = null; setDropKey(null); }
   /** Drop a swatch onto a target. `destLine` is the zone line, or -1 for standalone.
-   *  `locked` (Art-mode line 0) rejects the drop so the player palette is safe. */
+   *  `locked` rejects a drop on a locked line (no mount locks one today); a drop
+   *  onto the shared line 0 goes through the warning inside applyZoneSwatchCopy. */
   function onSwatchDrop(destLine: number, idx: number, locked: boolean): void {
     const p = dragPayload;
     endDrag();
@@ -240,10 +243,12 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }): Reac
         key="grip"
         style={{ ...styles.grip, ...(locked ? styles.locked : {}), ...(dropKey === `${keyPrefix}-line:${li}` ? styles.dropTarget : {}) }}
         title={locked
-          ? ZONE_LINE0_REFUSAL
+          ? 'This line is locked on this screen'
           : standaloneSprite
             ? 'Drag to copy this palette · right-click to copy to a zone line'
-            : `Drag to copy line ${li} · right-click to copy elsewhere`}
+            : isZoneSharedLine(li)
+              ? `Drag to copy line ${li} · right-click to copy elsewhere · ${ZONE_SHARED_LINE_NOTE}`
+              : `Drag to copy line ${li} · right-click to copy elsewhere`}
         draggable={!locked}
         onDragStart={() => onLineDragStart(rowColors(li))}
         onDragOver={(e) => onLineDragOver(e, `${keyPrefix}-line:${li}`, locked)}

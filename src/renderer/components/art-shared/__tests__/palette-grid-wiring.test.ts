@@ -62,28 +62,61 @@ describe('one grid, mounted by both engines', () => {
   });
 
   /**
-   * THE COPY BRIDGE READS THE PORT'S RULE, NOT ITS OWN.
+   * THE COPY BRIDGE ASKS THE SAME DOOR, AND HAS NO RULE OF ITS OWN.
    *
-   * PaletteEditor's "Copy to" menu and its swatch/line drop both gate on one
-   * local predicate, `zoneLineLocked`. Until 2026-09-10 that predicate was
-   * `line === 0 && !inSprite`: a second, quieter door onto the shared Sonic and
-   * Tails palette, open exactly when the swatch grid's own policy was refusing
-   * the same write. It now delegates to `zoneCopyTargetRefusal`, whose argument
-   * list has no `inSprite` in it (providers/palette-aeon.ts), and the decision
-   * itself is executed in providers/__tests__/palette-aeon.test.ts.
+   * WAS `gates the aeon copy bridge on the port's refusal, with no mode of its
+   * own`, which scanned a local `zoneLineLocked` predicate delegating to
+   * `zoneCopyTargetRefusal`. Until 2026-09-10 that predicate was `line === 0 &&
+   * !inSprite`, a second, quieter door onto the shared Sonic and Tails palette.
+   * Since the owner's 2026-09-13 ruling line 0 is editable behind a warning,
+   * so the bridge offers it as a target and every zone-line WRITE it makes goes
+   * through `whenZoneLineAdmitted` (providers/palette-aeon.ts), the door the
+   * swatch grid reaches through `port.admit`. The decision is executed in
+   * providers/__tests__/palette-aeon.test.ts and palette-line0-gate.test.ts.
    *
-   * What is left for a scan is that the host still ASKS: a re-inlined `line ===
-   * 0` here would restore the fork with both files looking reasonable.
+   * What is left for a scan is that each write ASKS before it commands, and that
+   * the bridge has not grown a line rule of its own back.
    */
-  it('gates the aeon copy bridge on the port\'s refusal, with no mode of its own', () => {
-    const body = /function zoneLineLocked\(line: number\): boolean \{([\s\S]*?)\n  \}/.exec(EDITOR)?.[1];
-    expect(body, 'PaletteEditor no longer declares zoneLineLocked: this scan measures nothing')
-      .toBeTruthy();
-    expect(body!, 'the copy bridge stopped consulting the port and decides for itself again')
-      .toMatch(/zoneCopyTargetRefusal\(/);
-    expect(body!, 'the copy bridge reads inSprite again: line 0 is a copy target in the sprite pane')
-      .not.toMatch(/\binSprite\b/);
-    expect(body!, 'the copy bridge hard-codes a line number again').not.toMatch(/line === \d/);
+  it('routes every aeon copy-bridge write through the shared-line door, with no rule of its own', () => {
+    for (const fn of ['applyZoneSwatchCopy', 'applyZoneLineCopy']) {
+      const body = new RegExp(`function ${fn}\\([^)]*\\): void \\{([\\s\\S]*?)\\n  \\}`).exec(EDITOR)?.[1];
+      expect(body, `PaletteEditor no longer declares ${fn}: this scan measures nothing`).toBeTruthy();
+      const gateAt = body!.indexOf('whenZoneLineAdmitted(line,');
+      const commandAt = body!.indexOf('executeAmbientCommand(');
+      expect(gateAt, `${fn} writes a zone line without asking the shared-line door`).toBeGreaterThan(-1);
+      expect(commandAt, `${fn} stopped issuing a command: this scan is aimed at nothing`)
+        .toBeGreaterThan(gateAt);
+    }
+    expect(EDITOR, 'the copy bridge grew its own lock predicate back').not.toMatch(/function zoneLineLocked/);
+    expect(EDITOR, 'the copy bridge hard-codes a line rule again').not.toMatch(/\bl(?:ine)? === 0\b/);
+  });
+
+  /**
+   * THE GRID ASKS BEFORE IT OPENS ANYTHING. `port.admit` is consulted for an
+   * edit before `port.select` runs and before the edit selection is set, so a
+   * declined warning leaves no brush bound and no sliders open. Both happen
+   * only inside `open`, and `open` is only ever called behind the gate.
+   */
+  it('asks port.admit before it selects or opens a swatch', () => {
+    const body = /function clickSwatch\(line: number, idx: number\): void \{([\s\S]*?)\n  \}/.exec(GRID)?.[1];
+    expect(body, 'PaletteGrid no longer declares clickSwatch: this scan measures nothing').toBeTruthy();
+    expect(body!, 'the grid no longer asks the port before an edit')
+      .toMatch(/const gate = act\.edit && port\.admit \? port\.admit\(line, idx\) : true;/);
+    const gateAt = body!.indexOf('const gate =');
+    const openStart = body!.indexOf('const open =');
+    const openEnd = body!.indexOf('};', openStart);
+    for (const effect of ['port.select(', 'setSel(']) {
+      const at = body!.indexOf(effect);
+      expect(at, `${effect} left clickSwatch: this scan is aimed at nothing`).toBeGreaterThan(-1);
+      expect(at > openStart && at < openEnd, `${effect} runs outside the gated open()`).toBe(true);
+      expect(body!.indexOf(effect, at + 1), `${effect} is called a second time, outside open()`).toBe(-1);
+    }
+    const calls = [...body!.matchAll(/\bopen\(\);/g)].map((m) => m.index!);
+    expect(calls.length, 'open() is never called: this scan is aimed at nothing').toBeGreaterThan(0);
+    for (const at of calls) expect(at, 'open() is called before the gate').toBeGreaterThan(gateAt);
+    expect(body!, 'a declined answer still opens').toMatch(/if \(gate === false\) return;/);
+    expect(body!, 'the asked path opens without reading the answer')
+      .toMatch(/gate\.then\(\(ok\) => \{ if \(ok\) open\(\); \}\)/);
   });
 
   it('leaves the classic host as a host and nothing else', () => {

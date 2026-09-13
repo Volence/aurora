@@ -80,12 +80,24 @@ export default function PaletteGrid({ port, shell }: {
    * binds the brush and CLOSES the sliders, because leaving them open over a
    * swatch the user just navigated away from is what makes a stranded drag
    * possible in the first place.
+   *
+   * AND A PORT MAY ASK FIRST (`port.admit`): aeon's zone line 0 is one palette
+   * file shared by every zone, so an edit to it opens only after a warning is
+   * accepted. Asked BEFORE the select, so a declined click changes nothing at
+   * all: no brush, no sliders, no preview. A select-only click (the eraser) is
+   * never asked, because it changes no colour.
    */
   function clickSwatch(line: number, idx: number): void {
     const act = swatchClick(line, idx, port.policy);
     if (!act.select && !act.edit) return;
-    if (act.select) port.select(line, idx);
-    setSel(act.edit ? { line, idx } : null);
+    const open = (): void => {
+      if (act.select) port.select(line, idx);
+      setSel(act.edit ? { line, idx } : null);
+    };
+    const gate = act.edit && port.admit ? port.admit(line, idx) : true;
+    if (gate === true) { open(); return; }
+    if (gate === false) return;
+    void gate.then((ok) => { if (ok) open(); });
   }
 
   const note = sel && port.note ? port.note(sel.line, sel.idx) : null;

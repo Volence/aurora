@@ -73,14 +73,14 @@ export interface PalettePolicy {
   /**
    * Lines no edit may reach, drawn dimmed and inert.
    *
-   * This is the one difference the whole port design exists for. Aeon's line 0
-   * is the PLAYER palette — sprite-reserved, shared across the zone, and
-   * repainting it from the Art facet would restain Sonic — so the Art mount
-   * locks it. Classic's line 0 is an ordinary act palette line with nothing
-   * reserved about it, so its policy locks nothing. And aeon's own SPRITE mount
-   * unlocks line 0, because editing the player palette is exactly what that pane
-   * is for. Three mounts, three lists — one of which is empty, and none of which
-   * needs the component to know which engine it is rendering.
+   * No mount locks a line today. Aeon's zone palette locked line 0 (the shared
+   * Sonic and Tails palette, one file for the whole game) from 2026-09-10 until
+   * the owner's 2026-09-13 ruling, and since then GUARDS it with a warning
+   * instead: see `PaletteGridPort.admit`, which is the shape for "editable, but
+   * ask first". Classic's line 0 is an ordinary act line, and the sprite pane's
+   * standalone row is not a CRAM line at all. The field stays because a lock is
+   * a real policy shape (a read-only mount), and the grid's rendering of it is
+   * pinned in art-shared/__tests__/palette-grid-model.test.ts.
    */
   readonly lockedLines: readonly number[];
   /** What a click on `TRANSPARENT_INDEX` does. */
@@ -262,6 +262,16 @@ export interface PaletteGridPort {
   readonly versionKey: string;
   /** The user picked this swatch as the paint colour / paint line. */
   select(line: number, idx: number): void;
+  /**
+   * May a click open this swatch's EDITOR? Absent or `true` means yes at once;
+   * `false` means no; a promise means the port is asking the person first, and
+   * the grid opens NOTHING (no select, no sliders, no preview) unless it
+   * resolves true. Aeon uses it for the zone palette's line 0, the shared
+   * Sonic and Tails palette, which edits behind a warning
+   * (providers/palette-line0-gate.ts). A select-only click (the eraser) is
+   * never asked: it changes no colour.
+   */
+  admit?(line: number, idx: number): boolean | Promise<boolean>;
   /**
    * One live-preview tick of an open swatch: no history, no dirty flag. Aeon
    * writes the document in place so the composer canvas repaints; classic has

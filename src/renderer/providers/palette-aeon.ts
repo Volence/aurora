@@ -6,17 +6,16 @@
 // and the preview/commit path — and none of them is a difference the grid itself
 // should know about:
 //
-//   1. Art / Palette facet   — the zone's 4 lines; line 0 is the shared PLAYER
-//                              palette, so the policy locks it.
-//   2. Sprite pane, zone     — the same 4 lines and the SAME lock since
-//                              2026-09-10 (see AEON_ZONE_PALETTE_POLICY: line 0
-//                              is one file for the whole game and this pane's
-//                              edits to it reached neither disk nor the running
-//                              game). A swatch pick binds the sprite's zoneLine
-//                              rather than artStore's paint line.
+//   1. Art / Palette facet   — the zone's 4 lines. Line 0 is the shared PLAYER
+//                              palette (Sonic and Tails, one file for the whole
+//                              game): editable since 2026-09-13, but only after
+//                              the warning in providers/palette-line0-gate.ts.
+//   2. Sprite pane, zone     — the same 4 lines and the SAME warning. A swatch
+//                              pick binds the sprite's zoneLine rather than
+//                              artStore's paint line.
 //   3. Sprite pane, standalone — one row of the sprite doc's 16 private colours;
 //                              writes go to the sprite's own undo stack. NOT a
-//                              CRAM line, so it is not locked.
+//                              CRAM line, so no warning applies.
 //
 // THE PREVIEW MUTATES THE OPEN DOCUMENT. That is deliberate — it is what makes
 // the composer canvas repaint per slider tick without spending a history step —
@@ -48,9 +47,9 @@ import {
   encodeGenesisColor, decodeGenesisColor, fmtGenesisWord, ZONE_PALETTE_FIRST_LINE,
 } from '../../core/formats/palette';
 import { resolvePaletteDragEnd } from '../../core/art/palette-drag';
+import { admitSharedLineEdit, isSharedLineAcknowledged } from './palette-line0-gate';
 import {
   TRANSPARENT_INDEX,
-  isLineLocked,
   lineWords,
   type PaletteGridPort,
   type PalettePolicy,
@@ -59,59 +58,55 @@ import {
 import type { Color, Zone } from '../../core/model/s4-types';
 
 /**
- * The CRAM lines of a zone palette that are NOT the zone's to write: every line
- * below the first one the authored palette file owns.
+ * The CRAM lines of a zone palette that are NOT in the zone's own palette file:
+ * every line below the first one the authored file owns. Today that is line 0,
+ * the shared player palette (Sonic and Tails), one file for the whole game.
  *
  * DERIVED from `ZONE_PALETTE_FIRST_LINE`, not typed as `[0]`, because that
  * constant is the single statement of which line the file's first word lands
- * on. If the format ever changed, a hand-typed `[0]` here would go on locking
- * the wrong line and the lock would silently protect nothing.
+ * on. If the format ever changed, a hand-typed `[0]` here would put the warning
+ * on the wrong line and leave the shared one unguarded.
  */
-export const ZONE_UNSAVABLE_LINES: readonly number[]
+export const ZONE_SHARED_LINES: readonly number[]
   = Array.from({ length: ZONE_PALETTE_FIRST_LINE }, (_, line) => line);
 
+/** Is this zone line the shared player palette rather than the zone's own? */
+export function isZoneSharedLine(line: number): boolean {
+  return ZONE_SHARED_LINES.includes(line);
+}
+
 /**
- * THE ZONE PALETTE'S LINE 0 IS LOCKED EVERYWHERE, AND THIS IS WHY.
+ * THE ZONE PALETTE LOCKS NOTHING. LINE 0 IS GUARDED BY A WARNING INSTEAD.
  *
  * `Zone.palette` is assembled from TWO files (core/project/aeon/load.ts): the
- * zone's own authored palette into CRAM lines 1 to 3, and
- * `art/palettes/SonicAndTails.bin` into line 0 — ONE file for the entire game,
- * which every zone carries in-game. So a line 0 edit is not a zone edit at all:
- * it recolours Sonic and Tails in every zone there is.
+ * zone's own authored palette into CRAM lines 1 to 3, and the shared player
+ * palette (Sonic and Tails; core/project/aeon/player-palette.ts) into line 0,
+ * ONE file for the entire game. So a line 0 edit is not a zone edit at all: it
+ * recolours Sonic and Tails in every zone there is.
  *
- * ═══ WHAT CHANGED, 2026-09-10 ═════════════════════════════════════════════
+ * ═══ LOCKED 2026-09-10, WARNED 2026-09-13 ═════════════════════════════════
  *
- * The Art facet always locked it. The SPRITE pane deliberately unlocked it,
- * with the reasoning "editing the player palette is precisely the job there" —
- * and until this date that control was inert in every direction anyone could
- * check:
+ * From 2026-09-10 this policy LOCKED line 0, the `refuse_line0` build of owner
+ * card PALETTE-LINE0-BLAST-RADIUS: the save could not write it, and an
+ * editable control whose edits evaporate was the defect that parcel removed.
+ * On 2026-09-13 the owner chose `write_shared_file` ("we should allow the top
+ * row with just a warning"), so:
  *
- *   • it did not reach DISK. The aeon save plan had no palette file in it at
- *     all, so the edit lived in the model until the reopen and then vanished.
- *     That is the defect this parcel closes for lines 1 to 3;
- *   • it did not reach a RUNNING GAME either. `Pal_Base` is 96 bytes covering
- *     lines 1 to 3 only, and `palBaseOffset` THROWS on line 0 because the
- *     engine never writes it (core/aether/palette-push.ts);
- *   • and the agent tool had refused the same write since long before, in
- *     those words: "palette line 0 is reserved for player/sprite art"
- *     (core/agent/validation.ts).
+ *   • the lock is gone: `lockedLines` is empty and line 0 draws like any line;
+ *   • every line 0 edit goes through ONE door first, `admitZoneLine` below,
+ *     which asks providers/palette-line0-gate.ts: a warning naming the shared
+ *     file and what else is built from it, once per open project;
+ *   • the save writes line 0 back to the file the load read (save.ts, THE
+ *     SHARED PLAYER PALETTE), and never creates or grows it;
+ *   • a running game is NOT recoloured live: `Pal_Base` covers lines 1 to 3,
+ *     `palBaseOffset` throws on line 0 (core/aether/palette-push.ts), and the
+ *     live push below never sends it. The warning says so.
  *
- * Three independent refusals and one unlocked slider. Now that lines 1 to 3
- * genuinely save, leaving line 0 editable would make it the ONE control in the
- * palette whose edits still silently evaporate — which is precisely the shape
- * of defect the rest of this parcel exists to remove. So it is refused, with
- * the reason in `ZONE_LINE0_REFUSAL` where a person can read it.
- *
- * ⚠ THIS IS A BUILD OF ONE OPTION, NOT A SETTLED FACT. Owner card
- * PALETTE-LINE0-BLAST-RADIUS is unanswered; `refuse_line0` is the recommended
- * option and this is it. If the ruling comes back the other way, the REFUSAL is
- * what gets replaced — by a write to the shared file, made deliberately and
- * with the blast radius named on screen. Nothing in this parcel writes
- * `art/palettes/SonicAndTails.bin`, and `serializeZonePalette` cannot emit
- * line 0 at all.
+ * Still refused: the AGENT tool's line 0 write (core/agent/validation.ts),
+ * because there is no person there to warn.
  */
 export const AEON_ZONE_PALETTE_POLICY: PalettePolicy = {
-  lockedLines: ZONE_UNSAVABLE_LINES,
+  lockedLines: [],
   transparent: 'paint',
 };
 
@@ -131,45 +126,44 @@ export const AEON_SPRITE_STANDALONE_PALETTE_POLICY: PalettePolicy = {
 };
 
 /**
- * What Aurora says when a gesture aims at zone palette line 0.
- *
- * ONE SENTENCE IN ONE PLACE, read by the swatch tooltip, the line-grip tooltip
- * and the port's own guard, because a refusal whose reason is spelled three
- * times is a refusal that comes to mean three things.
+ * What a shared-line swatch says about itself, in its tooltip, its heading and
+ * its grip. ONE phrase in one place, so the three cannot come to describe the
+ * line differently. The dialog is the loud half; this is the half that is on
+ * screen before anyone clicks.
  */
-export const ZONE_LINE0_REFUSAL
-  = 'Palette line 0 is the Sonic and Tails palette, one file shared by every zone in '
-  + 'the game, so Aurora does not change it from here. Lines 1 to 3 are this zone\'s '
-  + 'own palette and they do save.';
+export const ZONE_SHARED_LINE_NOTE = 'Sonic and Tails, shared by every zone';
 
 /**
- * The refusal a zone palette gesture earns, or null when there is none.
- *
- * Exported and pure so the decision is executable in the node suite: the hook
- * around it needs a DOM and the grid needs a screen, and a rule that can only
- * be checked by looking is a rule nobody checks.
+ * May a write to zone line `line` go ahead WITHOUT asking? Pure, so the
+ * decision runs in the node suite (the hook needs a DOM, the grid a screen):
+ * the zone's own lines always may; the shared line only once the warning was
+ * accepted for the project that is open.
  */
-export function zonePaletteLineRefusal(line: number): string | null {
-  return ZONE_UNSAVABLE_LINES.includes(line) ? ZONE_LINE0_REFUSAL : null;
+export function zonePaletteWriteAdmitted(line: number, acknowledged: boolean): boolean {
+  return !isZoneSharedLine(line) || acknowledged;
 }
 
 /**
- * The same refusal, for the COPY BRIDGE: the swatch/line "Copy to" menu and the
- * drag-and-drop target in components/art/PaletteEditor.tsx.
+ * THE ONE DOOR for any gesture about to change a zone palette line: `true` at
+ * once for the zone's own lines and for an acknowledged shared line, otherwise
+ * the warning (providers/palette-line0-gate.ts), resolving with the answer.
  *
- * ⚠ IT TAKES ONE ARGUMENT AND `inSprite` IS NOT IT. Until 2026-09-10 the host
- * computed this itself as `line === 0 && !inSprite`, which reopened line 0 as a
- * copy target whenever the palette was open in the sprite pane — a SECOND door
- * onto the write the policy refuses, and a quieter one, because a copy lands in
- * a single gesture with no slider to notice. The parameter that door was built
- * on does not exist here, so reintroducing it means reintroducing an argument.
- *
- * `standaloneRow` is a different question and a real one: the sprite document's
- * private palette is drawn as a single row the grid indexes as line 0, and it is
- * not a CRAM line at all. See AEON_SPRITE_STANDALONE_PALETTE_POLICY.
+ * Every writer asks it: the swatch grid through `PaletteGridPort.admit`, and the
+ * COPY BRIDGE in components/art/PaletteEditor.tsx (the "Copy to" menu and the
+ * drag-and-drop), through `whenZoneLineAdmitted`. The copy bridge is the one
+ * that matters most, because a copy lands in a single gesture with no slider to
+ * notice; until 2026-09-10 it computed its own rule (`line === 0 && !inSprite`)
+ * and was a second, quieter door, so it must not decide for itself again.
  */
-export function zoneCopyTargetRefusal(line: number, standaloneRow: boolean): string | null {
-  return standaloneRow ? null : zonePaletteLineRefusal(line);
+export function admitZoneLine(line: number): true | Promise<boolean> {
+  return zonePaletteWriteAdmitted(line, isSharedLineAcknowledged()) ? true : admitSharedLineEdit();
+}
+
+/** Run `write` once `line` is admitted; do nothing at all when it is declined. */
+export function whenZoneLineAdmitted(line: number, write: () => void): void {
+  const gate = admitZoneLine(line);
+  if (gate === true) { write(); return; }
+  void gate.then((ok) => { if (ok) write(); });
 }
 
 /**
@@ -325,19 +319,19 @@ export function useAeonPaletteGridPort(opts?: { context?: 'sprite' }): PaletteGr
    * sound because `drain` is guaranteed to run.
    */
   const previewZone = React.useCallback((line: number, idx: number, word: number): void => {
-    // THE REFUSAL, at the one place a zone colour is actually written.
+    // THE SECOND LOCK, at the one place a zone colour is actually written.
     //
-    // The policy above already stops the grid from OFFERING line 0, and this
-    // is deliberately a second lock rather than a redundant one: `preview` is a
-    // public port method, the policy is data a future mount could pass
-    // differently, and this preview writes straight into the open document
-    // outside the command system. A refusal that only lives in the data the UI
-    // consults is a refusal the next caller does not get.
-    //
-    // It is LOUD rather than a bare return: a control that does nothing and
-    // says nothing is the defect this whole parcel is about.
-    const refusal = zonePaletteLineRefusal(line);
-    if (refusal) { console.warn(refusal); return; }
+    // The grid asks `admit` before it opens a swatch, and this is deliberately
+    // a second check rather than a redundant one: `preview` is a public port
+    // method, and this preview writes straight into the open document outside
+    // the command system. A shared-line write the warning has not admitted for
+    // THIS project is refused here, whatever called it. LOUD rather than a bare
+    // return: a control that does nothing and says nothing is a defect.
+    if (!zonePaletteWriteAdmitted(line, isSharedLineAcknowledged())) {
+      console.warn(`palette line ${line} is ${ZONE_SHARED_LINE_NOTE}, and its warning has not `
+        + 'been accepted for this project, so this preview was refused');
+      return;
+    }
     const z = getCurrentZone(useProjectStore.getState());
     if (!z) return;
     beginZoneDrag(line, idx);
@@ -428,9 +422,9 @@ export function useAeonPaletteGridPort(opts?: { context?: 'sprite' }): PaletteGr
   }, [standaloneMode, inSprite]);
 
   const zone = getCurrentZone(useProjectStore.getState());
-  // The zone policy now covers the sprite pane's zone mode too: its line 0 is
-  // the same shared player palette the Art facet has always locked. Only the
-  // STANDALONE row, which is not a CRAM line at all, stays unlocked.
+  // The zone policy covers the sprite pane's zone mode too: its line 0 is the
+  // same shared player palette, behind the same warning (`admit` below). The
+  // STANDALONE row is not a CRAM line at all, so nothing guards it.
   const policy = standaloneMode ? AEON_SPRITE_STANDALONE_PALETTE_POLICY : AEON_ZONE_PALETTE_POLICY;
 
   /* eslint-disable-next-line react-hooks/exhaustive-deps -- the palette object is
@@ -490,6 +484,12 @@ export function useAeonPaletteGridPort(opts?: { context?: 'sprite' }): PaletteGr
    * Zone only: a standalone sprite palette is a private working palette, not
    * CRAM state, and pushing it would recolour the game from something it never
    * had.
+   *
+   * LINE 0 IS NEVER SENT, not even after an admitted edit: the loop starts at
+   * `PUSHABLE_FIRST_LINE`, because `Pal_Base` does not hold line 0 and
+   * `palBaseOffset` throws on it (the engine never writes the character's
+   * line). A line 0 edit shows in the editor and reaches the game only through
+   * a save and a rebuild; the warning says so, and nothing here claims more.
    */
   const lastPushedRef = React.useRef(new Map<number, string>());
   // Kind-gated: `palette` alone would light up against a CLASSIC ROM, whose
@@ -525,20 +525,23 @@ export function useAeonPaletteGridPort(opts?: { context?: 'sprite' }): PaletteGr
     preview,
     commit,
     drain,
+    // A standalone row is not a CRAM line, so nothing there is shared; a zone
+    // line that is gets the warning before its sliders open.
+    admit: (line) => (standaloneMode ? true : admitZoneLine(line)),
     title: (line, idx) => {
-      // The locked line's tooltip IS the refusal: it is the only place a person
-      // reading the palette is told why the swatch will not open, so it carries
-      // the reason rather than the label `sprite-reserved (line 0)` it used to.
-      if (isLineLocked(line, policy)) return ZONE_LINE0_REFUSAL;
       if (idx === TRANSPARENT_INDEX) return 'transparent (index 0)';
       const word = fmtGenesisWord(lines[line]?.[idx] ?? 0);
-      return standaloneMode
-        ? `sprite palette, index ${idx}: ${word}`
+      if (standaloneMode) return `sprite palette, index ${idx}: ${word}`;
+      // The shared line says whose it is on every swatch, before any click.
+      return isZoneSharedLine(line)
+        ? `line ${line}, index ${idx}: ${word} · ${ZONE_SHARED_LINE_NOTE}`
         : `line ${line}, index ${idx}: ${word}`;
     },
     heading: (line, idx) => (standaloneMode
       ? `Sprite · Index ${idx}`
-      : `Line ${line} · Index ${idx}`),
+      : isZoneSharedLine(line)
+        ? `Line ${line} · Index ${idx} · every zone`
+        : `Line ${line} · Index ${idx}`),
   }), [
     lines, policy, paintSel, scope, paletteVersion, historyVersion,
     select, preview, commit, drain, standaloneMode,
