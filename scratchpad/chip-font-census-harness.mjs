@@ -99,7 +99,9 @@ import { join, relative } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild, assertDebugBuild } from './lib/run-root.mjs';
-import { openNewCanvasDialog, fillDialog, settledInPage } from './canvas-cdp-harness.mjs';
+import {
+  openNewCanvasDialog, fillDialog, settledInPage, INSTALL as CANVAS_INSTALL,
+} from './canvas-cdp-harness.mjs';
 
 const PORT = Number(process.env.PORT ?? 9443);
 const ROOT = AURORA_DIR;
@@ -187,9 +189,70 @@ function chipDeclaration() {
   return { fontSizes, shorthands, inits, token, cssVar, varExpr };
 }
 
-function staticCensus() {
+/** A token's px, FROM SOURCE: theme.ts maps `tXs` to `var(--text-xs-size)`,
+ *  theme.css gives that property a px value. Null when either link is absent. */
+function tokenPx(token) {
+  const t = [...read(THEME_TS).matchAll(new RegExp(`\\b${token}:\\s*'var\\((--[\\w-]+)\\)'`, 'g'))];
+  if (t.length !== 1) return null;
+  const css = [...read('src/renderer/styles/theme.css').matchAll(new RegExp(`${t[0][1]}:\\s*([\\d.]+px)`, 'g'))];
+  return css.length === 1 ? css[0][1] : null;
+}
+
+/** WHICH ui PRIMITIVES SET A FONT SIZE ON WHAT THEY WRAP, derived rather than
+ *  typed: every capitalised top-level function in the ui directory whose
+ *  returned root JSX element carries `style={{ ... fontSize: T.x ... }}`.
+ *  A `font: inherit` chip inside one paints that size. `Chip` itself is left
+ *  out: it is the subject, not a container. */
+function containerTokens() {
+  const out = {};
+  const files = execFileSync('git', ['-C', ROOT, 'ls-files', '--', 'src/renderer/components/ui/*.tsx'], { encoding: 'utf8' })
+    .split('\n').filter((f) => f && !f.includes('__tests__'));
+  for (const rel of files) {
+    const sf = parse(rel);
+    sf.forEachChild((n) => {
+      if (!ts.isFunctionDeclaration(n) || !n.name || !/^[A-Z]/.test(n.name.text) || n.name.text === 'Chip' || !n.body) return;
+      for (const s of n.body.statements) {
+        if (!ts.isReturnStatement(s) || !s.expression) continue;
+        let e = s.expression;
+        while (ts.isParenthesizedExpression(e)) e = e.expression;
+        const open = ts.isJsxElement(e) ? e.openingElement : ts.isJsxSelfClosingElement(e) ? e : null;
+        const tok = open ? styleFontToken(sf, open) : null;
+        if (tok) out[n.name.text] = { token: tok, file: rel, line: lineOf(sf, s) };
+      }
+    });
+  }
+  return out;
+}
+function styleFontToken(sf, open) {
+  const st = open.attributes.properties.find((p) => ts.isJsxAttribute(p) && p.name.getText(sf) === 'style');
+  const obj = st?.initializer && ts.isJsxExpression(st.initializer) ? st.initializer.expression : null;
+  if (!obj || !ts.isObjectLiteralExpression(obj)) return null;
+  const fs = obj.properties.find((p) => ts.isPropertyAssignment(p) && p.name.getText(sf) === 'fontSize');
+  const m = fs && /^T\.(\w+)$/.exec(fs.initializer.getText(sf));
+  return m ? m[1] : null;
+}
+
+function staticCensus(decl) {
+  const CONTAINERS = containerTokens();
   const files = execFileSync('git', ['-C', ROOT, 'ls-files', '--', 'src/*.tsx'], { encoding: 'utf8' })
     .split('\n').filter((f) => f && !f.includes('__tests__') && !/\.test\.tsx$/.test(f));
+  const declaredPx = decl.token ? tokenPx(decl.token) : null;
+  // What a <button> chip inherits, as far as ITS OWN FILE can say: the nearest
+  // JSX ancestor that is a sizing primitive, or that carries an inline
+  // fontSize token. Anything else is decided where the component is MOUNTED,
+  // which this file cannot see; that is its own bucket, never a guess.
+  const containerOf = (sf, ancestors) => {
+    for (let i = ancestors.length - 1; i >= 0; i--) {
+      const a = ancestors[i];
+      const ao = ts.isJsxElement(a) ? a.openingElement : ts.isJsxSelfClosingElement(a) ? a : null;
+      if (!ao) continue;
+      const tag = ao.tagName.getText(sf);
+      if (CONTAINERS[tag]) return { via: `<${tag}>`, token: CONTAINERS[tag].token };
+      const tok = styleFontToken(sf, ao);
+      if (tok) return { via: `<${tag} style.fontSize>`, token: tok };
+    }
+    return null;
+  };
   const sites = []; const importProblems = [];
   for (const rel of files) {
     const text = read(rel);
@@ -223,14 +286,25 @@ function staticCensus() {
           && a.expression.name.text === 'map');
         let label = '';
         if (ts.isJsxElement(n)) label = n.children.map((ch) => ch.getText(sf)).join('').replace(/\s+/g, ' ').trim();
-        sites.push({ file: rel, line: lineOf(sf, n), cls, inMap, label: label.slice(0, 40) });
+        // TODAY'S PAINTED SIZE, PREDICTED FROM SOURCE ALONE. A <span> chip
+        // paints what Chip declares; a <button> chip (font: inherit) paints
+        // its container's size, when this file shows the container.
+        const cont = containerOf(sf, ancestors);
+        const contPx = cont ? (tokenPx(cont.token) ?? `T.${cont.token}?`) : 'from mount site';
+        const predicted = cls === 'static' ? declaredPx
+          : cls === 'interactive' ? contPx
+            : cls === 'conditional' ? `${declaredPx} as span / ${contPx} as button` : 'unknown';
+        sites.push({
+          file: rel, line: lineOf(sf, n), cls, inMap, label: label.slice(0, 40),
+          container: cont ? cont.via : null, predicted,
+        });
       }
       ts.forEachChild(n, (ch) => walk(ch, [...ancestors, n]));
     };
     walk(sf, []);
     if (sites.length > before && !importsChip) importProblems.push(rel);
   }
-  return { files: files.length, sites, importProblems };
+  return { files: files.length, sites, importProblems, containers: CONTAINERS, declaredPx };
 }
 
 function printStatic(st, decl) {
@@ -244,7 +318,8 @@ function printStatic(st, decl) {
     const n = (c) => ss.filter((s) => s.cls === c).length;
     console.log(`  ${f}: ${ss.length} site(s)  interactive=${n('interactive')} static=${n('static')} conditional=${n('conditional')}`);
     for (const s of ss) {
-      console.log(`      :${String(s.line).padEnd(5)} ${s.cls.padEnd(12)}${s.inMap ? ' in .map()' : '           '} ${JSON.stringify(s.label)}`);
+      console.log(`      :${String(s.line).padEnd(5)} ${s.cls.padEnd(12)}${s.inMap ? ' in .map()' : '           '} `
+        + `${JSON.stringify(s.label).padEnd(42)} paints today: ${s.predicted}${s.container ? ` (via ${s.container})` : ''}`);
     }
   }
   const tally = (c) => st.sites.filter((s) => s.cls === c).length;
@@ -257,6 +332,12 @@ function printStatic(st, decl) {
   console.log(`  TOTAL: ${totals.sites} call sites in ${totals.files} files (of ${st.files} .tsx scanned): `
     + `interactive=${totals.interactive} static=${totals.static} conditional=${totals.conditional} `
     + `unknown=${totals.unknown}; ${totals.inMap} of them inside a .map() (one site, many chips)`);
+  const predicted = {};
+  for (const s of st.sites) predicted[s.predicted] = (predicted[s.predicted] ?? 0) + 1;
+  totals.predictedToday = predicted;
+  console.log(`  PAINTS TODAY, predicted from source (unit: call sites): ${JSON.stringify(predicted)}`);
+  console.log(`  sizing containers derived from the ui primitives: ${JSON.stringify(Object.fromEntries(
+    Object.entries(st.containers).map(([k, v]) => [k, `T.${v.token}=${tokenPx(v.token)}`])))}`);
   console.log(`  DECLARED by function Chip (${PRIMITIVES}): fontSize initialisers `
     + `${JSON.stringify(decl.fontSizes)}; font shorthand keys ${JSON.stringify(decl.shorthands)}; `
     + `token=${decl.token} -> ${decl.varExpr}`);
@@ -349,7 +430,7 @@ const INSTALL = `(() => {
   const visible = (el) => (el.checkVisibility ? el.checkVisibility() : el.offsetParent !== null)
     && el.getClientRects().length > 0;
   // The component that rendered this host element, and the nearest named
-  // component above THAT (the call site's owner).
+  // component above THAT in the render tree (see INSIDE below).
   const renderedBy = (el) => { const f = fiberOf(el); return f && f.return ? f.return : null; };
   const ownerAbove = (f, skip) => {
     for (let p = f ? f.return : null; p; p = p.return) {
@@ -375,8 +456,12 @@ const INSTALL = `(() => {
       if (!isChip && !lookalike) continue;
       if (!visible(el)) { if (isChip) hiddenChips++; continue; }
       const r = el.getBoundingClientRect();
+      // INSIDE, not OWNER: a production fiber keeps no owner, so this is the
+      // nearest named component ABOVE the chip in the RENDER tree. The level
+      // header's chips are written in LevelWorkspace but passed as a prop to
+      // EditorShell, so they report EditorShell. Consistent, so it dedupes.
       const row = {
-        owner: isChip ? ownerAbove(by, 'Chip') : ownerAbove(fiberOf(el), null),
+        inside: isChip ? ownerAbove(by, 'Chip') : ownerAbove(fiberOf(el), null),
         text: el.textContent.trim().replace(/\\s+/g, ' ').slice(0, 40),
         tag: el.tagName.toLowerCase(),
         computed: getComputedStyle(el).fontSize,
@@ -561,7 +646,7 @@ function partRows(part, decl, firstChips) {
       n++;
       const pxOk = /^\d+(\.\d+)?px$/.test(s.census.declaredPx) && ch.computed === s.census.declaredPx;
       const inlineOk = ch.inlineFontSize === decl.varExpr;
-      if (!pxOk || !inlineOk) off.push(`${s.screen} :: ${ch.owner} ${ch.tag} ${JSON.stringify(ch.text)} `
+      if (!pxOk || !inlineOk) off.push(`${s.screen} :: ${ch.inside} ${ch.tag} ${JSON.stringify(ch.text)} `
         + `computed=${ch.computed} inline font-size=${ch.inlineFontSize}`);
     }
   }
@@ -577,9 +662,18 @@ function partRows(part, decl, firstChips) {
 // ─────────────────────────────────────────────────────────────────────────────
 // THE PARTS
 // ─────────────────────────────────────────────────────────────────────────────
-async function aeonPart(decl) {
-  const { app, c } = await launch();
+/** A part that throws is recorded as a FAILED `<part>.run` row and as NOT
+ *  MEASURED from that point, and the run goes on to print and write what it
+ *  did measure. A thrown part used to take the census file down with it. */
+function partThrew(part, e, notMeasured) {
+  check(`${part}.run`, `the ${part} part ran to its end`, false, `threw: ${e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e}`);
+  notMeasured.push(`${part} (from the throw on)`);
+}
+
+async function aeonPart(decl, notMeasured) {
+  let app = null, c = null;
   try {
+    ({ app, c } = await launch());
     console.log(`\n──── aeon: ${AEON.value} (${AEON.name}; a copy) ────`);
     const s = await openAndWait(c, `window.__dbg.aeon.open(${JSON.stringify(AEON.value)})`, 'aeon.open');
     if (s !== 'resolved:true') throw new Error(`aeon open did not succeed (${s})`);
@@ -589,19 +683,22 @@ async function aeonPart(decl) {
     await sleep(1200);
     const first = await takeCensus(c, 'aeon', 'landing', decl);
     await walkFacets(c, 'aeon', decl, {
-      crops: new Set(['Layout', 'Layout/tool:Stamp chunk', 'Effects/Tile anim', 'Effects/Colour', 'Art']),
+      crops: new Set(['Layout', 'Layout/tool:Stamp Chunk', 'Layout/tool:Paint Tile', 'Effects/Tile anim', 'Effects/Colour', 'Art']),
     });
     partRows('aeon', decl, first.chips.length);
+  } catch (e) {
+    partThrew('aeon', e, notMeasured);
   } finally {
-    c.close();
-    await killTree(app);
+    if (c) c.close();
+    if (app) await killTree(app);
   }
 }
 
-async function classicSpriteCanvasPart(decl) {
-  const { app, c } = await launch();
+async function classicSpriteCanvasPart(decl, notMeasured) {
+  let app = null, c = null;
   try {
-    if (PARTS.has('classic') || PARTS.has('sprite') || PARTS.has('canvas')) {
+    ({ app, c } = await launch());
+    {
       console.log(`\n──── classic: ${S1.value} (${S1.name}; a copy), GHZ act 1 ────`);
       await settledInPage(c, `window.__dbg.openDir(${JSON.stringify(S1.value)})`, 'openDir');
       let proj = { zones: 0 };
@@ -620,24 +717,31 @@ async function classicSpriteCanvasPart(decl) {
       await sleep(800);
     }
     if (PARTS.has('classic')) {
-      const first = await takeCensus(c, 'classic', 'landing', decl);
-      await walkFacets(c, 'classic', decl, {
-        crops: new Set(['Layout', 'Art/Chunk', 'Art/Block', 'Art/Tile', 'Collision']),
-      });
-      partRows('classic', decl, first.chips.length);
+      try {
+        const first = await takeCensus(c, 'classic', 'landing', decl);
+        await walkFacets(c, 'classic', decl, {
+          crops: new Set(['Layout', 'Art/Chunk', 'Art/Block', 'Art/Tile', 'Collision']),
+        });
+        partRows('classic', decl, first.chips.length);
+      } catch (e) { partThrew('classic', e, notMeasured); }
     }
     if (PARTS.has('sprite')) {
-      console.log('\n──── sprite: object $41 (the GHZ spring), __dbg.editObjectArt, the object UI\'s own door ────');
-      const ok = await openAndWait(c, 'window.__dbg.editObjectArt(0x41)', 'editObjectArt');
-      await sleep(2000);
-      const sp = await c.json('window.__dbg.spriteState()').catch(() => ({}));
-      console.log(`        ${ok} activeDocId=${sp.activeDocId} frames=${sp.frames}`);
-      const first = await takeCensus(c, 'sprite', 'document', decl, { crop: true });
-      await toolWalk(c, 'sprite', 'document', decl);
-      partRows('sprite', decl, first.chips.length);
+      try {
+        console.log('\n──── sprite: object $41 (the GHZ spring), __dbg.editObjectArt, the object UI\'s own door ────');
+        const ok = await openAndWait(c, 'window.__dbg.editObjectArt(0x41)', 'editObjectArt');
+        await sleep(2000);
+        const sp = await c.json('window.__dbg.spriteState()').catch(() => ({}));
+        console.log(`        ${ok} activeDocId=${sp.activeDocId} frames=${sp.frames}`);
+        const first = await takeCensus(c, 'sprite', 'document', decl, { crop: true });
+        await toolWalk(c, 'sprite', 'document', decl);
+        partRows('sprite', decl, first.chips.length);
+      } catch (e) { partThrew('sprite', e, notMeasured); }
     }
-    if (PARTS.has('canvas')) {
+    if (PARTS.has('canvas')) try {
       console.log('\n──── canvas: a new canvas through the real New Canvas dialog (Ctrl+K) ────');
+      // openNewCanvasDialog reads `window.__c` BEFORE it installs it; its own
+      // callers install it first, and so must this one.
+      await c.evalExpr(CANVAS_INSTALL);
       const opened = await openNewCanvasDialog(c);
       if (!opened) throw new Error('the New Canvas dialog would not open');
       const name = `chip-census-${Date.now().toString(36)}`;
@@ -654,10 +758,12 @@ async function classicSpriteCanvasPart(decl) {
       const first = await takeCensus(c, 'canvas', 'new 64x64', decl, { crop: true });
       await toolWalk(c, 'canvas', 'new 64x64', decl);
       partRows('canvas', decl, first.chips.length);
-    }
+    } catch (e) { partThrew('canvas', e, notMeasured); }
+  } catch (e) {
+    partThrew('classic/sprite/canvas session', e, notMeasured);
   } finally {
-    c.close();
-    await killTree(app);
+    if (c) c.close();
+    if (app) await killTree(app);
   }
 }
 
@@ -667,7 +773,7 @@ async function classicSpriteCanvasPart(decl) {
 function printRendered(st) {
   console.log('\n════ (a) RENDERED CHIPS: getComputedStyle().fontSize of every visible chip, per screen ════');
   const bucket = (px) => px;
-  const distinct = new Map();       // key -> { owner, text, tag, sizes:Set, screens:[] }
+  const distinct = new Map();       // key -> { inside, text, tag, sizes:Set, screens:[] }
   const chipScreens = {};
   const perPart = {};
   for (const s of screens) {
@@ -677,9 +783,9 @@ function printRendered(st) {
       const b = bucket(ch.computed);
       chipScreens[b] = (chipScreens[b] ?? 0) + 1;
       perPart[s.part].chipScreens[b] = (perPart[s.part].chipScreens[b] ?? 0) + 1;
-      const k = `${ch.owner}|${ch.text}|${ch.tag}`;
+      const k = `${ch.inside}|${ch.text}|${ch.tag}`;
       for (const m of [distinct, perPart[s.part].distinct]) {
-        if (!m.has(k)) m.set(k, { owner: ch.owner, text: ch.text, tag: ch.tag, sizes: new Set(), screens: [], inherited: new Set(), textSizes: new Set() });
+        if (!m.has(k)) m.set(k, { inside: ch.inside, text: ch.text, tag: ch.tag, sizes: new Set(), screens: [], inherited: new Set(), textSizes: new Set() });
         const e = m.get(k); e.sizes.add(ch.computed); e.screens.push(`${s.part}:${s.screen}`);
         e.inherited.add(ch.inherited); ch.textSizes.forEach((t) => e.textSizes.add(t));
       }
@@ -697,21 +803,22 @@ function printRendered(st) {
     console.log(`  ${p.padEnd(8)} screens=${String(v.screens).padStart(3)}  distinct chips ${JSON.stringify(tallyDistinct(v.distinct))}`
       + `  chip-screens ${JSON.stringify(v.chipScreens)}`);
   }
-  console.log('  DISTINCT CHIPS (owner | text | element -> sizes painted; inherited; screens seen on):');
-  for (const e of [...distinct.values()].sort((a, b) => a.owner.localeCompare(b.owner) || a.text.localeCompare(b.text))) {
-    console.log(`      ${e.owner.padEnd(24)} ${JSON.stringify(e.text).padEnd(34)} ${e.tag.padEnd(6)} `
+  console.log('  DISTINCT CHIPS (inside: nearest named component above it in the render tree | text | element '
+    + '-> sizes painted; its container\'s size; times seen):');
+  for (const e of [...distinct.values()].sort((a, b) => a.inside.localeCompare(b.inside) || a.text.localeCompare(b.text))) {
+    console.log(`      ${e.inside.padEnd(24)} ${JSON.stringify(e.text).padEnd(34)} ${e.tag.padEnd(6)} `
       + `-> ${[...e.sizes].join('/')}  (inherits ${[...e.inherited].join('/')}; text ${[...e.textSizes].join('/')}) `
       + `x${e.screens.length}`);
   }
   const look = new Map();
   for (const s of screens) for (const l of s.census.lookalikes) {
-    const k = `${l.owner}|${l.text}|${l.tag}`;
+    const k = `${l.inside}|${l.text}|${l.tag}`;
     if (!look.has(k)) look.set(k, { ...l, sizes: new Set() });
     look.get(k).sizes.add(l.computed);
   }
   console.log(`  LOOKALIKES (inline-flex + nowrap, NOT rendered by Chip; listed, do not vote): ${look.size} distinct`);
   for (const l of look.values()) {
-    console.log(`      ${l.owner.padEnd(24)} ${JSON.stringify(l.text).padEnd(34)} ${l.tag.padEnd(6)} -> ${[...l.sizes].join('/')}`);
+    console.log(`      ${l.inside.padEnd(24)} ${JSON.stringify(l.text).padEnd(34)} ${l.tag.padEnd(6)} -> ${[...l.sizes].join('/')}`);
   }
   const t = tallyDistinct(distinct);
   console.log(`  TOTAL distinct chips: ${distinct.size} ${JSON.stringify(t)}; chip-screens: `
@@ -723,7 +830,7 @@ function printRendered(st) {
 // ═════════════════════════════════════════════════════════════════════════════
 async function main() {
   const decl = chipDeclaration();
-  const st = staticCensus();
+  const st = staticCensus(decl);
   const staticTotals = printStatic(st, decl);
   check('S0', 'the static census found `<Chip` call sites, and every file using one imports it from the ui barrel',
     st.sites.length > 0 && st.importProblems.length === 0 && staticTotals.unknown === 0,
@@ -742,13 +849,13 @@ async function main() {
     assertDebugBuild(RUN);
     if (PARTS.has('aeon')) {
       if (!AEON) { skip('aeon', 'the aeon part', 'AEON_DIR is unset (no default: it must be a throwaway copy)'); notMeasured.push('aeon'); }
-      else await aeonPart(decl);
+      else await aeonPart(decl, notMeasured);
     }
     const s1Parts = ['classic', 'sprite', 'canvas'].filter((p) => PARTS.has(p));
     if (s1Parts.length) {
       if (!S1) {
         for (const p of s1Parts) { skip(p, `the ${p} part`, 'S1DISASM_DIR is unset (no default: it must be a throwaway copy)'); notMeasured.push(p); }
-      } else await classicSpriteCanvasPart(decl);
+      } else await classicSpriteCanvasPart(decl, notMeasured);
     }
   }
   const rendered = screens.length ? printRendered(st) : null;
