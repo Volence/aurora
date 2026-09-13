@@ -437,7 +437,16 @@ async function main() {
     // ⚠ THE ONE NON-UI DOOR, AND IT IS DECLARED. aeon's only real open route is
     // a NATIVE FOLDER PICKER that CDP cannot drive. Everything after this line
     // is real UI interaction; this step is NOT UI evidence.
-    await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(AEONDIR)})`);
+    //
+    // ⚠ CAUGHT, THE WAY EVERY SIBLING RIG CATCHES IT (RIGS-DEAD-NEEDLE-LEFTOVERS,
+    // 2026-09-13). On this build the call answers the CDP error
+    // `Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}` and
+    // the project opens anyway. Uncaught, it killed this rig after [0a], before
+    // it reached a single control, in every run of EFFECTS-RIGS-FIVE-MORE. Why
+    // the promise is collected is a different defect and is NOT measured here;
+    // [1a] below is what says whether the project really opened.
+    await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(AEONDIR)})`)
+      .catch((e) => console.log('        aeon open threw:', e.message));
     await sleep(3500);
     const st = await c.json('window.__dbg.aeon.state()');
     check('1a', 'the aeon clone opened', st && st.open === true, JSON.stringify(st));
