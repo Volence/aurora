@@ -692,13 +692,30 @@ async function aeonDeepStates(c, decl) {
   //     press whatever channel / band controls that preset offers.
   say('Effects pill', await clickText(c, '[aria-label="Facets"] button', 'Effects')); await sleep(900);
   say('Colour tab', await clickText(c, '[aria-label="Effects job"] button', 'Colour')); await sleep(700);
-  const input = await c.json(`(() => { const i = document.querySelector('input[placeholder="new_preset_id"]');
-    if (!i) return null; i.scrollIntoView({ block: 'center' }); const r = i.getBoundingClientRect();
-    return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
-  if (input) {
-    await mouseClick(c, input.x, input.y); await sleep(150);
-    await typeText(c, 'chip_census'); await sleep(250);
-    say('New preset chip_census', await clickText(c, 'button', 'New')); await sleep(800);
+  // `Input.insertText` lands only in the FOCUSED element; run 3 aimed a mouse
+  // click at the field, typed into nothing, and the census after "New" was the
+  // census before it. Focus from the page, READ the value back, and only then
+  // press the New chip that sits in the same Field as this input.
+  const INPUT = `document.querySelector('input[placeholder="new_preset_id"]')`;
+  const focused = await c.evalExpr(`(() => { const i = ${INPUT}; if (!i) return 'no-input';
+    i.scrollIntoView({ block: 'center' }); i.focus(); return document.activeElement === i ? 'focused' : 'not-focused'; })()`);
+  if (focused !== 'no-input') {
+    await typeText(c, 'chip_census'); await sleep(300);
+    let val = await c.evalExpr(`${INPUT}.value`);
+    if (val !== 'chip_census') {
+      val = await c.evalExpr(`(() => { const i = ${INPUT};
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'chip_census');
+        i.dispatchEvent(new Event('input', { bubbles: true })); return i.value; })()`);
+      await sleep(300);
+      say('preset id', `insertText did not land (${focused}); native setter + input event -> ${JSON.stringify(val)}`);
+    } else say('preset id', `typed (${focused}) -> ${JSON.stringify(val)}`);
+    const newBtn = await c.json(`(() => { const b = ${INPUT}.parentElement.querySelector('button');
+      if (!b) return null; const r = b.getBoundingClientRect();
+      return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2), disabled: b.disabled, text: b.textContent.trim() }; })()`);
+    if (newBtn && !newBtn.disabled) { await mouseClick(c, newBtn.x, newBtn.y); await sleep(900); }
+    say('New preset chip_census', newBtn ? `${newBtn.text} disabled=${newBtn.disabled}` : 'no button beside the field');
+    const refusal = await c.evalExpr(`${INPUT} ? ${INPUT}.value : '(field gone)'`);
+    say('field after New', JSON.stringify(refusal));
     await takeCensus(c, 'aeon', 'Effects/Colour/+preset', decl, { crop: true });
     for (const label of ['Add channel', 'Add raster band', 'Add base-swap band']) {
       const r = await clickText(c, 'button', label);
@@ -713,6 +730,32 @@ async function aeonDeepStates(c, decl) {
   await takeCensus(c, 'aeon', 'Effects/Tile anim/+New section', decl);
   say('Add blank tile animation', await clickText(c, 'button', 'Add blank tile animation')); await sleep(1000);
   await takeCensus(c, 'aeon', 'Effects/Tile anim/+band', decl, { crop: true });
+  // (iii) The preview strip's middle chip ("pan to move", the ONLY static call
+  //       site) shows while playback is on and every band reads the camera.
+  say('Play tile animations', await clickText(c, 'button', 'Play tile animations')); await sleep(800);
+  await takeCensus(c, 'aeon', 'Effects/Tile anim/+band/playing', decl);
+  // (iv) A band that cells DRAW refuses its first Remove and shows a confirm
+  //      row (two more chips). A blank band is not drawn and is just removed,
+  //      so promote one from existing tiles first, then press Remove on each
+  //      band, last first, until the confirm row is up.
+  say('Promote from tile', await clickText(c, 'button', 'Promote from tile', { prefix: true })); await sleep(1000);
+  await takeCensus(c, 'aeon', 'Effects/Tile anim/+promoted', decl);
+  let confirm = false;
+  for (let i = 0; i < 6 && !confirm; i++) {
+    const labels = await c.json(`[...document.querySelectorAll('button[aria-label^="Remove tile animation"]')]
+      .filter((b) => b.checkVisibility()).map((b) => b.getAttribute('aria-label'))`);
+    if (labels.length === 0) { say('Remove', 'no band left to press Remove on'); break; }
+    const lab = labels[labels.length - 1];
+    const p = await c.json(`(() => { const b = [...document.querySelectorAll('button')]
+      .find((e) => e.getAttribute('aria-label') === ${JSON.stringify(lab)});
+      b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect();
+      return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
+    await mouseClick(c, p.x, p.y); await sleep(800);
+    confirm = await c.evalExpr(`[...document.querySelectorAll('button')]
+      .some((b) => b.textContent.trim() === 'Remove and blank those cells' && b.checkVisibility())`);
+    say(`Remove (${lab})`, confirm ? 'refused and asked: the confirm row is up' : 'applied (no cell draws it)');
+  }
+  if (confirm) await takeCensus(c, 'aeon', 'Effects/Tile anim/+remove confirm', decl, { crop: true });
 }
 
 async function classicDeepStates(c, decl) {
@@ -726,8 +769,21 @@ async function classicDeepStates(c, decl) {
   const map = await c.json(`(() => { const cs = [...document.querySelectorAll('canvas')].filter((e) => e.checkVisibility());
     cs.sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight);
     if (!cs[0]) return null; const r = cs[0].getBoundingClientRect();
-    return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
-  if (map) { await mouseClick(c, map.x, map.y); await sleep(700); say('probe click', `at (${map.x},${map.y}) with View armed`); }
+    return { x: r.x, y: r.y, w: r.width, h: r.height }; })()`);
+  // The shape picker renders only for a probed cell that is NOT air, and the
+  // centre of GHZ's opening view can be sky. Probe a grid, stop on the picker.
+  let picker = false;
+  if (map) {
+    await c.evalExpr(INSTALL);
+    for (const [fx, fy] of [[0.5, 0.5], [0.5, 0.8], [0.3, 0.8], [0.7, 0.8], [0.5, 0.9], [0.2, 0.9],
+      [0.8, 0.9], [0.4, 0.65], [0.6, 0.65], [0.1, 0.75], [0.9, 0.75], [0.5, 0.95]]) {
+      const x = Math.round(map.x + map.w * fx), y = Math.round(map.y + map.h * fy);
+      await mouseClick(c, x, y); await sleep(450);
+      picker = await c.evalExpr(`window.__chipCensus(${JSON.stringify(decl.cssVar)}).chips.some((ch) => ch.names.includes('ShapePicker'))`);
+      if (picker) { say('probe click', `(${x},${y}) with View armed: the shape picker is up`); break; }
+    }
+    if (!picker) say('probe click', 'twelve probes, no non-air cell: the picker never rendered');
+  }
   await takeCensus(c, 'classic', 'Collision/+probe', decl, { crop: true });
   // (iv) The Import Art Sheet dialog, through the command palette. Its chip
   //      opens a native file picker, so it is measured and NEVER pressed.
@@ -746,10 +802,10 @@ async function canvasDeepStates(c, decl) {
   const pencil = (await c.json(`window.__clickable('button', 'ToolButton')`)).find((t) => t.label.startsWith('Pencil'));
   if (pencil) { await mouseClick(c, pencil.x, pencil.y); await sleep(300); }
   await c.evalExpr(CANVAS_INSTALL);
-  try { await drawArt(c, 4, 4, 40, 40, 64); say('stroke', 'drawn 4,4 -> 40,40 with Pencil'); }
+  try { await drawArt(c, 16, 16, 200, 200, 256); say('stroke', 'drawn 16,16 -> 200,200 with Pencil'); }
   catch (e) { say('stroke', `failed: ${e.message}`); }
   await sleep(800);
-  await takeCensus(c, 'canvas', 'new 64x64/+art', decl, { crop: true });
+  await takeCensus(c, 'canvas', 'new 256x256/+art', decl, { crop: true });
 }
 
 // The two rows every part gets.
@@ -866,7 +922,10 @@ async function classicSpriteCanvasPart(decl, notMeasured) {
       const opened = await openNewCanvasDialog(c);
       if (!opened) throw new Error('the New Canvas dialog would not open');
       const name = `chip-census-${Date.now().toString(36)}`;
-      await fillDialog(c, { name, width: 64, height: 64 });
+      // 256 x 256: ONE chunk (CHUNK_PX, core/art/canvas-resolve.ts). A smaller
+      // canvas has no chunk capacity, and the Commit to level section then
+      // renders none of its four chips.
+      await fillDialog(c, { name, width: 256, height: 256 });
       const create = await c.json(`(() => { const b = window.__c.dlgCreate(); if (!b) return null;
         const r = b.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
       if (!create) throw new Error('the dialog has no Create button');
@@ -876,8 +935,8 @@ async function classicSpriteCanvasPart(decl, notMeasured) {
       const docs = await c.json('window.__dbg.canvas.docIds()').catch(() => []);
       console.log(`        dialog still open=${still} canvas docs=${JSON.stringify(docs)}`);
       if (still) throw new Error(`create was refused: ${JSON.stringify(await c.json('window.__c.dlgError()'))}`);
-      const first = await takeCensus(c, 'canvas', 'new 64x64', decl, { crop: true });
-      await toolWalk(c, 'canvas', 'new 64x64', decl);
+      const first = await takeCensus(c, 'canvas', 'new 256x256', decl, { crop: true });
+      await toolWalk(c, 'canvas', 'new 256x256', decl);
       await canvasDeepStates(c, decl);
       partRows('canvas', decl, first.chips.length);
     } catch (e) { partThrew('canvas', e, notMeasured); }
@@ -959,11 +1018,26 @@ function printRendered(st) {
  * prediction, and NOT counted as either size.
  */
 function joinSites(st) {
+  // EACH CHIP BELONGS TO ONE COMPONENT: the nearest name in its render chain
+  // that is some call site's enclosing component. Matching any name in the
+  // chain let LevelWorkspace's `{l.toUpperCase()}` (FG/BG) claim the Effects
+  // option bar's chips, because that bar renders inside LevelWorkspace too.
+  const enclosingSet = new Set(st.sites.map((s) => s.enclosing).filter(Boolean));
+  const literalsOf = new Map();
+  for (const s of st.sites) {
+    if (!s.literal || !s.enclosing) continue;
+    if (!literalsOf.has(s.enclosing)) literalsOf.set(s.enclosing, new Set());
+    literalsOf.get(s.enclosing).add(s.label);
+  }
   const measured = [];
-  for (const s of screens) for (const ch of s.census.chips) measured.push(ch);
+  for (const s of screens) for (const ch of s.census.chips) {
+    measured.push({ ...ch, comp: ch.names.find((n) => enclosingSet.has(n)) ?? null });
+  }
   const rows = st.sites.map((site) => {
-    const hits = measured.filter((m) => site.enclosing && m.names.includes(site.enclosing)
-      && (!site.literal || m.text === site.label));
+    // A literal label takes the chips with that text; a templated one takes
+    // the component's chips that no literal site in it already names.
+    const hits = measured.filter((m) => site.enclosing && m.comp === site.enclosing
+      && (site.literal ? m.text === site.label : !(literalsOf.get(site.enclosing)?.has(m.text))));
     return { ...site, measured: [...new Set(hits.map((h) => h.computed))].sort() };
   });
   const tally = {};
