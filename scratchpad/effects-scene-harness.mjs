@@ -76,6 +76,7 @@ import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { SECTION_SCENE_FORM, openEffectsSectionState } from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9391);
 // ROOT defaults to the tree this harness FILE lives in, never a hardcoded path.
@@ -408,7 +409,21 @@ async function main() {
           // nothing and [4a] reported the pickers absent while on screen.
           // Anchored on the key ITSELF plus its separator, which keeps the row
           // aimed at the field rather than at prose a wording pass can rewrite.
-          .filter(e => /^Layer \d+ f[ab] — /.test(e.title || ''));
+          //
+          // ⚠ AND THE SEPARATOR WAS PROSE TOO (EFFECTS-RIGS-FIVE-MORE,
+          // 2026-09-13). 'Layer N fa' + space + EM DASH became 'Layer N fa: how
+          // far Plane A ...' in d70da895 on 2026-09-05 ("dash sweep, group 2:
+          // the effects scene provider, 80 repairs"), which rewrote
+          // PLANE_FACTOR_ROWS' titles. [4a] then reported [] and [4b] 'no
+          // picker' on a panel drawing both, and [11b]/[11d] reported "0 packed
+          // spinners" again, the same symptom the repair above was for. The key
+          // is CONTRACT and the punctuation after it is PROSE (the rule
+          // effects-deform's keyOfTitle states): so the boundary is "not
+          // another key character", never a punctuation mark. The packed
+          // triple's own controls are titled 's1:', 's2:', 'op:' (FactorField),
+          // so this cannot reach them. (No backticks in this comment: it sits
+          // inside a String.raw template.)
+          .filter(e => /^Layer \d+ f[ab](?![a-z0-9_])/.test(e.title || ''));
         return sels.map(s => ({
           title: s.title,
           options: [...s.options].map(o => o.value),
@@ -460,23 +475,26 @@ async function main() {
     // re-grown `<Select title="precision">` in that section left this row at
     // 40/40. The form is opened FIRST now, with its own instrument row, so the
     // null means the control is not there rather than that nothing is.
-    const sceneFormFor4c = await c.evalExpr(String.raw`
-      (() => {
-        const has = () => [...document.querySelectorAll('input')]
-          .some((e) => (e.title || '').startsWith('v_factor'));
-        if (has()) return 'already-open';
-        const hdr = [...document.querySelectorAll('div')]
-          .filter((d) => d.style && d.style.cursor === 'pointer'
-                      && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
-        if (!hdr) return 'no-scene-header';
-        hdr.click();
-        return 'clicked';
-      })()`);
-    await sleep(900);
+    //
+    // \u26a0 RE-AIMED (EFFECTS-RIGS-FIVE-MORE, 2026-09-13), and the old aim is quoted
+    // in `scratchpad/lib/effects-sections.mjs` beside `SECTION_SCENE_FORM`. This
+    // opener (and its twin at [10a0]) hunted a `cursor: pointer` div whose text
+    // began SCENE plus an em dash. That dash died in `24541886` on 2026-09-05
+    // (the effects dash sweep); the header reads `Scene: <id>`, composed per
+    // document at EffectsScenePanel.tsx. So [4c0] answered 'no-scene-header' and
+    // [4c1] went red beside it: the guard written after a planted precision
+    // picker left this section at 40/40 was itself blind. [4c] stayed GREEN
+    // throughout, against a shut form, which is the exact vacuity the comment
+    // above describes. The needle is RETIRED, not repaired: the title changes
+    // with the document under test. The verdict is the app's own
+    // `data-section-collapsed` read back AFTER the click.
+    const sceneFormFor4c = await openEffectsSectionState(c, SECTION_SCENE_FORM, { settleMs: 900 });
     check('4c0', 'INSTRUMENT: the Scene form is OPEN, so the absence [4c] asserts is an absence '
       + 'from a mounted section rather than from a collapsed one',
-      sceneFormFor4c === 'clicked' || sceneFormFor4c === 'already-open',
-      `open -> ${sceneFormFor4c}`);
+      sceneFormFor4c.ok === true
+      && (sceneFormFor4c.section === 'clicked' || sceneFormFor4c.section === 'already-open'),
+      `open -> ${JSON.stringify(sceneFormFor4c)} via [data-section="${SECTION_SCENE_FORM}"]`);
+    if (!sceneFormFor4c.ok) throw new Error(sceneFormFor4c.why);
     const vFactorPresent = await c.evalExpr(
       `[...document.querySelectorAll('input[type=number]')].some(e => /^v_factor\\b/.test(e.title || ''))`);
     check('4c1', 'ANTI-VACUOUS for [4c]: a control that DOES live in that form is on screen, so '
@@ -647,8 +665,9 @@ async function main() {
           // titles carry PLANE_FACTOR_ROWS' sentence after the key, so this
           // returned [] and every form stayed shut while [11b]/[11d] reported
           // "0 packed spinners" as though the app had drawn none.
-          // (O50 triage, 2026-09-03.)
-          .filter(t => /^Layer \d+ f[ab] — /.test(t))`);
+          // (O50 triage, 2026-09-03.) And re-aimed with it on 2026-09-13: the
+          // separator after the key is prose too, see [4a].
+          .filter(t => /^Layer \d+ f[ab](?![a-z0-9_])/.test(t))`);
       for (const t of titles) {
         await c.evalExpr(SET_INPUT(
           `[...document.querySelectorAll('select')].find(e => e.title === ${JSON.stringify(t)})`,
@@ -669,22 +688,14 @@ async function main() {
     // section is UNMOUNTED, not hidden, so both read MISSING and [10a] failed on
     // an inset it could not measure. Idempotent, and it says which door it
     // opened. (O50 triage, 2026-09-03.)
-    const sceneFormOpen = await c.evalExpr(String.raw`
-      (() => {
-        const has = () => [...document.querySelectorAll('input')]
-          .some((e) => (e.title || '').startsWith('v_factor'));
-        if (has()) return 'already-open';
-        const hdr = [...document.querySelectorAll('div')]
-          .filter((d) => d.style && d.style.cursor === 'pointer'
-                      && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
-        if (!hdr) return 'no-scene-header';
-        hdr.click();
-        return 'clicked';
-      })()`);
-    await sleep(900);
+    // RE-AIMED with [4c0] (EFFECTS-RIGS-FIVE-MORE, 2026-09-13): see there.
+    const sceneFormOpen = await openEffectsSectionState(c, SECTION_SCENE_FORM, { settleMs: 900 });
     check('10a0', 'INSTRUMENT: the Scene form is open, so Name and V factor are mounted - it '
       + 'arrives collapsed since d-26b, and a collapsed section is UNMOUNTED',
-      sceneFormOpen === 'clicked' || sceneFormOpen === 'already-open', `open -> ${sceneFormOpen}`);
+      sceneFormOpen.ok === true
+      && (sceneFormOpen.section === 'clicked' || sceneFormOpen.section === 'already-open'),
+      `open -> ${JSON.stringify(sceneFormOpen)} via [data-section="${SECTION_SCENE_FORM}"]`);
+    if (!sceneFormOpen.ok) throw new Error(sceneFormOpen.why);
 
     //
     // The number this row compares against is NOT typed here. It is read off the
