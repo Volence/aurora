@@ -102,6 +102,7 @@
     ],
     "harness:canvas-cdp": "node scratchpad/canvas-cdp-harness.mjs",
     "harness:capture": "node scratchpad/capture-harness.mjs",
+    "harness:chip-font-census": "node scratchpad/chip-font-census-harness.mjs",
     "harness:chunk-links": "node scratchpad/chunk-links-harness.mjs",
     "harness:chunk-row9": "node scratchpad/chunk-row9-probe.mjs",
     "harness:chunk-undo-measure": "node scratchpad/chunk-undo-measure-harness.mjs",
