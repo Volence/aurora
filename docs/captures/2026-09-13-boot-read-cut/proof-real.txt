@@ -1,0 +1,74 @@
+============================================================================================
+INPUTS
+============================================================================================
+  repo     : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ade3dc000f6e264b9   (--repo '.')
+  git tree : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ade3dc000f6e264b9   (git rev-parse --show-toplevel)
+  original : git 300085ea:docs/OVERSEER.md   (read from git tree /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ade3dc000f6e264b9)
+  output   : OVERSEER.md <- file /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ade3dc000f6e264b9/docs/OVERSEER.md
+  output   : OVERSEER-REFERENCE.md <- file /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ade3dc000f6e264b9/docs/OVERSEER-REFERENCE.md
+  declared new : file /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ade3dc000f6e264b9/.boot-cut-scratch/new-lines.md
+
+============================================================================================
+PROOF 1 - STRUCTURE: line accounting, then order-preserving partition
+============================================================================================
+  original non-blank lines            : 737
+  OVERSEER.md           non-blank lines : 336
+  OVERSEER-REFERENCE.md non-blank lines : 416
+  declared NEW non-blank lines        : 15
+  outputs - new  (must == original)   : 737
+  1a ORIGINAL lines ABSENT after split: 0
+  1b lines present but NOT DECLARED   : 0
+  1c declared NEW but already present : 0
+
+  1d order-preserving partition: is the original an interleaving of
+      the outputs (declared-new lines removed)?  A multiset check
+      alone would accept a file whose lines were shuffled.
+      RESULT: PASS - every original line sits in exactly one
+              output, in its original relative order.
+        OVERSEER.md           holds 324 original line(s) + 12 declared-new
+        OVERSEER-REFERENCE.md holds 413 original line(s) + 3 declared-new
+
+============================================================================================
+PROOF 2 - TOKENS: whitespace-token accounting (catches loss INSIDE a line)
+============================================================================================
+  original tokens                     : 13632
+  OVERSEER.md           tokens          : 5740
+  OVERSEER-REFERENCE.md tokens          : 8130
+  declared NEW tokens                 : 238
+  outputs - new  (must == original)   : 13632
+  DELTA vs original                   : 0
+  tokens LOST                         : 0
+  tokens GAINED undeclared            : 0
+
+============================================================================================
+PROOF 3 - SENTENCES: boundary predicate, run from BOTH sides of every seam
+============================================================================================
+  At each paragraph seam: does the text BEFORE still end a sentence,
+  and does the text AFTER still begin one?  Seams already flagged in
+  the ORIGINAL are pre-existing prose style, not this split's doing,
+  and are subtracted.
+
+  [heading-aware] flagged in original: 1    seams INTRODUCED by the split: 0    file-edge cuts: 0  <= GATE
+  [heading-blind] flagged in original: 19   seams INTRODUCED by the split: 5    file-edge cuts: 0
+
+  Both numbers are printed on every run.  --headings only chooses
+  which one gates; it can never quietly improve the reported result.
+
+  Cut points DERIVED from the PROOF 1 alignment (no hardcoded line
+  numbers), each put to the same predicate:
+    [OK ] DIVERGENCE OVERSEER.md keeps original line 243 -> OVERSEER-REFERENCE.md takes 244
+          before: 'by bar number, never by line.**'
+          after : '## Editor↔engine coordination points'
+    [OK ] DIVERGENCE OVERSEER-REFERENCE.md keeps original line 656 -> OVERSEER.md takes 657
+          before: '  questions, not that either is stale. Use `serverBuild.id` for staleness.'
+          after : '## Quirks'
+    [OK ] JUNCTION OVERSEER.md joins original line 243 straight to 657
+          before: 'by bar number, never by line.**'
+          after : '## Quirks'
+  derived cut points: 3   failing the predicate: 0
+
+============================================================================================
+PROOF 3 seams introduced: heading-aware 0 / heading-blind 5 (edge cuts 0 / 0) -- heading-aware GATED (--headings: a heading is a title, not a torn sentence)
+VERDICT: PROVED - the split is lossless by all three proofs
+============================================================================================
+REAL exit=0
