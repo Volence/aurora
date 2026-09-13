@@ -110,6 +110,7 @@ import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { SECTION_SCENE_FORM, openEffectsSectionState } from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9394);
 const ROOT = AURORA_DIR;
@@ -309,22 +310,24 @@ const EXPAND_LAYERS = String.raw`
   return open() ? 'clicked-open' : 'clicked-shut';
 })()`;
 
-/**
- * THE SCENE FORM, OPENED - it arrives COLLAPSED since EW-SHAPE-TABS (d-26b),
- * which is what gives the layers list above it a real height. Idempotent.
- */
-const OPEN_SCENE_FORM = String.raw`
-(() => {
-  const has = () => [...document.querySelectorAll('input')]
-    .some((e) => (e.title || '').startsWith('v_offset'));
-  if (has()) return 'already-open';
-  const hdr = [...document.querySelectorAll('div')]
-    .filter((d) => d.style && d.style.cursor === 'pointer'
-                && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
-  if (!hdr) return 'no-scene-header';
-  hdr.click();
-  return 'clicked';
-})()`;
+// THE SCENE FORM, OPENED - it arrives COLLAPSED since EW-SHAPE-TABS (d-26b),
+// which is what gives the layers list above it a real height. Opened by
+// `openForm` inside `main`, through `openEffectsSectionState`.
+//
+// \u26a0 RE-AIMED (EFFECTS-RIGS-FIVE-MORE, 2026-09-13), and the old aim is quoted in
+// `scratchpad/lib/effects-sections.mjs` beside `SECTION_SCENE_FORM`. The private
+// opener that stood here hunted a `cursor: pointer` div whose text began SCENE
+// plus an em dash. That dash died in `24541886` on 2026-09-05 (the effects dash
+// sweep); the header reads `Scene: <id>`, composed per document at
+// EffectsScenePanel.tsx, and row [2b] two screens down already listed it in its
+// artifact. The opener answered 'no-scene-header' AND ITS ANSWER WAS THROWN
+// AWAY: there was no row on the door, so the first thing to speak was [3d0],
+// "the Name field was found", which reads as a missing FIELD and was a shut
+// FORM, and then a TypeError at the transition select.
+//
+// The needle is RETIRED, not repaired: the title changes with the document
+// under test, so there is no stable string to type. The door is the section's
+// id, and it is now a ROW that can fail ([3s0]).
 
 async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
@@ -388,9 +391,17 @@ async function main() {
     // ---- 3. R1/R2: create the scene, name it. ----------------------------
     // ⚠ The scene form arrives COLLAPSED since d-26b's sub-tabs; `Name` and
     // every field below it live inside it. Opened once, the way an author does.
+    // ⚠ AND IT IS NOW A ROW. See the comment above `main`: the door's answer used
+    // to be thrown away, so a shut form first spoke as a missing Name field.
     const openForm = async () => {
-      const r = await c.evalExpr(OPEN_SCENE_FORM);
-      await sleep(800);
+      const r = await openEffectsSectionState(c, SECTION_SCENE_FORM, { settleMs: 800 });
+      check('3s0', 'INSTRUMENT: the Scene form is open: it arrives collapsed since d-26b, and '
+        + 'Name and every field below it live inside it',
+        r.ok === true && (r.section === 'clicked' || r.section === 'already-open'),
+        `open -> ${JSON.stringify(r)} via [data-section="${SECTION_SCENE_FORM}"]. The verdict is `
+        + 'the app\'s own data-section-collapsed read back AFTER the click, not the click\'s '
+        + 'return value: a header whose handler was removed still takes a click.');
+      if (!r.ok) throw new Error(r.why);
       return r;
     };
     const typed = await drive(c, 'R1 new_scene_id', SET_INPUT(
@@ -786,11 +797,25 @@ async function main() {
       // The form's own parameter rows: number inputs the sub-form titled with
       // this attachment's prefix. `speed` is titled the same way and takes the
       // same rule, so it rides along rather than being a second code path.
+      //
+      // ⚠ THE KEY IS THE LEADING RUN OF KEY CHARACTERS, not "everything up to the
+      // first space or paren" (EFFECTS-RIGS-FIVE-MORE, 2026-09-13). The old
+      // split worked only while a glossed title read 'deform_fg speed' + space +
+      // EM DASH, because the dash was its own word. `d70da895` on 2026-09-05
+      // ("dash sweep, group 2: the effects scene provider, 80 repairs") rewrote
+      // SCENE_DEFORM_ROW_SHARED.speedTitle to 'speed: how fast ...', gluing a
+      // colon to the key. The split then answered 'speed:', the selector became
+      // /^deform_fg speed:\b/, and a word boundary cannot follow ':' + space: so
+      // [8a] counted three 'no-element' misses and [8b] saw every speed left at
+      // the seed. The key is CONTRACT and the punctuation after it is PROSE,
+      // effects-deform's keyOfTitle rule: read the key, refuse to care what
+      // follows. (Opened only now, because the door above was shut until today.)
       const params = await c.json(
         `[...document.querySelectorAll('input[type=number]')]
            .map(e => e.title || '')
            .filter(t => t.startsWith(${JSON.stringify(`${prefix} `)}))
-           .map(t => t.slice(${prefix.length + 1}).split(/[ (]/)[0])`);
+           .map(t => (/^[a-z][a-z0-9_]*/.exec(t.slice(${prefix.length + 1})) || [''])[0])
+           .filter(k => k !== '')`);
       const got = {};
       const seeds = {};
       for (const key of params) {
@@ -813,11 +838,15 @@ async function main() {
         `[...document.querySelectorAll('select')]
            .map(e => e.title || '')
            .filter(t => t.startsWith(${JSON.stringify(`${prefix} `)}))
-           .map(t => t.slice(${prefix.length + 1}).split(/[ (]/)[0])
-           // A KEY, not a dash. The attachment's own on/off toggle is titled
-           // \`${prefix} — …\`, so a bare split would collect \`—\` as a
-           // parameter, issue a gesture for it and inflate row 8a's target by
-           // one per attachment. Schema keys are snake_case identifiers.
+           // THE KEY IS THE LEADING RUN OF KEY CHARACTERS (re-aimed 2026-09-13,
+           // with the number-input scan above and for the same reason). The old
+           // split-on-space answered 'period:' once 24541886 (2026-09-05, the
+           // effects-panel dash sweep) glued a colon to the picker's key, and the
+           // identifier filter below then DROPPED it: period was neither driven
+           // nor counted, its seed read null, and [8b]/[8f] failed over a picker
+           // that was on screen. The filter stays, and still keeps an on/off
+           // toggle's own title from being collected as a parameter.
+           .map(t => (/^[a-z_][a-z0-9_]*/.exec(t.slice(${prefix.length + 1})) || [''])[0])
            .filter(k => k !== 'table' && /^[a-z_][a-z0-9_]*$/.test(k))`);
       const pickTitles = {};
       for (const key of picks) {
