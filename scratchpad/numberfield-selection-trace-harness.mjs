@@ -80,6 +80,16 @@
 //                                                         discriminator
 //   S  one click on the spin arrow of an unfocused box    the scope, other axis
 //
+// ═══ 2026-09-13: THE TAB, WHICH NO ARM ABOVE TAKES ════════════════════════════
+//
+// Every arm above CLICKS its way into the box. NUMBERFIELD-TAB-THEN-CLICK (ruled
+// FIX, `docs/decisions.jsonl`) is the way in they cannot see: Tab in, click,
+// type, and the digit lands at the click's caret. These arms reach the box by a
+// REAL Tab key (`Input.dispatchKeyEvent`), never `.focus()`:
+//
+//   T0 Tab in, type, no click                             the Tab path's floor
+//   T  Tab in, ONE real click, type                       the defect (row 5b)
+//
 // **H against I isolates whether a commit happened. J against both separates
 // TYPING from COMMITTING** — and that boundary is where `NumberField`'s code
 // actually forks (`fields.tsx`: `commits += 1` and `onChange(n)` run only when
@@ -611,6 +621,104 @@ async function main() {
       return { verdict, at, armed, afterKey };
     })();
 
+    // ── ARMS T0 and T — THE WAY INTO THE BOX NO ARM ABOVE TAKES: A TAB ───
+    //
+    // NUMBERFIELD-TAB-THEN-CLICK (ruled FIX, `docs/decisions.jsonl`,
+    // `NUMBERFIELD-TAB-THEN-CLICK-answered`): Tab into the box, click it, type,
+    // and the digits land at the click's caret — `156` + `7` -> `1567`. Every
+    // arm above CLICKS its way in, so none of them can see it; row 160's own
+    // packet says so ("Nothing about Tab in a browser").
+    //
+    // ⚠ THE TAB IS A REAL KEY EVENT, NEVER `.focus()`. The defect is Blink's
+    // ordering of a gesture against a focus that already happened, and a
+    // scripted focus is not the focus the app sees from a keyboard. So the arm
+    // puts focus on the Top box with a REAL click and presses a REAL Tab
+    // (`Input.dispatchKeyEvent`, VK 9) until `activeElement` is the Bot box, and
+    // prints the path it took. If eight Tabs never land there, the arm ABORTS
+    // rather than measuring some other box.
+    //
+    // T0 is the floor for the Tab path, the way D is for the click path: Tab in
+    // and type with no click at all. It must REPLACE, because `onFocus` selects
+    // and Chromium's own keyboard focus selects too. A red there would mean the
+    // Tab itself inserts and T would say nothing about the click.
+    const TAB_KEY = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 };
+    const pressTab = async () => {
+      await c.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...TAB_KEY });
+      await c.send('Input.dispatchKeyEvent', { type: 'keyUp', ...TAB_KEY });
+    };
+    const WHO_IS_ACTIVE = String.raw`(() => {
+      const a = document.activeElement;
+      const box = ${EDGE_BOX(BOT_TITLE)};
+      return { onBox: !!box && a === box,
+        what: a ? a.tagName + (a.title ? ':' + a.title.slice(0, 28) : '') : null };
+    })()`;
+    /** Real click on the Top box, then real Tabs until the Bot box has focus. */
+    const tabInto = async (id) => {
+      const top = await aimAt(EDGE_BOX(TOP_TITLE));
+      if (!top || !top.hitIsTarget) throw new Error(`${id}: Top box not hit-testable: ${JSON.stringify(top)}`);
+      await clickPoint(top);
+      await sleep(300);
+      const path = [];
+      for (let i = 0; i < 8; i++) {
+        await pressTab();
+        await sleep(150);
+        const st = await c.json(WHO_IS_ACTIVE);
+        path.push(st.what);
+        if (st.onBox) return `real click on Top, then ${i + 1} real Tab(s): ${path.join(' -> ')}`;
+      }
+      throw new Error(`${id}: eight real Tabs from the Top box never reached the Bot box: ${path.join(' -> ')}`);
+    };
+    const leftEdge = async () => c.json(String.raw`(() => {
+      const el = ${EDGE_BOX(BOT_TITLE)};
+      if (!el) return null;
+      const b = el.getBoundingClientRect();
+      return { x: Math.round(b.left + 3), y: Math.round(b.top + b.height / 2) };
+    })()`);
+
+    /**
+     * One Tab arm. `between` runs after the Tab has landed and before the one
+     * keystroke every arm ends on; it returns a note. The verdict is read
+     * exactly as `runArm` reads it.
+     */
+    const runTabArm = async (id, label, between) => {
+      await freshPanel();
+      const cold = await boxState(EDGE_BOX(BOT_TITLE));
+      if (cold.focused !== false) throw new Error(`${id}: box already focused after a reload`);
+      await c.evalExpr(RESET_TRACE);
+      const tabNote = await tabInto(id);
+      const tabbed = await boxState(EDGE_BOX(BOT_TITLE));
+      // The Bot aim is re-taken AFTER the Tab: the Top box's aim scrolled it into
+      // view, and a stale centre would click somewhere the pointer never asked.
+      const aim = await aimAt(EDGE_BOX(BOT_TITLE));
+      if (!aim || !aim.hitIsTarget) throw new Error(`${id}: Bot box not hit-testable after the Tab`);
+      const note = await between(aim);
+      const armed = await boxState(EDGE_BOX(BOT_TITLE));
+      if (armed.focused !== true) throw new Error(`${id}: the box lost focus before the keystroke`);
+      await typeText(ONE_KEY);
+      await sleep(350);
+      const afterKey = await boxState(EDGE_BOX(BOT_TITLE));
+      const trace = await c.json(TRACE);
+      const at = insertedAt(armed.value, afterKey.value, ONE_KEY);
+      const verdict = afterKey.value === ONE_KEY ? 'REPLACED' : at >= 0 ? 'INSERTED' : 'NEITHER';
+      arms.push({ id, label, verdict, armedValue: armed.value, afterKey: afterKey.value, at, prepNote: note });
+      console.log(`\n──── ARM ${id}: ${label} ────`);
+      console.log(`        tab         : ${tabNote}`);
+      console.log(`        after Tab   : ${JSON.stringify(tabbed)}`);
+      console.log(`        then        : ${note}   (aim ${JSON.stringify({ x: aim.x, y: aim.y, dpr: aim.dpr })})`);
+      console.log(`        box at key  : ${JSON.stringify(armed)}`);
+      console.log(`        after "${ONE_KEY}"   : ${JSON.stringify(afterKey)}   -> ${verdict}`
+        + `${at >= 0 ? `  (caret at ${at})` : ''}`);
+      console.log(`        trace       : ${trace.map((r) => `${r.phase}(${r.isActive ? 'focused' : 'not'})`).join(' -> ')}`);
+      return { verdict, at, armed, afterKey };
+    };
+
+    const T0 = await runTabArm('T0', 'Tab in, NO click, type — the Tab path\'s floor', async () => 'nothing; typed straight after the Tab');
+    const T = await runTabArm('T', 'Tab in, ONE real click, type — the defect', async (aim) => {
+      await clickPoint(aim);
+      await sleep(350);
+      return 'one real click at the centre of the already-focused box';
+    });
+
     // ── ARM S — THE OTHER AXIS OF THE SCOPE: THE SPIN BUTTON ─────────────
     //
     // ⚠ A REMEDY THAT SUPPRESSES A DEFAULT ACTION HAS TO SAY WHOSE. Chromium's
@@ -774,6 +882,20 @@ async function main() {
       + 'value never moves at all: that means the pointer did not land on a spin button and this '
       + 'arm observed nothing. Distinguish the two before reporting either; the reverted build '
       + 'is the control, and an UNMEASURABLE on BOTH builds is this instrument, not the app.');
+
+    check('5a', 'THE TAB PATH\'S FLOOR: Tab in and type with no click REPLACES',
+      T0.verdict === 'REPLACED',
+      `${JSON.stringify(T0.armed.value)} + "${ONE_KEY}" -> ${JSON.stringify(T0.afterKey.value)} (${T0.verdict}). `
+      + 'The Tab path\'s D: `onFocus` selects and so does Chromium\'s keyboard focus. ⚠ A red here '
+      + 'means the TAB ITSELF inserts, and 5b below says nothing about the click.');
+    check('5b', 'NUMBERFIELD-TAB-THEN-CLICK: Tab in, one real click, type REPLACES',
+      T.verdict === 'REPLACED',
+      `${JSON.stringify(T.armed.value)} + "${ONE_KEY}" -> ${JSON.stringify(T.afterKey.value)} (${T.verdict}`
+      + `${T.at >= 0 ? `, caret at ${T.at}` : ''}). Ruled FIX (docs/decisions.jsonl, `
+      + 'NUMBERFIELD-TAB-THEN-CLICK-answered): "a click re-selects whenever the box was NOT focused '
+      + 'by a pointer". Before the fix this click was not armed, because `editing` was already true '
+      + 'after the Tab, and its caret took the digit: 156 + 7 -> 1567. ⚠ Read beside 2c: the same '
+      + 'run must still see arm N INSERT, or a REPLACED here is an instrument that stopped seeing.');
   } finally {
     try { c && c.close(); } catch { /* closing a dead socket is not a result */ }
     await killTree(child);
