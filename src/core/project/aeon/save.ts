@@ -106,6 +106,15 @@ export interface AeonSharedWrite {
 }
 
 /**
+ * The clause a save's report appends for the shared files it ACTUALLY wrote
+ * (the glue passes only those, never the planned ones): empty for none. Pure,
+ * so the wording is pinned in the node suite rather than only on screen.
+ */
+export function sharedWritesNote(whats: readonly string[]): string {
+  return whats.length ? ` · rewrote ${whats.join(' and ')}` : '';
+}
+
+/**
  * WHICH FILES A SAVE MAY DELETE, and the argument for why it is safe.
  *
  * ═══ THE DEFECT THIS EXISTS FOR ═══════════════════════════════════════════
