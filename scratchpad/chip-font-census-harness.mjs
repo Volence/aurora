@@ -261,10 +261,16 @@ function staticCensus(decl) {
         let label = '';
         if (ts.isJsxElement(n)) label = n.children.map((ch) => ch.getText(sf)).join('').replace(/\s+/g, ' ').trim();
         // TODAY'S PAINTED SIZE, PREDICTED FROM SOURCE ALONE. A <span> chip
-        // paints what Chip declares; a <button> chip (font: inherit) paints
-        // its container's size, when this file shows the container.
+        // paints what Chip declares. A <button> chip paints its CONTAINER's
+        // size only while Chip's style carries a `font` shorthand (S1 reads
+        // it), because that is what erases the declared size; with no
+        // shorthand the button paints the declaration like the span does.
+        // (First written assuming the shorthand, it went on predicting 11px
+        // for option-bar chips after the fix; the after run measured 13.)
         const cont = containerOf(sf, ancestors);
-        const contPx = cont ? (tokenPx(cont.token) ?? `T.${cont.token}?`) : 'from mount site';
+        const buttonsInherit = decl.shorthands.length > 0;
+        const contPx = !buttonsInherit ? declaredPx
+          : cont ? (tokenPx(cont.token) ?? `T.${cont.token}?`) : 'from mount site';
         const predicted = cls === 'static' ? declaredPx
           : cls === 'interactive' ? contPx
             : cls === 'conditional' ? `${declaredPx} as span / ${contPx} as button` : 'unknown';
