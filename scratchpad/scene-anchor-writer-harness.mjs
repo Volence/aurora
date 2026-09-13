@@ -60,12 +60,13 @@
 import {
   AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved,
 } from '../test/support/sibling-root.mjs';
-import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
 import { SECTION_SCENE_FORM, openEffectsSectionState } from './lib/effects-sections.mjs';
+import { captureDir } from './lib/capture-dir.mjs';
 
 const PORT = Number(process.env.PORT ?? 9527);
 const ROOT = AURORA_DIR;
@@ -78,7 +79,14 @@ const MAIN = RUN.main;
 // `checkoutOverride` exists for. Reading `process.env.AEON_DIR` by hand sees
 // ONE spelling and silently misses the aliases and the disagreement refusal.
 const AEONDIR = checkoutOverride('aeon')?.value ?? '';
-const SHOTS = join(ROOT, 'docs/captures/2026-09-05-scene-anchor-writer');
+// ⚠ NOT THE COMMITTED CAPTURES BY DEFAULT (ROWREMAP-STALE-ROWS-AND-CAPTURES,
+// 2026-09-13). This used to be `docs/captures/2026-09-05-scene-anchor-writer`
+// itself, so every run rewrote nine tracked PNGs. A run now writes into a
+// per-run temp dir named on its `captures:` line; `SHOTS=<that committed dir,
+// absolute>` is the explicit opt-in to refresh them. See lib/capture-dir.mjs.
+const CAPTURES_REL = 'docs/captures/2026-09-05-scene-anchor-writer';
+/** Resolved in main(), by captureDir. */
+let SHOTS = null;
 
 const SCENE_ID = 'aurora_anchor_waterline';
 const SECTION = 2;
@@ -353,7 +361,7 @@ async function anchorOf(c) {
 const ANCHOR_SEL = (field) => SEL_BY_TITLE(String.raw`/^anchor\.at\.${field}\b/`);
 
 async function main() {
-  mkdirSync(SHOTS, { recursive: true });
+  SHOTS = captureDir({ root: ROOT, committedRel: CAPTURES_REL, label: 'scene-anchor-writer' }).dir;
 
   // ⚠ BOTH VARIABLES OR NEITHER. A worktree has no `node_modules/.bin/electron`
   // and no `dist/`, so without AURORA_BUILT_TREE the resolver walks UP and
