@@ -201,7 +201,7 @@ const Q = String.raw`(() => {
     dialog: () => { const d = document.querySelector('[role=alertdialog]'); return d ? { title: d.getAttribute('aria-label'), text: d.innerText } : null; },
     buttonRect: (key) => rect(document.querySelector('button[data-confirm-key="' + key + '"]')),
     pillRect: (label) => rect([...document.querySelectorAll('[aria-label="Facets"] button')].find((e) => e.textContent.trim() === label) ?? null),
-    focusSlider: (n) => { const s = document.querySelectorAll('input[type=range]')[n]; if (!s) return null; s.focus(); return Number(s.value); },
+    sliderRect: (n) => rect(document.querySelectorAll('input[type=range]')[n] ?? null),
     sliderValue: (n) => { const s = document.querySelectorAll('input[type=range]')[n]; return s ? Number(s.value) : null; },
     bodyText: () => document.body.innerText,
   };
@@ -219,9 +219,11 @@ async function realClick(c, r, label) {
   await c.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
   return { x, y };
 }
+/** A real key press, in the shape the band-preset and bganim rigs use for the
+ *  same Ctrl+S (`keyDown` then `keyUp`), which is known to reach App.tsx. */
 async function realKey(c, key, code, vk, modifiers = 0) {
   const base = { key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers };
-  await c.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...base });
+  await c.send('Input.dispatchKeyEvent', { type: 'keyDown', ...base });
   await c.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
 }
 /** Poll until `pred()` is truthy or `ms` passes; returns the last value. An
@@ -327,17 +329,32 @@ async function runChecks(c) {
   check('5b', 'ACCEPT: the line 0 sliders open, under a heading that says every zone',
     opened5 === true && /^Line 0 · Index 5 · every zone/.test(heading ?? ''), JSON.stringify(heading));
 
-  // ── 6. One channel moved with REAL key events ─────────────────────────────
+  // ── 6. One channel moved with a REAL pointer press on the slider track ─────
+  // The first run of this rig drove it with an arrow key after a `.focus()`,
+  // and the value never moved (red 3 -> null): nothing was edited, so rows 6b
+  // to 7e measured nothing. A press on the track is the gesture a person makes,
+  // and its release is the pointerup the sliders commit on.
+  //
+  // WHERE TO PRESS, derived: a range input's value is linear in the pointer's x
+  // across the track minus one thumb width. The thumb is not queryable, so the
+  // press aims at the CENTRE of the target step (an error of half a thumb moves
+  // it well under half a step); the value it lands on is read back and printed,
+  // and the row fails if it is not the one aimed at.
   const oldWord = wordOf(title0);
-  const r0 = await c.json('window.__l0.focusSlider(0)');   // setup: focus only
-  const up = r0 < 7;
-  await realKey(c, up ? 'ArrowRight' : 'ArrowLeft', up ? 'ArrowRight' : 'ArrowLeft', up ? 39 : 37);
+  const r0 = (oldWord >> 1) & 7;
+  const target = r0 < 7 ? r0 + 1 : r0 - 1;
+  const track = await c.json('window.__l0.sliderRect(0)');
+  const THUMB = 16;
+  const pressX = track.x + THUMB / 2 + (target * (track.w - THUMB)) / 7;
+  const at = await realClick(c, { x: pressX, y: track.y, w: 0, h: track.h }, 'the red slider');
   const r1 = await until(async () => { const v = await c.json('window.__l0.sliderValue(0)'); return v !== r0 ? v : null; }, 3000);
-  // Derived: the same word with its red level moved by one.
-  const expectWord = (oldWord & ~(7 << 1)) | ((r0 + (up ? 1 : -1)) << 1);
+  // Derived: the same word with its red level set to the level aimed at.
+  const expectWord = (oldWord & ~(7 << 1)) | (target << 1);
   const title6 = await until(async () => { const t = await c.json(`window.__l0.title(${LINE}, ${ENTRY})`); return wordOf(t) === expectWord ? t : null; }, 3000);
-  check('6a', 'a real arrow key moved the red channel by one level, and the swatch shows the derived word',
-    r1 === r0 + (up ? 1 : -1) && !!title6, `red ${r0} -> ${r1}; expected ${fmt(expectWord)}; title=${JSON.stringify(title6)}`);
+  check('6a', 'a real press on the red slider moved it one level, and the swatch shows the derived word',
+    r1 === target && !!title6,
+    `red ${r0} -> ${r1} (aimed ${target}, track ${JSON.stringify(track)}, pressed at ${at.x},${at.y}); `
+    + `expected ${fmt(expectWord)}; title=${JSON.stringify(title6)}`);
   const dirty6 = await until(async () => ((await c.json('window.__dbg.aeon.state()')).dirty ? true : null), 3000);
   check('6b', 'the committed edit made the project dirty', dirty6 === true);
 

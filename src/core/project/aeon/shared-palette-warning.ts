@@ -194,7 +194,9 @@ export function sharedLine0Warning(path: string, scan: EmbedScan): { title: stri
     } else {
       parts.push([
         `Also built from this file (searched ${population} for ${embedded}):`,
-        ...scan.sites.map((s) => `• ${s.path}:${s.line}${s.name ? `  ${s.name}` : ''}`),
+        // The name in parentheses: the dialog wraps long paths, and a bare name
+        // pushed onto its own line reads as a separate item (seen in the capture).
+        ...scan.sites.map((s) => `• ${s.path}:${s.line}${s.name ? ` (${s.name})` : ''}`),
       ].join('\n'));
     }
     if (scan.blind.length > 0 || scan.capped) {
