@@ -101,6 +101,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild, assertDebugBuild } from './lib/run-root.mjs';
 import {
   openNewCanvasDialog, fillDialog, settledInPage, INSTALL as CANVAS_INSTALL,
+  ctrlK, typeText, enter, escape, drawArt,
 } from './canvas-cdp-harness.mjs';
 
 const PORT = Number(process.env.PORT ?? 9443);
@@ -294,9 +295,20 @@ function staticCensus(decl) {
         const predicted = cls === 'static' ? declaredPx
           : cls === 'interactive' ? contPx
             : cls === 'conditional' ? `${declaredPx} as span / ${contPx} as button` : 'unknown';
+        // The component the site is WRITTEN in, which the rendered census can
+        // find in a chip's render chain: the join between (b) and (a).
+        let enclosing = null;
+        for (let i = ancestors.length - 1; i >= 0 && !enclosing; i--) {
+          const a = ancestors[i];
+          if (ts.isFunctionDeclaration(a) && a.name && /^[A-Z]/.test(a.name.text)) enclosing = a.name.text;
+          else if ((ts.isArrowFunction(a) || ts.isFunctionExpression(a)) && a.parent
+            && ts.isVariableDeclaration(a.parent) && ts.isIdentifier(a.parent.name)
+            && /^[A-Z]/.test(a.parent.name.text)) enclosing = a.parent.name.text;
+        }
         sites.push({
           file: rel, line: lineOf(sf, n), cls, inMap, label: label.slice(0, 40),
-          container: cont ? cont.via : null, predicted,
+          literal: label !== '' && !label.includes('{'),
+          container: cont ? cont.via : null, predicted, enclosing,
         });
       }
       ts.forEachChild(n, (ch) => walk(ch, [...ancestors, n]));
@@ -438,6 +450,14 @@ const INSTALL = `(() => {
     }
     return '(none)';
   };
+  const namesAbove = (f, skip, max) => {
+    const out = [];
+    for (let p = f ? f.return : null; p && out.length < max; p = p.return) {
+      const n = nameOf(p.type);
+      if (n && n !== skip && out[out.length - 1] !== n) out.push(n);
+    }
+    return out;
+  };
   const textSizes = (el) => {
     const out = new Set();
     const visit = (e) => {
@@ -457,11 +477,15 @@ const INSTALL = `(() => {
       if (!visible(el)) { if (isChip) hiddenChips++; continue; }
       const r = el.getBoundingClientRect();
       // INSIDE, not OWNER: a production fiber keeps no owner, so this is the
-      // nearest named component ABOVE the chip in the RENDER tree. The level
+      // chain of named components ABOVE the chip in the RENDER tree. The level
       // header's chips are written in LevelWorkspace but passed as a prop to
-      // EditorShell, so they report EditorShell. Consistent, so it dedupes.
+      // EditorShell, so they read "EditorShell < LevelWorkspace". FOUR names
+      // are the dedupe key: one name merged different controls that share a
+      // wrapper (the sprite and canvas bars' "Fit" are both inside OptionBar).
+      const names = isChip ? namesAbove(by, 'Chip', 12) : namesAbove(fiberOf(el), null, 12);
       const row = {
-        inside: isChip ? ownerAbove(by, 'Chip') : ownerAbove(fiberOf(el), null),
+        inside: names.slice(0, 4).join(' < ') || '(none)',
+        names,
         text: el.textContent.trim().replace(/\\s+/g, ' ').slice(0, 40),
         tag: el.tagName.toLowerCase(),
         computed: getComputedStyle(el).fontSize,
@@ -633,6 +657,101 @@ async function toolWalk(c, part, prefix, decl) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DEEP STATES: the chips that exist only once a document holds something.
+// The facet walk sees each facet as it opens; these are the call sites that
+// walk never mounted (a preset, a band, a probed cell, a commit plan, a
+// dialog). Each state is made through the app's own controls with real
+// events, in the throwaway copy, and nothing saves.
+// ─────────────────────────────────────────────────────────────────────────────
+/** Press the visible element whose text is exactly `text` (or starts with it,
+ *  when `prefix`), scrolled into view first so the aim is on screen. */
+async function clickText(c, sel, text, { prefix = false } = {}) {
+  const p = await c.json(`(() => {
+    const els = [...document.querySelectorAll(${JSON.stringify(sel)})].filter((e) => {
+      if (!(e.checkVisibility ? e.checkVisibility() : e.offsetParent !== null)) return false;
+      const t = e.textContent.trim();
+      return ${prefix ? `t.startsWith(${JSON.stringify(text)})` : `t === ${JSON.stringify(text)}`};
+    });
+    if (els.length === 0) return null;
+    els[0].scrollIntoView({ block: 'center' });
+    const r = els[0].getBoundingClientRect();
+    return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2), n: els.length,
+      disabled: els[0].disabled === true };
+  })()`);
+  if (!p) return `not-found:${text}`;
+  if (p.disabled) return `disabled:${text}`;
+  await mouseClick(c, p.x, p.y);
+  return 'clicked';
+}
+const say = (what, r) => console.log(`        [state] ${what}: ${r}`);
+
+async function aeonDeepStates(c, decl) {
+  console.log('\n──── aeon deep states ────');
+  // (i) Colour: create a preset through its own id field and New chip, then
+  //     press whatever channel / band controls that preset offers.
+  say('Effects pill', await clickText(c, '[aria-label="Facets"] button', 'Effects')); await sleep(900);
+  say('Colour tab', await clickText(c, '[aria-label="Effects job"] button', 'Colour')); await sleep(700);
+  const input = await c.json(`(() => { const i = document.querySelector('input[placeholder="new_preset_id"]');
+    if (!i) return null; i.scrollIntoView({ block: 'center' }); const r = i.getBoundingClientRect();
+    return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
+  if (input) {
+    await mouseClick(c, input.x, input.y); await sleep(150);
+    await typeText(c, 'chip_census'); await sleep(250);
+    say('New preset chip_census', await clickText(c, 'button', 'New')); await sleep(800);
+    await takeCensus(c, 'aeon', 'Effects/Colour/+preset', decl, { crop: true });
+    for (const label of ['Add channel', 'Add raster band', 'Add base-swap band']) {
+      const r = await clickText(c, 'button', label);
+      say(label, r);
+      if (r === 'clicked') { await sleep(700); await takeCensus(c, 'aeon', `Effects/Colour/+preset/${label}`, decl); }
+    }
+  } else say('preset id field', 'not-found');
+  // (ii) Tile anim: open the collapsed "New tile animation" section, then add
+  //      a blank tile animation, which is what gives the preview strip bands.
+  say('Tile anim tab', await clickText(c, '[aria-label="Effects job"] button', 'Tile anim')); await sleep(700);
+  say('open "New tile animation"', await clickText(c, 'div, span, button', 'New tile animation')); await sleep(600);
+  await takeCensus(c, 'aeon', 'Effects/Tile anim/+New section', decl);
+  say('Add blank tile animation', await clickText(c, 'button', 'Add blank tile animation')); await sleep(1000);
+  await takeCensus(c, 'aeon', 'Effects/Tile anim/+band', decl, { crop: true });
+}
+
+async function classicDeepStates(c, decl) {
+  console.log('\n──── classic deep states ────');
+  // (iii) Collision: the picker exists only for a PROBED cell. Arm View first
+  //       (the walk left Paint Collision armed); a View click only probes.
+  say('Collision pill', await clickText(c, '[aria-label="Facets"] button', 'Collision')); await sleep(900);
+  await c.evalExpr(INSTALL);
+  const view = (await c.json(`window.__clickable('button', 'ToolButton', ['View'])`))[0];
+  if (view) { await mouseClick(c, view.x, view.y); await sleep(300); }
+  const map = await c.json(`(() => { const cs = [...document.querySelectorAll('canvas')].filter((e) => e.checkVisibility());
+    cs.sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight);
+    if (!cs[0]) return null; const r = cs[0].getBoundingClientRect();
+    return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
+  if (map) { await mouseClick(c, map.x, map.y); await sleep(700); say('probe click', `at (${map.x},${map.y}) with View armed`); }
+  await takeCensus(c, 'classic', 'Collision/+probe', decl, { crop: true });
+  // (iv) The Import Art Sheet dialog, through the command palette. Its chip
+  //      opens a native file picker, so it is measured and NEVER pressed.
+  await escape(c); await sleep(200);
+  await ctrlK(c); await sleep(600);
+  await typeText(c, 'Import Art Sheet'); await sleep(450);
+  await enter(c); await sleep(900);
+  await takeCensus(c, 'classic', 'dialog: Import Art Sheet', decl, { crop: true });
+  await escape(c); await sleep(400);
+}
+
+async function canvasDeepStates(c, decl) {
+  console.log('\n──── canvas deep states ────');
+  // (v) Art on the canvas, so the Commit to level section has a plan.
+  await c.evalExpr(INSTALL);
+  const pencil = (await c.json(`window.__clickable('button', 'ToolButton')`)).find((t) => t.label.startsWith('Pencil'));
+  if (pencil) { await mouseClick(c, pencil.x, pencil.y); await sleep(300); }
+  await c.evalExpr(CANVAS_INSTALL);
+  try { await drawArt(c, 4, 4, 40, 40, 64); say('stroke', 'drawn 4,4 -> 40,40 with Pencil'); }
+  catch (e) { say('stroke', `failed: ${e.message}`); }
+  await sleep(800);
+  await takeCensus(c, 'canvas', 'new 64x64/+art', decl, { crop: true });
+}
+
 // The two rows every part gets.
 function partRows(part, decl, firstChips) {
   const mine = screens.filter((s) => s.part === part);
@@ -685,6 +804,7 @@ async function aeonPart(decl, notMeasured) {
     await walkFacets(c, 'aeon', decl, {
       crops: new Set(['Layout', 'Layout/tool:Stamp Chunk', 'Layout/tool:Paint Tile', 'Effects/Tile anim', 'Effects/Colour', 'Art']),
     });
+    await aeonDeepStates(c, decl);
     partRows('aeon', decl, first.chips.length);
   } catch (e) {
     partThrew('aeon', e, notMeasured);
@@ -722,6 +842,7 @@ async function classicSpriteCanvasPart(decl, notMeasured) {
         await walkFacets(c, 'classic', decl, {
           crops: new Set(['Layout', 'Art/Chunk', 'Art/Block', 'Art/Tile', 'Collision']),
         });
+        await classicDeepStates(c, decl);
         partRows('classic', decl, first.chips.length);
       } catch (e) { partThrew('classic', e, notMeasured); }
     }
@@ -757,6 +878,7 @@ async function classicSpriteCanvasPart(decl, notMeasured) {
       if (still) throw new Error(`create was refused: ${JSON.stringify(await c.json('window.__c.dlgError()'))}`);
       const first = await takeCensus(c, 'canvas', 'new 64x64', decl, { crop: true });
       await toolWalk(c, 'canvas', 'new 64x64', decl);
+      await canvasDeepStates(c, decl);
       partRows('canvas', decl, first.chips.length);
     } catch (e) { partThrew('canvas', e, notMeasured); }
   } catch (e) {
@@ -827,6 +949,42 @@ function printRendered(st) {
     list: [...distinct.values()].map((e) => ({ ...e, sizes: [...e.sizes], inherited: [...e.inherited], textSizes: [...e.textSizes] })) };
 }
 
+/**
+ * (b) JOINED TO (a): each call site's MEASURED size. A site matches a rendered
+ * chip when the site's enclosing component is in that chip's render chain and,
+ * where the site's label is a literal, the text is equal. A templated label
+ * (`{p}`, `{verb.label}`) matches every chip of its component, so for those
+ * the size is the component's, which the table shows. A site with no match was
+ * rendered on no screen this run reached: listed, with the source's
+ * prediction, and NOT counted as either size.
+ */
+function joinSites(st) {
+  const measured = [];
+  for (const s of screens) for (const ch of s.census.chips) measured.push(ch);
+  const rows = st.sites.map((site) => {
+    const hits = measured.filter((m) => site.enclosing && m.names.includes(site.enclosing)
+      && (!site.literal || m.text === site.label));
+    return { ...site, measured: [...new Set(hits.map((h) => h.computed))].sort() };
+  });
+  const tally = {};
+  const unrendered = [];
+  for (const r of rows) {
+    const k = r.measured.length === 0 ? 'NOT RENDERED' : r.measured.length === 1 ? r.measured[0] : `mixed(${r.measured.join('/')})`;
+    tally[k] = (tally[k] ?? 0) + 1;
+    if (r.measured.length === 0) unrendered.push(r);
+  }
+  console.log('\n════ (b) x (a): CALL SITES BY THE SIZE MEASURED FOR THEM (unit: call sites) ════');
+  for (const r of rows) {
+    console.log(`  ${`${r.file.replace('src/renderer/', '')}:${r.line}`.padEnd(48)} ${r.cls.padEnd(12)} `
+      + `${String(r.enclosing).padEnd(22)} ${JSON.stringify(r.label).padEnd(34)} measured ${r.measured.join('/') || '-'}`
+      + `${r.measured.length === 0 ? `   (source predicts: ${r.predicted})` : ''}`);
+  }
+  console.log(`  TOTAL call sites by measured size: ${JSON.stringify(tally)}`);
+  console.log(`  NOT RENDERED on any screen reached (${unrendered.length}): `
+    + unrendered.map((r) => `${r.file.replace('src/renderer/', '')}:${r.line}${r.inMap ? '(map)' : ''}`).join(', '));
+  return { tally, rows };
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 async function main() {
   const decl = chipDeclaration();
@@ -859,16 +1017,18 @@ async function main() {
     }
   }
   const rendered = screens.length ? printRendered(st) : null;
+  const joined = screens.length ? joinSites(st) : null;
 
   writeFileSync(join(SHOTS, `census-${TAG}.json`), JSON.stringify({
     tag: TAG, declaration: decl, static: { totals: staticTotals, sites: st.sites },
-    rendered, screens, notMeasured,
+    rendered, joined, screens, notMeasured,
   }, null, 2));
 
   console.log('\n════ SUMMARY ════');
   console.log(`  (b) call sites: ${JSON.stringify(staticTotals)}`);
   if (rendered) console.log(`  (a) distinct chips: ${rendered.distinctN} ${JSON.stringify(rendered.distinct)}; `
     + `chip-screens ${JSON.stringify(rendered.chipScreens)} over ${rendered.screens} screens`);
+  if (joined) console.log(`  (b)x(a) call sites by measured size: ${JSON.stringify(joined.tally)}`);
   console.log(`  NOT MEASURED: ${notMeasured.length ? notMeasured.join(', ') : '(none)'}`);
   console.log(`  census json: ${relative(ROOT, join(SHOTS, `census-${TAG}.json`))}`);
   console.log(`\n${results.length - fails.length}/${results.length} rows passed`
