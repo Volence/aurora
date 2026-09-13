@@ -6,7 +6,9 @@
 by size, nothing reworded, proven lossless. **Models:** aurora `f47c07f3` (the review-bars split) and
 empyrean `origin/main:docs/2026-09-13-protocol-cut-plan.md` steps 1-4.
 
-Base: `300085ea` (the branch's merge-base with master). Branch `docs/boot-read-cut`.
+Base: `300085ea` (the branch's merge-base with master). The 15 declared-new lines and both proof outputs are
+tracked under `docs/captures/2026-09-13-boot-read-cut/`: to re-run the proof, check out `2b632321` and pass
+`docs/captures/2026-09-13-boot-read-cut/new-lines.md` as `--new` (the transcripts below name the scratch copy it came from).
 
 | Commit | Purpose |
 |---|---|
