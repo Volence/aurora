@@ -97,6 +97,11 @@ function zone(id: string, name: string, acts: Act[]): Zone {
     // writable either. `complete: false` is the honest value for a palette that
     // came from no file at all, and it is the value that writes nothing.
     paletteFile: { path: '(fixture)', complete: false, tail: new Uint8Array(0) },
+    // Line 0 likewise came from no file: no path, so nothing can be written.
+    playerPaletteFile: {
+      path: null, bytes: new Uint8Array(0), complete: false, readFailure: null,
+      loadedWords: Array.from({ length: 16 }, () => 0),
+    },
   };
 }
 
