@@ -89,6 +89,13 @@
 //
 //   T0 Tab in, type, no click                             the Tab path's floor
 //   T  Tab in, ONE real click, type                       the defect (row 5b)
+//   U  Tab in, TYPE, click the left edge, type            the sub-case (5c)
+//   V  Tab in, click, click the left edge, type           one gesture (5d)
+//   SH the spin arrow HELD on an unfocused box, released  row 4b
+//   TH the spin arrow HELD on a tabbed-into box, released row 4c
+//
+// U is this parcel's interpretation, not the ruling's words, and is flagged
+// for ratification in docs/reviews/2026-09-13-numberfield-tab-then-click.md.
 //
 // **H against I isolates whether a commit happened. J against both separates
 // TYPING from COMMITTING** — and that boundary is where `NumberField`'s code
@@ -650,7 +657,7 @@ async function main() {
       const a = document.activeElement;
       const box = ${EDGE_BOX(BOT_TITLE)};
       return { onBox: !!box && a === box,
-        what: a ? a.tagName + (a.title ? ':' + a.title.slice(0, 28) : '') : null };
+        what: a ? a.tagName + (a.title ? ':' + a.title.slice(0, 40) : '') : null };
     })()`;
     /** Real click on the Top box, then real Tabs until the Bot box has focus. */
     const tabInto = async (id) => {
@@ -719,6 +726,42 @@ async function main() {
       return 'one real click at the centre of the already-focused box';
     });
 
+    // ── ARMS U and V — WHAT THE TAB FIX MUST NOT TAKE ────────────────────
+    //
+    // Both end on a click at the LEFT edge, like arm N, so a kept caret is
+    // index 0 and cannot be mistaken for an append.
+    //
+    // U  Tab in, TYPE, then click. The sub-case the ruling does not spell out.
+    //    This parcel ruled it KEEPS its caret: the ruling's question is scoped
+    //    to "click it BEFORE typing", and after typing the box holds the
+    //    author's own text, not the old number the hazard is about. Flagged for
+    //    ratification in docs/reviews/2026-09-13-numberfield-tab-then-click.md.
+    //    The typed value is arm I's (one line inside the current bot, legal by
+    //    the panel's own law), typed over the Tab's selection.
+    // V  Tab in, click, click again. The ruling's stated cost is ONE gesture.
+    //    After the first click re-selects, the pointer has claimed the box, and
+    //    a second click places a caret exactly as arm N's does.
+    const U = await runTabArm('U', 'Tab in, TYPE a value, then click the LEFT edge', async () => {
+      const m = await band0();
+      const typed = String(Math.max(2, m.bot - 1));
+      await typeText(typed);
+      await sleep(350);
+      const caret = await leftEdge();
+      if (!caret) throw new Error('U: box vanished before the caret aim');
+      await clickPoint(caret);
+      await sleep(350);
+      return `typed ${typed} over the Tab's selection, then one real click at the LEFT edge ${JSON.stringify(caret)}`;
+    });
+    const V = await runTabArm('V', 'Tab in, click, then click the LEFT edge', async (aim) => {
+      await clickPoint(aim);
+      await sleep(350);
+      const caret = await leftEdge();
+      if (!caret) throw new Error('V: box vanished before the caret aim');
+      await clickPoint(caret);
+      await sleep(350);
+      return `one real click at the centre, then a second at the LEFT edge ${JSON.stringify(caret)}`;
+    });
+
     // ── ARM S — THE OTHER AXIS OF THE SCOPE: THE SPIN BUTTON ─────────────
     //
     // ⚠ A REMEDY THAT SUPPRESSES A DEFAULT ACTION HAS TO SAY WHOSE. Chromium's
@@ -767,6 +810,7 @@ async function main() {
         const y = Math.round(b.bottom - Math.max(3, b.height / 4));  // the DOWN half
         return {
           padR, bordR, w: Math.round(b.width), h: Math.round(b.height),
+          right: b.right, bottom: b.bottom,   // so SH/TH can re-derive S's hit
           spots: [inner - 3, inner - 8, b.right - 5, b.right - 12, inner - 14]
             .map((x) => ({ x: Math.round(x), y })),
         };
@@ -800,6 +844,84 @@ async function main() {
         : '        no candidate moved the value: no spin button was reached');
       return { v0, v1, v2, hit, tried, box: spots };
     })();
+
+    // ── ARMS SH and TH — THE SPIN ARROW HELD, THEN RELEASED ──────────────
+    //
+    // Row 160's packet: "Nothing about the spinner past one click and two
+    // seconds ... a held arrow ... is a different gesture." And the Tab fix now
+    // arms the click on a TABBED-INTO box, whose spin arrow the old guard never
+    // reached. So both are measured the way the failure mode needs: the value
+    // sampled WHILE the arrow is held (it must keep stepping, which proves the
+    // press is a hold and the auto-repeat is live), then twice AFTER the release
+    // (it must have stopped). A mouseup whose default is prevented leaves the
+    // auto-repeat running, which shows as a value still sliding between the
+    // two release samples.
+    //
+    // THE AIM IS ARM S's HIT, re-derived against the box's current rect by its
+    // offset from the right and bottom edges, so it is a spot a measured click
+    // has already proven lands on the down arrow. No S hit, no aim: the row is
+    // UNMEASURABLE, and so is a hold that never moved the value.
+    const holdSpin = async (id, label, enter) => {
+      if (!S.hit) return { id, label, measured: false };
+      await freshPanel();
+      const enterNote = await enter();
+      const at = await c.json(String.raw`(() => {
+        const el = ${EDGE_BOX(BOT_TITLE)};
+        if (!el) return null;
+        const b = el.getBoundingClientRect();
+        return { right: b.right, bottom: b.bottom, min: el.min, max: el.max,
+          focused: document.activeElement === el };
+      })()`);
+      if (!at) throw new Error(`${id}: box vanished before the aim`);
+      const spot = {
+        x: Math.round(at.right - (S.box.right - S.hit.x)),
+        y: Math.round(at.bottom - (S.box.bottom - S.hit.y)),
+      };
+      const t0 = Date.now();
+      const samples = [];
+      const sample = async (phase) => {
+        const val = (await boxState(EDGE_BOX(BOT_TITLE))).value;
+        samples.push(`${phase}@${Date.now() - t0}ms=${val}`);
+        return val;
+      };
+      // ⚠ HOVER FIRST, AS A REAL POINTER ALWAYS DOES. The first run of this arm
+      // pressed with no move before it, and SH came back UNMEASURABLE: held at
+      // arm S's exact hit on an unfocused, never-hovered box, the value moved 0,
+      // while TH (a FOCUSED box, same offset) moved 21. Chromium shows the
+      // number spin button on hover or focus, and a CDP press with no move has
+      // hovered nothing. That is the likely reading, not a proven one; the
+      // re-run with this move is what supports it.
+      await c.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: spot.x, y: spot.y });
+      await sleep(300);
+      const pre = await sample('pre');
+      await c.send('Input.dispatchMouseEvent',
+        { type: 'mousePressed', x: spot.x, y: spot.y, button: 'left', clickCount: 1 });
+      await sleep(400);
+      const held1 = await sample('held');
+      await sleep(800);
+      const held2 = await sample('held');
+      await c.send('Input.dispatchMouseEvent',
+        { type: 'mouseReleased', x: spot.x, y: spot.y, button: 'left', clickCount: 1 });
+      await sleep(600);
+      const rel1 = await sample('released');
+      await sleep(1400);
+      const rel2 = await sample('released');
+      const moved = Math.abs(Number(held2) - Number(pre));
+      console.log(`\n──── ARM ${id}: ${label} ────`);
+      console.log(`        enter       : ${enterNote}`);
+      console.log(`        box         : focused=${at.focused} min=${JSON.stringify(at.min)} `
+        + `max=${JSON.stringify(at.max)}   aim ${JSON.stringify(spot)} (arm S's hit, re-derived; `
+        + `rect right/bottom ${at.right}/${at.bottom} against S's ${S.box.right}/${S.box.bottom}; hovered first)`);
+      console.log(`        samples     : ${samples.join('  ')}`);
+      return { id, label, measured: true, pre, held1, held2, rel1, rel2, moved, spot, samples };
+    };
+    const SH = await holdSpin('SH', 'the spin arrow HELD on an UNFOCUSED box, then released', async () => {
+      await blur();
+      await sleep(250);
+      return 'unfocused since the reload';
+    });
+    const TH = await holdSpin('TH', 'the spin arrow HELD on a TABBED-INTO box, then released',
+      async () => tabInto('TH'));
 
     // ═══════════════════════════════════════════════════════════════════════
     console.log('\n──── the arms, one variable ────');
@@ -896,6 +1018,39 @@ async function main() {
       + 'by a pointer". Before the fix this click was not armed, because `editing` was already true '
       + 'after the Tab, and its caret took the digit: 156 + 7 -> 1567. ⚠ Read beside 2c: the same '
       + 'run must still see arm N INSERT, or a REPLACED here is an instrument that stopped seeing.');
+    check('5c', 'THE SUB-CASE, AS THIS PARCEL RULED IT: Tab in, TYPE, then a click at the left edge '
+      + 'KEEPS its caret',
+      U.verdict === 'INSERTED' && U.at === 0,
+      `${JSON.stringify(U.armed.value)} + "${ONE_KEY}" -> ${JSON.stringify(U.afterKey.value)} (${U.verdict}`
+      + `${U.at >= 0 ? `, caret at ${U.at}` : ''}). The ruling's question is scoped to "click it `
+      + 'BEFORE typing", and its hazard is digits appended to the OLD number. After typing, the box '
+      + 'holds the author\'s own text, so this click is an edit of it, as click, type, click has '
+      + 'always been. ⚠ AN INTERPRETATION, flagged in docs/reviews/2026-09-13-numberfield-tab-then-click.md '
+      + 'for ratification: the option\'s literal words ("whenever the box was NOT focused by a '
+      + 'pointer") would make this REPLACE. If that is ruled, this row flips to REPLACED and '
+      + '`claimed` stops being set in `onChange`.');
+    check('5d', 'ONE GESTURE, NOT THE WHOLE VISIT: after Tab-then-click, a second click at the left '
+      + 'edge KEEPS its caret',
+      V.verdict === 'INSERTED' && V.at === 0,
+      `${JSON.stringify(V.armed.value)} + "${ONE_KEY}" -> ${JSON.stringify(V.afterKey.value)} (${V.verdict}`
+      + `${V.at >= 0 ? `, caret at ${V.at}` : ''}). The ruling's cost is "one gesture": a caret `
+      + 'click straight after the Tab. The first click re-selects and claims the box; from then on '
+      + 'it is a box the pointer is in, and its caret clicks are arm N\'s. ⚠ A red here means the '
+      + 'fix re-selects on every click after a Tab, which leaves no way to place a caret with the '
+      + 'mouse until the box is left.');
+
+    const holdRow = (id, name, H) => check(id, name,
+      !H.measured || H.moved === 0 ? 'UNMEASURABLE' : H.moved >= 2 && H.rel2 === H.rel1,
+      `${H.measured ? H.samples.join('  ') : 'arm S found no spin button, so there is no aim'}`
+      + `${H.measured ? ` (moved ${H.moved} while held; aim ${JSON.stringify(H.spot)})` : ''}. `
+      + 'PASS needs BOTH halves: the value moved by two or more while held (the press was a hold '
+      + 'and the auto-repeat ran), and the two samples after the release agree (it stopped). A '
+      + 'mouseup preventDefault shows as the second half failing: still sliding after the '
+      + 'release. ⚠ UNMEASURABLE when the hold never moved the value, which means the press did '
+      + 'not land on the arrow, not that the arrow is fine.');
+    holdRow('4b', 'THE SPIN ARROW HELD ON AN UNFOCUSED BOX repeats while held and STOPS when released', SH);
+    holdRow('4c', 'THE SPIN ARROW HELD ON A TABBED-INTO BOX repeats while held and STOPS when released '
+      + '(the box the Tab fix now arms)', TH);
   } finally {
     try { c && c.close(); } catch { /* closing a dead socket is not a result */ }
     await killTree(child);
