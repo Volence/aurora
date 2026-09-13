@@ -109,22 +109,36 @@ const TABS = (() => {
 })();
 
 /**
- * The HEADING an id draws, so an absence can be asserted against what an author
- * would look for. Titles are what the column paints; ids never reach the DOM.
+ * PRESENCE AND ABSENCE ARE JUDGED BY THE SECTION'S ID, which is its mount marker.
+ *
+ * ⚠ RE-AIMED (EFFECTS-RIGS-FIVE-MORE, 2026-09-13). This was `TITLE_OF`, a map
+ * from each id to "the HEADING an id draws, so an absence can be asserted
+ * against what an author would look for", on the stated premise that "ids never
+ * reach the DOM". Both halves had moved under it:
+ *
+ *   - TWO OF ITS ELEVEN HEADINGS WERE DEAD. 'SCENE' and 'PRESET', each followed
+ *     by an em dash, died in `24541886` on 2026-09-05 (the effects dash sweep:
+ *     every section header took a colon). The app composes
+ *     `Scene: ${selected.id}` (EffectsScenePanel.tsx) and
+ *     `Preset: ${selected.id}` (BandPresetPanel.tsx) today. So [3a], the
+ *     presence half, went RED on every run: it looked for a spelling no header
+ *     has. And [3b], the absence half, stayed GREEN for those two sections
+ *     VACUOUSLY: "the scene form is not on the Colour tab" was asserted against
+ *     a string no tab can paint, so a scene form mounted on the wrong tab would
+ *     have passed it. That is worse than the red, because it is green.
+ *   - IDS DO REACH THE DOM. `CollapsibleSection` renders
+ *     `<div data-section={id} data-section-collapsed=…>`, the attribute
+ *     `scratchpad/lib/effects-sections.mjs` opens doors by.
+ *
+ * So [3a] [3b] [3c] now judge `data-section`, which is also the literal claim
+ * [3b] makes ("in the DOM at all, unmounted, not hidden"): a collapsed section
+ * still carries its marker, so an id that is absent is a section that is not
+ * mounted. The painted headings are still collected and printed beside it as
+ * the artifact a person reads. The two composed titles were NOT repaired to
+ * the colon spelling: they change with the document under test, so there is
+ * no stable string to type, and the next wording pass would blind this again.
  */
-const TITLE_OF = {
-  'aeon.effects.scenes': 'SCENES',
-  'aeon.effects.layers': 'LAYERS (',
-  'aeon.effects.scene': 'SCENE — ',
-  'aeon.effects.assign': 'SECTION ASSIGNMENT',
-  'aeon.effects.timeline': 'RASTER TIMELINE',
-  'aeon.effects.presets': 'RASTER BAND PRESETS',
-  'aeon.effects.preset.bands': 'PRESET — ',
-  'aeon.effects.preset.channels': 'CYCLES',
-  'aeon.effects.preset.anchors': 'MOVING ANCHORS',
-  'aeon.bganim.bands': 'TILE ANIMATIONS (',
-  'aeon.bganim.new': 'NEW TILE ANIMATION',
-};
+const mounted = (seenOnTab, sectionId) => (seenOnTab.sections || []).includes(sectionId);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -254,8 +268,12 @@ const HEADERS = String.raw`(() => {
   const heads = [...col.querySelectorAll('div')]
     .filter((d) => d.style && d.style.cursor === 'pointer')
     .map((d) => (d.innerText || '').trim().split('\n')[0]);
+  // The MOUNT MARKER the absence rows judge by (see SECTION_IDS): every
+  // CollapsibleSection in the column, by the id the app routes on.
+  const sections = [...col.querySelectorAll('[data-section]')]
+    .map((e) => e.getAttribute('data-section'));
   return {
-    found: true, heads,
+    found: true, heads, sections,
     column: { h: Math.round(col.clientHeight), sh: Math.round(col.scrollHeight) },
   };
 })()`;
@@ -435,17 +453,24 @@ async function main() {
       await sleep(1100);
       seen[tab.id] = await c.json(HEADERS);
     }
-    const titlesOf = (tab) => tab.sections.map((s) => TITLE_OF[s]);
+    // `shows` is the TITLE finder, kept for [5a]/[5b] below, whose headings are
+    // fixed literals the app still paints. [3a]-[3c] judge `mounted` (by id).
     const shows = (heads, title) => heads.some((h) => h.toUpperCase().includes(title.toUpperCase()));
-    const report = TABS.map((t) => `${t.label}: ${JSON.stringify(seen[t.id].heads)}`).join('\n        ');
+    // Every id that SHOULD be missing and is not, per tab: empty is the pass.
+    const strays = (t) => TABS.filter((o) => o.id !== t.id)
+      .flatMap((o) => o.sections).filter((id) => mounted(seen[t.id], id));
+    const missing = (t) => t.sections.filter((id) => !mounted(seen[t.id], id));
+    const report = TABS.map((t) => `${t.label}: heads ${JSON.stringify(seen[t.id].heads)}\n`
+      + `          data-section ${JSON.stringify(seen[t.id].sections)}`
+      + ` missing=${JSON.stringify(missing(t))} strays=${JSON.stringify(strays(t))}`)
+      .join('\n        ');
     check('3a', 'each tab paints ITS OWN sections — the finder that the absence rows use, proven '
       + 'on presence first',
-      TABS.every((t) => titlesOf(t).every((title) => shows(seen[t.id].heads, title))),
+      TABS.every((t) => missing(t).length === 0),
       report);
     check('3b', 'and NONE of the other two jobs\' sections is in the DOM at all — unmounted, not '
       + 'hidden',
-      TABS.every((t) => TABS.filter((o) => o.id !== t.id)
-        .every((other) => titlesOf(other).every((title) => !shows(seen[t.id].heads, title)))),
+      TABS.every((t) => strays(t).length === 0),
       report);
     // THE WALKTHROUGH'S §c1, ON SCREEN. The two features called "band" were
     // adjacent sections in one list; they can no longer be looked at together.
@@ -459,8 +484,10 @@ async function main() {
     // carry it alone.
     check('3c', '⚠ THE TWO "BAND" FEATURES ARE NEVER ON SCREEN TOGETHER (walkthrough §c1) — '
       + 'meaningful only with [3a]; see the comment above',
-      TABS.every((t) => !(shows(seen[t.id].heads, 'TILE ANIMATIONS (')
-        && shows(seen[t.id].heads, 'RASTER BAND PRESETS'))),
+      // By id with [3a]/[3b], which is the conjunction this row rests on: the
+      // tile-animation list and the raster band presets.
+      TABS.every((t) => !(mounted(seen[t.id], 'aeon.bganim.bands')
+        && mounted(seen[t.id], 'aeon.effects.presets'))),
       report);
 
     // ---- 4. THE LAYERS LIST GOT A HEIGHT. ---------------------------------
