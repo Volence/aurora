@@ -1,7 +1,7 @@
 # Aurora Overseer — reference sections, read at a specific moment
 
 Three sections moved whole and byte-identical from `docs/OVERSEER.md` on 2026-09-13, in their original order, nothing reworded. **`docs/OVERSEER.md` governs on any disagreement.**
-Each section is read at the moment its stub in `docs/OVERSEER.md` names (the stub carries the same heading), never at boot.
+Each section is read at the moment its stub in `docs/OVERSEER.md` names (the stub carries the same heading), never at boot. A bare "bar N" in these sections names `docs/OVERSEER-REVIEW-BARS.md` bar N.
 
 ## Editor↔engine coordination points
 
@@ -68,7 +68,7 @@ What stays live:
   directly; keep the old note only as history.
 - **The generalisation worth keeping, oracle's:** *a test per component and none across the seam is
   how a chain of individually sound links holds nothing* — **and a seam has no author**, which is
-  why it took a reader who wrote none of the three tests. That is the mechanism behind this file's
+  why it took a reader who wrote none of the three tests. That is the mechanism behind `docs/OVERSEER-REVIEW-BARS.md`
   bar 18b, stated better than bar 18b states it. Its corollary, paid for in the same exchange:
   **when a check looks redundant, ask what each of the two claims is before collapsing them.**
 

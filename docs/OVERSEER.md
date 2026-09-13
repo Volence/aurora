@@ -289,7 +289,7 @@ Aurora". The grant above is what governs.
 
 Aurora is a TypeScript/Electron app: features, tests and harnesses all go to agents in
 worktrees. The overseer's own work is judging returned work, running the **foreground**
-runtime harnesses (below — agents cannot), rulings, and landing.
+runtime harnesses ("Instruments" in `docs/OVERSEER-REFERENCE.md` — agents cannot), rulings, and landing.
 
 ## Read at a specific moment → `docs/OVERSEER-REFERENCE.md` and `docs/OVERSEER-REVIEW-BARS.md`
 
