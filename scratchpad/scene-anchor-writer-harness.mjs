@@ -65,6 +65,7 @@ import { join, resolve } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
+import { SECTION_SCENE_FORM, openEffectsSectionState } from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9527);
 const ROOT = AURORA_DIR;
@@ -300,44 +301,36 @@ async function drive(c, label, expr) {
  * on a collapsed section is NAVIGATION MISSING, not a control missing — the
  * same mistake the sec7 packet's §7 records for the sub-tab bar.
  *
- * The header is opened by a REAL POINTER GESTURE on its title span, which is
- * what an author clicks; `CollapsibleSection`'s own `isHeaderAction` walk
- * refuses to toggle for anything interactive on the path, and a plain span is
- * not. Idempotent by MEASUREMENT rather than by assumption: it clicks, looks
- * for a control that only exists inside the section, and clicks once more if it
- * is still absent (the section may have arrived open from persisted state and
- * been closed by the first click).
+ * ⚠ AND THEN THE OPENER ITSELF SHUT THE DOOR (RIGS-DEAD-NEEDLE-LEFTOVERS,
+ * 2026-09-13). The private opener that stood here clicked the header's title
+ * span, found by the prose `/^Scene: /`, and was "idempotent by measurement":
+ * it probed for the anchor toggle and clicked again if the toggle was absent.
+ * But the probe was the anchor needle `anchor` + em dash, which `d70da895`
+ * reworded the same afternoon this rig was migrated. So the first click OPENED
+ * the section, the dead probe said it was shut, and the second click SHUT it
+ * again: `{"open":false,"attempt":2}`, measured on the first run that reached
+ * this line. [3b], [6b1] and [8d] then went green over a shut form.
+ *
+ * The door is now `openEffectsSectionState` on SECTION_SCENE_FORM, the helper
+ * the five rigs of ROADMAP row 170 use, and it is a row ([3s0]) judged on the
+ * app's own `data-section-collapsed` read back AFTER the click, never on the
+ * click's return value and never on a control inside the section. The title is
+ * not a door at all: it is composed per document (`Scene: <id>`).
+ *
+ * ⚠ THE ANCHOR TOGGLE IS FOUND BY ITS KEY, INSIDE THAT SECTION. Its title
+ * reads `anchor: the world-anchored band split...` today (`ANCHOR_ROW.title`
+ * in `providers/effects-aeon.ts`). The key is contract (`scene.anchor`), the
+ * punctuation after it is prose: `effects-deform`'s rule, and the one row 170
+ * applied to the factor pickers. So the pattern is the key followed by
+ * anything that is NOT another key character and NOT a dot, because the
+ * anchor's own rows are titled `anchor.at.channel`, `anchor.at.dsa` and
+ * `anchor.at.dsb`. [3s1] measures that with those rows on screen.
  */
-const HEADER_SPAN_RECT = (re) => String.raw`
-(() => {
-  const el = [...document.querySelectorAll('span')]
-    .filter((e) => ${re}.test((e.textContent || '').trim()))
-    .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length)[0];
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  const sc = el.closest('[style*="overflow"]') || document.scrollingElement;
-  const s = sc ? sc.getBoundingClientRect() : null;
-  return {
-    x: r.x, y: r.y, w: r.width, h: r.height, text: (el.textContent || '').trim(),
-    dpr: window.devicePixelRatio,
-    scroller: s ? { x: s.x, y: s.y, w: s.width, h: s.height } : null,
-    insideScroller: s ? (r.top >= s.top - 1 && r.bottom <= s.bottom + 1) : null,
-  };
-})()`;
-
-async function openSection(c, titleRe, probeExpr, label) {
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    if (await c.evalExpr(`!!(${probeExpr})`)) return { open: true, attempt: attempt - 1 };
-    const rect = await c.json(HEADER_SPAN_RECT(titleRe));
-    if (rect === null) return { open: false, attempt, why: 'no header span matched' };
-    note(`${label} header rect`, `x=${rect.x} y=${rect.y} w=${rect.w} h=${rect.h} `
-      + `dpr=${rect.dpr} insideScroller=${rect.insideScroller} text=${JSON.stringify(rect.text)}`);
-    const at = await clickRect(c, rect);
-    note(`clicked ${label} header at integer client px`, `(${at.x}, ${at.y})`);
-    await sleep(700);
-  }
-  return { open: await c.evalExpr(`!!(${probeExpr})`), attempt: 2 };
-}
+const SCENE_FORM_SELECTS = `[...document.querySelectorAll('[data-section=${JSON.stringify(SECTION_SCENE_FORM)}] select')]`;
+const SCENE_FORM_SEL = (re) => `${SCENE_FORM_SELECTS}.find((e) => ${re}.test(e.title || ''))`;
+const SCENE_FORM_COUNT = (re) => `${SCENE_FORM_SELECTS}.filter((e) => ${re}.test(e.title || '')).length`;
+const ANCHOR_KEY = String.raw`/^anchor(?![a-z0-9_.])/`;
+const ANCHOR_AT_KEY = String.raw`/^anchor\.at\./`;
 
 /** The selected scene as the APP holds it. */
 function SCENE_JSON() {
@@ -506,18 +499,25 @@ async function main() {
     // control's ABSENCE was the measurement; here its PRESENCE is, and the
     // before-state is on record in that packet.
     //
-    // OPEN THE SECTION FIRST — see `openSection`. A `no-element` read off a
-    // collapsed section is navigation missing, not a control missing, and
-    // reading it the other way would write up this parcel's own control as
-    // never having landed.
-    const toggleSel = SEL_BY_TITLE(String.raw`/^anchor —/`);
-    const opened = await openSection(c, String.raw`/^Scene: /`, toggleSel, 'Scene');
-    note('scene section', JSON.stringify(opened));
+    // OPEN THE SECTION FIRST, and it is a row: see SCENE_FORM_SEL. A
+    // `no-element` read off a collapsed section is navigation missing, not a
+    // control missing, and reading it the other way would write up this
+    // parcel's own control as never having landed.
+    const sceneForm = await openEffectsSectionState(c, SECTION_SCENE_FORM, { settleMs: 900 });
+    check('3s0', 'INSTRUMENT: the Scene form is open, so the anchor rows below are in the DOM: '
+      + 'it arrives collapsed',
+      sceneForm.ok === true
+      && (sceneForm.section === 'clicked' || sceneForm.section === 'already-open'),
+      `open -> ${JSON.stringify(sceneForm)} via [data-section="${SECTION_SCENE_FORM}"]. The verdict `
+      + 'is the app\'s own data-section-collapsed read back AFTER the click, not the click\'s '
+      + 'return value: a header whose handler was removed still takes a click.');
+    if (!sceneForm.ok) throw new Error(sceneForm.why);
+    const toggleSel = SCENE_FORM_SEL(ANCHOR_KEY);
     await shot(c, '03-scene-section-open');
     const toggle = await c.json(OPTIONS_OF(toggleSel));
     check('3a', 'an anchor control exists on the scene panel',
       toggle !== null && toggle.options.length === 2,
-      toggle === null ? 'no select whose title starts "anchor —" is on screen'
+      toggle === null ? `no select in the Scene form has a title opening on the key ${ANCHOR_KEY}`
         : JSON.stringify(toggle));
     // Off first: the shift ladders must NOT be on screen while the anchor is
     // off, or an author could set a shift on a scene that declares no anchor.
@@ -533,6 +533,15 @@ async function main() {
       `anchor.at = ${JSON.stringify(seeded)} — a split, and no deform nobody asked for. `
       + 'aeon\'s own refusal names this shape: "a PURE-BOUNDARY anchor (dsa 15, dsb 15) '
       + 'composes with curves".');
+    // The aim, measured where it can be wrong: with the anchor ON its three
+    // `anchor.at.*` rows are on screen beside the toggle, so a key boundary that
+    // let the dot through would count four here.
+    const aim = await c.json(`({ toggles: ${SCENE_FORM_COUNT(ANCHOR_KEY)}, `
+      + `atRows: ${SCENE_FORM_COUNT(ANCHOR_AT_KEY)} })`);
+    check('3s1', 'INSTRUMENT: exactly ONE select in the Scene form carries the anchor key, with '
+      + 'its anchor.at rows on screen beside it',
+      aim.toggles === 1 && aim.atRows > 0,
+      `${JSON.stringify(aim)} for ${ANCHOR_KEY} in [data-section="${SECTION_SCENE_FORM}"]`);
     await shotAt(c, ANCHOR_SEL('dsb'), '03-anchor-on');
 
     // ── [4] THE LADDERS ON SCREEN ─────────────────────────────────────────

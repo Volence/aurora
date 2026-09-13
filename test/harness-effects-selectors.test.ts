@@ -196,22 +196,17 @@ const EXEMPT: ReadonlyArray<{ readonly file: string; readonly why: string }> = [
  * matches a live line, so the parcel that re-aims the rig has to delete the
  * hold in the same change, and a hold that outlives its defect cannot sit here
  * quietly. Printed every run, like the exemptions.
+ *
+ * EMPTY TODAY. The one hold it carried (`rowremap-author-harness.mjs`, taken by
+ * EFFECTS-RIGS-FIVE-MORE on 2026-09-13 because the rig died on an uncaught
+ * `window.__dbg.aeon.open` CDP error before its door) was lifted by
+ * RIGS-DEAD-NEEDLE-LEFTOVERS the same day: the rig catches that error the way
+ * its siblings do, opens the scene form by `data-section`, and the hold was
+ * deleted in that change, as its end condition demanded.
  */
 const HOLDS: ReadonlyArray<{
   readonly file: string; readonly section: string; readonly since: string; readonly why: string;
-}> = [
-  {
-    file: 'scratchpad/rowremap-author-harness.mjs',
-    section: 'aeon.effects.scene',
-    since: '2026-09-13',
-    why: 'BLOCKED in EFFECTS-RIGS-FIVE-MORE. The rig carries the dead scene needle '
-      + '(openSection, and the anchor toggle needle beside it), but it dies at startup before '
-      + 'its door: window.__dbg.aeon.open answers CDP "Promise was collected" in every rig on '
-      + 'this build, the sibling rigs swallow it with .catch, and this one does not. That is a '
-      + 'different defect class, so the re-aim could not be reproduced or proven red-first. '
-      + 'Lift by re-aiming the rig with a red-first, and delete this hold in that change.',
-  },
-];
+}> = [];
 
 /** Tracked files under scratchpad/ that could carry a selector. */
 function scratchpadSources(): string[] {
