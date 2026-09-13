@@ -259,13 +259,19 @@ export function Chip({ children, active, onClick, disabled, title, tone }: {
   // :focus-visible ring with it, and none of those can then drift apart. The
   // non-interactive chips (readouts like "tiles: 12 new") stay spans, because a
   // button that does nothing is a worse lie than a span that does nothing.
+  //
+  // ONE SIZE, DECLARED ONCE, FOR BOTH ELEMENTS: T.tBase (13px). The owner's
+  // rule for d-36 was "go with whatever there's more of", and more chips
+  // already painted 13px than 11px (counted in the running app and in source:
+  // docs/reviews/2026-09-13-chip-font-majority.md). This key used to say
+  // T.tXs and only the span obeyed it; the button's note below says why.
   const style: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: T.s2, padding: `${T.s1} ${T.s3}`,
     background: active ? T.accent : T.raised,
     color: active ? T.onAccent : toned ? T.warning : T.textBase,
     border: `1px solid ${active ? T.accent : toned ? T.warning : T.border}`,
     borderRadius: T.rMd,
-    fontSize: T.tXs, cursor: disabled ? 'default' : (onClick ? 'pointer' : 'default'),
+    fontSize: T.tBase, cursor: disabled ? 'default' : (onClick ? 'pointer' : 'default'),
     opacity: disabled ? 0.5 : 1, whiteSpace: 'nowrap',
   };
   if (!onClick) return <span title={title} style={style}>{children}</span>;
@@ -277,9 +283,19 @@ export function Chip({ children, active, onClick, disabled, title, tone }: {
       aria-pressed={active === undefined ? undefined : active}
       onClick={disabled ? undefined : onClick}
       // The UA's own button styling is the only thing the span never had to
-      // undo: font and line-height are inherited so a chip in a 13px bar is
-      // still 11px, and `margin: 0` keeps the option bars' gaps exact.
-      style={{ ...style, font: 'inherit', fontSize: T.tXs, lineHeight: 1, margin: 0, textAlign: 'left' }}
+      // undo, and it is undone with LONGHANDS. A <button> does not inherit the
+      // page's font family, weight or style, so those three are set to
+      // `inherit`. The SIZE is not inherited: it is the T.tBase in the shared
+      // `style` above, so both elements paint the one declared size.
+      // Never the `font` shorthand here: written after the spread, it resets
+      // every font longhand, size included. That is how this button painted
+      // its CONTAINER's size (13px in the header, 11px in an OptionBar) while
+      // declaring 11px, until 2026-09-13. `lineHeight: 1` and `margin: 0` keep
+      // the option bars' heights and gaps exact.
+      style={{
+        ...style, fontFamily: 'inherit', fontWeight: 'inherit', fontStyle: 'inherit',
+        lineHeight: 1, margin: 0, textAlign: 'left',
+      }}
     >{children}</button>
   );
 }
@@ -311,7 +327,8 @@ export function Divider() {
  *
  * `box-sizing: border-box` and the 1px vertical padding are what keep the
  * ORDINARY bar at exactly 32px, so no harness's pinned geometry moves: chips are
- * 11px text on a 1-unit pad and sit well inside 30px of content box. The growth
+ * 13px text (Chip declares T.tBase) at `lineHeight: 1` on a 1-unit (2px) pad,
+ * 13 + 4 + a 2px border = 19px, well inside 30px of content box. The growth
  * only happens on the long-sentence case that used to overflow.
  *
  * `align-items: center` STAYS. It is right for the resting bar (chips of unequal
