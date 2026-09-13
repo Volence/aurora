@@ -78,6 +78,7 @@ import * as os from 'node:os';
 import * as zlib from 'node:zlib';
 import { spawnGuarded, killTree, RUN_PROFILE_DIR, descendants, cmdlineOf, isXvfbProcess } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild, assertDebugBuild } from './lib/run-root.mjs';
+import { chipDeclaredSize } from './lib/chip-declared-size.mjs';
 
 const ROOT = AURORA_DIR;
 const RUN = announceRunRoot(runTarget(ROOT));
@@ -179,6 +180,14 @@ async function loadOracle() {
 }
 /** Token name (T.textBase) to its CSS custom property (--text-base). */
 const TOKEN_VAR = { textBase: '--text-base', textLo: '--text-lo', textHi: '--text-hi', textFaint: '--text-faint', tXs: '--text-xs-size', tSm: '--text-sm-size', t2xs: '--text-2xs-size', fontMono: '--font-mono' };
+// What `Chip` DECLARES, read from HEAD (like every literal here) by the chip
+// census's own parser, and its size token resolved with the others, so CL.FONT
+// follows the primitive rather than a token typed into this table.
+const CHIP_DECL = chipDeclaredSize(AURORA_DIR, {
+  primitives: SRC_HEAD('src/renderer/components/ui/primitives.tsx'),
+  theme: SRC_HEAD('src/renderer/components/ui/theme.ts'),
+});
+if (CHIP_DECL.token) TOKEN_VAR[CHIP_DECL.token] = CHIP_DECL.cssVar;
 
 // ═══ THE COPY ══════════════════════════════════════════════════════════════
 const ED = 'games/sonic4/data/editor';
@@ -966,15 +975,16 @@ async function stampPart(d, O) {
     `MEASURED: ${J(chip)}; want title ${J(O.detachTitle(lh ? lh.placementId : -1))}; chip background (screen) ${fmt(chipBg)}; `
     + `WCAG contrast text/chip ${chipBg ? contrast(rgbOf(chip.color), chipBg) : 'n/a'}. LOOK CALL FOR THE OWNER: capture ${roCap && roCap.path}`);
 
-  // THE CHIP'S SIZE, measured against what Chip states (red run red-cl and dev
-  // run 3 both read 13px): the button's style ends `font: 'inherit', fontSize:
-  // T.tXs` and its comment promises "a chip in a 13px bar is still 11px".
-  const chipStyle = fromHead('src/renderer/components/ui/primitives.tsx',
-    /style=\{\{ \.\.\.style, font: 'inherit', fontSize: T\.([a-zA-Z0-9]+), lineHeight: 1, margin: 0, textAlign: 'left' \}\}/, 'Chip button style');
-  finding('CL.FONT', `the enabled Detach chip is at Chip's own ${chipStyle[1]} size (primitives.tsx Chip: style {...style, font: 'inherit', fontSize: T.${chipStyle[1]}}; "a chip in a 13px bar is still 11px")`,
-    chip.found && chip.tag === 'BUTTON' && chip.fontSize === tk[chipStyle[1]],
-    `MEASURED: Detach chip ${J({ tag: chip.tag, fontSize: chip.fontSize, disabled: chip.disabled })}; token ${chipStyle[1]} = ${tk[chipStyle[1]]}; the readout beside it ${ro.fontSize}. `
-    + 'Why, from the code (not measured here): the spread `style` already carries fontSize, so the later fontSize keeps that EARLIER key position and `font: inherit`, set after it, resets the size to the parent\'s.');
+  // THE CHIP'S SIZE, measured against what Chip DECLARES (CHIP_DECL, read from
+  // HEAD by lib/chip-declared-size.mjs). This used to match the button's style
+  // line with a regex that spelled out its `font: 'inherit'` shorthand, and
+  // that shorthand WAS the defect (d-36, answered 2026-09-13): the regex would
+  // have thrown the day the defect was fixed.
+  if (!CHIP_DECL.token) throw new Error(`ORACLE: Chip's declared font size could not be read from HEAD: ${CHIP_DECL.problem}`);
+  finding('CL.FONT', `the enabled Detach chip is at the size Chip declares (T.${CHIP_DECL.token} = ${CHIP_DECL.varExpr}, HEAD:primitives.tsx)`,
+    chip.found && chip.tag === 'BUTTON' && chip.fontSize === tk[CHIP_DECL.token],
+    `MEASURED: Detach chip ${J({ tag: chip.tag, fontSize: chip.fontSize, disabled: chip.disabled })}; token ${CHIP_DECL.token} = ${tk[CHIP_DECL.token]}; the readout beside it ${ro.fontSize}. `
+    + `Chip's font shorthand keys in HEAD: ${J(CHIP_DECL.shorthands)} (one written after the spread resets the size to the parent's).`);
 
   // ── CONTROL: an UNLINKED tile, the same pick ──────────────────────────────
   const un = await c.json(String.raw`(() => { const a = window.__dbg.aeon;

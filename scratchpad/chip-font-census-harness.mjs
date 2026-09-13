@@ -99,6 +99,7 @@ import { join, relative } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild, assertDebugBuild } from './lib/run-root.mjs';
+import { chipDeclaredSize } from './lib/chip-declared-size.mjs';
 import {
   openNewCanvasDialog, fillDialog, settledInPage, INSTALL as CANVAS_INSTALL,
   ctrlK, typeText, enter, escape, drawArt,
@@ -156,39 +157,11 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 const parse = (rel) => ts.createSourceFile(rel, read(rel), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const lineOf = (sf, node) => sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
 
-/** What `function Chip` declares, read out of its own body: every `fontSize`
- *  property's initializer, and every `font` shorthand key, in any object
- *  literal inside the function. */
-function chipDeclaration() {
-  const sf = parse(PRIMITIVES);
-  let fn = null;
-  sf.forEachChild((n) => {
-    if (ts.isFunctionDeclaration(n) && n.name?.text === 'Chip') fn = n;
-  });
-  if (!fn) return { error: `${PRIMITIVES} has no top-level function Chip` };
-  const fontSizes = []; const shorthands = [];
-  const walk = (n) => {
-    if (ts.isPropertyAssignment(n) && (ts.isIdentifier(n.name) || ts.isStringLiteral(n.name))) {
-      const k = n.name.text;
-      if (k === 'fontSize') fontSizes.push({ line: lineOf(sf, n), init: n.initializer.getText(sf) });
-      if (k === 'font') shorthands.push({ line: lineOf(sf, n), init: n.initializer.getText(sf) });
-    }
-    ts.forEachChild(n, walk);
-  };
-  walk(fn);
-  const inits = [...new Set(fontSizes.map((f) => f.init))];
-  // `T.tXs` -> the theme table's value for key `tXs` -> `var(--text-xs-size)`.
-  let token = null, cssVar = null, varExpr = null;
-  if (inits.length === 1) {
-    const m = /^T\.(\w+)$/.exec(inits[0]);
-    if (m) {
-      token = m[1];
-      const themeHits = [...read(THEME_TS).matchAll(new RegExp(`\\b${token}:\\s*'(var\\((--[\\w-]+)\\))'`, 'g'))];
-      if (themeHits.length === 1) { varExpr = themeHits[0][1]; cssVar = themeHits[0][2]; }
-    }
-  }
-  return { fontSizes, shorthands, inits, token, cssVar, varExpr };
-}
+/** What `function Chip` declares, from lib/chip-declared-size.mjs: the one
+ *  derivation this census, chunk-links row 4b, chunk-row9-probe's copy of it
+ *  and cdp-sweep-4's CL.FONT share, so no two of them can measure against
+ *  different tokens. */
+function chipDeclaration() { return chipDeclaredSize(ROOT); }
 
 /** A token's px, FROM SOURCE: theme.ts maps `tXs` to `var(--text-xs-size)`,
  *  theme.css gives that property a px value. Null when either link is absent. */
@@ -1068,8 +1041,8 @@ async function main() {
     st.sites.length > 0 && st.importProblems.length === 0 && staticTotals.unknown === 0,
     `sites=${st.sites.length} filesWithoutTheImport=${JSON.stringify(st.importProblems)} unknown=${staticTotals.unknown}`);
   check('S1', 'function Chip declares ONE font size token, and no style object in it carries the `font` shorthand',
-    !decl.error && decl.inits.length === 1 && decl.varExpr !== null && decl.shorthands.length === 0,
-    decl.error ?? `fontSize initialisers=${JSON.stringify(decl.fontSizes)} -> ${decl.varExpr}; `
+    decl.problem === null && decl.varExpr !== null && decl.shorthands.length === 0,
+    `${decl.problem ? `UNRESOLVED: ${decl.problem}; ` : ''}fontSize initialisers=${JSON.stringify(decl.fontSizes)} -> ${decl.varExpr}; `
       + `font shorthand keys=${JSON.stringify(decl.shorthands)}`);
 
   const wantsApp = ['aeon', 'classic', 'sprite', 'canvas'].some((p) => PARTS.has(p));
