@@ -45,15 +45,21 @@
 //       tiles that still remember the chunk and NOT the one painted by hand in
 //       row 6/7. Skipped with a stated reason if the composer gesture cannot be
 //       reached (it reports SKIP, never PASS).
-//       ⛔ ROW 9 WRITES. Its Save dispatches `set-chunk`, which writes the
-//       section's files into the aeon tree the run opened. So the rig runs
-//       ONLY against a throwaway copy: AEON_DIR has NO DEFAULT, and the run
-//       refuses unset and refuses the live tree (the block beside AEON_DIR).
+//       ⛔ ROWS 3 TO 9 EDIT THE OPEN PROJECT, ONE KEYSTROKE FROM A WRITE. Row
+//       9's Save (the Art facet's `Save changes back to this chunk`) runs
+//       `set-chunk` and the act propagation as commands on the project IN
+//       MEMORY. Measured 2026-09-13: no file in the opened tree changed during
+//       or after a run, because no row sends the project save (Ctrl+S,
+//       shell/commands.ts) and the app has no autosave. That is safety held by
+//       two omissions, not by this rig, so it runs ONLY against a throwaway
+//       copy: AEON_DIR has NO DEFAULT, and the run refuses unset and refuses
+//       the live tree (the block beside AEON_DIR).
 //
 // ═══ THE aeon TREE: A COPY, NEVER THE LIVE ONE ═══
-// The row-1 open reads the tree, and row 9 writes it. Point AEON_DIR at a
-// FRESH copy of aeon's committed tip for every run; a reused copy carries the
-// previous run's saves, and row 3 requires exactly one placement of its chunk.
+// Row 1 opens the tree and rows 3 to 9 leave its project dirty. Point AEON_DIR
+// at a FRESH copy of aeon's committed tip for every run. Nothing saves today,
+// so a reused copy would still start clean; the fresh copy is what keeps that
+// true the day a row does save (row 3 requires exactly one placement).
 //
 // ═══ DEVICE PIXELS ═══
 // `devicePixelRatio` varies run to run on this box (observed at 1 and at 1.35
@@ -91,18 +97,24 @@ const RUN = announceRunRoot(runTarget(ROOT));
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
 /**
- * THIS RIG WRITES THE TREE IT OPENS, SO IT RUNS ONLY AGAINST A COPY AND HAS NO
- * DEFAULT (RIG-WRITES-LIVE-AEON, hub ruling d-28 option 2: copy where a harness
- * can WRITE).
+ * THIS RIG DRIVES EDITS INTO THE PROJECT IT OPENS, SO IT RUNS ONLY AGAINST A
+ * COPY AND HAS NO DEFAULT (RIG-WRITES-LIVE-AEON). Hub ruling d-28 option 2 is
+ * "copy where a harness can WRITE"; whether that covers a rig that is one
+ * keystroke from a write is flagged for the controller in
+ * docs/reviews/2026-09-13-rig-writes-live-aeon.md.
  *
- * This line used to read `siblingPathOrUnresolved('aeon')` with the comment
- * "OPEN ONLY — never written". The comment was false: row 9 clicks the Art
- * facet's `Save changes back to this chunk`, which dispatches `set-chunk` and
- * writes the section's project files. With nothing set, that default resolved to
- * the aeon lane's LIVE working copy. It never fired, which was luck about
- * defaults, not a property of the rig. See
- * docs/reviews/2026-09-12-chunklinks-row9-determination.md, "The aeon
- * observation, SETTLED".
+ * This line used to read `siblingPathOrUnresolved('aeon')`, which with nothing
+ * set resolves to the aeon lane's LIVE working copy, with the comment "OPEN
+ * ONLY — never written". RIG-WRITES-LIVE-AEON booked that comment as false
+ * because row 9 clicks Save. MEASURED 2026-09-13 IT IS TRUE ON DISK: that Save
+ * (`saveComposerDocument`, src/renderer/state/art-composer-save.ts) runs
+ * `set-chunk` and the propagation through `executeCommand` on the in-memory
+ * project, and two fresh copies driven through a whole run had no file newer
+ * than the run's start. But rows 3 to 9 leave the project dirty with the tree
+ * open, and what keeps it off disk is that no row sends Ctrl+S
+ * (shell/commands.ts `save`) and the app has no autosave. A rig kept safe by two
+ * omissions is one edit away from writing another lane's tree, and this one
+ * has already been copied once (chunk-row9-probe.mjs, which kept the default).
  *
  * The two refusals are the ones `guard-surface-harness.mjs` carries, for the
  * same reason, and they stay two separate questions:
@@ -117,20 +129,20 @@ const MAIN = RUN.main;
 const aeonOverride = checkoutOverride('aeon');
 if (aeonOverride === null) {
   throw new Error(
-    'AEON_DIR is unset, and this harness has no honest default: its row 9 SAVES a '
-    + 'chunk edit (set-chunk), which WRITES project files into the tree it opens, so '
-    + 'it must be pointed at a throwaway copy of aeon. Make one from the committed '
+    'AEON_DIR is unset, and this harness has no honest default: rows 3 to 9 edit the '
+    + 'project in the tree it opens (stamps, paints, a chunk Save), one Ctrl+S from '
+    + 'writing it, so it must be pointed at a throwaway copy of aeon. Make one from the committed '
     + 'tip, e.g. `D=$(mktemp -d) && git -C '
     + `${siblingDefaultPathOrUnresolved('aeon')} archive origin/master | tar -x -C "$D"\`, `
-    + 'and set AEON_DIR="$D". A fresh copy per run: a reused one carries the last '
-    + "run's saves. (empyrean contract/SUITE_PATHS.md, precedence step 4)",
+    + 'and set AEON_DIR="$D", a fresh copy per run. '
+    + '(empyrean contract/SUITE_PATHS.md, precedence step 4)',
   );
 }
 const AEON_DIR = aeonOverride.value;
 if (AEON_DIR === siblingDefaultPathOrUnresolved('aeon')) {
   throw new Error(
     `refusing to run against the real aeon tree (${aeonOverride.name}=${AEON_DIR}): `
-    + 'row 9 saves into it. Use a throwaway copy.',
+    + 'rows 3 to 9 edit the project open on it. Use a throwaway copy.',
   );
 }
 console.log(`aeon: ${AEON_DIR}  (${aeonOverride.name}; a copy, refused if it is the live tree)`);
