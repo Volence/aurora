@@ -109,6 +109,7 @@ import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { SECTION_SCENE_FORM, openEffectsSectionState } from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9397);
 // SELF-LOCATING, never a pinned path: run from a worktree this must serve THAT
@@ -424,24 +425,32 @@ async function main() {
     // arrival, which is why [3a1]/[3a2] passed and only this one did not.
     //
     // IDEMPOTENT, and it reports which door it had to open. The Layers and Scene
-    // sections are both on the Parallax sub-tab, which is the default, so no tab
-    // switch is needed here — [3a3b] would say so if that ever changed.
-    const sceneForm = await c.evalExpr(String.raw`
-      (() => {
-        const has = () => [...document.querySelectorAll('input')]
-          .some((e) => /^v_offset: /.test(e.title || ''));
-        if (has()) return 'already-open';
-        const hdr = [...document.querySelectorAll('div')]
-          .filter((d) => d.style && d.style.cursor === 'pointer'
-                      && /^SCENE\s*—/i.test((d.innerText || '').trim()))[0];
-        if (!hdr) return 'no-scene-header';
-        hdr.click();
-        return 'clicked';
-      })()`);
-    await sleep(900);
+    // sections are both on the Parallax sub-tab, which is the default; the
+    // helper activates the owning tab only if it is not already, and [3a3b]
+    // prints which (`tab`).
+    //
+    // ⚠ RE-AIMED (EFFECTS-RIGS-FIVE-MORE, 2026-09-13), and the old aim is quoted
+    // in `scratchpad/lib/effects-sections.mjs` beside `SECTION_SCENE_FORM`. This
+    // opener hunted a `cursor: pointer` div whose text began SCENE plus an em
+    // dash. That dash died in `24541886` on 2026-09-05 (the effects dash sweep:
+    // every section header took a colon); the header reads `Scene: <id>` today,
+    // composed per document at EffectsScenePanel.tsx. So [3a3b] answered
+    // 'no-scene-header', `voField` missed, and eighteen rows downstream measured a
+    // scene whose v_offset had never been set: the exact failure the comment
+    // above says this door was added to end.
+    //
+    // The needle is RETIRED, not repaired: the title changes with the document
+    // under test, so there is no stable string to type. The door is the
+    // section's id, and the verdict is the app's own `data-section-collapsed`
+    // read back AFTER the click, never the click's return value: a header whose
+    // handler was removed still takes a click.
+    const sceneForm = await openEffectsSectionState(c, SECTION_SCENE_FORM, { settleMs: 900 });
     check('3a3b', 'INSTRUMENT: the Scene form is open — it arrives collapsed since d-26b, and '
       + 'a collapsed section is UNMOUNTED, not hidden',
-      sceneForm === 'clicked' || sceneForm === 'already-open', `open -> ${sceneForm}`);
+      sceneForm.ok === true
+      && (sceneForm.section === 'clicked' || sceneForm.section === 'already-open'),
+      `open -> ${JSON.stringify(sceneForm)} via [data-section="${SECTION_SCENE_FORM}"]`);
+    if (!sceneForm.ok) throw new Error(sceneForm.why);
     await setField('3a4', 'ANTI-VACUOUS: the scene\'s v_offset field exists and took the owner\'s value',
       voField, VO_A);
     await c.evalExpr('window.__dbg.setView(0, 0, 1)');
