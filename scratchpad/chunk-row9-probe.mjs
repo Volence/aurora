@@ -45,6 +45,22 @@
 //       tiles that still remember the chunk and NOT the one painted by hand in
 //       row 6/7. Skipped with a stated reason if the composer gesture cannot be
 //       reached (it reports SKIP, never PASS).
+//       ⛔ ROWS 3 TO 9 EDIT THE OPEN PROJECT, ONE KEYSTROKE FROM A WRITE. Row
+//       9's Save (the Art facet's `Save changes back to this chunk`) runs
+//       `set-chunk` and the act propagation as commands on the project IN
+//       MEMORY. Measured 2026-09-13 on chunk-links-harness, whose rows 1 to 8
+//       and whose Save this probe shares: no file in the opened tree changed
+//       during or after a run, because no row sends the project save (Ctrl+S,
+//       shell/commands.ts) and the app has no autosave. That is safety held by
+//       two omissions, not by this probe, so it runs ONLY against a throwaway
+//       copy: AEON_DIR has NO DEFAULT, and the run refuses unset and refuses
+//       the live tree (the block beside AEON_DIR).
+//
+// ═══ THE aeon TREE: A COPY, NEVER THE LIVE ONE ═══
+// Row 1 opens the tree and rows 3 to 9 leave its project dirty. Point AEON_DIR
+// at a FRESH copy of aeon's committed tip for every run. Nothing saves today,
+// so a reused copy would still start clean; the fresh copy is what keeps that
+// true the day a row does save (row 3 requires exactly one placement).
 //
 // ═══ DEVICE PIXELS ═══
 // `devicePixelRatio` varies run to run on this box (observed at 1 and at 1.35
@@ -53,9 +69,10 @@
 // integer back through the app's own tile arithmetic; dpr and the rect are
 // printed beside the results so the environment is visible in the log.
 //
-// Usage: node scratchpad/chunk-links-harness.mjs   (VERBOSE=1 for app logs)
+// Usage: D=$(mktemp -d) && git -C <aeon> archive origin/master | tar -x -C "$D"
+//        AEON_DIR="$D" node scratchpad/chunk-row9-probe.mjs   (VERBOSE=1 for app logs)
 
-import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -80,7 +97,59 @@ const ROOT = AURORA_DIR;
 const RUN = announceRunRoot(runTarget(ROOT));
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
-const AEON_DIR = siblingPathOrUnresolved('aeon');   // OPEN ONLY — never written; O66: a copy may be named
+/**
+ * THIS PROBE DRIVES EDITS INTO THE PROJECT IT OPENS, SO IT RUNS ONLY AGAINST A
+ * COPY AND HAS NO DEFAULT (CHUNK-ROW9-PROBE-LIVE-DEFAULT, after
+ * RIG-WRITES-LIVE-AEON gave chunk-links-harness the same two refusals). Hub
+ * ruling d-28 option 2 is "copy where a harness can WRITE"; whether that covers
+ * a rig that is one keystroke from a write is flagged for the controller in
+ * docs/reviews/2026-09-13-rig-writes-live-aeon.md.
+ *
+ * This line used to read `siblingPathOrUnresolved('aeon')`, which with nothing
+ * set resolves to the aeon lane's LIVE working copy, with the comment "OPEN
+ * ONLY — never written". It was copied here from chunk-links-harness with that
+ * default kept. The comment is true ON DISK as measured 2026-09-13 on
+ * chunk-links-harness: row 9's Save (`saveComposerDocument`,
+ * src/renderer/state/art-composer-save.ts) runs `set-chunk` and the propagation
+ * through `executeCommand` on the in-memory project, and fresh copies driven
+ * through a whole run had no file newer than the run's start. But this probe
+ * opens the tree, stamps and paints into its project (rows 3 to 8) and clicks
+ * that Save (row 9), leaving the project dirty with the tree open, and what
+ * keeps it off disk is that no row sends Ctrl+S (shell/commands.ts `save`) and
+ * the app has no autosave. A probe kept safe by two omissions is one edit away
+ * from writing another lane's tree.
+ *
+ * The two refusals are the ones `chunk-links-harness.mjs` and
+ * `guard-surface-harness.mjs` carry, for the same reason, and they stay two
+ * separate questions:
+ *   (1) UNSET: `checkoutOverride` is the resolver's instrument for a harness
+ *       that REQUIRES an override, and it brings the aliases, the
+ *       two-spellings-disagree refusal and the set-but-absent error with it.
+ *   (2) SET TO THE LIVE TREE: compared against the RESOLVED default location
+ *       (`siblingDefaultPathOrUnresolved`), never a literal, so it still guards
+ *       when the suite moves.
+ * Both throw at import, before `main()` can build, spawn or open anything.
+ */
+const aeonOverride = checkoutOverride('aeon');
+if (aeonOverride === null) {
+  throw new Error(
+    'AEON_DIR is unset, and this probe has no honest default: rows 3 to 9 edit the '
+    + 'project in the tree it opens (stamps, paints, a chunk Save), one Ctrl+S from '
+    + 'writing it, so it must be pointed at a throwaway copy of aeon. Make one from the committed '
+    + 'tip, e.g. `D=$(mktemp -d) && git -C '
+    + `${siblingDefaultPathOrUnresolved('aeon')} archive origin/master | tar -x -C "$D"\`, `
+    + 'and set AEON_DIR="$D", a fresh copy per run. '
+    + '(empyrean contract/SUITE_PATHS.md, precedence step 4)',
+  );
+}
+const AEON_DIR = aeonOverride.value;
+if (AEON_DIR === siblingDefaultPathOrUnresolved('aeon')) {
+  throw new Error(
+    `refusing to run against the real aeon tree (${aeonOverride.name}=${AEON_DIR}): `
+    + 'rows 3 to 9 edit the project open on it. Use a throwaway copy.',
+  );
+}
+console.log(`aeon: ${AEON_DIR}  (${aeonOverride.name}; a copy, refused if it is the live tree)`);
 const SHOTS = join(ROOT, 'scratchpad/shots-chunk-links');
 mkdirSync(SHOTS, { recursive: true });
 
