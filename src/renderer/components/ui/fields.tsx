@@ -289,6 +289,10 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
   // at the bottom of this component. A ref and not state for the reason above:
   // it is written and read inside the same gesture, and nothing draws it.
   const focusingClick = React.useRef(false);
+  // HAS THIS VISIT BEEN CLAIMED, by a primary press or by the author's own
+  // edit? False from every blur until one of those happens. It is what lets a
+  // Tab-then-click arm the click; the block above `onMouseDown` has the reason.
+  const claimed = React.useRef(false);
   // A RE-SELECT THE FOCUSING CLICK SCHEDULED FOR AFTER ITSELF, or null. The
   // `onClick` block below is the whole derivation; this is the handle that lets
   // a blur or an unmount cancel one that has not run yet.
@@ -374,8 +378,46 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
        * ⚠ PRIMARY BUTTON ONLY. A middle-click on X11 pastes the primary
        * selection, and a field that grabbed the selection out from under that
        * paste would be inventing a second defect out of the fix for the first.
+       *
+       * ═══ 2026-09-13: AND A TAB, WHICH `!editing` COULD NOT SEE ═══
+       *
+       * `!editing` asked "was this box unfocused when the pointer went down?",
+       * and a Tab gets that answer wrong. After a Tab the box is ALREADY focused,
+       * so the next click was not armed and its caret took the digits: Tab in,
+       * click, type `7`, and `156` read `1567` (harness arm T, red on master
+       * `f60526ac`). Ruled FIX (`docs/decisions.jsonl`,
+       * NUMBERFIELD-TAB-THEN-CLICK-answered): *"A click re-selects whenever the
+       * box was NOT focused by a pointer."*
+       *
+       * So the arm now asks whether a pointer has CLAIMED this visit. `claimed`
+       * is set by a primary press and cleared by a blur, and the click is armed
+       * when the box is unfocused (as before) OR focused but unclaimed. That
+       * gives one rule for every way in: **the first primary click of a visit
+       * re-selects, and every click after it places a caret.** The pointer path
+       * is exactly as it was, because the focusing click is still the first
+       * press. Arm N's second click keeps its caret, and so does a second click
+       * after Tab-then-click (arm V), which is a box a pointer has now claimed
+       * like any other.
+       *
+       * ⚠ TYPING CLAIMS THE VISIT TOO, and this is an interpretation of the ruling,
+       * not its words. Its question is scoped to "click it BEFORE typing", and its
+       * whole hazard is digits appended to the OLD number. Once the author has
+       * typed, the box holds their own text, which they are looking at, and a
+       * click into it is an edit of that text. So Tab, type, click keeps its
+       * caret (arm U), the same as click, type, click has always done. `onChange`
+       * sets it: a keystroke, an arrow key or a spin step, whether or not the
+       * value committed.
+       *
+       * ⚠ AND NO DEFAULT ACTION IS SUPPRESSED HERE EITHER. This changes WHICH
+       * clicks queue the re-select above, and nothing about how it is done. The
+       * spin button's mouseup still runs, so a held arrow on a tabbed-into box
+       * still stops when released (arms SH and TH).
        */
-      onMouseDown={(e) => { focusingClick.current = e.button === 0 && !editing; }}
+      onMouseDown={(e) => {
+        const primary = e.button === 0;
+        focusingClick.current = primary && (!editing || !claimed.current);
+        if (primary) claimed.current = true;
+      }}
       onClick={(e) => {
         if (!focusingClick.current) return;
         focusingClick.current = false;
@@ -396,8 +438,10 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
         // which is what every author expects of a small numeric field and what
         // makes the refusal below a backstop rather than a daily obstacle.
         // ⚠ THIS LINE ALONE DOES NOT HOLD THE SELECTION AGAINST A CLICK, and it
-        // is still the only thing that selects for a Tab, which has no click to
-        // land in. The `onClick` above is the other half; see its block.
+        // is still the only thing that selects for a Tab followed by typing,
+        // which has no click to land in. The `onClick` above is the other half,
+        // and since 2026-09-13 it also serves a Tab followed by a click; see its
+        // block.
         e.currentTarget.select();
         // The baseline for the drift clause: what the author is about to type
         // OVER. Reset the counter with it — a second visit to the same box is a
@@ -417,6 +461,9 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
         // selection back a task later.
         focusingClick.current = false;
         cancelReselect();
+        // The claim belongs to ONE visit. The next Tab into this box starts
+        // unclaimed, so its first click re-selects again.
+        claimed.current = false;
         // ⚠ THE COUNTER IS NOT CLEARED HERE, only on the next focus. The refusal
         // text stays painted after the box snaps back, and it is exactly then
         // that an author reads it — a clause deleted on blur would vanish at the
@@ -425,6 +472,10 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
       }}
       onChange={(e) => {
         const raw = e.target.value;
+        // THE BOX NOW HOLDS THE AUTHOR'S OWN TEXT, so a click from here on is an
+        // edit of it and keeps its caret. Before the commit check, on purpose:
+        // a refused value is still on screen. See the Tab block above `onMouseDown`.
+        claimed.current = true;
         setText(raw);
         const n = parseNumberFieldText(raw);
         if (n === undefined) return;

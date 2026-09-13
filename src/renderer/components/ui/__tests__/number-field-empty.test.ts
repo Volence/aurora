@@ -400,6 +400,120 @@ describe('NumberField re-selects on the FOCUSING click, and no other', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// A TAB, THEN A CLICK (NUMBERFIELD-TAB-THEN-CLICK, ruled FIX 2026-09-13)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Tab into a box holding 156, click it, type `7`, and it read `1567`. The arm
+// above was set on `mousedown` only while the box was unfocused, and after a Tab
+// it is already focused. The ruling (`docs/decisions.jsonl`,
+// NUMBERFIELD-TAB-THEN-CLICK-answered): "a click re-selects whenever the box was
+// NOT focused by a pointer."
+//
+// `focus()` with no `mouseDown()` before it is how this suite spells a Tab. As
+// with the block above, these rows ask the SCOPE (which clicks re-select) and not
+// whether the selection survives. That is Blink's gesture ordering and is put to
+// a browser: harness arms T, U and V.
+
+describe('NumberField after a Tab: the first click re-selects, and then the box is claimed', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  /** A click on a box that is ALREADY focused, start to finish. */
+  const clickIn = (b: Box, button = 0): void => { b.mouseDown(button); b.click(); b.settle(); };
+
+  it('re-selects on the first click after a Tab', () => {
+    // RED ON MASTER f60526ac: the count stayed at 1 and the click's caret took
+    // the digits. GREEN RULES OUT the Tab-then-click insert.
+    const b = box({ value: 156 });
+    b.focus();
+    expect(b.selects.count, 'the Tab selects on focus').toBe(1);
+    clickIn(b);
+    expect(b.selects.count, 'and the first click after it must re-select').toBe(2);
+  });
+
+  it('ONLY the first: a second click after Tab-then-click keeps its caret', () => {
+    // The ruling's cost is ONE gesture, not every click in the visit. GREEN RULES
+    // OUT a field that re-selects on every click after a Tab, which would leave
+    // no way to place a caret with the mouse until the box is left.
+    const b = box({ value: 156 });
+    b.focus();
+    clickIn(b);
+    const after = b.selects.count;
+    clickIn(b);
+    expect(b.selects.count - after, 'the pointer has claimed the box; a caret click selects nothing')
+      .toBe(0);
+  });
+
+  it('typing after the Tab claims the box: Tab, type, click keeps the caret', () => {
+    // THE SUB-CASE, AS RULED BY THIS PARCEL (flagged in the packet): once the
+    // author has typed, the box holds their own text, and a click into it is an
+    // edit of that text, just as click, type, click has always been.
+    const b = box({ value: 156 });
+    b.focus();
+    b.type('155');
+    const after = b.selects.count;
+    clickIn(b);
+    expect(b.selects.count - after, 'a click after typing must not re-select').toBe(0);
+  });
+
+  it('and a REFUSED keystroke claims it too, because what matters is the author\'s text', () => {
+    // A value the caller refuses commits nothing, and the box still shows what
+    // was typed. The claim is about that text, not about a commit.
+    const b = box({ value: 156, refuse: (v) => (v < 100 ? 'too low' : null) });
+    b.focus();
+    b.type('1');
+    expect(b.commits, 'the premise: nothing committed').toEqual([]);
+    const after = b.selects.count;
+    clickIn(b);
+    expect(b.selects.count - after).toBe(0);
+  });
+
+  it('a non-primary press after a Tab neither re-selects nor claims', () => {
+    // A right-click or an X11 middle-click paste is not the gesture the ruling is
+    // about. It must not re-select, and it must not use up the arm, so the next
+    // primary click still does.
+    const b = box({ value: 156 });
+    b.focus();
+    for (const button of [1, 2]) {
+      b.mouseDown(button);
+      b.settle();
+    }
+    expect(b.selects.count, 'no re-select for a non-primary press').toBe(1);
+    clickIn(b);
+    expect(b.selects.count, 'and the first PRIMARY click still re-selects').toBe(2);
+  });
+
+  it('a blur ends the claim: the next visit by Tab re-selects on its first click again', () => {
+    const b = box({ value: 156 });
+    b.focus();
+    b.type('155');
+    clickIn(b);
+    expect(b.selects.count, 'claimed by typing: only the Tab selected').toBe(1);
+    b.blur();
+    b.focus();
+    expect(b.selects.count, 'the second Tab selects on focus').toBe(2);
+    clickIn(b);
+    expect(b.selects.count, 'and its first click re-selects, because the claim did not survive the blur')
+      .toBe(3);
+  });
+
+  it('the pointer path is unchanged: a focusing click, then a caret click (anti-vacuous)', () => {
+    // Every row above could be green on a field that re-selects on EVERY click
+    // except after typing. This is the same box going in by pointer: the second
+    // click must still select nothing, which is the scope row of the block above
+    // and harness arm N.
+    const b = box({ value: 156 });
+    b.mouseDown();
+    b.focus();
+    b.click();
+    b.settle();
+    expect(b.selects.count, 'focus + the focusing click').toBe(2);
+    clickIn(b);
+    expect(b.selects.count, 'a click inside a box the pointer brought focus to').toBe(2);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // A REFUSAL THAT CANNOT READ AS "NOTHING CHANGED" (cold read 2026-09-05, C8)
 // ═══════════════════════════════════════════════════════════════════════════
 //
