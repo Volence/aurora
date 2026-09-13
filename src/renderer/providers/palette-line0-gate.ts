@@ -38,22 +38,24 @@
 // rather than letting a person make an edit that evaporates.
 
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
-import { useConfirmStore, type ConfirmButton } from '../state/confirmStore';
+import { useConfirmStore } from '../state/confirmStore';
 import { playerPaletteRefusal } from '../../core/project/aeon/player-palette';
 import {
   EMBED_SOURCE_EXTENSION, scanEmbeds, sharedLine0Warning, type EmbedScan,
 } from '../../core/project/aeon/shared-palette-warning';
 import type { S4Project } from '../../core/model/s4-types';
 
-/** The answer key that accepts the warning. Every other answer declines. */
+/**
+ * The answer key that accepts the warning. Every other answer declines.
+ *
+ * ⚠ THE BUTTONS AT THE `ask` BELOW SPELL THIS KEY AS A LITERAL, ON PURPOSE.
+ * shell/__tests__/confirm-dialog-focus.test.ts parses every confirm door in
+ * src/ and REFUSES a `buttons` array it cannot read as literals (a spread of a
+ * constant was refused, measured 2026-09-13), because it proves no door ever
+ * focuses a destructive button. So the literal and this constant are two
+ * statements of one key, and palette-line0-gate.test.ts asserts they agree.
+ */
 export const LINE0_ACCEPT_KEY = 'edit-shared';
-
-/** The warning's buttons. The accepting one is `danger`, so the dialog focuses
- *  Cancel and a stray Enter or Space declines (shell/ConfirmDialog.tsx). */
-export const LINE0_WARNING_BUTTONS: readonly ConfirmButton[] = [
-  { key: LINE0_ACCEPT_KEY, label: 'Edit the shared palette', tone: 'danger' },
-  { key: 'cancel', label: 'Cancel' },
-];
 
 /** The title when line 0 cannot be saved at all. */
 export const LINE0_REFUSED_TITLE = 'Palette line 0 cannot be saved from here';
@@ -103,7 +105,16 @@ async function askOnce(): Promise<boolean> {
   // about one project must never be recorded against another.
   if (useProjectStore.getState().project !== project) return false;
   const { title, body } = sharedLine0Warning(file.path, scan);
-  const answer = await useConfirmStore.getState().ask({ title, body, buttons: [...LINE0_WARNING_BUTTONS] });
+  // The accepting button is `danger`, so the dialog focuses Cancel and a stray
+  // Enter or Space declines (shell/ConfirmDialog.tsx).
+  const answer = await useConfirmStore.getState().ask({
+    title,
+    body,
+    buttons: [
+      { key: 'edit-shared', label: 'Edit the shared palette', tone: 'danger' },
+      { key: 'cancel', label: 'Cancel' },
+    ],
+  });
   if (answer !== LINE0_ACCEPT_KEY || useProjectStore.getState().project !== project) return false;
   acknowledgedFor = project;
   return true;

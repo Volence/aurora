@@ -265,6 +265,13 @@ const HELPERS = String.raw`
     a.dispatchEvent(new DragEvent('dragend', { bubbles: true }));
     return 'dropped';
   };
+  // The in-app confirm (shell/ConfirmDialog): aeon's zone line 0 raises it
+  // before an edit (providers/palette-line0-gate.ts, owner ruling 2026-09-13).
+  H.dialog = () => !!document.querySelector('[role=alertdialog]');
+  H.answer = (key) => {
+    const b = document.querySelector('button[data-confirm-key="' + key + '"]');
+    if (!b) return 'no-button'; b.click(); return 'clicked';
+  };
   H.sliders = () => [...document.querySelectorAll('input[type=range]')];
   H.sliderCount = () => H.sliders().length;
   H.heading = () => {
@@ -376,10 +383,19 @@ async function checkMount(c, tag, pill) {
   const line0Sliders = await c.evalExpr('window.__h.sliderCount()');
   const line0Opacity = await c.evalExpr('window.__h.opacity(0, 5)');
   if (ENGINE === 'aeon') {
-    check(P('6'), `${pill}: line 0 is LOCKED — dimmed, and a click opens nothing`,
-      line0Sliders === 0 && line0Opacity === '0.35',
-      `sliders=${line0Sliders} opacity=${line0Opacity} title=${JSON.stringify(await c.evalExpr('window.__h.title(0,5)'))}`);
-    neg(P('6n'), 'line 1 is dimmed too', (await c.evalExpr('window.__h.opacity(1, 5)')) === '0.35');
+    // WAS "line 0 is LOCKED — dimmed, and a click opens nothing" (the
+    // `refuse_line0` build). Since the owner's 2026-09-13 ruling line 0 is the
+    // shared Sonic and Tails palette, editable behind a warning: not dimmed,
+    // and a click raises the in-app warning and opens nothing until it is
+    // answered. Declined here, so every later row sees line 0 unacknowledged.
+    const warned = await c.evalExpr('window.__h.dialog()');
+    check(P('6'), `${pill}: line 0 is not dimmed, and a click raises the shared-palette warning and opens nothing`,
+      line0Sliders === 0 && line0Opacity === '1' && warned === true,
+      `sliders=${line0Sliders} opacity=${line0Opacity} dialog=${warned} title=${JSON.stringify(await c.evalExpr('window.__h.title(0,5)'))}`);
+    await c.evalExpr('window.__h.answer("cancel")'); await sleep(300);
+    check(P('6b'), `${pill}: declining the warning leaves line 0 closed`,
+      (await c.evalExpr('window.__h.dialog()')) === false && (await c.evalExpr('window.__h.sliderCount()')) === 0);
+    neg(P('6n'), 'line 1 is dimmed', (await c.evalExpr('window.__h.opacity(1, 5)')) === '0.35');
   } else {
     check(P('6'), `${pill}: line 0 is EDITABLE — a click opens the sliders, nothing is dimmed`,
       line0Sliders === 3 && line0Opacity === '1',
@@ -534,20 +550,26 @@ async function runChecks(c) {
     // ---- the grips and the copy menu, which stayed in PaletteEditor -------
     await facet(c, 'Art');
     const grips = await c.json('window.__h.gripInfo()');
+    // WAS "locked on line 0 and draggable on 1-3". Copying FROM line 0 changes
+    // nothing shared, so its grip drags like any other since 2026-09-13; it
+    // says whose line it is in its title instead.
     const okGrips = Array.isArray(grips) && grips.length === 4 && grips.every((g) => g && g.tag === 'DIV')
-      && grips[0].draggable === 'false' && grips.slice(1).every((g) => g.draggable === 'true' && g.cursor === 'grab');
-    check('D1', 'aeon: a drag grip per row, locked on line 0 and draggable on 1-3',
+      && grips.every((g) => g.draggable === 'true' && g.cursor === 'grab')
+      && /every zone/.test(grips[0].title ?? '');
+    check('D1', 'aeon: a drag grip per row, all draggable, the line 0 grip naming the shared palette',
       okGrips, JSON.stringify(grips));
-    neg('D1n', 'the locked line 0 grip is draggable', grips[0] && grips[0].draggable === 'true');
+    neg('D1n', 'a grip is not draggable', Array.isArray(grips) && grips.some((g) => !g || g.draggable !== 'true'));
 
     // right-click a swatch → the copy menu
     await c.evalExpr('window.__h.rightClick(1, 5)'); await sleep(400);
     const items = await c.json('window.__h.menuItems()');
     const mHeading = await c.evalExpr('window.__h.menuHeading()');
-    check('D2', 'aeon: right-clicking a swatch opens the "Copy to ▸" menu, with the locked line 0 absent',
-      items.length > 0 && items.every((t) => !/^Zone line 0/.test(t)) && items.some((t) => /^Zone line [23] · idx 5/.test(t)),
+    // WAS "with the locked line 0 absent". Line 0 is a copy TARGET since
+    // 2026-09-13; the write itself asks the warning (row D6 below).
+    check('D2', 'aeon: right-clicking a swatch opens the "Copy to ▸" menu, line 0 offered behind its warning',
+      items.length > 0 && items.some((t) => /^Zone line 0 · idx 5/.test(t)) && items.some((t) => /^Zone line [23] · idx 5/.test(t)),
       `heading=${JSON.stringify(mHeading)} items=${JSON.stringify(items)}`);
-    neg('D2n', 'the menu offers the sprite-reserved line 0', items.some((t) => /^Zone line 0/.test(t)));
+    neg('D2n', 'the menu offers the source line itself', items.some((t) => /^Zone line 1 · /.test(t)));
 
     // …and selecting an item performs the copy, on the undo stack.
     const srcColor = await c.evalExpr('window.__h.color(1, 5)');
@@ -577,12 +599,19 @@ async function runChecks(c) {
     const d1 = await c.evalExpr('window.__h.color(3, 9)');
     check('D5', 'aeon: dragging a swatch onto another copies it', s === d0 || d1 === s,
       `drag=${dropped} source ${s}, dest ${d0} -> ${d1}`);
-    // The locked line must REFUSE a drop.
+    // WAS "the sprite-reserved line 0 refuses a drop". A drop onto the shared
+    // line 0 now ASKS: the warning comes up and nothing lands until it is
+    // answered. Declined here, and the colour must still be the one it was.
     const l0 = await c.evalExpr('window.__h.color(0, 9)');
     await c.evalExpr('window.__h.dragSwatch(1, 9, 0, 9)'); await sleep(600);
     await c.evalExpr(HELPERS);
-    check('D6', 'aeon: the sprite-reserved line 0 refuses a drop',
-      (await c.evalExpr('window.__h.color(0, 9)')) === l0, `line0 idx9 stayed ${l0}`);
+    const askedOnDrop = await c.evalExpr('window.__h.dialog()');
+    const whileAsking = await c.evalExpr('window.__h.color(0, 9)');
+    await c.evalExpr('window.__h.answer("cancel")'); await sleep(400);
+    await c.evalExpr(HELPERS);
+    check('D6', 'aeon: a drop onto the shared line 0 raises the warning, and a decline lands nothing',
+      askedOnDrop === true && whileAsking === l0 && (await c.evalExpr('window.__h.color(0, 9)')) === l0,
+      `dialog=${askedOnDrop} line0 idx9 ${l0} -> ${whileAsking} (while asking) -> ${await c.evalExpr('window.__h.color(0, 9)')}`);
     neg('D6n', 'line 0 accepted the drop', (await c.evalExpr('window.__h.color(0, 9)')) === s && s !== l0);
     await shot(c, 'dnd');
   }
