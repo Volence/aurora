@@ -97,6 +97,7 @@ import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { SECTION_SCENE_FORM, openEffectsSectionState } from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9397);
 // SELF-LOCATING, never a pinned path: run from the main clone this must serve
@@ -657,22 +658,29 @@ async function main() {
     // passed on a field that had never been written. The blanket row is the only
     // thing between that and a green run measuring an unset fixture, which is
     // exactly the job it was written for; it is worth saying so out loud.
-    const sceneForm = await c.evalExpr(String.raw`
-      (() => {
-        const has = () => [...document.querySelectorAll('input')]
-          .some((e) => (e.title || '').startsWith('v_offset:'));
-        if (has()) return 'already-open';
-        const hdr = [...document.querySelectorAll('div')]
-          .filter((d) => d.style && d.style.cursor === 'pointer'
-                      && /^SCENE\s*—/i.test((d.innerText || '').trim()))[0];
-        if (!hdr) return 'no-scene-header';
-        hdr.click();
-        return 'clicked';
-      })()`);
-    await sleep(900);
+    //
+    // ⚠ RE-AIMED (EFFECTS-RIGS-FIVE-MORE, 2026-09-13), and the old aim is quoted
+    // in `scratchpad/lib/effects-sections.mjs` beside `SECTION_SCENE_FORM`. This
+    // opener hunted a `cursor: pointer` div whose text began SCENE plus an em
+    // dash. That dash died in `24541886` on 2026-09-05 (the effects dash sweep:
+    // every section header took a colon); the header reads `Scene: <id>` today,
+    // composed per document at EffectsScenePanel.tsx. So the opener answered
+    // 'no-scene-header' on every run, [6a0] went red, and [7d] caught the
+    // fallout as `6 v_offset: "no-element"`, while [6a] passed only because the
+    // sweep's first candidate is the 0 the scene already sat at.
+    //
+    // The needle is RETIRED, not repaired: the title changes with the document
+    // under test, so there is no stable string to type. The door is the
+    // section's id, and the verdict is the app's own `data-section-collapsed`
+    // read back AFTER the click, never the click's return value: a header whose
+    // handler was removed still takes a click.
+    const sceneForm = await openEffectsSectionState(c, SECTION_SCENE_FORM, { settleMs: 900 });
     check('6a0', 'INSTRUMENT: the Scene form is open, so the v_offset sweep below writes a real '
       + 'field — it arrives collapsed since d-26b',
-      sceneForm === 'clicked' || sceneForm === 'already-open', `open -> ${sceneForm}`);
+      sceneForm.ok === true
+      && (sceneForm.section === 'clicked' || sceneForm.section === 'already-open'),
+      `open -> ${JSON.stringify(sceneForm)} via [data-section="${SECTION_SCENE_FORM}"]`);
+    if (!sceneForm.ok) throw new Error(sceneForm.why);
 
     let owned = [];
     let vOff = 0;

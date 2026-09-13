@@ -70,6 +70,7 @@ import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { SECTION_SCENE_FORM, openEffectsSectionState } from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9433);
 const ROOT = AURORA_DIR;
@@ -179,26 +180,41 @@ async function shot(c, name) {
 }
 
 /**
+ * THE SCENE FORM'S BOX — the `CollapsibleSection` wrapper, found by the id the
+ * app routes on.
+ *
+ * ⚠ RE-AIMED (EFFECTS-RIGS-FIVE-MORE, 2026-09-13). This used to find an
+ * uppercase header div whose text began SCENE plus an em dash, then climb two
+ * parents to the section box. That dash died in `24541886` on 2026-09-05 (the
+ * effects dash sweep); the header reads `Scene: <id>`, composed per document
+ * at EffectsScenePanel.tsx, so the probe answered 'no "Scene:" section header
+ * on screen', and so, ironically, did its own error message, which already
+ * named the new spelling while the needle one line above still asked for the
+ * old one.
+ *
+ * THE SCOPE IS UNCHANGED, and that is derived rather than hoped:
+ * `CollapsibleSection.tsx` renders `<div data-section={id}>` > the clickable
+ * header div > `PanelHeader`'s uppercase div (`ui/primitives.tsx`) > a span,
+ * so the old `header.parentElement.parentElement` WAS the `data-section` div.
+ * The needle is retired, not repaired: there is no stable title to type.
+ */
+const SCENE_BOX = String.raw`document.querySelector('[data-section=${JSON.stringify(SECTION_SCENE_FORM)}]')`;
+
+/**
  * THE SCENE FORM'S ROWS, read structurally.
  *
- * `column-layout`'s `Field` renders `<label-span><control>`; the Scene section is
- * the one whose header text starts "Scene:". Rows are collected with their
+ * `column-layout`'s `Field` renders `<label-span><control>`; the box is
+ * `SCENE_BOX` above. Rows are collected with their
  * VISIBLE text and, for a `<select>`, its option values and texts — so a row
  * that renders but is hidden contributes nothing an author can see.
  */
 const FORM_PROBE = String.raw`
 (() => {
-  const isHeader = (el) => {
-    if (el.tagName !== 'DIV') return false;
-    const cs = getComputedStyle(el);
-    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
-      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
-  };
-  const header = [...document.querySelectorAll('div')].filter(isHeader)
-    .find(h => /^SCENE\s*—/i.test((h.textContent || '').trim()));
-  if (!header) return { error: 'no "Scene:" section header on screen' };
-  const box = header.parentElement && header.parentElement.parentElement;
-  if (!box) return { error: 'the Scene header has no section box' };
+  const box = ${SCENE_BOX};
+  if (!box) return { error: 'no [data-section=${JSON.stringify(SECTION_SCENE_FORM)}] on screen' };
+  if (box.getAttribute('data-section-collapsed') !== 'false') {
+    return { error: 'the Scene section is on screen but collapsed, so its rows are unmounted' };
+  }
   const visible = (el) => {
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
@@ -226,15 +242,8 @@ const FORM_PROBE = String.raw`
 /** Pick a value in the labelled `<select>` and fire React's change. */
 const setSelect = (label, value) => String.raw`
 (() => {
-  const isHeader = (el) => {
-    if (el.tagName !== 'DIV') return false;
-    const cs = getComputedStyle(el);
-    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
-      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
-  };
-  const header = [...document.querySelectorAll('div')].filter(isHeader)
-    .find(h => /^SCENE\s*—/i.test((h.textContent || '').trim()));
-  const box = header && header.parentElement && header.parentElement.parentElement;
+  // The same box FORM_PROBE reads: see SCENE_BOX (re-aimed 2026-09-13).
+  const box = ${SCENE_BOX};
   if (!box) return 'no scene box';
   const sel = [...box.querySelectorAll('select')].find((s) => {
     const row = s.closest('div');
@@ -251,25 +260,13 @@ const setSelect = (label, value) => String.raw`
 
 const rowFor = (probe, label) => (probe.rows || []).find(r => r.label === label) ?? null;
 
-/**
- * THE SCENE FORM, OPENED — it arrives COLLAPSED since EW-SHAPE-TABS (d-26b),
- * which is what gives the layers list above it a real height on the Parallax
- * sub-tab. Every row below reads controls inside that form, so the arrival
- * state has to be opened the way an author opens it: one click on the header.
- * Idempotent — it returns 'already-open' when the form is showing.
- */
-const OPEN_SCENE_FORM = String.raw`
-(() => {
-  const has = () => [...document.querySelectorAll('input')]
-    .some((e) => (e.title || '').startsWith('v_offset'));
-  if (has()) return 'already-open';
-  const hdr = [...document.querySelectorAll('div')]
-    .filter((d) => d.style && d.style.cursor === 'pointer'
-                && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
-  if (!hdr) return 'no-scene-header';
-  hdr.click();
-  return 'clicked';
-})()`;
+// THE SCENE FORM, OPENED - it arrives COLLAPSED since EW-SHAPE-TABS (d-26b),
+// which is what gives the layers list above it a real height on the Parallax
+// sub-tab. Every row below reads controls inside that form, so the arrival
+// state has to be opened the way an author opens it: one click on the header.
+// Opened at [i2b] through `openEffectsSectionState`. The private opener that
+// stood here hunted the same retired needle as FORM_PROBE (see SCENE_BOX) and
+// answered 'no-scene-header' on every run since 2026-09-05.
 
 async function main() {
   console.log('\n=== THE VERTICAL BOB CONTROL, AS RENDERED — ROADMAP row 99 ===');
@@ -332,10 +329,14 @@ async function main() {
     await sleep(1800);
     check('i2', 'the Effects facet is mounted [instrument]', clicked === true, `click=${clicked}`);
     if (clicked !== true) throw new Error('could not reach the Effects facet');
-    const openedForm = await c.evalExpr(OPEN_SCENE_FORM);
-    await sleep(900);
+    const openedForm = await openEffectsSectionState(c, SECTION_SCENE_FORM, { settleMs: 900 });
     check('i2b', 'the Scene form is open — it arrives collapsed since d-26b\'s sub-tabs [instrument]',
-      openedForm === 'clicked' || openedForm === 'already-open', `open → ${openedForm}`);
+      openedForm.ok === true
+      && (openedForm.section === 'clicked' || openedForm.section === 'already-open'),
+      `open → ${JSON.stringify(openedForm)} via [data-section="${SECTION_SCENE_FORM}"]. The verdict `
+      + 'is the app\'s own data-section-collapsed read back AFTER the click, not the click\'s '
+      + 'return value: a header whose handler was removed still takes a click.');
+    if (!openedForm.ok) throw new Error(openedForm.why);
 
     // ---- OFF: the arrival state, and the state every saved scene is in -----
     const off = await c.json(FORM_PROBE);
