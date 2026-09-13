@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS, unwrapBinaryRead, unwrapWriteOutcome } from '../shared/ipc-types';
 import type { RecentsState } from '../shared/recents';
-import type { GuardedWriteFile, GuardedWriteResult, ReadManyEntry, DeleteOutcome, DirListing, PathProbe, AetherStatusPayload, AetherWarpResult, AetherBuildResult } from '../shared/ipc-types';
+import type { GuardedWriteFile, GuardedWriteResult, ReadManyEntry, DeleteOutcome, DirListing, PathProbe, SourceListing, AetherStatusPayload, AetherWarpResult, AetherBuildResult } from '../shared/ipc-types';
 import { AGENT_REQUEST_CHANNEL, AGENT_RESPONSE_CHANNEL } from '../shared/agent-protocol';
 import type { AgentRequestEnvelope, AgentResponseEnvelope } from '../shared/agent-protocol';
 
@@ -50,6 +50,12 @@ const api = {
 
   listProjectFiles: (basePath: string): Promise<string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.LIST_PROJECT_FILES, basePath),
+
+  // Every `extension` file under the project, AND the folders it could not read
+  // and whether it hit its limit: see SourceListing. For a search that has to
+  // be able to say "I could not look" (the shared-palette warning).
+  listProjectSources: (basePath: string, extension: string): Promise<SourceListing> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LIST_PROJECT_SOURCES, basePath, extension),
 
   // Three answers, not two - see PathProbe. Renamed from `pathExists` with the
   // meaning, so a caller that still wants a yes/no has to look at what it is

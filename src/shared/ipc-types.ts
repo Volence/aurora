@@ -30,6 +30,12 @@ export const IPC_CHANNELS = {
   WRITE_BINARY_FILE: 'file:write-binary',
   SELECT_FILES: 'dialog:select-files',
   LIST_PROJECT_FILES: 'file:list-project-files',
+  // Every file of ONE extension under the project, plus the directories it could
+  // not read and whether it stopped at its limit: see SourceListing. The
+  // shared-palette warning's `embed(...)` search (core/project/aeon/
+  // shared-palette-warning.ts) is its reader. Base-only, like the channel above,
+  // so it is contained by construction.
+  LIST_PROJECT_SOURCES: 'file:list-project-sources',
   // Directory-level probes backing the classic-project FileAccess bridge (Task
   // 9). `read` reuses READ_BINARY_FILE; these cover exists/list.
   // Renamed from PATH_EXISTS ('file:path-exists') when the answer stopped being a
@@ -446,6 +452,25 @@ export type PathPresence = 'present' | 'absent' | 'unknown';
 export interface PathProbe {
   presence: PathPresence;
   reason: string | null;
+}
+
+/**
+ * A recursive listing that can REPORT ITS OWN BLINDNESS. `listProjectFiles`
+ * answers a bare array and swallows a directory it cannot read, which is fine
+ * for a best-effort sprite scan and wrong for anything that must say when it
+ * could not look. This answers three things:
+ *
+ *   files       project-relative paths found, in walk order;
+ *   unreadable  every directory the walk could not read, with the errno text;
+ *   capped      true when the walk stopped at its depth or count limit.
+ *
+ * So "found nothing" and "could not see everything" are different values, and
+ * a caller has to look at `unreadable` and `capped` to claim a complete search.
+ */
+export interface SourceListing {
+  files: string[];
+  unreadable: { path: string; reason: string }[];
+  capped: boolean;
 }
 
 /**
