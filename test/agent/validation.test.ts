@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   validateGenesisColor, validatePaletteLine, validateTilePixels, validatePaintRegion,
-  validatePaintCollisionRect,
+  validatePaintCollisionRect, AGENT_LINE0_REFUSAL,
 } from '../../src/core/agent/validation';
 
 describe('validateGenesisColor', () => {
@@ -23,9 +23,23 @@ describe('validateGenesisColor', () => {
 });
 
 describe('validatePaletteLine', () => {
-  it('rejects line 0 (sprite-reserved) and out-of-range lines', () => {
-    expect(validatePaletteLine(0, Array(16).fill(0))).toMatch(/line 0|reserved/i);
+  it('rejects line 0 (the shared Sonic and Tails palette) and out-of-range lines', () => {
+    expect(validatePaletteLine(0, Array(16).fill(0))).toBe(AGENT_LINE0_REFUSAL);
     expect(validatePaletteLine(4, Array(16).fill(0))).toMatch(/line/i);
+  });
+  /**
+   * The agent tool still refuses line 0, since there is no person there to warn,
+   * but since the owner's 2026-09-13 ruling the EDITOR can make the change behind
+   * a warning. The refusal says so rather than calling the line reserved.
+   */
+  it('says line 0 CAN be changed, in the palette editor, behind a warning', () => {
+    const msg = validatePaletteLine(0, Array(16).fill(0))!;
+    expect(msg).toMatch(/Sonic and Tails/);
+    expect(msg).toMatch(/every zone/);
+    expect(msg).toMatch(/palette editor/);
+    expect(msg).toMatch(/warning/);
+    expect(msg, 'the old wording, which named a reservation that no longer holds')
+      .not.toMatch(/reserved for player\/sprite art/);
   });
   it('requires exactly 16 valid colors', () => {
     expect(validatePaletteLine(1, Array(15).fill(0))).toMatch(/16/);
