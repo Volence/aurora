@@ -22,6 +22,14 @@
  * `effects-sub-tabs` asserted an ABSENCE against both dead spellings and so
  * passed vacuously. Those two needles are in `RETIRED` now.
  *
+ * ⚠ AND A THIRD, ONE CONTROL OVER. The anchor toggle's title was `anchor`
+ * followed by an em dash until `d70da895` (dash sweep, group 2) reworded it to
+ * `anchor: the world-anchored band split...` (`ANCHOR_ROW.title` in
+ * `providers/effects-aeon.ts`). Two rigs selected the toggle on the dash:
+ * `rowremap-author` (spelled with the escape) and `scene-anchor-writer` (the
+ * character). RIGS-DEAD-NEEDLE-LEFTOVERS (2026-09-13) re-aimed both on the key
+ * and put the needle in `RETIRED` too, caret form only (see `dashKey`).
+ *
  * ═══ WHAT THESE ROWS COVER, SAID EXACTLY ═══
  *
  * FOUR different claims, and they are not interchangeable:
@@ -79,6 +87,8 @@ const HELPER = join(ROOT, 'scratchpad/lib/effects-sections.mjs');
 const PANEL = join(ROOT, 'src/renderer/components/effects/BgAnimBandPanel.tsx');
 const SCENE_PANEL = join(ROOT, 'src/renderer/components/effects/EffectsScenePanel.tsx');
 const PRESET_PANEL = join(ROOT, 'src/renderer/components/effects/BandPresetPanel.tsx');
+/** Where the scene panel's row titles are composed (`ANCHOR_ROW` among them). */
+const AEON_PROVIDER = join(ROOT, 'src/renderer/providers/effects-aeon.ts');
 const SECTION_COMPONENT = join(ROOT, 'src/renderer/components/ui/CollapsibleSection.tsx');
 const SUB_TAB_BAR = join(ROOT, 'src/renderer/components/effects/EffectsSubTabBar.tsx');
 /** Every panel in the facet — which one renders a section is DERIVED, not pinned. */
@@ -102,6 +112,15 @@ interface Retired {
   readonly section: string;
   /** The label as that panel's own source would spell it, if it painted it again. */
   readonly painted: RegExp;
+  /**
+   * WHEN THE PANEL PAINTS THE LABEL FROM A CONSTANT COMPOSED ELSEWHERE, the file
+   * that composes it, the declaration row 4 finds there, and the expression the
+   * panel renders it by. Row 4 then reads BOTH files: the words would come back
+   * in the composer, and asking only the panel would be green for the wrong
+   * reason, the same shape as asking the tile-animation panel about a scene
+   * header.
+   */
+  readonly composer?: { readonly file: string; readonly declares: string; readonly renders: string };
 }
 
 /** A tile-animation label: the harness spelling and the painted spelling are one. */
@@ -133,6 +152,34 @@ const dashHeader = (word: string, now: string, panel: string, section: string): 
 });
 
 /**
+ * A CONTROL TITLE's leading key followed by an em dash, the shape the dash
+ * sweep retired for a control rather than a section header.
+ *
+ * ⚠ CARET FORM ONLY, AND THAT IS MEASURED, NOT CAUTION. `dashHeader` also
+ * accepts the opening quote of a string that BEGINS with the word, and for
+ * `anchor` that form fires on PROSE in this directory: a check message whose
+ * continuation string begins with the phrase (`camera-preview-harness.mjs`,
+ * "anchor" + dash + "because a locked plane has no vertical camera to move"),
+ * and on origin/master `scene-anchor-writer`'s own failure message, which
+ * quoted the old needle in double quotes. Both are sentences for a reader and
+ * neither selects anything. Every live selector the rigs ever carried for this
+ * toggle was a title regex (`/^anchor` + dash + `/`, in both spellings), which
+ * the caret form catches. What it does NOT catch is a `startsWith(...)` of the
+ * old title; no file in scratchpad/ has one.
+ */
+const dashKey = (
+  word: string, now: string, panel: string, section: string,
+  composer: NonNullable<Retired['composer']>,
+): Retired => ({
+  pattern: new RegExp(`\\^${word}(?:\\\\s[*+]?| )*${DASH}`, 'i'),
+  now,
+  panel,
+  section,
+  painted: new RegExp(`\\b${word}\\s*${DASH}`, 'i'),
+  composer,
+});
+
+/**
  * THE LABELS RETIRED UNDER THE HARNESSES, and what each became.
  *
  * A named list, and row 4 below is the reason that is defensible: it asserts
@@ -148,6 +195,10 @@ const dashHeader = (word: string, now: string, panel: string, section: string): 
  * `dashHeader`). Neither is repaired to the colon spelling in any harness: the
  * titles are composed per document (`Scene: ${selected.id}`), so the
  * harnesses open and judge these sections by `data-section` instead.
+ *
+ * THE ANCHOR TOGGLE (see `dashKey`). Repaired by KEY, not to the colon: the
+ * rigs find it as `/^anchor(?![a-z0-9_.])/` inside the scene section, because
+ * the key is contract and the punctuation after it is prose.
  */
 const RETIRED: readonly Retired[] = [
   tileAnim(/BG animation bands/, 'Tile animations (n/m)', 'aeon.bganim.bands'),
@@ -163,6 +214,10 @@ const RETIRED: readonly Retired[] = [
   dashHeader('PRESET', 'Preset: <id>, composed per document; judge it by '
     + 'data-section="aeon.effects.preset.bands"',
   PRESET_PANEL, 'aeon.effects.preset.bands'),
+  dashKey('anchor', 'anchor: <prose>, since d70da895; find the toggle by its key, '
+    + '/^anchor(?![a-z0-9_.])/, inside [data-section="aeon.effects.scene"]',
+  SCENE_PANEL, 'aeon.effects.scene',
+  { file: AEON_PROVIDER, declares: 'export const ANCHOR_ROW', renders: 'title={ANCHOR_ROW.title}' }),
 ];
 
 /**
@@ -196,22 +251,17 @@ const EXEMPT: ReadonlyArray<{ readonly file: string; readonly why: string }> = [
  * matches a live line, so the parcel that re-aims the rig has to delete the
  * hold in the same change, and a hold that outlives its defect cannot sit here
  * quietly. Printed every run, like the exemptions.
+ *
+ * EMPTY TODAY. The one hold it carried (`rowremap-author-harness.mjs`, taken by
+ * EFFECTS-RIGS-FIVE-MORE on 2026-09-13 because the rig died on an uncaught
+ * `window.__dbg.aeon.open` CDP error before its door) was lifted by
+ * RIGS-DEAD-NEEDLE-LEFTOVERS the same day: the rig catches that error the way
+ * its siblings do, opens the scene form by `data-section`, and the hold was
+ * deleted in that change, as its end condition demanded.
  */
 const HOLDS: ReadonlyArray<{
   readonly file: string; readonly section: string; readonly since: string; readonly why: string;
-}> = [
-  {
-    file: 'scratchpad/rowremap-author-harness.mjs',
-    section: 'aeon.effects.scene',
-    since: '2026-09-13',
-    why: 'BLOCKED in EFFECTS-RIGS-FIVE-MORE. The rig carries the dead scene needle '
-      + '(openSection, and the anchor toggle needle beside it), but it dies at startup before '
-      + 'its door: window.__dbg.aeon.open answers CDP "Promise was collected" in every rig on '
-      + 'this build, the sibling rigs swallow it with .catch, and this one does not. That is a '
-      + 'different defect class, so the re-aim could not be reproduced or proven red-first. '
-      + 'Lift by re-aiming the rig with a red-first, and delete this hold in that change.',
-  },
-];
+}> = [];
 
 /** Tracked files under scratchpad/ that could carry a selector. */
 function scratchpadSources(): string[] {
@@ -253,7 +303,7 @@ function retiredHits(files: readonly string[]): Hit[] {
   return hits;
 }
 
-/** The two dash-sweep entries. */
+/** The dash-sweep entries: the two section headers and the anchor toggle. */
 const DASH_SWEEP = RETIRED.filter((r) => r.panel !== PANEL);
 
 describe('harness selectors follow the app, not the other way round', () => {
@@ -386,6 +436,22 @@ describe('harness selectors follow the app, not the other way round', () => {
         back.push(`${relative(ROOT, r.panel)} paints the label retired for ${r.section} `
           + `(harnesses were told: now ${r.now})`);
       }
+      // The composer, when the words live there: proven to be the right file
+      // (the panel renders its constant, and it declares that constant), then
+      // asked the same question.
+      if (r.composer) {
+        const { file, declares, renders } = r.composer;
+        expect(src, `${relative(ROOT, r.panel)} no longer renders ${renders}, so row 4 would be `
+          + `asking ${relative(ROOT, file)} about a label the panel does not paint`)
+          .toContain(renders);
+        const composed = readFileSync(file, 'utf8');
+        expect(composed, `${relative(ROOT, file)} no longer declares ${declares}, so row 4 is `
+          + 'reading the wrong composer').toContain(declares);
+        if (r.painted.test(stripComments(composed, false))) {
+          back.push(`${relative(ROOT, file)} composes the label retired for ${r.section} `
+            + `(harnesses were told: now ${r.now})`);
+        }
+      }
     }
     expect(back, 'a panel renders a label this file forbids harnesses from selecting on. One of '
       + 'the two is wrong: either the app re-adopted a retired word, or the RETIRED list above '
@@ -475,5 +541,44 @@ describe('harness selectors follow the app, not the other way round', () => {
     const quoting = scratchpadSources().filter((f) => /\^SCENE\\s\*/.test(readFileSync(join(ROOT, f), 'utf8')));
     expect(quoting.length, 'no scratchpad file quotes the retired scene needle even in a comment, '
       + 'so the comment half of row 3 is unexercised on real files').toBeGreaterThan(0);
+  });
+
+  /**
+   * ANTI-VACUOUS FOR THE ANCHOR TOGGLE, one property per assertion, and the
+   * prose half is the reason `dashKey` exists: every prose line below is one a
+   * real file in scratchpad/ carries, or carried until RIGS-DEAD-NEEDLE-LEFTOVERS,
+   * and the quote form `dashHeader` uses would have failed the suite on the
+   * first two.
+   */
+  it('ANTI-VACUOUS: the anchor toggle needle is caught as a selector and not as prose', () => {
+    const anchor = RETIRED.find((r) => r.composer?.declares === 'export const ANCHOR_ROW');
+    expect(anchor, 'no RETIRED entry for the anchor toggle').toBeDefined();
+    const sel = (src: string) => stripComments(src, false).split('\n')
+      .some((l) => anchor?.pattern.test(l) === true);
+
+    // The two dead selectors, each in the spelling its rig used.
+    expect(sel(`const toggleSel = SEL_BY_TITLE(String.raw\`/^anchor ${EM_ESCAPE_TEXT}/\`);`),
+      'the scanner misses the anchor needle spelled with its backslash-u escape').toBe(true);
+    expect(sel(`const toggleSel = SEL_BY_TITLE(String.raw\`/^anchor ${EM}/\`);`),
+      'the scanner misses the anchor needle spelled with the character').toBe(true);
+
+    // The live aim that replaced them must stay green.
+    expect(sel('const ANCHOR_KEY = String.raw`/^anchor(?![a-z0-9_.])/`;'),
+      'the scanner fires on the key-based aim the rigs use today').toBe(false);
+
+    // PROSE, which must stay green.
+    expect(sel(`      + 'anchor ${EM} because a locked plane has no vertical camera to move',`),
+      'the scanner fires on a message continuation that begins with the phrase').toBe(false);
+    expect(sel(`      toggle === null ? 'no select whose title starts "anchor ${EM}" is on screen'`),
+      'the scanner fires on a failure message that quotes the old needle').toBe(false);
+    expect(sel(`check('2a2', 'and the scene declares NO anchor ${EM} so the anchor precondition is live here',`),
+      'the scanner fires on a check message that says the words mid-sentence').toBe(false);
+
+    // The PAINTED side: row 4 sees the composer spelling the old title again,
+    // and does not mistake today's title for it.
+    expect(anchor?.painted.test(`  title: 'anchor ${EM} the world-anchored band split. The engine splits '`),
+      'row 4 cannot see the composer painting the old anchor title').toBe(true);
+    expect(anchor?.painted.test("  title: 'anchor: the world-anchored band split. The engine splits '"),
+      'row 4 reads the anchor title the app paints today as the retired one').toBe(false);
   });
 });

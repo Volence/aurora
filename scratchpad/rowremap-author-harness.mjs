@@ -71,6 +71,7 @@ import { join, resolve } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
+import { SECTION_SCENE_FORM, openEffectsSectionState } from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9529);
 const ROOT = AURORA_DIR;
@@ -311,40 +312,36 @@ async function drive(c, label, expr) {
  * `aeon.effects.scene`), so the anchor rows are NOT IN THE DOM until an author
  * opens it. A `no-element` read off a collapsed section is NAVIGATION MISSING,
  * not a control missing, and reading it the other way writes up a live control
- * as absent. Opened by a REAL pointer gesture on the header's title span, and
- * idempotent BY MEASUREMENT: it probes for a control that exists only inside
- * the section and clicks again if it is still absent.
+ * as absent.
+ *
+ * ⚠ OPENED BY ITS ID, NOT ITS TITLE (RIGS-DEAD-NEEDLE-LEFTOVERS, 2026-09-13).
+ * The private opener that stood here hunted the header's title span for
+ * `Scene` followed by an em dash, which the app stopped painting in `24541886`
+ * (the 2026-09-05 dash sweep), and it probed for "open" with the anchor toggle
+ * needle below, which died the same afternoon. So it answered
+ * `no header span matched`, clicked nothing, and every anchor gesture came back
+ * `no-element`. The title is composed per document (`Scene: <id>`), so there
+ * is no stable string to type. The door is now `openEffectsSectionState` on
+ * SECTION_SCENE_FORM, the helper the five rigs of ROADMAP row 170 use, and it
+ * is a row ([4s0]) judged on the app's own `data-section-collapsed` read back
+ * AFTER the click, never on the click's return value.
+ *
+ * ⚠ AND THE ANCHOR TOGGLE IS FOUND BY ITS KEY, INSIDE THAT SECTION. Its title
+ * was `anchor` + em dash + prose until `d70da895` reworded it to
+ * `anchor: the world-anchored band split...` (`ANCHOR_ROW.title` in
+ * `providers/effects-aeon.ts`). The key is contract (`scene.anchor`), the
+ * punctuation after it is prose: `effects-deform`'s rule, and the one row 170
+ * applied to the factor pickers. So the pattern is the key followed by
+ * anything that is NOT another key character and NOT a dot, because the
+ * anchor's own rows are titled `anchor.at.channel`, `anchor.at.dsa` and
+ * `anchor.at.dsb`, and a boundary that let the dot through would count them as
+ * toggles too. [4s1] measures that with those rows on screen.
  */
-const HEADER_SPAN_RECT = (re) => String.raw`
-(() => {
-  const el = [...document.querySelectorAll('span')]
-    .filter((e) => ${re}.test((e.textContent || '').trim()))
-    .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length)[0];
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  const sc = el.closest('[style*="overflow"]') || document.scrollingElement;
-  const s = sc ? sc.getBoundingClientRect() : null;
-  return {
-    x: r.x, y: r.y, w: r.width, h: r.height, text: (el.textContent || '').trim(),
-    dpr: window.devicePixelRatio,
-    scroller: s ? { x: s.x, y: s.y, w: s.width, h: s.height } : null,
-    insideScroller: s ? (r.top >= s.top - 1 && r.bottom <= s.bottom + 1) : null,
-  };
-})()`;
-
-async function openSection(c, titleRe, probeExpr, label) {
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    if (await c.evalExpr(`!!(${probeExpr})`)) return { open: true, attempt: attempt - 1 };
-    const rect = await c.json(HEADER_SPAN_RECT(titleRe));
-    if (rect === null) return { open: false, attempt, why: 'no header span matched' };
-    note(`${label} header rect`, `x=${rect.x} y=${rect.y} w=${rect.w} h=${rect.h} `
-      + `dpr=${rect.dpr} insideScroller=${rect.insideScroller} text=${JSON.stringify(rect.text)}`);
-    const at = await clickRect(c, rect);
-    note(`clicked ${label} header at integer client px`, `(${at.x}, ${at.y})`);
-    await sleep(700);
-  }
-  return { open: await c.evalExpr(`!!(${probeExpr})`), attempt: 2 };
-}
+const SCENE_FORM_SELECTS = `[...document.querySelectorAll('[data-section=${JSON.stringify(SECTION_SCENE_FORM)}] select')]`;
+const SCENE_FORM_SEL = (re) => `${SCENE_FORM_SELECTS}.find((e) => ${re}.test(e.title || ''))`;
+const SCENE_FORM_COUNT = (re) => `${SCENE_FORM_SELECTS}.filter((e) => ${re}.test(e.title || '')).length`;
+const ANCHOR_KEY = String.raw`/^anchor(?![a-z0-9_.])/`;
+const ANCHOR_AT_KEY = String.raw`/^anchor\.at\./`;
 
 /** The selected scene as the APP holds it. */
 function SCENE_JSON() {
@@ -437,7 +434,16 @@ async function main() {
     // ⚠ THE ONE NON-UI DOOR, AND IT IS DECLARED. aeon's only real open route is
     // a NATIVE FOLDER PICKER that CDP cannot drive. Everything after this line
     // is real UI interaction; this step is NOT UI evidence.
-    await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(AEONDIR)})`);
+    //
+    // ⚠ CAUGHT, THE WAY EVERY SIBLING RIG CATCHES IT (RIGS-DEAD-NEEDLE-LEFTOVERS,
+    // 2026-09-13). On this build the call answers the CDP error
+    // `Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}` and
+    // the project opens anyway. Uncaught, it killed this rig after [0a], before
+    // it reached a single control, in every run of EFFECTS-RIGS-FIVE-MORE. Why
+    // the promise is collected is a different defect and is NOT measured here;
+    // [1a] below is what says whether the project really opened.
+    await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(AEONDIR)})`)
+      .catch((e) => console.log('        aeon open threw:', e.message));
     await sleep(3500);
     const st = await c.json('window.__dbg.aeon.state()');
     check('1a', 'the aeon clone opened', st && st.open === true, JSON.stringify(st));
@@ -515,18 +521,32 @@ async function main() {
       JSON.stringify(strips?.layers));
 
     // ── [4] THE ANCHOR - precondition 2 ───────────────────────────────────
-    // ⚠ THESE TWO PATTERNS MATCH LIVE UI TEXT AND THE CHARACTER IS AN EM DASH.
-    // It is spelled as a `\u2014` ESCAPE because no committed file here may carry
-    // the literal one (owner ruling, 2026-09-05, all tools) - and because a
-    // pattern that quietly matched a HYPHEN instead would find nothing and read
-    // as "the anchor control was never added", which is the exact misreading
-    // the anchor packet's section 3 records. The escape is a regex escape, so the
-    // pattern the app sees is unchanged.
-    const toggleSel = SEL_BY_TITLE(String.raw`/^anchor \u2014/`);
-    const opened = await openSection(c, String.raw`/^Scene \u2014 /`, toggleSel, 'Scene');
-    note('scene section', JSON.stringify(opened));
+    // The door first, and it is a row: see SCENE_FORM_SEL. A shut form stops
+    // the run here instead of speaking first as a missing anchor at [4a].
+    const sceneForm = await openEffectsSectionState(c, SECTION_SCENE_FORM, { settleMs: 900 });
+    check('4s0', 'INSTRUMENT: the Scene form is open, so the anchor rows below are in the DOM: '
+      + 'it arrives collapsed',
+      sceneForm.ok === true
+      && (sceneForm.section === 'clicked' || sceneForm.section === 'already-open'),
+      `open -> ${JSON.stringify(sceneForm)} via [data-section="${SECTION_SCENE_FORM}"]. The verdict `
+      + 'is the app\'s own data-section-collapsed read back AFTER the click, not the click\'s '
+      + 'return value: a header whose handler was removed still takes a click.');
+    if (!sceneForm.ok) throw new Error(sceneForm.why);
+    const toggleSel = SCENE_FORM_SEL(ANCHOR_KEY);
     await drive(c, 'anchor on', SET_SELECT(toggleSel, 'on'));
     await sleep(500);
+    // The aim, measured where it can be wrong: with the anchor ON its three
+    // `anchor.at.*` rows are on screen beside the toggle, so a key boundary that
+    // let the dot through would count four here.
+    const aim = await c.json(`({ toggles: ${SCENE_FORM_COUNT(ANCHOR_KEY)}, `
+      + `atRows: ${SCENE_FORM_COUNT(ANCHOR_AT_KEY)}, `
+      + `options: (() => { const e = ${toggleSel}; `
+      + 'return e ? [...e.options].map((o) => o.value) : null; })() })');
+    check('4s1', 'INSTRUMENT: exactly ONE select in the Scene form carries the anchor key, with '
+      + 'its anchor.at rows on screen beside it, and it is the none/on toggle',
+      aim.toggles === 1 && aim.atRows > 0
+      && JSON.stringify(aim.options) === JSON.stringify(['none', 'on']),
+      `${JSON.stringify(aim)} for ${ANCHOR_KEY} in [data-section="${SECTION_SCENE_FORM}"]`);
     await drive(c, 'anchor channel', SET_SELECT(
       SEL_BY_TITLE(String.raw`/^anchor\.at\.channel\b/`), CHANNEL));
     await sleep(500);
