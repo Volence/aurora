@@ -10,21 +10,52 @@
 // A FIELD THAT DOES NOT EXIST PRINT THE SAME THING.
 //
 // So the rows below run the parser over aeon's ACTUAL `act_descriptor.emp` and
-// `ojz_effects.emp` when a checkout is reachable, and are SKIPPED WITH A REASON
-// when it is not — never quietly passed on fixtures alone. The fixtures are
-// here too, for the shapes the real tree cannot produce.
+// `ojz_effects.emp`, read at a pinned revision out of aeon's object database,
+// and are SKIPPED WITH A REASON when that revision cannot be reached — never
+// quietly passed on fixtures alone. The fixtures are here too, for the shapes
+// the real tree cannot produce.
 //
-// ⚠ WHAT THE NUMBERS BELOW ARE. `[0,1,2,3,4,5]` and `{OJZ_Preset_Sec5: 5}` are
-// NOT the contract and are not a list this repository holds — they are what the
-// parse returns TODAY, asserted here so a changed world is distinguishable from
-// a broken parser. When aeon splits `OJZ_Preset_Plain`, these rows go red and
-// the correct response is to read the new numbers off the file and update them,
-// not to touch the derivation. The PRODUCT never sees a literal: it renders
-// whatever the parse returned on this load.
+// ⚠ WHAT THE NUMBERS BELOW ARE. `[0..8]`, `{OJZ_Preset_Sec5: 5, OJZ_Preset_Sec6: 6}`
+// and the rest are NOT the contract and are not a list this repository holds —
+// they are what the parse returns at `AEON_PIN`, asserted here so a broken
+// parser is distinguishable from a correct one on real text. Since 2026-09-13
+// they no longer move when aeon moves (see the WHICH BYTES banner below): a
+// changed aeon is the REGIONS work's currency row, not these. The PRODUCT never
+// sees a literal: it renders whatever the parse returned on this load.
+
+// ═══ WHICH BYTES: a PINNED aeon revision, never that lane's working tree ═══
+//
+// (2026-09-13, docs/reviews/2026-09-13-section-wiring-off-live-aeon.md; review
+// bar 19, "A TEST MUST NOT READ A PEER REPO'S WORKING TREE".) Until this date the
+// two "against aeon's real ojz/act1" blocks opened `act_descriptor.emp` and
+// `ojz_effects.emp` BY PATH inside aeon's live checkout. aeon `1a657990`
+// (2026-09-13, "regions-p1 step 4: delete the section identity fields") took
+// `effects:` and `sec:` off every `ojz_sec(...)` row, the lane moved its
+// checkout, and 8 rows here went red with no aurora commit at all: their colour
+// had always been decided in someone else's directory.
+//
+// SO THOSE ROWS NOW READ `AEON_PIN` THROUGH GIT OBJECTS (`test/support/peer-repo.ts`):
+// `git -C <aeon> show <pin>:<path>`. aeon's working tree is never opened and never
+// written to. They record a HISTORICAL reading, the cold read and the arm ruling
+// as they stood before regions, and at a fixed revision that reading is a
+// property of THIS repo's parser, which is what they can honestly still assert.
+//
+// ⚠ WHAT THEY NO LONGER DO, SAID SO NOBODY READS THEM AS COVER FOR IT. A pinned
+// blob equals itself forever, so these rows CANNOT tell you whether the parser
+// still understands aeon's CURRENT files. It does not: against aeon
+// `origin/master` after regions, `descriptorEffectsBindings` finds no records at
+// all and the load marks the descriptor unread (measured in the packet above).
+// That currency question is DELIBERATELY UNCHECKED here: re-pointing the reader
+// at the region table is the REGIONS work, sequenced separately, and a row that
+// asserted today's wrong answer would defend it from that correction. The REGIONS
+// parcel owes the currency row when it re-points the reader.
+//
+// The one row in these blocks that IS a currency question, "the channel TABLE
+// still matches aeon's SECTION_CHANNELS", reads `AEON_TIP` (origin/master) at a
+// COMMITTED revision instead of the pin, because a pin could never answer it.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import {
   descriptorEffectsBindings, libraryRasterChooserCalls, rasterChooserName, wiringPaths,
   unknownWiring, sectionRasterState, sectionRasterAdvisory, sectionSharers,
@@ -36,47 +67,133 @@ import {
   extraChannelsAdvisory, EXTRA_SECTION_CHANNELS, type SectionRasterWiring,
 } from '../section-wiring';
 import { siblingPathOrUnresolved, siblingPathSource } from '../../../../../test/support/sibling-root.mjs';
+import { peerRepo, resolveRev, readAtRev } from '../../../../../test/support/peer-repo';
 import {
   announceFixture, READ_MODES,
 } from '../../../../../scratchpad/lib/fixture-provenance.mjs';
 
 const AEON = siblingPathOrUnresolved('aeon');
-const DESC = join(AEON, 'games/sonic4/data/levels/ojz/act1/act_descriptor.emp');
-const LIB = join(AEON, 'games/sonic4/data/effects/ojz_effects.emp');
-const haveTree = existsSync(DESC) && existsSync(LIB);
+/** aeon-repo-relative, because these go to `git show <rev>:<path>` and nothing else. */
+const DESC_REL = 'games/sonic4/data/levels/ojz/act1/act_descriptor.emp';
+const LIB_REL = 'games/sonic4/data/effects/ojz_effects.emp';
+const GEN_REL = 'tools/effects_gen.py';
 
 /**
- * WHICH AEON THIS RUN READ, printed before the rows that read it.
+ * THE AEON REVISION THE HISTORICAL ROWS READ. A full SHA, so it cannot move.
  *
- * Aurora's lens ledger, FIXTURE-REVISION-UNSTAMPED. The describe block below is
- * titled "the numbers as they stand today", and until this stamp existed the
- * run never said WHICH today. These rows open aeon's files BY PATH, so their
- * colour is decided by whatever that lane has on disk, committed or not, and a
- * result three weeks stale looked exactly like a fresh one.
- *
- * The mode is WORKTREE and that is the whole point of stamping it: the block
- * prints the checkout's HEAD, and it prints alongside it, in words, that HEAD
- * names only the BASE and not the bytes these rows read. When that tree is
- * dirty, no revision describes this run's input, and the reader is told so
- * instead of being handed a SHA that looks like an identity.
+ * DERIVED FROM `git log`, NOT GUESSED (2026-09-13, against aeon `origin/master`
+ * `55c062a4`):
+ *   `git -C <aeon> log -- <act_descriptor.emp> <ojz_effects.emp> <effects_gen.py>`
+ *   names `1a657990` as the commit that deleted `ojz_sec`'s `effects:` and `sec:`
+ *   and as the LAST commit to touch any of the three; `git log 1a657990..origin/master`
+ *   over the same paths is empty. `1a657990` has exactly one parent, `31c0ddd8`,
+ *   and is an ancestor of `origin/master`. So `31c0ddd8` is the newest revision
+ *   whose three blobs are the pre-regions ones (act_descriptor `cf8a860b`,
+ *   ojz_effects `1506943c`, effects_gen `67f5f2db`, byte-identical to their
+ *   last-touching commit `b048f571`), and every revision after it carries the
+ *   deletion. Every row in the two "against aeon's real ojz/act1" blocks was run
+ *   at `31c0ddd8` (green) and at `1a657990` (the 8 reds this pin exists for), plus
+ *   the file-touching commits back to `9c45616d` (the [0, 7] ruling) — the table
+ *   is in the packet. Re-pin only by re-running that derivation.
  */
-let provenance = '';
-if (haveTree) {
-  announceFixture(
-    {
-      peer: 'aeon',
-      mode: READ_MODES.WORKTREE,
-      dir: AEON,
-      dirSource: siblingPathSource('aeon') ?? 'siblingPathOrUnresolved(\'aeon\')',
-      // A checkout that is somehow not a git repository still gets read by the
-      // rows below, so this must not refuse the run. It renders a loud UNKNOWN
-      // and the row asserting on the stamp still sees it.
-      allowUnrevisioned: true,
-    },
-    (s: string) => { provenance += s; },
-  );
+const AEON_PIN = '31c0ddd834821c5c89f808a9051957c4cf793b3b';
+/**
+ * THE BRANCH THAT ANSWERS "WHAT HAS AEON PUBLISHED", for the one currency row.
+ * A remote-tracking ref, read through git objects, so no local edit in that
+ * checkout moves it; the same spelling every other aeon-facing gate here uses.
+ */
+const AEON_TIP = 'origin/master';
+
+type AeonAt =
+  | { ok: true; dir: string; sha: string; provenance: string }
+  | { ok: false; why: string };
+
+/**
+ * Resolve `ref` in aeon's checkout and stamp its provenance, or say why not.
+ *
+ * THREE WAYS TO FAIL, KEPT APART in the reason (the precedent is
+ * `raster-binding-threaded-set.test.ts`): no checkout, a checkout that is not a
+ * git repository, and a repository in which `ref` does not resolve. Each is a
+ * loud skip in the rows, never a pass, and NONE FALLS BACK TO THE WORKING TREE:
+ * a fallback is how "I could not look" becomes "I looked and it was fine".
+ */
+function openAeonAt(ref: string): AeonAt {
+  if (!existsSync(AEON)) {
+    return {
+      ok: false,
+      why: `no aeon checkout at ${AEON} (resolved by: ${siblingPathSource('aeon') ?? 'unresolved'}). `
+        + 'Set AEON_DIR or EMPYREAN_SUITE_ROOT',
+    };
+  }
+  const dir = peerRepo('aeon');
+  if (dir === null) {
+    return {
+      ok: false,
+      why: `${AEON} exists but is not a git checkout, so aeon at ${ref} cannot be read out of `
+        + 'its object database, and these rows will not read that directory\'s files instead',
+    };
+  }
+  const sha = resolveRev(dir, ref);
+  if (sha === null) {
+    return {
+      ok: false,
+      why: `${ref} does not resolve to a commit in ${dir} (unfetched, shallow, or history `
+        + 'rewritten). These rows ask for that revision and nothing else',
+    };
+  }
+  let provenance = '';
+  try {
+    // COMMITTED, with no allowance: any claim the module cannot measure throws
+    // and becomes a loud skip below rather than a partial stamp.
+    announceFixture(
+      {
+        peer: 'aeon', mode: READ_MODES.COMMITTED, ref, dir,
+        dirSource: siblingPathSource('aeon') ?? 'peerRepo(\'aeon\')',
+      },
+      (s: string) => { provenance += s; },
+    );
+  } catch (e) {
+    return {
+      ok: false,
+      why: `provenance for aeon at ${ref} could not be taken in ${dir}: `
+        + `${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
   process.stderr.write(provenance);
+  return { ok: true, dir, sha, provenance };
 }
+
+/**
+ * aeon's bytes at a resolved revision, out of its object database.
+ *
+ * ⚠ AFTER THE REVISION HAS RESOLVED, `ok: false` CAN ONLY MEAN THE PATH IS NOT IN
+ * THAT TREE. That is a measurement, not a failure to look, so it throws and the
+ * row goes red naming the peer, the path and the revision.
+ */
+function readAeon(at: AeonAt & { ok: true }, rel: string): string {
+  const r = readAtRev(at.dir, at.sha, rel);
+  if (!r.ok) {
+    throw new Error(`aeon:${rel} at ${at.sha}: ${r.why}. That is a MEASURED absence at a `
+      + 'resolved revision, not a failure to look');
+  }
+  return r.text;
+}
+
+/**
+ * WHICH AEON THE HISTORICAL ROWS READ, printed before the rows that read it.
+ *
+ * Aurora's lens ledger, FIXTURE-REVISION-UNSTAMPED, and now its answer: the
+ * stamp names `AEON_PIN` and says, in `fixture-provenance.mjs`'s own words, that
+ * this revision names the bytes these rows read. The "working tree" line it also
+ * prints is informational about aeon's disk and is NOT their input.
+ */
+const pinned = openAeonAt(AEON_PIN);
+const provenance = pinned.ok ? pinned.provenance : '';
+const pinnedDesc = pinned.ok ? readAeon(pinned, DESC_REL) : '';
+const pinnedLib = pinned.ok ? readAeon(pinned, LIB_REL) : '';
+/** What a real-tree wiring's `path` fields say: the file AND the revision it came from. */
+const DESC = `aeon:${DESC_REL}@${AEON_PIN.slice(0, 8)}`;
+const LIB = `aeon:${LIB_REL}@${AEON_PIN.slice(0, 8)}`;
 
 // ---------------------------------------------------------------------------
 // Synthetic fixtures — the shapes the real tree cannot produce
@@ -505,32 +622,46 @@ describe('the two paths are derived from dataPath, never written down', () => {
 });
 
 describe('against aeon\'s real ojz/act1: the numbers as they stand today', () => {
-  const desc = haveTree ? readFileSync(DESC, 'utf8') : '';
-  const lib = haveTree ? readFileSync(LIB, 'utf8') : '';
-  // ⚠ SKIPPED WITH A REASON, NEVER QUIETLY. A row that cannot reach aeon's tree
-  // measured NOTHING; a green total that swallowed it would be exactly the
-  // silent zero this whole derivation exists to prevent.
+  // "TODAY" IS `AEON_PIN`, the last pre-regions revision (see its docblock). The
+  // title is kept because the rows below are the reading taken on those days.
+  const desc = pinnedDesc;
+  const lib = pinnedLib;
+  // ⚠ SKIPPED WITH A REASON, NEVER QUIETLY. A row that cannot reach aeon's
+  // object database measured NOTHING; a green total that swallowed it would be
+  // exactly the silent zero this whole derivation exists to prevent.
   const need = (ctx: { skip: (reason: string) => void }): boolean => {
-    if (haveTree) return true;
-    ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout at ${AEON}: this row reads their real `
-      + 'act_descriptor.emp and ojz_effects.emp and could not. The synthetic rows above still '
-      + 'ran and cover the parser\'s shapes; what is unmeasured here is whether aeon\'s CURRENT '
-      + 'files still parse the way this module expects.');
+    if (pinned.ok) return true;
+    ctx.skip(`SKIPPED, NOT PASSED: ${pinned.why}: this row reads aeon's real act_descriptor.emp `
+      + `and ojz_effects.emp at ${AEON_PIN} and could not. The synthetic rows above still ran and `
+      + 'cover the parser\'s shapes; what is unmeasured here is whether this module still reads '
+      + 'that revision of aeon\'s files the way these rows record.');
     return false;
   };
 
-  it('the run SAID which aeon these numbers are today, and that HEAD does not name them', (ctx) => {
+  it('the run SAID which aeon REVISION these numbers are, and that revision NAMES the bytes', (ctx) => {
     if (!need(ctx)) return;
-    // The row this block was missing. Without it "the numbers as they stand
-    // today" is a claim about an unnamed input, and a stale reading of it is
-    // indistinguishable from a current one.
-    expect(provenance, 'these rows read aeon\'s files by path and the run printed no provenance, '
-      + 'so nothing in this result says which aeon decided it').not.toBe('');
-    expect(provenance).toContain('WORKING TREE');
-    // The load-bearing half: a HEAD is printed, and it is printed with the
-    // sentence that stops it being read as an identity for these bytes.
-    expect(provenance).toContain('does NOT name the bytes this run read');
-    expect(provenance).toMatch(/working tree +: (DIRTY, \d+ path\(s\) uncommitted|clean, nothing uncommitted|UNKNOWN: )/);
+    // Without this "the numbers as they stand today" is a claim about an
+    // unnamed input, and a stale reading of it is indistinguishable from a
+    // current one.
+    expect(provenance, 'these rows read aeon and the run printed no provenance, so nothing in '
+      + 'this result says which aeon decided it').not.toBe('');
+    // ⚠ THE MODE IS THE CLAIM. `COMMITTED OBJECTS` is fixture-provenance.mjs's
+    // sentence for "git read the object database; the peer working tree was never
+    // opened". Until 2026-09-13 this row asserted `WORKING TREE`, and that is the
+    // read that let aeon's lane turn this file red without an aurora commit.
+    expect(provenance, 'the stamp does not say the bytes came out of aeon\'s object database')
+      .toContain('COMMITTED OBJECTS');
+    expect(provenance, 'the stamp claims a WORKING TREE read; these rows must never consume a '
+      + 'sibling lane\'s disk').not.toContain('WORKING TREE. the bytes read are');
+    // BOTH HALVES OF THE FIXTURE'S NAME, and the pin is a full SHA so the module
+    // says it cannot move.
+    expect(provenance, `the stamp does not name the pinned revision ${AEON_PIN}`).toContain(AEON_PIN);
+    expect(provenance, 'the stamp does not say the pin is immovable')
+      .toContain('A full SHA, so it cannot move under the caller');
+    expect(provenance, 'the stamp does not say the revision names the bytes this run consumed')
+      .toContain('WHICH BYTES this run consumed');
+    expect(provenance, 'the stamp declares itself incomplete; no allowance is passed, so that '
+      + 'must have been a loud skip instead').not.toContain('PROVENANCE INCOMPLETE');
   });
 
   it('every section 0-8 binds a preset record', (ctx) => {
@@ -679,28 +810,36 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
     // of CHANNELS is a schema fact and is a table here. A table can go silently
     // short when aeon adds a seventh key — `boundary` was the fourth added in a
     // fortnight — so the divergence is made loud in the suite instead.
-    const gen = join(AEON, 'tools/effects_gen.py');
-    if (!existsSync(gen)) {
-      ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout at ${AEON}, so EXTRA_SECTION_CHANNELS was `
-        + 'compared against nothing. What is unmeasured is whether aeon has added a chooser '
-        + 'channel this table does not carry: the exact hole aeon\'s own channel_faults exists '
-        + 'to close, one repo over.');
+    //
+    // ⚠ THIS ROW READS `AEON_TIP`, NOT `AEON_PIN`, AND THAT IS THE POINT. It is a
+    // CURRENCY question ("still matches"), and a pinned blob equals itself by
+    // construction, so a pin could never answer it (review bar 19). It reads the
+    // revision aeon has PUBLISHED, through git objects, and names that revision in
+    // its messages; the working tree is never opened.
+    const tip = openAeonAt(AEON_TIP);
+    if (!tip.ok) {
+      ctx.skip(`SKIPPED, NOT PASSED: ${tip.why}, so EXTRA_SECTION_CHANNELS was compared against `
+        + 'nothing. What is unmeasured is whether aeon has added a chooser channel this table does '
+        + 'not carry: the exact hole aeon\'s own channel_faults exists to close, one repo over.');
       return;
     }
-    const src = readFileSync(gen, 'utf8');
+    const src = readAeon(tip, GEN_REL);
+    const where = `aeon:${GEN_REL} at ${AEON_TIP} (${tip.sha})`;
     const table = /SECTION_CHANNELS\s*=\s*\(([\s\S]*?)\n\)/.exec(src);
-    expect(table, 'aeon\'s SECTION_CHANNELS table could not be located in tools/effects_gen.py: '
-      + 'the shape changed; re-read it rather than deleting this row').not.toBeNull();
+    expect(table, `NOT AN AURORA REGRESSION: aeon's SECTION_CHANNELS table could not be located in `
+      + `${where}: the shape changed; re-read it rather than deleting this row`).not.toBeNull();
     const arms = /ARM_CHANNELS\s*=\s*\(([^)]*)\)/.exec(src);
-    expect(arms, 'aeon\'s ARM_CHANNELS could not be located').not.toBeNull();
+    expect(arms, `NOT AN AURORA REGRESSION: aeon's ARM_CHANNELS could not be located in ${where}`)
+      .not.toBeNull();
     const armNames = [...arms![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
     // The first string of each `SectionChannel(...)` row is its channel name.
     const allChannels = [...table![1].matchAll(/SectionChannel\(\s*"([^"]+)"/g)].map((m) => m[1]);
-    expect(allChannels.length, 'aeon\'s table parsed as empty: the regex, not the table')
+    expect(allChannels.length, `aeon's table in ${where} parsed as empty: the regex, not the table`)
       .toBeGreaterThan(2);
     const nonArm = allChannels.filter((c) => !armNames.includes(c));
     expect(EXTRA_SECTION_CHANNELS.map((c) => c.channel),
-      `aeon's non-arm channels are now [${nonArm.join(', ')}]: transcribe the new row into `
+      `NOT AN AURORA REGRESSION, a drift: at ${where} aeon's non-arm channels are now `
+      + `[${nonArm.join(', ')}]: transcribe the new row into `
       + 'EXTRA_SECTION_CHANNELS (key, param, chooser suffix, index param, owed, indices, hand) '
       + 'from tools/effects_gen.py, and check tools/effects_seam_gate.py::channel_faults for '
       + 'whether it changed shape too').toEqual(nonArm);
@@ -1053,14 +1192,16 @@ describe('the disable rule, both clauses', () => {
 });
 
 describe('against aeon\'s real ojz/act1: which sections are structurally barred', () => {
-  const desc = haveTree ? readFileSync(DESC, 'utf8') : '';
-  const lib = haveTree ? readFileSync(LIB, 'utf8') : '';
+  // Read at `AEON_PIN`, the last pre-regions revision; see its docblock. The
+  // ruling these rows apply was made against that tree.
+  const desc = pinnedDesc;
+  const lib = pinnedLib;
   const need = (ctx: { skip: (reason: string) => void }): boolean => {
-    if (haveTree) return true;
-    ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout at ${AEON}: these rows read their real `
-      + 'act_descriptor.emp and ojz_effects.emp and could not. The synthetic rows above still '
-      + 'ran and cover every verdict; what is unmeasured here is WHICH sections aeon\'s current '
-      + 'files bar.');
+    if (pinned.ok) return true;
+    ctx.skip(`SKIPPED, NOT PASSED: ${pinned.why}: these rows read aeon's real act_descriptor.emp `
+      + `and ojz_effects.emp at ${AEON_PIN} and could not. The synthetic rows above still ran and `
+      + 'cover every verdict; what is unmeasured here is WHICH sections that revision of aeon\'s '
+      + 'files bars.');
     return false;
   };
   const real = (): SectionRasterWiring => ({
