@@ -42,13 +42,18 @@
 //
 // ⚠ WHAT THEY NO LONGER DO, SAID SO NOBODY READS THEM AS COVER FOR IT. A pinned
 // blob equals itself forever, so these rows CANNOT tell you whether the parser
-// still understands aeon's CURRENT files. It does not: against aeon
-// `origin/master` after regions, `descriptorEffectsBindings` finds no records at
-// all and the load marks the descriptor unread (measured in the packet above).
-// That currency question is DELIBERATELY UNCHECKED here: re-pointing the reader
-// at the region table is the REGIONS work, sequenced separately, and a row that
-// asserted today's wrong answer would defend it from that correction. The REGIONS
-// parcel owes the currency row when it re-points the reader.
+// still understands aeon's CURRENT files. On 2026-09-13 it did not: against aeon
+// `origin/master` after regions the old reader found no records at all and the
+// load marked the descriptor unread (measured in the packet above).
+//
+// ⚠ AMENDED 2026-09-14 (SECTIONS-0-7-UNBARRED-AFTER-REGIONS,
+// docs/reviews/2026-09-14-sections-0-7-regions-reader.md). The reader now pairs
+// each `effects:` with the `sec:` inside its own call, which reads the region
+// rows, and the currency rows this paragraph said were owed are the LAST block
+// of this file. They read `AEON_REGIONS_PIN`, a second committed revision, and
+// derive their expectations with instruments that share no code with the
+// reader. The pre-regions rows above them still read `AEON_PIN` and are
+// unchanged except for row 8's anti-vacuous line.
 //
 // The one row in these blocks that IS a currency question, "the channel TABLE
 // still matches aeon's SECTION_CHANNELS", reads `AEON_TIP` (origin/master) at a
@@ -65,6 +70,7 @@ import {
   libraryPatchedArmBindings, sectionArmExclusivity, sectionArmExclusivityRefusal,
   sectionArmExclusivityUnknownNotice, armBarredSections, sectionBindingControlDisabled,
   extraChannelsAdvisory, EXTRA_SECTION_CHANNELS, type SectionRasterWiring,
+  descriptorEffectsRows, readDescriptorWiring,
 } from '../section-wiring';
 import { siblingPathOrUnresolved, siblingPathSource } from '../../../../../test/support/sibling-root.mjs';
 import { peerRepo, resolveRev, readAtRev } from '../../../../../test/support/peer-repo';
@@ -195,6 +201,28 @@ const pinnedLib = pinned.ok ? readAeon(pinned, LIB_REL) : '';
 const DESC = `aeon:${DESC_REL}@${AEON_PIN.slice(0, 8)}`;
 const LIB = `aeon:${LIB_REL}@${AEON_PIN.slice(0, 8)}`;
 
+/**
+ * THE AEON REVISION THE CURRENCY ROWS READ: aeon's published act 1 AFTER
+ * regions step 4 (`1a657990`), with the section bindings in the region table
+ * `OJZ_ACT1_REGION_ROWS`. A full SHA, so it cannot move.
+ *
+ * WHY THIS ONE (2026-09-14): it was aeon `origin/master`'s tip when this parcel
+ * was cut, and the three blobs these rows read (act_descriptor `a25f55e7`,
+ * ojz_effects `86b630e9`, effects_gen `0ba8a14c`) are byte-identical at aeon
+ * `eec81e48`, the revision aeon's own answer was read at
+ * (docs/reviews/2026-09-14-aeon-answer-sections-0-7.md). It is deliberately NOT
+ * `origin/master`: a later aeon (its step 5 adds a region row with no section
+ * key) is measured against the file when it is published, by re-pinning here
+ * and re-running the derivation in the packet, never by following a branch.
+ */
+const AEON_REGIONS_PIN = '6bd8ed8925d292d5f70f13ea24302161bef405bc';
+const regions = openAeonAt(AEON_REGIONS_PIN);
+const regionsProvenance = regions.ok ? regions.provenance : '';
+const regionsDesc = regions.ok ? readAeon(regions, DESC_REL) : '';
+const regionsLib = regions.ok ? readAeon(regions, LIB_REL) : '';
+const RDESC = `aeon:${DESC_REL}@${AEON_REGIONS_PIN.slice(0, 8)}`;
+const RLIB = `aeon:${LIB_REL}@${AEON_REGIONS_PIN.slice(0, 8)}`;
+
 // ---------------------------------------------------------------------------
 // Synthetic fixtures — the shapes the real tree cannot produce
 // ---------------------------------------------------------------------------
@@ -262,6 +290,165 @@ describe('the parse has no window: the defect that produced a wrong answer', () 
     const b = descriptorEffectsBindings(
       `${SYNTHETIC_DESC}\nraster: zzz_act1_sec_raster(sec: 7, hand: X) effects: Ghost`, 'zzz');
     expect(b[7]).toBeUndefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE REGION-ROW READER (2026-09-14, SECTIONS-0-7-UNBARRED-AFTER-REGIONS)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// EVERY FIXTURE HERE IS SYNTHETIC, written for the one property its row names.
+// They are shaped like aeon's region rows because that is the shape the reader
+// has to survive, and they claim nothing about any aeon file: the rows that read
+// aeon are the pinned blocks further down. In particular the key-less row below
+// is NOT aeon's step-5 row, which was unpublished when this was written; it is
+// the smallest text that has no section key.
+
+/** Lines joined with '\n', so a fixture's line numbers are its argument positions + 1. */
+const lines = (...ls: string[]): string => ls.join('\n');
+
+describe('the region-row reader: each `effects:` with the `sec:` inside its OWN call', () => {
+  it('THE PAIRING TRAP (SYNTHETIC): effects before sec, adjacent rows, each keeps its own preset', () => {
+    // The region rows name their preset BEFORE their key and their keys run out
+    // of order; the old-style row names its key FIRST. "Find sec:, search
+    // forward for effects:" gives each region row its neighbour's preset. "The
+    // nearest sec: before it" gets the region rows right and the old row wrong.
+    // Zipping the i-th preset with the i-th key gets every row wrong. Only
+    // pairing by the enclosing call gets all four.
+    const desc = lines(
+      'zzz_region(x0: 0, effects: ZZZ_A, parallax: zzz_act1_sec_scene(sec: 2)),',
+      'zzz_region(x0: 1, effects: ZZZ_B, parallax: zzz_act1_sec_scene(sec: 0)),',
+      'zzz_region(x0: 2, effects: ZZZ_C, parallax: zzz_act1_sec_scene(sec: 1)),',
+      'zzz_sec(sec: 3, blocks: D, effects: ZZZ_D)',
+    );
+    const r = descriptorEffectsRows(desc, 'zzz');
+    expect(r.bindings, 'each preset belongs to the sec: in its own call').toEqual({
+      0: 'ZZZ_B', 1: 'ZZZ_C', 2: 'ZZZ_A', 3: 'ZZZ_D',
+    });
+    expect(r.unkeyed).toEqual([]);
+    expect(r.contested).toEqual([]);
+  });
+
+  it('A ROW WITH NO SECTION KEY (SYNTHETIC) is reported, never assigned, never dropped', () => {
+    const desc = lines(
+      'zzz_region(x0: 0, effects: ZZZ_A, parallax: zzz_act1_sec_scene(sec: 0)),',
+      'zzz_region(x0: 9, effects: ZZZ_Keyless),',
+      'zzz_region(x0: 1, effects: ZZZ_B, parallax: zzz_act1_sec_scene(sec: 1)),',
+    );
+    const r = descriptorEffectsRows(desc, 'zzz');
+    expect(r.unkeyed, 'the key-less row is REPORTED, with what a person needs to find it').toEqual([
+      { preset: 'ZZZ_Keyless', constructorName: 'zzz_region', line: 2, sectionKeys: [] },
+    ]);
+    expect(Object.values(r.bindings), 'and it is ASSIGNED to no section, neighbour or otherwise')
+      .not.toContain('ZZZ_Keyless');
+    expect(r.bindings, 'the keyed rows around it still read as themselves')
+      .toEqual({ 0: 'ZZZ_A', 1: 'ZZZ_B' });
+    // It names no section, so it falsifies no section's reading: the descriptor
+    // stays usable, and the row travels with the wiring instead of vanishing.
+    const read = readDescriptorWiring('g/act_descriptor.emp', desc, 'zzz');
+    expect(read.descriptor.parsed).toBe(true);
+    expect(read.unkeyedRows, 'the load CARRIES the row').toEqual(r.unkeyed);
+    // The bindings-only door has no seat for it, so it REFUSES rather than
+    // quietly returning the smaller map.
+    expect(() => descriptorEffectsBindings(desc, 'zzz')).toThrow(/ZZZ_Keyless/);
+  });
+
+  it('A ROW WITH TWO SECTION KEYS (SYNTHETIC) is reported, never assigned, and the read is refused', () => {
+    const desc = lines(
+      'zzz_region(x0: 0, effects: ZZZ_Two, parallax: zzz_pick(sec: 1, or: zzz_act1_sec_scene(sec: 2))),',
+    );
+    const r = descriptorEffectsRows(desc, 'zzz');
+    expect(r.unkeyed).toEqual([
+      { preset: 'ZZZ_Two', constructorName: 'zzz_region', line: 1, sectionKeys: [1, 2] },
+    ]);
+    expect(r.bindings, 'neither key is picked').toEqual({});
+    const read = readDescriptorWiring('g/act_descriptor.emp', desc, 'zzz');
+    expect(read.descriptor.parsed, 'any pick would be Aurora\'s, so nothing is published').toBe(false);
+    expect(read.descriptor.read).toBe(true);
+    expect(read.descriptor.reason).toContain('ZZZ_Two');
+    expect(read.descriptor.reason).toContain('section keys 1 and 2');
+    // The control: one key written twice is ONE key, and it binds.
+    expect(descriptorEffectsRows(desc.replace('sec: 2', 'sec: 1'), 'zzz').bindings)
+      .toEqual({ 1: 'ZZZ_Two' });
+  });
+
+  it('a constructor DECLARATION is not a row: it names a type and has no section', () => {
+    // aeon's descriptor declares `comptime fn ojz_region(…, effects: Label, …)` a
+    // few lines above its table. Read as a row it would be a key-less binding of a
+    // preset called `Label`.
+    const decl = 'comptime fn zzz_region(x0: int, effects: Label, parallax: Label = 0) -> Region {';
+    const desc = lines(decl, '}',
+      'zzz_region(x0: 0, effects: ZZZ_A, parallax: zzz_act1_sec_scene(sec: 0)),');
+    const r = descriptorEffectsRows(desc, 'zzz');
+    expect(r.unkeyed, 'the declaration is not reported as a row').toEqual([]);
+    expect(r.bindings).toEqual({ 0: 'ZZZ_A' });
+    // The control: the same parentheses as a CALL are a row, and a key-less one,
+    // so this row is not passing because the text is inert.
+    expect(descriptorEffectsRows(lines(decl.replace('comptime fn ', ''), '}'), 'zzz').unkeyed
+      .map((u) => u.preset)).toEqual(['Label']);
+  });
+
+  it('a comment or a string literal is not a row', () => {
+    const desc = lines(
+      '// zzz_region(x0: 0, effects: ZZZ_Ghost, parallax: zzz_act1_sec_scene(sec: 5)),',
+      'ensure(ok, "zzz_region(effects: ZZZ_Str) has an unbalanced ( in its message")',
+      'zzz_region(x0: 0, effects: ZZZ_A, // a trailing comment',
+      '           parallax: zzz_act1_sec_scene(sec: 0)),',
+    );
+    const r = descriptorEffectsRows(desc, 'zzz');
+    expect(r.bindings, 'a commented-out row binds nothing').toEqual({ 0: 'ZZZ_A' });
+    expect(r.unkeyed, 'a sentence in a string is not a key-less row').toEqual([]);
+  });
+
+  it('CONTESTED (SYNTHETIC): two keyed rows that disagree bind neither; two that agree are one binding', () => {
+    // aeon `31c0ddd8` carries BOTH forms at once, the old `ojz_sec(sec: N, …,
+    // effects: X)` rows and the region rows, naming the same nine presets. That
+    // agreement is one binding per section. A disagreement is not settled by
+    // whichever row the parse met last.
+    const desc = lines(
+      'zzz_sec(sec: 0, blocks: A, effects: ZZZ_A)',
+      'zzz_sec(sec: 1, blocks: B, effects: ZZZ_B)',
+      'zzz_region(x0: 0, effects: ZZZ_A, parallax: zzz_act1_sec_scene(sec: 0)),',
+      'zzz_region(x0: 1, effects: ZZZ_Other, parallax: zzz_act1_sec_scene(sec: 1)),',
+    );
+    const r = descriptorEffectsRows(desc, 'zzz');
+    expect(r.bindings, 'the rows that agree are one binding').toEqual({ 0: 'ZZZ_A' });
+    expect(r.contested).toEqual([{
+      section: 1,
+      rows: [
+        { preset: 'ZZZ_B', constructorName: 'zzz_sec', line: 2 },
+        { preset: 'ZZZ_Other', constructorName: 'zzz_region', line: 4 },
+      ],
+    }]);
+    const read = readDescriptorWiring('g/act_descriptor.emp', desc, 'zzz');
+    expect(read.descriptor.parsed).toBe(false);
+    expect(read.descriptor.reason).toContain('section 1 is bound by 2 rows naming different presets');
+    expect(read.bindings, 'a refused read publishes no partial map').toEqual({});
+    expect(() => descriptorEffectsBindings(desc, 'zzz')).toThrow(/section 1/);
+  });
+
+  it('READ AND NOT UNDERSTOOD is not "could not read": the reason and both sentences say it was read', () => {
+    // The defect's third face (docs/reviews/2026-09-13-section-wiring-off-live-aeon.md):
+    // against aeon after regions the strip said Aurora "could not read" a file it
+    // had read. This descriptor is what a file in a shape the reader does not key
+    // looks like: rows, and not one of them keyed.
+    const desc = lines('zzz_region(x0: 0, effects: ZZZ_A),', 'zzz_region(x0: 1, effects: ZZZ_B),');
+    const read = readDescriptorWiring('g/data/levels/zzz/act1/act_descriptor.emp', desc, 'zzz');
+    expect(read.descriptor).toMatchObject({ parsed: false, read: true });
+    expect(read.descriptor.reason).toContain('no row carries a section key');
+    const w: SectionRasterWiring = { ...synthetic(), ...read };
+    const CH = rasterChooserName('zzz', 'act1');
+    const c1 = sectionWiringConditions(w, 0, CH).ownPreset;
+    expect(c1.verdict, 'still unknown: nothing is refused over a file Aurora could not use')
+      .toBe('unknown');
+    expect(c1.detail).toBe('read act_descriptor.emp; no usable section binding');
+    const say = sectionRasterAdvisory(w, 0, CH)!;
+    expect(say).toContain(
+      'Aurora read g/data/levels/zzz/act1/act_descriptor.emp but found no section binding');
+    expect(say, 'the file WAS read').not.toMatch(/could not read/);
+    // A file with no rows at all says THAT, naming both shapes it looked for.
+    expect(readDescriptorWiring('p', 'nothing here', 'zzz').descriptor.reason).toBe(
+      'no zzz_region(… effects: …, … sec: N …) or zzz_sec(sec: N, … effects: …) rows were found in it');
   });
 });
 
@@ -1298,5 +1485,225 @@ describe('against aeon\'s real ojz/act1: which sections are structurally barred'
     expect(Object.keys(libraryPatchedArmBindings(lib)).sort(),
       'and exactly two records bind an arm, both of them real')
       .toEqual(['OJZ_Preset_Sec0', 'OJZ_Preset_Sec7']);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AGAINST aeon's CURRENT ACT 1, AFTER REGIONS: the currency rows row 178 left owed
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// (2026-09-14, SECTIONS-0-7-UNBARRED-AFTER-REGIONS; packet
+// docs/reviews/2026-09-14-sections-0-7-regions-reader.md.) The blocks above
+// read `AEON_PIN`, the last revision before regions, and cannot say whether the
+// reader still reads aeon. These read `AEON_REGIONS_PIN`, aeon's published act 1
+// with the bindings in `OJZ_ACT1_REGION_ROWS`, through git objects like the rest
+// of this file. aeon's working tree is never opened.
+//
+// ⚠ THE EXPECTATIONS COME FROM A SECOND INSTRUMENT, NOT FROM THE READER. A reader
+// checked against itself is green whatever it does. So the map these rows
+// expect comes from `regionRowsByLine`, which reads the table one physical line
+// at a time and shares no code with the reader, and the barred set from
+// `presetsBindingPatched`, which balances each `preset(...)` call where
+// `libraryPatchedArmBindings` splits declaration to declaration. The literal
+// readings are asserted too, as what both instruments returned at this pin, so
+// the two drifting together is red as well.
+
+/**
+ * aeon's region table read ONE PHYSICAL LINE AT A TIME: for each row line, the
+ * `effects:` and the `sec:` written on that same line. Valid only while the
+ * table is written one row per line, which it is at `AEON_REGIONS_PIN`, so the
+ * row that uses it ASSERTS that formatting (declared length equals row lines,
+ * one of each per line) instead of assuming it.
+ */
+function regionRowsByLine(desc: string, constName: string): {
+  declared: number | null;
+  rows: { line: number; presets: string[]; secs: number[]; effectsBeforeSec: boolean }[];
+} {
+  const ls = desc.split('\n');
+  const start = ls.findIndex((l) => new RegExp(`^\\s*(?:pub\\s+)?const\\s+${constName}\\s*:`).test(l));
+  if (start < 0) return { declared: null, rows: [] };
+  const declared = /\[\s*Region\s*;\s*(\d+)\s*\]/.exec(ls[start]);
+  const rows: { line: number; presets: string[]; secs: number[]; effectsBeforeSec: boolean }[] = [];
+  for (let i = start + 1; i < ls.length && !/^\s*\]\s*$/.test(ls[i]); i++) {
+    const code = ls[i].split('//')[0];
+    if (!/^\s*ojz_region\s*\(/.test(code)) continue;
+    rows.push({
+      line: i + 1,
+      presets: [...code.matchAll(/\beffects\s*:\s*([A-Za-z_]\w*)/g)].map((m) => m[1]),
+      secs: [...code.matchAll(/\bsec\s*:\s*(\d+)/g)].map((m) => Number(m[1])),
+      effectsBeforeSec: code.search(/\beffects\s*:/) < code.search(/\bsec\s*:/),
+    });
+  }
+  return { declared: declared ? Number(declared[1]) : null, rows };
+}
+
+/**
+ * The `EffectsPreset` records whose OWN `preset(...)` call passes a non-zero
+ * `patched:`, found by balancing that call's parentheses after dropping `//`
+ * comments line by line. Independent of `libraryPatchedArmBindings`.
+ */
+function presetsBindingPatched(lib: string): { declared: number; patched: Set<string> } {
+  const code = lib.split('\n').map((l) => l.split('//')[0]).join('\n');
+  const patched = new Set<string>();
+  let declared = 0;
+  for (const m of code.matchAll(/\bdata\s+([A-Za-z_]\w*)\s*:\s*EffectsPreset\s*=\s*preset\s*\(/g)) {
+    declared++;
+    const open = m.index! + m[0].length - 1;
+    let depth = 0;
+    let j = open;
+    for (; j < code.length; j++) {
+      if (code[j] === '(') depth++;
+      else if (code[j] === ')' && --depth === 0) break;
+    }
+    const p = /\bpatched\s*:\s*([A-Za-z_]\w*|\d+)/.exec(code.slice(open, j + 1));
+    if (p && p[1] !== '0') patched.add(m[1]);
+  }
+  return { declared, patched };
+}
+
+describe('against aeon\'s CURRENT act 1, after regions: the reader reads the region rows', () => {
+  const desc = regionsDesc;
+  const lib = regionsLib;
+  const where = `aeon:${DESC_REL} at ${AEON_REGIONS_PIN}`;
+  const need = (ctx: { skip: (reason: string) => void }): boolean => {
+    if (regions.ok) return true;
+    ctx.skip(`SKIPPED, NOT PASSED: ${regions.why}: this row reads aeon's act_descriptor.emp and `
+      + `ojz_effects.emp at ${AEON_REGIONS_PIN}, aeon's published act 1 after regions, and CANNOT `
+      + 'MEASURE whether Aurora\'s reader finds the section bindings in the region rows or which '
+      + 'sections come back barred. The synthetic reader rows above still ran; the pre-regions rows '
+      + 'read a different revision and cannot answer this.');
+    return false;
+  };
+  /** The wiring the load builds, call for call: `readDescriptorWiring` IS the load's descriptor step. */
+  const loaded = (): SectionRasterWiring => ({
+    ...readDescriptorWiring(RDESC, desc, 'ojz'),
+    threadedBy: libraryRasterChooserCalls(lib, rasterChooserName('ojz', 'act1')),
+    channelThreadedBy: libraryChannelCalls(lib, 'ojz', 'act1'),
+    patchedArm: libraryPatchedArmBindings(lib),
+    library: { path: RLIB, parsed: true },
+  });
+
+  it('the run SAID it read aeon at AEON_REGIONS_PIN, out of the object database', (ctx) => {
+    if (!need(ctx)) return;
+    expect(regionsProvenance, 'the stamp does not say the bytes came out of aeon\'s object database')
+      .toContain('COMMITTED OBJECTS');
+    expect(regionsProvenance, `the stamp does not name the pinned revision ${AEON_REGIONS_PIN}`)
+      .toContain(AEON_REGIONS_PIN);
+    expect(regionsProvenance, 'the stamp declares itself incomplete').not.toContain('PROVENANCE INCOMPLETE');
+  });
+
+  it('the second instrument SAW the table: one line per declared row, one preset and one key on each', (ctx) => {
+    if (!need(ctx)) return;
+    const t = regionRowsByLine(desc, 'OJZ_ACT1_REGION_ROWS');
+    expect(t.declared, `no [Region; N] declaration of OJZ_ACT1_REGION_ROWS in ${where}: the table `
+      + 'moved or was renamed; re-read the file before touching this row').not.toBeNull();
+    expect(t.rows.length, `${where}: one row line per declared entry`).toBe(t.declared);
+    for (const r of t.rows) {
+      expect(r.presets, `${where} line ${r.line}: exactly one effects:`).toHaveLength(1);
+      expect(r.secs, `${where} line ${r.line}: exactly one sec:`).toHaveLength(1);
+      // THE TRAP'S PRECONDITION, measured here rather than taken from aeon's
+      // message: on every row the preset is written BEFORE the key.
+      expect(r.effectsBeforeSec, `${where} line ${r.line}: effects: before sec:`).toBe(true);
+    }
+    // And every row names a DIFFERENT preset, so a neighbour shift is visible to
+    // the pairing row below rather than landing on an equal value.
+    expect(new Set(t.rows.map((r) => r.presets[0])).size, `${where}: the presets are distinct`)
+      .toBe(t.rows.length);
+  });
+
+  it('THE READER AGAINST IT: one binding per region row, none unkeyed, none contested', (ctx) => {
+    if (!need(ctx)) return;
+    const t = regionRowsByLine(desc, 'OJZ_ACT1_REGION_ROWS');
+    const expected: Record<number, string> = {};
+    for (const r of t.rows) expected[r.secs[0]] = r.presets[0];
+    const rows = descriptorEffectsRows(desc, 'ojz');
+    expect(rows.bindings, `the reader disagrees with the region table read line by line in ${where}`)
+      .toEqual(expected);
+    expect(rows.unkeyed, `${where}: a row the reader could not key`).toEqual([]);
+    expect(rows.contested, `${where}: a section two rows disagree about`).toEqual([]);
+    // THE READING AT THIS PIN, as both instruments return it (and as aeon's
+    // answer states it, which is a claim this row checked, not its source).
+    expect(Object.keys(rows.bindings).map(Number), where).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(Object.values(rows.bindings), where).toEqual([
+      'OJZ_Preset_Sec0', 'OJZ_Preset_Sec1', 'OJZ_Preset_Sec2', 'OJZ_Preset_Sec3', 'OJZ_Preset_Depth',
+      'OJZ_Preset_Sec5', 'OJZ_Preset_Sec6', 'OJZ_Preset_Sec7', 'OJZ_Preset_Plain',
+    ]);
+    // ANTI-VACUOUS FOR `unkeyed: []`: this very file carries the declaration that
+    // WOULD be a key-less row if the reader took it for one.
+    expect(desc, `${where}: the ojz_region declaration this row relies on`)
+      .toMatch(/comptime fn ojz_region\([^)]*effects: Label/);
+  });
+
+  it('THE PAIRING TRAP: no section is given its neighbour\'s preset', (ctx) => {
+    if (!need(ctx)) return;
+    // aeon's point 2. Every row writes `effects:` before `sec:` (the instrument
+    // row above measures it), so a reader that finds `sec: N` and searches
+    // FORWARD for `effects:` gives section N the NEXT row's preset and still
+    // returns a tidy map.
+    const t = regionRowsByLine(desc, 'OJZ_ACT1_REGION_ROWS');
+    const b = descriptorEffectsRows(desc, 'ojz').bindings;
+    t.rows.forEach((own, i) => {
+      const next = t.rows[i + 1];
+      expect(b[own.secs[0]], `section ${own.secs[0]} (${where} line ${own.line}) must bind `
+        + `${own.presets[0]}, the preset in its own row`
+        + (next ? `, not ${next.presets[0]} from line ${next.line}` : '')).toBe(own.presets[0]);
+    });
+  });
+
+  it('THE LOAD\'S READING IS PARSED: condition 1 answers, the act-sets line has its inputs, no "could not read"', (ctx) => {
+    if (!need(ctx)) return;
+    const w = loaded();
+    const n = regionRowsByLine(desc, 'OJZ_ACT1_REGION_ROWS').rows.length;
+    expect(w.descriptor, `the load marks ${where} unparsed: ${w.descriptor.reason ?? ''}`)
+      .toMatchObject({ parsed: true, read: true });
+    expect(w.unkeyedRows, where).toEqual([]);
+    const CH = rasterChooserName('ojz', 'act1');
+    for (let s = 0; s < n; s++) {
+      const c1 = sectionWiringConditions(w, s, CH).ownPreset;
+      expect(c1.verdict, `section ${s}: condition 1 still unknown against ${where}`).not.toBe('unknown');
+      expect(c1.detail, `section ${s}`).not.toMatch(/could not read|no usable/);
+    }
+    // The act-sets line is drawn on `descriptor.parsed` (SectionPicker.tsx) and
+    // prints these sets. Every row names its own distinct preset (measured
+    // above), so every section owns its preset.
+    expect(ownPresetSections(w, n, CH), where).toEqual([...Array(n).keys()]);
+    expect(wiredSections(w, n), `${where}: the library half, which regions did not touch`)
+      .toEqual([5, 6]);
+  });
+
+  it('SECTIONS 0 AND 7 COME BACK BARRED, and the barred set is DERIVED from the patched: declarations', (ctx) => {
+    if (!need(ctx)) return;
+    const w = loaded();
+    const t = regionRowsByLine(desc, 'OJZ_ACT1_REGION_ROWS');
+    const n = t.rows.length;
+    const lib2 = presetsBindingPatched(lib);
+    expect(lib2.declared, `aeon:${LIB_REL} at ${AEON_REGIONS_PIN}: the second instrument found `
+      + 'fewer preset() records than there are sections, so it is not reading that file')
+      .toBeGreaterThanOrEqual(n);
+    expect(lib2.patched.size, 'the second instrument found no record binding patched:, so it '
+      + 'measured nothing').toBeGreaterThan(0);
+    const derived = t.rows.filter((r) => lib2.patched.has(r.presets[0])).map((r) => r.secs[0])
+      .sort((a, b) => a - b);
+    expect(armBarredSections(w, n), `the barred set disagrees with the sections whose own row binds `
+      + `a preset that passes patched:, derived independently from ${where}`).toEqual(derived);
+    expect(derived.length, 'a barred set that names every section refuses nothing in particular')
+      .toBeLessThan(n);
+    // THE READING AT THIS PIN: sections 0 and 7, the two aeon's preset() refuses.
+    const reading: [number, string, string][] = [
+      [0, 'OJZ_Preset_Sec0', 'OJZ_TwoChannel'], [7, 'OJZ_Preset_Sec7', 'OJZ_WorldWater'],
+    ];
+    for (const [sec, record, program] of reading) {
+      const arm = sectionArmExclusivity(w, sec);
+      expect(arm, `section ${sec} against ${where}`).toEqual({ verdict: 'barred', record, patched: program });
+      expect(sectionBindingControlDisabled(w, sec, null), `section ${sec}'s control is disabled`).toBe(true);
+    }
+    // Every OTHER section is open WITH A RECORD: its instrument saw its subject,
+    // so `open` here is not the answer an empty binding map would give.
+    for (let s = 0; s < n; s++) {
+      if (derived.includes(s)) continue;
+      const arm = sectionArmExclusivity(w, s);
+      expect(arm.verdict, `section ${s}`).toBe('open');
+      expect(arm.record, `section ${s} binds a record`).not.toBeNull();
+    }
   });
 });

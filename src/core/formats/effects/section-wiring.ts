@@ -107,6 +107,20 @@ export interface WiringSource {
   parsed: boolean;
   /** Why not, when `parsed` is false — shown to the author verbatim. */
   reason?: string;
+  /**
+   * True when the BYTES were read and it is the parse that came back empty or
+   * refused. Absent means the file was not read (or nobody said), and the
+   * sentences keep saying "could not read".
+   *
+   * ⚠ WHY THIS EXISTS (2026-09-14, SECTIONS-0-7-UNBARRED-AFTER-REGIONS). When
+   * aeon moved the section bindings into region rows, the load read
+   * act_descriptor.emp perfectly well, found nothing it recognised, and the
+   * strip then told the author Aurora "could not read" a file it had just
+   * read. Only the parenthetical reason was true. "I could not open it" and "I
+   * opened it and did not understand it" send a person to different places, so
+   * they are two sentences.
+   */
+  read?: boolean;
 }
 
 export interface SectionRasterWiring {
@@ -140,6 +154,16 @@ export interface SectionRasterWiring {
   patchedArm: Record<string, string>;
   descriptor: WiringSource;
   library: WiringSource;
+  /**
+   * Descriptor rows that name an `effects:` preset and carry NO section key (or
+   * several), exactly as `descriptorEffectsRows` reported them. CARRIED, NOT
+   * RENDERED: nothing on screen reads this yet, because a binding that belongs
+   * to no section has no seat in a section-keyed control, and where it should
+   * live is design Q8 (where `effectsRef` lives), owed to empyrean. It is here
+   * so the load does not become the place such a row is silently dropped.
+   * Absent on a wiring built by hand; the load always sets it.
+   */
+  unkeyedRows?: UnkeyedEffectsRow[];
 }
 
 /** Nothing was read. Every predicate below answers "unknown", never "no". */
@@ -155,33 +179,285 @@ export function unknownWiring(descriptorPath: string, libraryPath: string, reaso
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// READING THE DESCRIPTOR: EACH `effects:` WITH THE `sec:` INSIDE ITS OWN CALL
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ─── WHERE THE BINDINGS LIVE, AND WHY THIS WAS REWRITTEN (2026-09-14) ───
+//
+// Until aeon `1a657990` (2026-09-13, "regions-p1 step 4: delete the section
+// identity fields") every section row was `ojz_sec(sec: N, …, effects: X)` and
+// this reader split the file on `<zone>_sec(sec: N` and took the next
+// `effects:`. Step 4 took both arguments off `ojz_sec`. The preset now lives
+// in the act's REGION ROWS, and the section key moved INSIDE a nested call:
+//
+//   ojz_region(x0: 2048, …, effects: OJZ_Preset_Sec1, parallax: ojz_act1_sec_scene(sec: 1)),
+//
+// Against that the old split found nothing, the load marked the descriptor
+// unparsed, and arm exclusivity answered `open` for sections 0 and 7, whose
+// presets still bind `patched:`. The control this module disables went live on
+// exactly the two sections aeon's `preset()` refuses, and nothing said so.
+// docs/reviews/2026-09-13-section-wiring-off-live-aeon.md measured it;
+// docs/reviews/2026-09-14-sections-0-7-regions-reader.md is this fix.
+//
+// ─── THE PAIRING TRAP, AND WHY THE CALL AND NOT THE ORDER ───
+//
+// In a region row `effects:` comes BEFORE `sec:`. So the obvious generalisation
+// of the old method, "find `sec: N`, search forward for `effects:`", pairs every
+// row with its NEIGHBOUR's preset: section 0 gets row 1's, and so on down the
+// table. Every shape check stays green, because nine keys still map to nine
+// distinct presets. aeon measured that exact fault on its own tree, with every
+// pytest lane green. The mirror rule ("the nearest `sec:` before it") is right
+// for the region rows and wrong for the old `ojz_sec` rows. Both are claims
+// about ARGUMENT ORDER, and argument order is not the data.
+//
+// What IS the data is which call an argument belongs to. So each `effects:` is
+// paired with the numeric `sec:` values inside ITS OWN enclosing call: the
+// innermost unclosed `(` before it, balanced to its `)`, nested calls included
+// (the region row's key is inside `parallax: …(sec: N)`). That one rule reads
+// both the old rows and the region rows, and reads aeon `31c0ddd8`, which
+// carries both at once, as the same nine bindings twice.
+//
+// ─── WHAT IS A ROW ───
+//
+// A CALL to `<zone>_region(` or `<zone>_sec(`, by aeon's own constructor
+// convention, keyed on the zone id so another zone's constructor, or a helper
+// whose name merely begins with one, is not this act's row. A DECLARATION
+// (`comptime fn ojz_region(…, effects: Label, …)`) is not a row either: it names a
+// type, not a preset, and has no section. Comments and string literals are
+// masked before anything is matched, because the descriptor's prose is dense
+// and its ensure messages carry parentheses of their own.
+//
+// ─── NEVER INVENT A KEY, NEVER DROP A ROW ───
+//
+// A row with NO numeric `sec:` in its own call, or with more than one, is not
+// assigned a section by guessing from its neighbours or its position. It is
+// REPORTED, in `unkeyed`, with its preset, its constructor and its line. Two
+// keyed rows that give one section DIFFERENT presets are not settled by
+// last-wins either: the section is reported in `contested` and bound to
+// neither. Two rows that agree are one binding, which is aeon `31c0ddd8`'s
+// shape. Where a binding that belongs to no section should live is design Q8
+// (where `effectsRef` lives), owed to empyrean, and is deliberately NOT
+// modelled here.
+
 /**
- * `{sec index: the preset record that section's `<zone>_sec(...)` binds}`.
- *
- * ⚠ THE APPROACH IS AEON'S `descriptor_effects_bindings`, DELIBERATELY, and the
- * one thing copied from their lane is the ABSENCE of a window: split the file on
- * each `<zone>_sec(sec: N`, then search the WHOLE following chunk for
- * `effects: <Name>`. Their own first attempt windowed to 800 characters and
- * reported section 0 as binding nothing, because its `effects:` sits at offset
- * 964. This function must never grow a bound.
- *
- * A section that binds no `effects:` is ABSENT from the map rather than mapped
- * to null — the field defaults to 0 = "no preset", which is a legal state and
- * not a fault. Callers must not read "absent" as "shared".
+ * A descriptor row that names an `effects:` preset but cannot be given ONE
+ * section: its own call carries no numeric `sec:`, or carries several.
+ */
+export interface UnkeyedEffectsRow {
+  /** The preset record the row's `effects:` names. */
+  preset: string;
+  /** The constructor the row is written with, e.g. `ojz_region`. */
+  constructorName: string;
+  /** 1-based line of the row's `effects:` argument in the descriptor. */
+  line: number;
+  /** The distinct numeric `sec:` values inside the row's own call: none, or two or more. */
+  sectionKeys: number[];
+}
+
+/** One section that two keyed rows bind to DIFFERENT presets. Aurora picks neither. */
+export interface ContestedSection {
+  section: number;
+  rows: { preset: string; constructorName: string; line: number }[];
+}
+
+/** Everything the descriptor says about which preset each section binds. */
+export interface DescriptorEffectsRows {
+  /**
+   * `{sec index: the preset record its row binds}`, for each section exactly one
+   * preset is keyed to. A section that binds no `effects:` is ABSENT from the map
+   * rather than mapped to null; callers must not read "absent" as "shared".
+   */
+  bindings: Record<number, string>;
+  /** Rows naming a preset with no section key, or several. Never assigned, never dropped. */
+  unkeyed: UnkeyedEffectsRow[];
+  /** Sections two keyed rows bind to different presets. In neither `bindings` nor `unkeyed`. */
+  contested: ContestedSection[];
+}
+
+/**
+ * The descriptor's text with every `//` comment and every string literal's
+ * contents replaced by spaces. OFFSETS AND NEWLINES ARE PRESERVED, so a match
+ * in the result has the same index, and the same line, as in the original.
+ * `.emp` has no block comment in any file this module reads (checked at aeon
+ * `31c0ddd8` and `6bd8ed89`), so none is handled.
+ */
+function maskCommentsAndStrings(src: string): string {
+  const out = src.split('');
+  let i = 0;
+  while (i < src.length) {
+    if (src[i] === '/' && src[i + 1] === '/') {
+      while (i < src.length && src[i] !== '\n') out[i++] = ' ';
+      continue;
+    }
+    if (src[i] === '"') {
+      i++;
+      while (i < src.length && src[i] !== '"' && src[i] !== '\n') {
+        if (src[i] === '\\' && i + 1 < src.length && src[i + 1] !== '\n') out[i++] = ' ';
+        out[i++] = ' ';
+      }
+      i++;
+      continue;
+    }
+    i++;
+  }
+  return out.join('');
+}
+
+/** Index of the innermost `(` left open before `pos`, or -1 at top level. */
+function enclosingOpenParen(code: string, pos: number): number {
+  let depth = 0;
+  for (let i = pos - 1; i >= 0; i--) {
+    if (code[i] === ')') depth++;
+    else if (code[i] === '(') {
+      if (depth === 0) return i;
+      depth--;
+    }
+  }
+  return -1;
+}
+
+/** Index of the `)` that closes the `(` at `open`, or the end of the text if none does. */
+function matchingCloseParen(code: string, open: number): number {
+  let depth = 0;
+  for (let j = open; j < code.length; j++) {
+    if (code[j] === '(') depth++;
+    else if (code[j] === ')' && --depth === 0) return j;
+  }
+  return code.length;
+}
+
+/**
+ * Every section binding the act descriptor makes, and every row it could not
+ * key. THE READER. Read the banner above before changing how a row is paired:
+ * the pairing is by enclosing call, never by argument order.
+ */
+export function descriptorEffectsRows(desc: string, zoneId: string): DescriptorEffectsRows {
+  const code = maskCommentsAndStrings(desc);
+  const constructors = new Set([`${zoneId}_region`, `${zoneId}_sec`]);
+  const keyed = new Map<number, { preset: string; constructorName: string; line: number }[]>();
+  const unkeyed: UnkeyedEffectsRow[] = [];
+  const effects = /\beffects\s*:\s*([A-Za-z_][A-Za-z0-9_]*)/g;
+  let m: RegExpExecArray | null;
+  while ((m = effects.exec(code)) !== null) {
+    const open = enclosingOpenParen(code, m.index);
+    if (open < 0) continue;
+    // The callee is the identifier immediately before the `(`, and a `fn`
+    // before THAT makes the parentheses a parameter list, not a call.
+    const head = /(\bfn\s+)?\b([A-Za-z_][A-Za-z0-9_]*)\s*$/.exec(code.slice(Math.max(0, open - 256), open));
+    if (head === null || head[1] !== undefined || !constructors.has(head[2])) continue;
+    const span = code.slice(open, matchingCloseParen(code, open) + 1);
+    const keys = [...new Set([...span.matchAll(/\bsec\s*:\s*(\d+)\b/g)].map((k) => Number(k[1])))]
+      .sort((a, b) => a - b);
+    const row = {
+      preset: m[1], constructorName: head[2], line: code.slice(0, m.index).split('\n').length,
+    };
+    if (keys.length === 1) {
+      const list = keyed.get(keys[0]) ?? [];
+      list.push(row);
+      keyed.set(keys[0], list);
+    } else {
+      unkeyed.push({ ...row, sectionKeys: keys });
+    }
+  }
+  const bindings: Record<number, string> = {};
+  const contested: ContestedSection[] = [];
+  for (const [section, rows] of [...keyed.entries()].sort((a, b) => a[0] - b[0])) {
+    if (new Set(rows.map((r) => r.preset)).size === 1) bindings[section] = rows[0].preset;
+    else contested.push({ section, rows });
+  }
+  return { bindings, unkeyed, contested };
+}
+
+/**
+ * `{sec index: preset record}` alone: the bindings-only door, and IT REFUSES
+ * RATHER THAN DROPS. When the descriptor carries a row this map has no seat for
+ * (no section key, several, or a section two rows disagree about), it throws
+ * naming the first, because returning the map would hand the caller a smaller
+ * world and no sign that it was smaller. A caller that must go on reading such a
+ * descriptor (the load) reads `descriptorEffectsRows` and carries the rows.
  */
 export function descriptorEffectsBindings(desc: string, zoneId: string): Record<number, string> {
-  const out: Record<number, string> = {};
-  // The section constructor is `<zone>_sec(sec: N, …)` by aeon's own
-  // convention; keyed on the zone id so one act's parse cannot pick up
-  // another's, and so `<act>_sec_raster(sec: 5)` in the same file is not
-  // mistaken for a section record.
-  const split = new RegExp(`\\b${zoneId}_sec\\s*\\(\\s*sec\\s*:\\s*(\\d+)`, 'g');
-  const chunks = desc.split(split);
-  for (let i = 1; i < chunks.length; i += 2) {
-    const m = /effects\s*:\s*([A-Za-z_][A-Za-z0-9_]*)/.exec(chunks[i + 1] ?? '');
-    if (m) out[Number(chunks[i])] = m[1];
+  const rows = descriptorEffectsRows(desc, zoneId);
+  const refusal = refusedRowSentence(rows);
+  if (refusal !== null) {
+    throw new Error(`descriptorEffectsBindings: ${refusal}. Read descriptorEffectsRows instead, `
+      + 'which reports that row rather than dropping it.');
   }
-  return out;
+  return rows.bindings;
+}
+
+/** The first row the bindings map has no seat for, as a sentence, or null. */
+function refusedRowSentence(rows: DescriptorEffectsRows): string | null {
+  const c = rows.contested[0];
+  if (c !== undefined) {
+    return `section ${c.section} is bound by ${c.rows.length} rows naming different presets (`
+      + `${c.rows.map((r) => `${r.preset} at line ${r.line}`).join(', ')}), and Aurora will not `
+      + 'pick one';
+  }
+  const several = rows.unkeyed.find((u) => u.sectionKeys.length > 1);
+  if (several !== undefined) {
+    return `the ${several.constructorName} row at line ${several.line} names ${several.preset} `
+      + `with section keys ${listOf(several.sectionKeys)}, and Aurora will not pick one`;
+  }
+  const none = rows.unkeyed[0];
+  if (none !== undefined) {
+    return `${rows.unkeyed.length} ${rows.unkeyed.length === 1 ? 'row names' : 'rows name'} a `
+      + `preset with no section key (the first: the ${none.constructorName} row at line `
+      + `${none.line}, naming ${none.preset})`;
+  }
+  return null;
+}
+
+/**
+ * What the load records about the descriptor it READ: whether its bindings can
+ * be used, and in words, why not. Kept here rather than in `load.ts` so the
+ * decision is reachable from the node suite.
+ *
+ * ⚠ THREE OUTCOMES, AND ONLY ONE OF THEM IS "PARSED".
+ *   A section two rows disagree about, or a row keyed to several sections:
+ *     REFUSED. Every section reading would rest on a pick Aurora made, and a
+ *     section-keyed control cannot say which. Bindings are not published.
+ *   No binding at all: UNPARSED, and the reason says whether there were rows
+ *     with no key (the file moved to a shape this reader does not key) or no
+ *     rows at all.
+ *   Otherwise PARSED. A row with NO section key does not stop that: it names no
+ *     section, so it falsifies no section's reading. It is carried on the
+ *     wiring (`unkeyedRows`) rather than dropped.
+ * Every outcome carries `read: true`, because the bytes WERE read; the
+ * sentences say "could not read" only when they were not.
+ */
+export function descriptorWiringSource(path: string, rows: DescriptorEffectsRows, zoneId: string)
+: WiringSource {
+  if (rows.contested.length > 0 || rows.unkeyed.some((u) => u.sectionKeys.length > 1)) {
+    return { path, parsed: false, read: true, reason: refusedRowSentence(rows) ?? 'refused' };
+  }
+  if (Object.keys(rows.bindings).length === 0) {
+    return {
+      path, parsed: false, read: true,
+      reason: rows.unkeyed.length > 0
+        ? `${refusedRowSentence(rows)}, and no row carries a section key`
+        : `no ${zoneId}_region(… effects: …, … sec: N …) or ${zoneId}_sec(sec: N, … effects: …) `
+          + 'rows were found in it',
+    };
+  }
+  return { path, parsed: true, read: true };
+}
+
+/**
+ * THE LOAD'S WHOLE DESCRIPTOR STEP, for a file it has read: the source record,
+ * the bindings it may publish, and the rows it carries. `load.ts` assigns these
+ * three fields and nothing else, so the node suite tests the real decision
+ * rather than a copy of it.
+ *
+ * A REFUSED or UNPARSED read publishes NO bindings: every predicate reads the
+ * parse flag first, and a partial map would only be a second way to be wrong.
+ */
+export function readDescriptorWiring(path: string, desc: string, zoneId: string)
+: Pick<SectionRasterWiring, 'bindings' | 'descriptor' | 'unkeyedRows'> {
+  const rows = descriptorEffectsRows(desc, zoneId);
+  const descriptor = descriptorWiringSource(path, rows, zoneId);
+  return { descriptor, bindings: descriptor.parsed ? rows.bindings : {}, unkeyedRows: rows.unkeyed };
 }
 
 /**
@@ -371,7 +647,12 @@ export function sectionRasterAdvisory(
   if (state === 'wired') return null;
   if (state === 'unknown') {
     const which = !w.descriptor.parsed ? w.descriptor : w.library;
-    return `Aurora could not read ${which.path}, so it cannot say whether section ${sectionIndex} `
+    // READ AND NOT UNDERSTOOD is a different sentence from NOT READ; see
+    // `WiringSource.read`.
+    const head = which.read === true
+      ? `Aurora read ${which.path} but found no section binding it could use in it`
+      : `Aurora could not read ${which.path}`;
+    return `${head}, so it cannot say whether section ${sectionIndex} `
       + `can carry a raster band${which.reason ? ` (${which.reason})` : ''}. The binding is still `
       + 'written; aeon\'s build is the authority.';
   }
@@ -451,7 +732,11 @@ export function sectionWiringConditions(
 ): SectionWiringConditions {
   const ownPreset: WiringCondition = (() => {
     if (!w.descriptor.parsed) {
-      return { verdict: 'unknown', record: null, detail: `could not read ${basename(w.descriptor.path)}` };
+      const file = basename(w.descriptor.path);
+      return {
+        verdict: 'unknown', record: null,
+        detail: w.descriptor.read === true ? `read ${file}; no usable section binding` : `could not read ${file}`,
+      };
     }
     const record = w.bindings[sectionIndex];
     if (record === undefined) {

@@ -44,7 +44,7 @@ import {
 import { parseSectionMeta } from '../../formats/section-meta';
 import { loadEffectsSceneLibrary } from '../../formats/effects/scene';
 import {
-  wiringPaths, unknownWiring, descriptorEffectsBindings, libraryRasterChooserCalls,
+  wiringPaths, unknownWiring, readDescriptorWiring, libraryRasterChooserCalls,
   libraryChannelCalls, libraryPatchedArmBindings, rasterChooserName,
   type SectionRasterWiring,
 } from '../../formats/effects/section-wiring';
@@ -778,14 +778,15 @@ async function loadFullProject(
         rasterWiring = unknownWiring(wiringAt.descriptor, wiringAt.library, 'not read');
         try {
           const descText = new TextDecoder().decode(await fa.read(wiringAt.descriptor));
-          const bindings = descriptorEffectsBindings(descText, zoneConfig.id);
-          rasterWiring.bindings = bindings;
-          rasterWiring.descriptor = Object.keys(bindings).length > 0
-            ? { path: wiringAt.descriptor, parsed: true }
-            : {
-                path: wiringAt.descriptor, parsed: false,
-                reason: `no ${zoneConfig.id}_sec(sec: N, … effects: …) records were found in it`,
-              };
+          // THE REGION ROWS, PAIRED BY CALL AND NOT BY ORDER, and every row that
+          // could not be keyed REPORTED rather than dropped. See section-wiring.ts's
+          // READING THE DESCRIPTOR banner. `readDescriptorWiring` makes the whole
+          // decision (what this read may publish, and the rows it carries), and it
+          // lives there so the node suite tests it rather than a copy of it.
+          const read = readDescriptorWiring(wiringAt.descriptor, descText, zoneConfig.id);
+          rasterWiring.descriptor = read.descriptor;
+          rasterWiring.bindings = read.bindings;
+          rasterWiring.unkeyedRows = read.unkeyedRows;
         } catch (e) {
           rasterWiring.descriptor = {
             path: wiringAt.descriptor, parsed: false,
