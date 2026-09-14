@@ -25,13 +25,12 @@
 //       the armed chunk's id. Prints the plane readout it judges.
 //   4   hovering the stamped region makes the panel NAME it — both the store
 //       latch and the rendered text, printed.
-//   4b  the Detach button is PAINTED at the size its own style declares.
-//       CHIP-FONT-13PX, and it is RED ON PURPOSE: the defect is measured, the
-//       cause is `Chip`'s button branch, and the one-line fix at that cause
-//       moves EVERY interactive chip in the app — so it is the owner's call,
-//       not this harness's. See docs/reviews/2026-09-12-scene-row-and-chip-font.md.
-//       The row prints the blast radius (every chip-shaped element mounted, with
-//       its computed and inherited size) so the ruling has the list.
+//   4b  the Detach button is PAINTED at the size the `Chip` primitive declares,
+//       and its inline font-size IS that declaration (not `inherit`). The token
+//       is derived from primitives.tsx (lib/chip-declared-size.mjs), its px
+//       from the live document. CHIP-FONT-13PX: committed RED on 2026-09-12
+//       (docs/reviews/2026-09-12-scene-row-and-chip-font.md), answered by the
+//       owner's d-36 majority rule (docs/reviews/2026-09-13-chip-font-majority.md).
 //   5   the panel's real Detach button clears that placement AND LEAVES THE ART
 //       ALONE (detaching turns a link into a copy). The nametable comparison is
 //       the half that separates "detached" from "erased".
@@ -78,6 +77,7 @@ import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
+import { chipDeclaredSize, CHIP_PRIMITIVES } from './lib/chip-declared-size.mjs';
 
 const PORT = Number(process.env.PORT ?? 9411);
 const ROOT = AURORA_DIR;
@@ -96,6 +96,8 @@ const ROOT = AURORA_DIR;
 const RUN = announceRunRoot(runTarget(ROOT));
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
+// What `Chip` declares, read from the tree this run BUILT (row 4b).
+const CHIP_DECL = chipDeclaredSize(RUN.root);
 /**
  * THIS RIG DRIVES EDITS INTO THE PROJECT IT OPENS, SO IT RUNS ONLY AGAINST A
  * COPY AND HAS NO DEFAULT (RIG-WRITES-LIVE-AEON). Hub ruling d-28 option 2 is
@@ -499,13 +501,27 @@ async function main() {
 
     // ── Row 4b: the Detach button is RENDERED AT THE SIZE ITS STYLE DECLARES ─
     //
-    // CHIP-FONT-13PX. `Chip`'s button branch (primitives.tsx:282) sets
-    // `fontSize: T.tXs`, i.e. `var(--text-xs-size)`, and its own comment says
-    // "a chip in a 13px bar is still 11px". On screen it is not.
+    // CHIP-FONT-13PX, answered by the owner's d-36 rule ("go with whatever
+    // there's more of"): the chip census counted more chips painting 13px than
+    // 11px, so `Chip` DECLARES T.tBase for both branches and its button branch
+    // inherits family, weight and style as longhands. Until 2026-09-13 it
+    // declared T.tXs and a `font: 'inherit'` shorthand after the spread erased
+    // that, so the button painted whatever its container had.
     //
-    // THE EXPECTATION IS DERIVED, NEVER TYPED: `--text-xs-size` is read out of
-    // the live document's own custom properties, so this row cannot drift from
-    // the token, and it goes LOUD (not green) if the property resolves empty.
+    // THE EXPECTATION IS DERIVED, NEVER TYPED, AND IT FOLLOWS THE PRIMITIVE.
+    // Which token `Chip` declares is read out of primitives.tsx by the parser
+    // the chip census uses (lib/chip-declared-size.mjs), in the tree this run
+    // BUILT; that token's px is read out of the live document's own custom
+    // properties. This row used to read `--text-xs-size` by name, which would
+    // have gone on measuring against the old token after the primitive moved.
+    //
+    // TWO CLAUSES: the painted px equals the declared token's px, AND the
+    // button's inline font-size reads back as that token's var(). The second
+    // is the mechanism: a `font` shorthand after the spread makes it read
+    // `inherit`, and on a day the declared and the inherited sizes are equal
+    // (13 and 13, in the header's panel) the first clause alone cannot see it.
+    // LOUD: an unresolved declaration, an empty token or a missing button
+    // fails, never passes by absence.
     //
     // DPR CANNOT CONFOUND IT. `getComputedStyle().fontSize` is resolved CSS px,
     // not device px, and both sides of the comparison come from the same
@@ -513,13 +529,12 @@ async function main() {
     // runs. dpr is printed anyway, beside the button's own rect, because this
     // box has been seen at 1 and at 1.35 hours apart.
     //
-    // THE CENSUS beside it is the blast-radius measurement: every chip-shaped
-    // <button> mounted right now, with its computed size and the size it
-    // inherits. `Chip`'s span branch carries no `font: inherit`, so the two
-    // branches of one primitive are expected to disagree today.
+    // THE LIST beside it is context, not the assertion: every chip-shaped
+    // element mounted right now, with its computed and inherited size. The
+    // whole-app count is scratchpad/chip-font-census-harness.mjs.
     const chipFont = await c.json(`(() => {
       const declared = getComputedStyle(document.documentElement)
-        .getPropertyValue('--text-xs-size').trim();
+        .getPropertyValue(${JSON.stringify(CHIP_DECL.cssVar ?? '--chip-declaration-unresolved')}).trim();
       const chipish = (e) => e.style.display === 'inline-flex' && e.style.whiteSpace === 'nowrap';
       const detach = [...document.querySelectorAll('button')]
         .find((e) => e.textContent.trim() === 'Detach');
@@ -552,12 +567,13 @@ async function main() {
         + `inherited=${String(e.inherited).padStart(7)} inline font-size=${String(e.inlineFontSize).padStart(9)}`
         + `  ${JSON.stringify(e.text)}`);
     const censusOff = chipFont.census.filter((e) => e.computed !== declaredPx);
-    check('4b', "the panel's Detach button is painted at the size its own style declares (--text-xs-size), not at whatever it inherits",
-      // LOUD ON UNMEASURABLE: an empty token or a missing button is a failure,
-      // never a pass by absence.
-      /^\d+(\.\d+)?px$/.test(declaredPx) && chipFont.detach !== null
-      && measuredPx === declaredPx,
-      `declared --text-xs-size=${JSON.stringify(declaredPx)} computed=${JSON.stringify(measuredPx)} `
+    check('4b', `the panel's Detach button is painted at the size the Chip primitive declares (T.${CHIP_DECL.token} = ${CHIP_DECL.varExpr}, derived from ${CHIP_PRIMITIVES}), and its inline font-size is that declaration, not inherit`,
+      // LOUD ON UNMEASURABLE: an unresolved declaration, an empty token or a
+      // missing button is a failure, never a pass by absence.
+      CHIP_DECL.varExpr !== null && /^\d+(\.\d+)?px$/.test(declaredPx) && chipFont.detach !== null
+      && measuredPx === declaredPx && chipFont.detach.inlineFontSize === CHIP_DECL.varExpr,
+      `declared T.${CHIP_DECL.token} ${CHIP_DECL.varExpr}=${JSON.stringify(declaredPx)}`
+      + `${CHIP_DECL.problem ? ` (UNRESOLVED: ${CHIP_DECL.problem})` : ''} computed=${JSON.stringify(measuredPx)} `
       + `inherited=${JSON.stringify(chipFont.detach && chipFont.detach.inherited)} `
       + `inline font-size=${JSON.stringify(chipFont.detach && chipFont.detach.inlineFontSize)} `
       + `inline font shorthand=${JSON.stringify(chipFont.detach && chipFont.detach.inlineFontShorthand)}\n`

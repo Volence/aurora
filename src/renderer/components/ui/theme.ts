@@ -34,9 +34,9 @@ export const T = {
   // — frame numbers, thumbnail corner tags, the ◀▶ stepper arrows. Those are
   // glyphs over pixels, not text in chrome, and they are sized to the art.
   t2xs: 'var(--text-2xs-size)',     // 10px — micro-chrome: readouts, tags, captions, hints
-  tXs: 'var(--text-xs-size)',       // 11px — dense labels, chips, readouts
+  tXs: 'var(--text-xs-size)',       // 11px — dense labels, readouts
   tSm: 'var(--text-sm-size)',       // 12px — secondary UI text
-  tBase: 'var(--text-base-size)',   // 13px — default UI text
+  tBase: 'var(--text-base-size)',   // 13px — default UI text, and every Chip (d-36)
   tMd: 'var(--text-md-size)',       // 14px — emphasis / panel body
   tLg: 'var(--text-lg-size)',       // 16px — panel titles
   tXl: 'var(--text-xl-size)',       // 20px — section headers
