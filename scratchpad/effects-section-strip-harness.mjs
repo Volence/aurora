@@ -90,6 +90,10 @@ import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 import { aeonArmTruth } from './lib/aeon-arm-truth.mjs';
+import { openEffectsSectionState, openEffectsSectionOrThrow } from './lib/effects-sections.mjs';
+
+/** The raster band presets section's id: `BandPresetPanel.tsx`, `<CollapsibleSection id=…>`. */
+const SECTION_RASTER_PRESETS = 'aeon.effects.presets';
 
 const PORT = Number(process.env.PORT ?? 9458);
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 92);
@@ -460,6 +464,10 @@ async function main() {
       await sleep(1500);
       await c.evalExpr(SUBTAB('colour'));
       await sleep(1000);
+      // The rows read the raster select, which a shut presets section does not
+      // render; opened by id, and a miss STOPS the run rather than reading as
+      // "the app has no raster select".
+      await openEffectsSectionOrThrow(c, SECTION_RASTER_PRESETS);
       const got = await c.json(readExpr);
       return { open: !!(s2 && s2.open), ...got };
     };
@@ -488,14 +496,30 @@ async function main() {
 
     // Open every collapsible so the column is at the height an author who has
     // been working in it has. A short column cannot fail a permanence row.
-    const opened = await c.evalExpr(String.raw`(() => {
+    //
+    // ⚠ OPEN, NOT TOGGLE (2026-09-14). This clicked EVERY pointer-cursor header in
+    // the column, and those headers TOGGLE (the capture step below says so), so a
+    // section that was already open was SHUT, and CollapsibleSection persists the
+    // shut state (`savePanelState`) through the reloads [3c], [4b] and [4c] make.
+    // With the raster band presets section shut there is no raster select in the
+    // DOM at all, which is the premise the line below records rather than assumes:
+    // [2c], [4a], [4b] and [4c] were red on master and on the fix branch alike
+    // with `raster select: {"found":false}`, and that had nothing to do with which
+    // section is barred. It now opens only the sections the app itself marks
+    // collapsed (`data-section-collapsed`), and prints the ones already open, which
+    // are the ones the old loop would have shut.
+    const expand = await c.json(String.raw`(() => {
       const col = ${STRIP}.parentElement;
       const before = col.scrollHeight;
-      for (const h of [...col.querySelectorAll('div')].filter((d) => d.style && d.style.cursor === 'pointer')) {
-        h.click();
-      }
-      return before;
+      const wasOpen = [...col.querySelectorAll('[data-section][data-section-collapsed="false"]')]
+        .map((s) => s.getAttribute('data-section'));
+      const shut = [...col.querySelectorAll('[data-section][data-section-collapsed="true"]')];
+      for (const s of shut) if (s.firstElementChild) s.firstElementChild.click();
+      return { before, wasOpen, opened: shut.map((s) => s.getAttribute('data-section')) };
     })()`);
+    const opened = expand.before;
+    console.log(`    expand-all  : already open ${JSON.stringify(expand.wasOpen)} (the old toggle loop `
+      + `would have SHUT these); opened ${JSON.stringify(expand.opened)}`);
     await sleep(2000);
 
     const at = await c.evalExpr(SCROLL_END);
@@ -513,6 +537,9 @@ async function main() {
     // that control is the ordinary one (OPEN_SUBJECT, derived; see above).
     await c.evalExpr(SET_SELECT(STRIP_SELECT, OPEN_SUBJECT));
     await sleep(900);
+    // The section that holds the control, opened by ITS ID with the app's own
+    // collapsed attribute read back, so a shut section is a stated miss.
+    const presetsDoor = await openEffectsSectionState(c, SECTION_RASTER_PRESETS);
     const rasterAt = await c.json(String.raw`(() => {
       const s = ${RASTER_SELECT};
       if (!s) return { found: false };
@@ -533,7 +560,8 @@ async function main() {
     check('2c', 'AT THE RASTER BINDING — the control it captions — the strip is still painted',
       rasterAt.found === true && atRaster.insideScroller === true && atRaster.hitIsSelect === true
       && atRaster.scroll.top > atRaster.rect.height,
-      `raster select: ${JSON.stringify(rasterAt)}\n        ${JSON.stringify(atRaster)}`);
+      `raster select: ${JSON.stringify(rasterAt)} on section ${OPEN_SUBJECT}; presets section door: `
+      + `${JSON.stringify(presetsDoor)}\n        ${JSON.stringify(atRaster)}`);
 
     // ---- 3. THE CONDITIONS, APART. ---------------------------------------
     await c.evalExpr(SET_SELECT(STRIP_SELECT, 0));
