@@ -18,8 +18,9 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  EMBED_SOURCE_EXTENSION, findEmbedSites, scanEmbeds, sharedLine0Warning,
-  type EmbedScan, type SourceRead,
+  EMBED_SOURCE_EXTENSION, SPRING_LINE0_GATE_EXTENSION, SPRING_LINE0_GATE_PATH,
+  findEmbedSites, scanEmbeds, scanSpringGate, sharedLine0Warning,
+  type EmbedScan, type SourceRead, type SpringGateScan,
 } from '../shared-palette-warning';
 import { PLAYER_PALETTE_CANDIDATES } from '../player-palette';
 import { PAL_BASE_FIRST_LINE, PAL_BASE_LAST_LINE } from '../../../aether/palette-push';
@@ -28,6 +29,11 @@ import type { SourceListing } from '../../../../shared/ipc-types';
 import { siblingPathOrUnresolved } from '../../../../../test/support/sibling-root.mjs';
 
 const TARGET = PLAYER_PALETTE_CANDIDATES[0];
+
+/** The embed rows below are about the embed list; a project with no spring
+ *  check keeps the gate's paragraph out of them. */
+const NO_GATE: SpringGateScan = { kind: 'absent' };
+const warn = (scan: EmbedScan, gate: SpringGateScan = NO_GATE) => sharedLine0Warning(TARGET, scan, gate);
 
 const listing = (files: string[], extra?: Partial<SourceListing>): SourceListing => ({
   files, unreadable: [], capped: false, ...extra,
@@ -118,7 +124,7 @@ describe('sharedLine0Warning: the sentence a person reads before the first line 
   });
 
   it('says the change reaches EVERY zone, names the file, and says there is no per-level copy', () => {
-    const w = sharedLine0Warning(TARGET, measured([]));
+    const w = warn(measured([]));
     expect(w.title).toContain('every zone');
     expect(w.body).toContain(TARGET);
     expect(w.body).toContain('EVERY zone');
@@ -131,7 +137,7 @@ describe('sharedLine0Warning: the sentence a person reads before the first line 
       { path: 'games/a/test_solid.emp', line: 934, name: '_spring_pal_sonic' },
       { path: 'games/a/knuckles_data.emp', line: 73, name: null },
     ];
-    const w = sharedLine0Warning(TARGET, measured(sites));
+    const w = warn(measured(sites));
     for (const s of sites) {
       expect(w.body, `the warning dropped ${s.path}`).toContain(`${s.path}:${s.line}`);
       if (s.name) expect(w.body).toContain(s.name);
@@ -141,7 +147,7 @@ describe('sharedLine0Warning: the sentence a person reads before the first line 
   });
 
   it('UNMEASURABLE: says it could NOT check and lists nothing, so silence cannot read as "nothing else"', () => {
-    const w = sharedLine0Warning(TARGET, { kind: 'unmeasurable', reason: 'listing failed: EIO' });
+    const w = warn({ kind: 'unmeasurable', reason: 'listing failed: EIO' });
     expect(w.body).toContain('could NOT check');
     expect(w.body).toContain('listing failed: EIO');
     expect(w.body).not.toMatch(/Nothing else/);
@@ -149,27 +155,133 @@ describe('sharedLine0Warning: the sentence a person reads before the first line 
   });
 
   it('MEASURED ZERO: states the population searched, never an empty list', () => {
-    const w = sharedLine0Warning(TARGET, measured([]));
+    const w = warn(measured([]));
     expect(w.body).toContain(`searched 42 ${EMBED_SOURCE_EXTENSION} source files`);
     expect(w.body).toContain('found none');
     expect(w.body).not.toMatch(/^• /m);
   });
 
   it('PARTIAL: a blind or capped scan says the list may not be everything', () => {
-    const blind = sharedLine0Warning(TARGET, measured([], { blind: ['locked (EACCES)'] }));
+    const blind = warn(measured([], { blind: ['locked (EACCES)'] }));
     expect(blind.body).toContain('may not be everything');
     expect(blind.body).toContain('locked (EACCES)');
-    const capped = sharedLine0Warning(TARGET, measured([], { capped: true }));
+    const capped = warn(measured([], { capped: true }));
     expect(capped.body).toContain('file limit');
-    expect(sharedLine0Warning(TARGET, measured([])).body, 'a complete scan hedged anyway')
+    expect(warn(measured([])).body, 'a complete scan hedged anyway')
       .not.toContain('may not be everything');
   });
 
   it('never claims line 0 reaches a running game: it names the live range, from the push module', () => {
-    const w = sharedLine0Warning(TARGET, measured([]));
+    const w = warn(measured([]));
     expect(w.body).toContain(`lines ${PAL_BASE_FIRST_LINE} to ${PAL_BASE_LAST_LINE} live`);
     expect(PAL_BASE_FIRST_LINE, 'line 0 is inside the live range, so the sentence would be false')
       .toBeGreaterThan(0);
+  });
+});
+
+// ═══ THE SPRING CHECK (hub ruling 2026-09-14T00:24:36Z) ═══════════════════
+// Synthetic, in memory. The gate's text is planted here, and every expected
+// value is read back off that planted text, never typed a second time.
+const FOLDER = TARGET.slice(0, TARGET.lastIndexOf('/'));
+const PARTNER = `${FOLDER}/partner.bin`;
+const GATE_TEXT = [
+  '"""The spring\'s colours, and each character\'s palette: prose, not a path."""',
+  `# PAL_OLD = "${FOLDER}/retired.bin"   (a comment: never a partner)`,
+  `PAL_SONIC = "${TARGET}"`,
+  `PAL_OTHER = '${PARTNER}'`,
+  'SPRING_ART = "games/x/generated/art_spring.bin"   # another folder: never a partner',
+].join('\n');
+
+describe('scanSpringGate: found by the listing, read, and tied to the file being edited', () => {
+  const pyListing = (extra?: Partial<SourceListing>) =>
+    async () => listing(['tools/other_tool.py', SPRING_LINE0_GATE_PATH], extra);
+
+  it('PRESENT: the project lists the check and it reads this file; the partner is its other literal in the same folder', async () => {
+    const gate = await scanSpringGate(TARGET, pyListing(), reader({ [SPRING_LINE0_GATE_PATH]: GATE_TEXT }));
+    expect(gate).toEqual({ kind: 'present', path: SPRING_LINE0_GATE_PATH, partners: [PARTNER] });
+  });
+
+  it('ABSENT: a complete listing without the file is a finding, and nothing is read', async () => {
+    let reads = 0;
+    const gate = await scanSpringGate(
+      TARGET,
+      // An unreadable folder that is NOT above the gate cannot hide it.
+      async () => listing(['tools/other_tool.py'], { unreadable: [{ path: 'games/locked', reason: 'EACCES' }] }),
+      async (paths) => { reads++; return reader({})(paths); },
+    );
+    expect(gate).toEqual({ kind: 'absent' });
+    expect(reads, 'an absent check was read anyway').toBe(0);
+  });
+
+  it('UNMEASURABLE: a listing that throws says why', async () => {
+    const gate = await scanSpringGate(TARGET, async () => { throw new Error('no channel'); }, reader({}));
+    expect(gate).toEqual({ kind: 'unmeasurable', reason: expect.stringContaining('no channel') });
+    expect(gate.kind === 'unmeasurable' && gate.reason).toContain(SPRING_LINE0_GATE_EXTENSION);
+  });
+
+  it('UNMEASURABLE: an unreadable folder ABOVE the check, or a capped listing, cannot say it is absent', async () => {
+    const folders = SPRING_LINE0_GATE_PATH.split('/').slice(0, -1);
+    const above = ['.', ...folders.map((_, i) => folders.slice(0, i + 1).join('/'))];
+    expect(above.length, 'the gate path has no folder above it: this row tests only the root').toBeGreaterThan(1);
+    for (const path of above) {
+      const gate = await scanSpringGate(TARGET, async () => listing([], { unreadable: [{ path, reason: 'EACCES' }] }), reader({}));
+      expect(gate, `unreadable ${path}`).toEqual({ kind: 'unmeasurable', reason: expect.stringContaining(path) });
+    }
+    const capped = await scanSpringGate(TARGET, async () => listing(['tools/other_tool.py'], { capped: true }), reader({}));
+    expect(capped.kind).toBe('unmeasurable');
+  });
+
+  it('UNMEASURABLE: the check is listed but cannot be read', async () => {
+    const gate = await scanSpringGate(TARGET, pyListing(), reader({ [SPRING_LINE0_GATE_PATH]: null }));
+    expect(gate).toEqual({ kind: 'unmeasurable', reason: expect.stringContaining('EACCES') });
+  });
+
+  it('READS ANOTHER FILE: under the fallback, a check that reads only the primary is not this edit\'s', async () => {
+    const fallback = PLAYER_PALETTE_CANDIDATES[1];
+    expect(fallback, 'there is no fallback candidate to test').toBeTruthy();
+    const gate = await scanSpringGate(fallback, pyListing(), reader({ [SPRING_LINE0_GATE_PATH]: GATE_TEXT }));
+    expect(gate).toEqual({ kind: 'reads-other-file', path: SPRING_LINE0_GATE_PATH });
+  });
+});
+
+describe('sharedLine0Warning: the spring check, named only when the project has it', () => {
+  const measured: EmbedScan = { kind: 'measured', searched: 42, sites: [], blind: [], capped: false };
+  // Phrases only the gate's paragraphs say. The embed list's own unmeasurable
+  // sentence also says "could NOT check", so that phrase alone proves nothing.
+  const NAMED = 'whichever character you play';
+  const UNCHECKED = 'could NOT check whether one of this project\'s own checks';
+
+  it('NAMED: the file, what it checks, the partner palette, and that the check fails until it matches', () => {
+    const w = warn(measured, { kind: 'present', path: SPRING_LINE0_GATE_PATH, partners: [PARTNER] });
+    expect(w.body).toContain(`check ${SPRING_LINE0_GATE_PATH} also reads this file`);
+    expect(w.body).toContain(NAMED);
+    expect(w.body).toContain(`same colours in ${PARTNER}`);
+    expect(w.body).toContain(`that check will fail until ${PARTNER} is changed to match`);
+    expect(w.body).not.toContain(UNCHECKED);
+  });
+
+  it('NAMED with no partner it could read: it says "another character\'s palette file", never an empty name', () => {
+    const w = warn(measured, { kind: 'present', path: SPRING_LINE0_GATE_PATH, partners: [] });
+    expect(w.body).toContain(SPRING_LINE0_GATE_PATH);
+    expect(w.body).toContain('fail until another character\'s palette file is changed to match');
+  });
+
+  it('NOT NAMED when the project has no such check, or it reads another file: not a word of it', () => {
+    for (const gate of [{ kind: 'absent' }, { kind: 'reads-other-file', path: SPRING_LINE0_GATE_PATH }] as SpringGateScan[]) {
+      const w = warn(measured, gate);
+      expect(w.body, gate.kind).not.toContain(SPRING_LINE0_GATE_PATH);
+      expect(w.body, gate.kind).not.toContain(NAMED);
+      expect(w.body, gate.kind).not.toContain(UNCHECKED);
+      expect(w.body, `${gate.kind}: ANTI-VACUOUS, this is the real warning`).toContain('found none');
+    }
+  });
+
+  it('COULD NOT CHECK: says so in its own sentence, with the reason, and names no file it did not find', () => {
+    const w = warn(measured, { kind: 'unmeasurable', reason: 'the folder tools could not be read (EACCES)' });
+    expect(w.body).toContain(UNCHECKED);
+    expect(w.body).toContain('the folder tools could not be read (EACCES)');
+    expect(w.body).not.toContain(SPRING_LINE0_GATE_PATH);
+    expect(w.body.split('could NOT check').length - 1, 'the embed list was measured: exactly one "could NOT check"').toBe(1);
   });
 });
 

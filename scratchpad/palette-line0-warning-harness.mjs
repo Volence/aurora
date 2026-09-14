@@ -112,6 +112,21 @@ function expectedSites(root, target) {
 }
 const SITES = expectedSites(AEONDIR, SHARED_PATH);
 
+// Hub ruling 2026-09-14T00:24:36Z (empyrean docs/OVERSEER.md, empyrean 8a7476f):
+// the warning ALSO names the project's spring character-swap check. Its path is
+// read out of the source the app was built from; whether the COPY has it, and
+// whether it reads the resolved shared file, is this file's own look at the
+// copy, sharing no code with the app's scan. Row 3h expects the name exactly
+// when both hold, and its absence otherwise.
+const GATE_PATH = parseOrDie('src/core/project/aeon/shared-palette-warning.ts',
+  /export const SPRING_LINE0_GATE_PATH = '([^']+)'/, 'SPRING_LINE0_GATE_PATH');
+const GATE_EXPECTED = (() => {
+  const p = join(AEONDIR, GATE_PATH);
+  if (!existsSync(p)) return false;
+  const src = readFileSync(p, 'utf8');
+  return src.includes(`"${SHARED_PATH}"`) || src.includes(`'${SHARED_PATH}'`);
+})();
+
 const sha = (b) => createHash('sha256').update(b).digest('hex').slice(0, 16);
 const readShared = () => readFileSync(join(AEONDIR, SHARED_PATH));
 
@@ -250,7 +265,8 @@ async function runChecks(c) {
   note('0a', 'environment', `dpr=${envInfo.dpr} viewport=${envInfo.w}x${envInfo.h} `
     + `load=${readFileSync('/proc/loadavg', 'utf8').trim().split(' ').slice(0, 3).join(' ')}`);
   note('0b', 'derived expectations', `shared=${SHARED_PATH} (candidates ${CANDIDATES.join(', ')}) `
-    + `accept-key=${ACCEPT_KEY} embed-sites=${JSON.stringify(SITES)}`);
+    + `accept-key=${ACCEPT_KEY} embed-sites=${JSON.stringify(SITES)} `
+    + `spring-check=${GATE_PATH} (${GATE_EXPECTED ? 'on the copy and reads the shared file: expect NAMED' : 'not on the copy, or reads another file: expect NOT named'})`);
   check('0c', 'ANTI-VACUOUS: the independent scan of the copy found embed sites to look for',
     SITES.length > 0, `${SITES.length} site(s)`);
 
@@ -299,6 +315,16 @@ async function runChecks(c) {
   check('3d', 'the warning names EVERY embed site the independent scan of the copy found',
     SITES.length > 0 && missing.length === 0, missing.length ? `missing ${JSON.stringify(missing)}` : `${SITES.length} named`);
   check('3e', 'the warning never claims line 0 is pushed live', /until it is rebuilt/.test(text) && !/pushes only lines 0/.test(text));
+  // [3h] ADDED 2026-09-14 (PALETTE-WARNING-NAMES-SPRING-GATE), not yet run by its
+  // author: the controller runs CDP rigs. Red-first plant for that run: in
+  // src/renderer/providers/palette-line0-gate.ts pass `{ kind: 'absent' }` as
+  // sharedLine0Warning's third argument instead of `gate`, rebuild, and on a copy
+  // that has the check this row must FAIL naming the missing path.
+  check('3h', GATE_EXPECTED
+    ? 'the warning names the spring character-swap check the copy holds'
+    : 'the warning does not name a spring check the copy lacks (or that reads another file)',
+  text.includes(GATE_PATH) === GATE_EXPECTED,
+  `${GATE_PATH} expected ${GATE_EXPECTED ? 'NAMED' : 'NOT named'}; ${text.includes(GATE_PATH) ? 'named' : 'missing'} in the warning`);
   check('3f', 'no sliders opened while the warning is up', (await c.json('window.__l0.sliders()')) === 0);
   const warnShot = await shot(c, 'warning');
   note('3g', 'capture', warnShot);
