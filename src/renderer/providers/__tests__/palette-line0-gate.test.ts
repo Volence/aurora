@@ -26,6 +26,9 @@ import {
   LINE0_ACCEPT_KEY, LINE0_REFUSED_TITLE,
 } from '../palette-line0-gate';
 import { admitZoneLine, whenZoneLineAdmitted } from '../palette-aeon';
+import {
+  SPRING_LINE0_GATE_EXTENSION, SPRING_LINE0_GATE_PATH,
+} from '../../../core/project/aeon/shared-palette-warning';
 
 const PLAYER = PLAYER_PALETTE_CANDIDATES[0];
 const tile = (fill: number): Tile => ({ pixels: new Uint8Array(64).fill(fill) });
@@ -36,7 +39,12 @@ const SOURCES: Record<string, string> = {
   'games/g/other.emp': 'module h\npub data X = embed("games/g/x.bin")\n',
 };
 
-function fixtureFiles(opts?: { player?: Uint8Array | null }): Map<string, Uint8Array> {
+/** The spring check, planted only by the rows that want it. It reads the
+ *  shared file and one partner palette in the same folder. */
+const PARTNER = `${PLAYER.slice(0, PLAYER.lastIndexOf('/'))}/partner.bin`;
+const GATE_SOURCE = `PAL_A = "${PLAYER}"\nPAL_B = "${PARTNER}"\n`;
+
+function fixtureFiles(opts?: { player?: Uint8Array | null; gate?: boolean }): Map<string, Uint8Array> {
   const files = new Map<string, Uint8Array>();
   files.set('project.json', new TextEncoder().encode(JSON.stringify({
     name: 'Gate Fixture', engine: 's4', objectLibrary: 'data/objects.json', chunkLibrary: '',
@@ -57,6 +65,7 @@ function fixtureFiles(opts?: { player?: Uint8Array | null }): Map<string, Uint8A
     serializeNametable(new Uint16Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH)));
   files.set('data/objects.json', new TextEncoder().encode('[]'));
   for (const [p, t] of Object.entries(SOURCES)) files.set(p, new TextEncoder().encode(t));
+  if (opts?.gate) files.set(SPRING_LINE0_GATE_PATH, new TextEncoder().encode(GATE_SOURCE));
   return files;
 }
 
@@ -70,13 +79,15 @@ function memFa(files: Map<string, Uint8Array>): FileAccess {
 
 let files: Map<string, Uint8Array>;
 
-function installApi(opts?: { noListing?: boolean }): void {
+function installApi(opts?: { noListing?: boolean; rootUnreadableFor?: string }): void {
   (globalThis as { window?: unknown }).window = {
     api: {
       ...(opts?.noListing ? {} : {
-        listProjectSources: async (_base: string, ext: string) => ({
-          files: [...files.keys()].filter((p) => p.endsWith(ext)), unreadable: [], capped: false,
-        }),
+        // `rootUnreadableFor`: the listing for that one extension could not
+        // read the project folder at all, the way file-io reports it.
+        listProjectSources: async (_base: string, ext: string) => (ext === opts?.rootUnreadableFor
+          ? { files: [], unreadable: [{ path: '.', reason: 'EACCES: permission denied' }], capped: false }
+          : { files: [...files.keys()].filter((p) => p.endsWith(ext)), unreadable: [], capped: false }),
       }),
       readManyFiles: async (_base: string, rels: string[]) => rels.map((rel) => {
         const b = files.get(rel);
@@ -209,6 +220,59 @@ describe('a decline changes nothing; an acceptance lets exactly the asked write 
     answer(LINE0_ACCEPT_KEY);
     await new Promise((r) => setTimeout(r, 0));
     expect(writes).toBe(1);
+  });
+});
+
+// Hub ruling 2026-09-14T00:24:36Z: the warning ALSO names the project's spring
+// check when the project has it. Through the real gate, over in-memory listings.
+describe('the spring check: named when the project has it, silent when not, honest when it cannot look', () => {
+  /** The warning's own embedder line, so a row can prove it read the real warning. */
+  const embedderLine = (): string => {
+    const [path, text] = Object.entries(SOURCES).find(([, t]) => t.includes(`embed("${PLAYER}")`))!;
+    return `${path}:${text.split('\n').findIndex((l) => l.includes(`embed("${PLAYER}")`)) + 1}`;
+  };
+
+  it('NAMED: a project that lists the check gets it named, with the partner palette read off the check', async () => {
+    files = fixtureFiles({ gate: true });
+    installApi();
+    await openProject();
+    const gate = admitSharedLineEdit();
+    const req = await raised();
+    expect(req.body).toContain(SPRING_LINE0_GATE_PATH);
+    expect(req.body).toContain('whichever character you play');
+    expect(req.body).toContain(`that check will fail until ${PARTNER} is changed to match`);
+    expect(req.body).toContain(embedderLine());
+    answer('cancel');
+    await gate;
+  });
+
+  it('NOT NAMED: a project without the check hears nothing about it', async () => {
+    const gate = admitSharedLineEdit();
+    const req = await raised();
+    expect(req.body, 'ANTI-VACUOUS: this is the real warning, with its embed list').toContain(embedderLine());
+    expect(req.body).not.toContain(SPRING_LINE0_GATE_PATH);
+    expect(req.body).not.toContain('whichever character you play');
+    expect(req.body).not.toContain('could NOT check');
+    answer('cancel');
+    await gate;
+  });
+
+  it('COULD NOT CHECK: when the listing cannot read the project, it says so, and names nothing it did not find', async () => {
+    // The check IS on disk; only the listing is blind. So a name in the warning
+    // could only have come from somewhere other than the listing.
+    files = fixtureFiles({ gate: true });
+    installApi({ rootUnreadableFor: SPRING_LINE0_GATE_EXTENSION });
+    await openProject();
+    const gate = admitSharedLineEdit();
+    const req = await raised();
+    expect(req.body).toContain('could NOT check whether one of this project\'s own checks');
+    expect(req.body).toContain('EACCES');
+    expect(req.body).not.toContain(SPRING_LINE0_GATE_PATH);
+    expect(req.body, 'the embed list must have been measured, so the "could NOT check" is the gate\'s')
+      .toContain(embedderLine());
+    expect((req.body ?? '').split('could NOT check').length - 1).toBe(1);
+    answer('cancel');
+    await gate;
   });
 });
 

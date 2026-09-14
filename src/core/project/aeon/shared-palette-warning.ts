@@ -28,6 +28,30 @@
 // zero files is unmeasurable too (an aeon project has sources, so zero means
 // the search went wrong, not that nothing embeds the file); and a scan that
 // could read only some of them says the list may be missing entries.
+//
+// ═══ THE SPRING'S CHARACTER-SWAP CHECK, NAMED WHEN THE PROJECT HAS IT ═════
+//
+// Hub ruling 2026-09-14T00:24:36Z (empyrean docs/OVERSEER.md, carried by
+// empyrean 8a7476f), verbatim in part: "the top-row save warning ALSO names
+// aeon's `tools/spring_line0_gate.py`. That gate checks the spring's seven
+// colour slots render the same as Sonic and as Knuckles, deriving from
+// `SonicAndTails.bin` and `knuckles.bin`, so an edit there makes the spring
+// change colour on a character swap and turns the gate red until the Knuckles
+// palette matches. A warning that omits the one consequence that fails a build
+// is incomplete." Wording is Aurora's; WHAT is listed is the hub's.
+//
+// The gate's PATH is the one fixed thing here, because the ruling names that
+// file. Everything else is derived the way the embed list is, at warning time,
+// from the open project: whether the project HAS the file (the same
+// `listProjectSources` listing, asked for the file's own extension), whether
+// it reads the file this edit changes (a quoted literal equal to the resolved
+// path, so the `sonic.bin` fallback does not name a check that reads its
+// sibling, the embed search's own precedent), and which other palette it
+// compares against (its other quoted literals in the same folder). The
+// spring's colour indices are NOT restated: the gate takes them from a nibble
+// histogram of its art file, and Aurora does not repeat that derivation.
+// "Could not look" says so, on the embed list's convention, without naming a
+// file the project may not have.
 
 import type { SourceListing } from '../../../shared/ipc-types';
 import { PAL_BASE_FIRST_LINE, PAL_BASE_LAST_LINE } from '../../aether/palette-push';
@@ -162,16 +186,115 @@ function message(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+/** The project-relative path of aeon's spring character-swap check, as the
+ *  hub's ruling names it (see the file header). The only fixed input. */
+export const SPRING_LINE0_GATE_PATH = 'tools/spring_line0_gate.py';
+
+/** The listing asked for the gate: its own extension, read off its path. */
+export const SPRING_LINE0_GATE_EXTENSION = SPRING_LINE0_GATE_PATH.slice(SPRING_LINE0_GATE_PATH.lastIndexOf('.'));
+
+/** What the search for the spring check found. See the file header. */
+export type SpringGateScan =
+  /** The project has the check and it reads the file being edited. */
+  | { kind: 'present'; path: string; partners: string[] }
+  /** A complete look, and the project has no such file. Nothing is said. */
+  | { kind: 'absent' }
+  /** The project has the file, but it never reads the file being edited. */
+  | { kind: 'reads-other-file'; path: string }
+  | { kind: 'unmeasurable'; reason: string };
+
+const folderOf = (p: string): string => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
+
+/**
+ * The quoted literals in a Python source, one line at a time, full-line `#`
+ * comments skipped. Prose between two apostrophes in a docstring ("the
+ * spring's ... character's") can match too. It is harmless: it never equals
+ * the resolved path, and the partner rule keeps only literals in exactly the
+ * resolved path's folder.
+ */
+function quotedLiterals(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const line of text.split('\n')) {
+    if (line.trimStart().startsWith('#')) continue;
+    for (const m of line.matchAll(/(["'])([^"'\n]+)\1/g)) out.add(m[2]);
+  }
+  return out;
+}
+
+/**
+ * Does the open project hold the spring check, and does it read `target`?
+ * The same two injected I/O steps as `scanEmbeds`; the renderer passes the
+ * same IPC channels, listing by the gate's own extension.
+ */
+export async function scanSpringGate(
+  target: string,
+  list: () => Promise<SourceListing>,
+  readMany: (paths: string[]) => Promise<SourceRead[]>,
+): Promise<SpringGateScan> {
+  const path = SPRING_LINE0_GATE_PATH;
+  let listing: SourceListing;
+  try {
+    listing = await list();
+  } catch (e) {
+    return { kind: 'unmeasurable', reason: `listing the project's ${SPRING_LINE0_GATE_EXTENSION} files failed: ${message(e)}` };
+  }
+  if (!listing.files.includes(path)) {
+    // Absent is only a finding if nothing that could hold it went unread: an
+    // unreadable folder ABOVE it, or a listing that stopped early, can hide it.
+    // An unreadable folder elsewhere cannot, so it does not hedge the answer.
+    const hiding = listing.unreadable.find((u) => u.path === '.' || path.startsWith(`${u.path}/`));
+    if (hiding) return { kind: 'unmeasurable', reason: `the folder ${hiding.path} could not be read (${hiding.reason})` };
+    if (listing.capped) return { kind: 'unmeasurable', reason: 'the file listing stopped at its limit' };
+    return { kind: 'absent' };
+  }
+  let read: SourceRead | undefined;
+  try {
+    [read] = await readMany([path]);
+  } catch (e) {
+    return { kind: 'unmeasurable', reason: `${path} is in this project but could not be read: ${message(e)}` };
+  }
+  if (!read || read.text === null) {
+    return { kind: 'unmeasurable', reason: `${path} is in this project but could not be read: ${read?.reason ?? 'no answer'}` };
+  }
+  const literals = quotedLiterals(read.text);
+  if (!literals.has(target)) return { kind: 'reads-other-file', path };
+  const partners = [...literals].filter((l) => l !== target && folderOf(l) === folderOf(target)).sort();
+  return { kind: 'present', path, partners };
+}
+
+/** The gate's paragraph, or null when there is nothing to say. */
+function springGateParagraph(gate: SpringGateScan): string | null {
+  if (gate.kind === 'present') {
+    const [first, ...rest] = gate.partners;
+    const other = first === undefined
+      ? 'another character\'s palette file'
+      : rest.length === 0 ? first : `each of ${gate.partners.join(', ')}`;
+    const matches = rest.length === 0 ? 'is changed to match' : 'are changed to match';
+    return `This project's check ${gate.path} also reads this file. It makes sure the spring looks the `
+      + 'same whichever character you play, so the colours the spring uses on this row must match the '
+      + `same colours in ${other}. If you change one of the spring's colours here, the spring will `
+      + `change colour when you switch character, and that check will fail until ${other} ${matches}.`;
+  }
+  if (gate.kind === 'unmeasurable') {
+    return 'Aurora could NOT check whether one of this project\'s own checks compares this row with '
+      + `another character's palette (${gate.reason}). Assume an edit here may make such a check fail.`;
+  }
+  return null;
+}
+
 /**
  * The warning a person sees before their first edit to palette line 0, in the
  * owner's spirit ("heyy just sayying this changes everything"): plain, first,
  * and about the blast radius, not the mechanism.
  *
  * Every figure in it is derived: the path is the one the load read, the list
- * and its population come from `scan`, and the live-push range is the push
- * module's own constants.
+ * and its population come from `scan`, the spring check's paragraph from
+ * `gate` (required, so no caller can forget to look), and the live-push range
+ * is the push module's own constants.
  */
-export function sharedLine0Warning(path: string, scan: EmbedScan): { title: string; body: string } {
+export function sharedLine0Warning(
+  path: string, scan: EmbedScan, gate: SpringGateScan,
+): { title: string; body: string } {
   const parts: string[] = [];
   parts.push(
     'Heads up: this row is not this level\'s. Palette line 0 is Sonic and Tails, and it is read '
@@ -209,6 +332,9 @@ export function sharedLine0Warning(path: string, scan: EmbedScan): { title: stri
       parts.push(`The search ${why}, so this may not be everything.`);
     }
   }
+
+  const gateParagraph = springGateParagraph(gate);
+  if (gateParagraph !== null) parts.push(gateParagraph);
 
   parts.push(
     `A running game will not show a line 0 edit until it is rebuilt: Aurora pushes only lines `

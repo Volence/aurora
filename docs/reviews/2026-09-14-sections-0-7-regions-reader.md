@@ -13,7 +13,7 @@ aeon's working tree. Governing bar: `docs/OVERSEER-REVIEW-BARS.md` bar 19. Follo
 | `d7c378ff` | row 8 ("SECTIONS 1 TO 4") asserts its instrument saw a record |
 | `55c2de28` | an unusable descriptor makes arm exclusivity `unknown`, never a silent `open` (a RULE CHANGE, in its own commit) |
 | `4ee10559` | the currency rows assert the second instrument saw the region table before looping over it |
-| `90f19730` | this packet and ROADMAP row 179 |
+| `90f19730` | this packet and ROADMAP row 180 (written as 179; renumbered at the master merge, because master's own 179 is the palette warning) |
 | the commit after it | the full-suite totals below, measured on `90f19730` |
 
 ## The defect, re-measured at aeon `6bd8ed89`
