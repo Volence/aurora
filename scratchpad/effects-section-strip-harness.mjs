@@ -89,6 +89,7 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { aeonArmTruth } from './lib/aeon-arm-truth.mjs';
 
 const PORT = Number(process.env.PORT ?? 9458);
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 92);
@@ -135,12 +136,18 @@ const listOf = (ns) => (ns.length <= 1 ? ns.join('') : `${ns.slice(0, -1).join('
 function independentDerivation() {
   const desc = readFileSync(DESC, 'utf8');
   const lib = readFileSync(LIB, 'utf8');
-  const bind = {};
-  const chunks = desc.split(/\bojz_sec\s*\(\s*sec\s*:\s*(\d+)/g);
-  for (let i = 1; i < chunks.length; i += 2) {
-    const m = /effects\s*:\s*([A-Za-z_][A-Za-z0-9_]*)/.exec(chunks[i + 1] ?? '');
-    if (m) bind[Number(chunks[i])] = m[1];
-  }
+  // ⚠ REPAIRED 2026-09-14 (SECTIONS-0-7-UNBARRED-AFTER-REGIONS). This split the
+  // descriptor on `ojz_sec(sec: N` and took the next `effects:`. aeon's regions
+  // step 4 (1a657990) moved every section's preset into region rows, where
+  // `effects:` comes BEFORE a `sec:` nested in the sidecar call, so the split
+  // found nothing and every expectation below was `undefined`, on master and on
+  // the fix branch alike (the controller's runs: [3b] `bind[0]=undefined`, [3c]
+  // "already share undefined"). The bindings now come from
+  // scratchpad/lib/aeon-arm-truth.mjs, which pairs each `effects:` with the
+  // `sec:` inside its own call, in its own code: still NOT an import of the
+  // app's section-wiring.ts.
+  const arm = aeonArmTruth(desc, lib);
+  const bind = arm.bind;
   const counts = {};
   for (const v of Object.values(bind)) counts[v] = (counts[v] ?? 0) + 1;
   const own = Object.keys(bind).map(Number).filter((s) => counts[bind[s]] === 1).sort((a, b) => a - b);
@@ -164,7 +171,7 @@ function independentDerivation() {
     try { meta = JSON.parse(readFileSync(`${META_DIR}/section_${s}.meta.json`, 'utf8')); } catch { continue; }
     if (meta && meta.rasterRef !== null && meta.rasterRef !== undefined) bound.push(s);
   }
-  return { bind, own, threaded, sharers, bound };
+  return { bind, own, threaded, sharers, bound, barred: arm.barred, patched: arm.patched };
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -356,12 +363,30 @@ async function main() {
    * defect that made this a function instead of a literal `'✗'`.
    */
   const failMark = (sec) => (truth.bound.includes(sec) ? '✗' : '☐');
+  /**
+   * THE SUBJECT OF [2c] AND [4a], DERIVED (2026-09-14): the lowest section that
+   * is NOT barred and NOT threaded, from aeon's files. Both rows read the raster
+   * binding by its ordinary title, and a BARRED section's select carries the
+   * refusal sentence as its title instead (BandPresetPanel), so with section 0
+   * active (barred: its preset passes patched:) [2c] found nothing, and [4a]'s
+   * "stays ENABLED" would have been asserting the one control this facet is right
+   * to disable.
+   */
+  const OPEN_SUBJECT = Object.keys(truth.bind).map(Number).sort((a, b) => a - b)
+    .find((n) => !truth.barred.includes(n) && !truth.threaded.includes(n));
+  if (OPEN_SUBJECT === undefined) {
+    throw new Error(`no unbarred, unthreaded section in ${DESC}: bind=${JSON.stringify(truth.bind)} `
+      + `barred=[${truth.barred.join(',')}] threaded=[${truth.threaded.join(',')}]`);
+  }
   console.log('=== effects-section-strip harness ===');
   console.log(`    node        : ${process.version}   PLANT=${PLANT || '(none)'}`);
   console.log(`    loadavg     : ${os.loadavg().map((n) => n.toFixed(2)).join(' ')}`);
   console.log(`    AEON_DIR    : ${AEONDIR}`);
   console.log(`    DISPLAY     : :${DISPLAY_NUM}`);
   console.log('    INDEPENDENT DERIVATION (this process, from aeon\'s own files):');
+  console.log(`      bind      : ${JSON.stringify(truth.bind)}`);
+  console.log(`      barred    : [${truth.barred.join(',')}] (patched: ${JSON.stringify(truth.patched)})   `
+    + `open subject for [2c]/[4a]: section ${OPEN_SUBJECT}`);
   console.log(`      own preset: [${truth.own.join(',')}]   threaded: [${truth.threaded.join(',')}]`);
   console.log(`      bound (Aurora sidecars, decides ☐ vs ✗): [${truth.bound.join(',')}]`);
   console.log(`    condition rows expected: ${CONDITION_ROWS} (${CONDITION_LABELS.join(' / ')})`);
@@ -484,7 +509,10 @@ async function main() {
       + `\n        ⚠ the two that do NOT discriminate: checkVisibility=${bottom.visible} `
       + `rects=${bottom.rects} — both were TRUE at top=-2635 before this parcel`);
 
-    // AT THE SECOND BINDING — the control the strip captions.
+    // AT THE SECOND BINDING — the control the strip captions, on a section where
+    // that control is the ordinary one (OPEN_SUBJECT, derived; see above).
+    await c.evalExpr(SET_SELECT(STRIP_SELECT, OPEN_SUBJECT));
+    await sleep(900);
     const rasterAt = await c.json(String.raw`(() => {
       const s = ${RASTER_SELECT};
       if (!s) return { found: false };
@@ -631,7 +659,10 @@ async function main() {
       + `\n        expected detail: ${JSON.stringify(sharedDetail)}`);
 
     // ---- 4. IT ADVISES; IT DOES NOT GATE. --------------------------------
-    await c.evalExpr(SET_SELECT(STRIP_SELECT, 0));
+    // On OPEN_SUBJECT and not section 0: "the advisory conditions refuse
+    // nothing" is a claim about a section the ONE structural refusal does not
+    // cover, and section 0 is covered by it (its preset passes patched:).
+    await c.evalExpr(SET_SELECT(STRIP_SELECT, OPEN_SUBJECT));
     await sleep(900);
     // ⚠ THE PREMISE IS MEASURED HERE, NOT ASSUMED. This row was green through
     // the whole 2026-09-05 drift because it only ever asked whether the select

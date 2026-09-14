@@ -104,6 +104,7 @@ import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { readAeonShippedPreset } from './lib/aeon-shipped-preset.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { aeonArmTruth } from './lib/aeon-arm-truth.mjs';
 
 const PORT = Number(process.env.PORT ?? 9438);
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 98);
@@ -142,12 +143,52 @@ const SHIPPED = process.env.PRESET_ID ? null : readAeonShippedPreset(AEONDIR);
 const PRESET_ID = process.env.PRESET_ID ?? SHIPPED.id;
 if (SHIPPED) console.log(`    SHIPPED     : ${SHIPPED.path} (${SHIPPED.text.length}B, id ${SHIPPED.id}, ${SHIPPED.bands} band(s))`);
 else console.log(`    SHIPPED     : OVERRIDDEN by PRESET_ID=${PRESET_ID} — the by-path identity check is SKIPPED`);
-/** The section under test. 0 has a sidecar in aeon's tree; 1 is the SECOND
- *  section, used to prove the select follows `activeSectionIndex` rather than
- *  drawing section 0 forever. */
-const SEC_A = 0;
-const SEC_B = 1;
 const metaPath = (n) => `${AEONDIR}/games/sonic4/data/editor/ojz/act1/section_${n}.meta.json`;
+/**
+ * THE SECTIONS UNDER TEST, DERIVED FROM aeon's FILES, NEVER TYPED (2026-09-14).
+ *
+ * This file said `SEC_A = 0` until SECTIONS-0-7-UNBARRED-AFTER-REGIONS, and
+ * section 0 is a section this harness must NOT bind: its preset record passes
+ * `patched: OJZ_TwoChannel`, aeon's preset() refuses a raster beside a patched
+ * program, and the panel DISABLES this select there (section-wiring.ts's ARM
+ * EXCLUSIVITY). On master the run went 23/23 only because Aurora's reader had
+ * stopped finding aeon's bindings after regions step 4, so section 0 was
+ * wrongly OPEN. On the fixed branch [2b] found no select, because a barred
+ * section's select carries the refusal sentence as its `title` and `SELECT`
+ * below finds the control by its ordinary title (measured by [2e]: section 0's
+ * select is rendered and disabled, found by the refusal's text).
+ *
+ * So both subjects come from aeon's own files, read by THIS process through
+ * `scratchpad/lib/aeon-arm-truth.mjs` and not through the app's module:
+ *   SEC_A: the lowest section that is NOT barred, is NOT threaded (aeon binds a
+ *          rasterRef on exactly the threaded ones, so an unthreaded section is
+ *          one aeon ships unbound, which [1c]'s floor needs), and HAS a
+ *          sidecar, the property the old constant was chosen for;
+ *   SEC_B: the next such section, sidecar or not (the old SEC_B had none).
+ * Derived from the FILES rather than from what the copy's disk holds unbound,
+ * so a prior run's leftover binding still trips the FRESH COPY refusal below
+ * instead of quietly moving the subject.
+ */
+const DESC_PATH = `${AEONDIR}/games/sonic4/data/levels/ojz/act1/act_descriptor.emp`;
+const LIB_PATH = `${AEONDIR}/games/sonic4/data/effects/ojz_effects.emp`;
+const TRUTH = aeonArmTruth(readFileSync(DESC_PATH, 'utf8'), readFileSync(LIB_PATH, 'utf8'));
+const SECTIONS = Object.keys(TRUTH.bind).map(Number).sort((a, b) => a - b);
+const FREE = SECTIONS.filter((n) => !TRUTH.barred.includes(n) && !TRUTH.threaded.includes(n));
+const SEC_A = FREE.find((n) => existsSync(metaPath(n)));
+const SEC_B = FREE.find((n) => n !== SEC_A);
+if (SEC_A === undefined || SEC_B === undefined) {
+  throw new Error(`cannot derive two unbarred, unthreaded sections (one with a sidecar) from ${DESC_PATH} `
+    + `and ${LIB_PATH}: bind=${JSON.stringify(TRUTH.bind)} barred=[${TRUTH.barred.join(',')}] `
+    + `threaded=[${TRUTH.threaded.join(',')}]`);
+}
+/** Whether a section's sidecar on the copy's disk carries a rasterRef right now. */
+const boundOnDisk = (n) => {
+  if (!existsSync(metaPath(n))) return false;
+  try {
+    const m = JSON.parse(readFileSync(metaPath(n), 'utf8'));
+    return !!m && m.rasterRef !== undefined && m.rasterRef !== null;
+  } catch { return false; }
+};
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -304,6 +345,12 @@ async function main() {
   console.log(`    loadavg     : ${os.loadavg().map((n) => n.toFixed(2)).join(' ')}`);
   console.log(`    AEON_DIR    : ${AEONDIR}`);
   console.log(`    DISPLAY     : :${DISPLAY_NUM}`);
+  console.log('    INDEPENDENT DERIVATION (this process, from aeon\'s own files):');
+  console.log(`      bind      : ${JSON.stringify(TRUTH.bind)} (${TRUTH.rows} row call(s), `
+    + `unkeyed ${TRUTH.unkeyed.length}, contested ${TRUTH.contested.length})`);
+  console.log(`      patched   : ${JSON.stringify(TRUTH.patched)}   barred: [${TRUTH.barred.join(',')}]   `
+    + `threaded: [${TRUTH.threaded.join(',')}]`);
+  console.log(`      subjects  : SEC_A=${SEC_A} SEC_B=${SEC_B} (unbarred, unthreaded; SEC_A has a sidecar)`);
   for (const n of [SEC_A, SEC_B]) {
     console.log(`    section ${n} sidecar: ${existsSync(metaPath(n))
       ? JSON.stringify(readFileSync(metaPath(n), 'utf8')) : 'ABSENT'}`);
@@ -422,6 +469,12 @@ async function main() {
       isOpen === true && opened !== 'no-header',
       `section → ${opened}, open after settle = ${isOpen}`);
 
+    // THE SUBJECT IS MADE ACTIVE, NOT ASSUMED. The panel draws
+    // `activeSectionIndex`, which a freshly opened project leaves at 0, and every
+    // row below was silently about section 0 because of it.
+    await c.evalExpr(`window.__dbg.aeon.setActiveSection(${SEC_A})`);
+    await sleep(800);
+
     // THE FLOOR. Found, populated, and offering the id this run is about —
     // asserted BEFORE anything reads a value off it.
     const shape = await c.json(String.raw`(() => {
@@ -501,6 +554,68 @@ async function main() {
       order.found === true && order.limitChars > 400
       && order.selectFollowsLimit === true && order.sameSectionBody === true,
       JSON.stringify(order));
+
+    // ---- 2e/2f. THE ARM-EXCLUSIVITY REFUSAL, ON SCREEN, FOR EVERY SECTION. --
+    //
+    // (2026-09-14, SECTIONS-0-7-UNBARRED-AFTER-REGIONS.) The one control the
+    // effects facet disables: a section whose preset record binds `patched:`
+    // cannot take a raster, because aeon's preset() refuses one beside the other,
+    // so the select is DISABLED there and `[data-effects-arm-refusal]` says why,
+    // naming the record and its program. Nothing asserted that on screen before
+    // these rows, and after aeon's regions step 4 the app stopped doing it with
+    // every node row green. THE EXPECTED SET IS TRUTH.barred, derived by this
+    // process from aeon's files and never a literal, and the census covers EVERY
+    // section, so an app that bars the wrong section, or none, or all, fails.
+    //
+    // ⚠ HOW A BARRED SECTION'S SELECT IS FOUND. Its `title` IS the refusal
+    // sentence (BandPresetPanel: `title={armRefusal ?? RASTER_REF_ROW.title}`),
+    // which is why `SELECT` cannot see it. Here it is found by that identity: the
+    // select whose title equals the refusal block's text, whitespace normalised.
+    // A barred section whose sidecar ALREADY carries a rasterRef keeps a LIVE
+    // select (the second clause of `sectionBindingControlDisabled`), so the
+    // expected `disabled` is read off the copy's disk, per section.
+    const census = [];
+    for (const n of SECTIONS) {
+      await c.evalExpr(`window.__dbg.aeon.setActiveSection(${n})`);
+      await sleep(500);
+      census.push({ n, ...(await c.json(String.raw`(() => {
+        const norm = (t) => (t || '').replace(/\s+/g, ' ').trim();
+        const r = document.querySelector('[data-effects-arm-refusal]');
+        const refusal = r ? norm(r.innerText) : null;
+        const plain = ${SELECT};
+        const byRefusal = refusal === null ? null
+          : [...document.querySelectorAll('select')].find((s) => norm(s.title) === refusal) || null;
+        const s = plain || byRefusal;
+        return { refusal, found: !!s, via: plain ? 'title' : (byRefusal ? 'refusal' : null),
+                 disabled: s ? s.disabled : null,
+                 unknown: !!document.querySelector('[data-effects-arm-unknown]') };
+      })()`)) });
+    }
+    await c.evalExpr(`window.__dbg.aeon.setActiveSection(${SEC_A})`);
+    await sleep(600);
+    const censusLine = census.map((e) => `${e.n}:${e.found ? (e.disabled ? 'DISABLED' : 'enabled') : 'NO-SELECT'}`
+      + `${e.refusal !== null ? '+refusal' : ''}${e.unknown ? '+unknown' : ''}(${e.via})`).join(' ');
+    const barredSeen = census.filter((e) => TRUTH.barred.includes(e.n));
+    const expectRefusal = (n) => `Section ${n} binds the preset record ${TRUTH.bind[n]}, which passes `
+      + `patched: ${TRUTH.patched[TRUTH.bind[n]]}`;
+    check('2e', `the BARRED sections [${TRUTH.barred.join(',')}], derived from aeon's files, show the `
+      + 'select DISABLED under a refusal naming the record and its patched: program',
+      TRUTH.barred.length > 0 && TRUTH.barred.length < SECTIONS.length
+      && SECTIONS.length === st.sections
+      && barredSeen.length === TRUTH.barred.length
+      && barredSeen.every((e) => e.found === true && e.via === 'refusal'
+        && e.disabled === !boundOnDisk(e.n) && e.unknown === false
+        && e.refusal.startsWith(expectRefusal(e.n))),
+      `census: ${censusLine}\n        expected barred (independent parse): [${TRUTH.barred.join(',')}] of `
+      + `${SECTIONS.length} section(s); the app reports ${st.sections}`
+      + barredSeen.map((e) => `\n        section ${e.n}: expected ${JSON.stringify(expectRefusal(e.n))}; `
+        + `painted ${JSON.stringify((e.refusal ?? '(no refusal)').slice(0, 120))}`).join(''));
+    const openSeen = census.filter((e) => !TRUTH.barred.includes(e.n));
+    check('2f', 'every UNBARRED section shows the select ENABLED, found by its ordinary title, with no refusal',
+      openSeen.length > 0 && openSeen.length === SECTIONS.length - TRUTH.barred.length
+      && openSeen.every((e) => e.found === true && e.via === 'title' && e.disabled === false
+        && e.refusal === null && e.unknown === false),
+      `census: ${censusLine}`);
 
     // ---- 3. PICK A PRESET → THE BINDING LANDS IN THE MODEL. --------------
     const picked = await c.evalExpr(SET_SELECT(SELECT, PRESET_ID));
