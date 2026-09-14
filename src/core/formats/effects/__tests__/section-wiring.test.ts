@@ -1335,6 +1335,36 @@ describe('arm exclusivity: the three verdicts, and none of them is the others', 
     expect(notice).toContain('ENABLED');
   });
 
+  it('AN UNUSABLE DESCRIPTOR IS `unknown` TOO, and never a silent `open`', () => {
+    // (2026-09-14.) How sections 0 and 7 went live after regions: the load read
+    // the descriptor, could not use it, every section's record came back null,
+    // and "no record" answered `open` with no notice, because the notice spoke
+    // only for the library. The descriptor here is a key-less region row, so the
+    // load marks it read and unparsed; the library is the one that bars section 0.
+    const read = readDescriptorWiring('g/data/levels/zzz/act1/act_descriptor.emp',
+      lines('zzz_region(x0: 0, effects: ZZZ_Preset_Sec0),'), 'zzz');
+    const w: SectionRasterWiring = { ...barred(), ...read };
+    expect(w.descriptor.parsed, 'PRECONDITION: the descriptor is unusable').toBe(false);
+    expect(sectionArmExclusivity(w, 0).verdict,
+      'the record section 0 binds is unknown, so whether it binds an arm is unknown').toBe('unknown');
+    expect(sectionBindingControlDisabled(w, 0, null),
+      'unknown never folds into barred: the control stays ENABLED').toBe(false);
+    expect(armBarredSections(w, 4), 'and the barred set names nobody').toEqual([]);
+    const notice = sectionArmExclusivityUnknownNotice(w, 0);
+    expect(notice, 'and it is never SILENTLY enabled').not.toBeNull();
+    expect(notice).toContain('Aurora read g/data/levels/zzz/act1/act_descriptor.emp but could not use it');
+    expect(notice).toContain('no section key');
+    expect(notice).toContain('ENABLED');
+    // A descriptor that could not be READ says that instead, and names it.
+    const unread: SectionRasterWiring = {
+      ...barred(), descriptor: { path: 'g/act_descriptor.emp', parsed: false, reason: 'ENOENT' },
+    };
+    expect(sectionArmExclusivityUnknownNotice(unread, 0))
+      .toContain('Aurora could not read g/act_descriptor.emp (ENOENT)');
+    // The control: the same library with a USABLE descriptor bars section 0.
+    expect(sectionArmExclusivity(barred(), 0).verdict).toBe('barred');
+  });
+
   it('the unknown notice is SILENT when there is a real answer', () => {
     // Otherwise it would print beside the refusal it is the alternative to.
     expect(sectionArmExclusivityUnknownNotice(barred(), 0)).toBeNull();

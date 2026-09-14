@@ -884,15 +884,31 @@ export interface SectionArmExclusivity {
  *
  * ⚠ THE LIBRARY IS ASKED FIRST, and that ordering is the `unknown` rule: with
  * the library unread there is no answer to give, whatever the descriptor says.
- * A section whose RECORD is unknown (descriptor unread, or it binds nothing) is
- * `open` and not `unknown` — the arm is a property of a record, and no record
- * is no arm. That is not a licence: conditions 1 and 2 already answer for a
- * section that binds nothing, in their own words, and this predicate exists to
- * refuse and must therefore stay silent wherever it cannot positively refuse.
+ * A section the descriptor was READ AND USED for, and which binds nothing, is
+ * `open` and not `unknown`: the arm is a property of a record, and no record is
+ * no arm. Conditions 1 and 2 already answer for such a section in their own
+ * words, and this predicate exists to refuse and stays silent wherever it
+ * cannot positively refuse.
+ *
+ * ⚠ AMENDED 2026-09-14, AND THIS PARAGRAPH USED TO READ "A section whose RECORD
+ * is unknown (descriptor unread, or it binds nothing) is `open` and not
+ * `unknown`". QUOTED RATHER THAN DELETED, because that sentence is how sections
+ * 0 and 7 went live. It put two facts under one verdict: "the descriptor was
+ * used and this section binds nothing" (no record, so no arm: still `open`) and
+ * "Aurora could not use the descriptor" (the record is UNKNOWN). When aeon moved
+ * the bindings into region rows, the load read the descriptor and could not use
+ * it, every record came back null, and this predicate answered `open` for the
+ * two sections aeon's preset() refuses, with no notice, because the notice only
+ * spoke for the library (docs/reviews/2026-09-13-section-wiring-off-live-aeon.md).
+ * An unusable descriptor is now `unknown` too: the control stays ENABLED, since
+ * unknown never folds into barred, and `sectionArmExclusivityUnknownNotice` names
+ * the file. This module's header says it: A WINDOW THAT FINDS NOTHING AND A
+ * FIELD THAT DOES NOT EXIST PRINT THE SAME THING.
  */
 export function sectionArmExclusivity(w: SectionRasterWiring, sectionIndex: number)
 : SectionArmExclusivity {
   if (!w.library.parsed) return { verdict: 'unknown', record: null, patched: null };
+  if (!w.descriptor.parsed) return { verdict: 'unknown', record: null, patched: null };
   const record = w.bindings[sectionIndex] ?? null;
   if (record === null) return { verdict: 'open', record: null, patched: null };
   const patched = w.patchedArm[record] ?? null;
@@ -952,15 +968,24 @@ export function sectionArmExclusivityRefusal(
  * (this), or disabled-and-explained (`sectionArmExclusivityRefusal`). Enabled
  * and SILENT would let a structural impossibility present as an ordinary
  * binding; disabled-for-the-structural-reason would state a mechanism nobody
- * measured. Returns null whenever the library WAS read — there is a real answer
- * then, and this sentence would be noise beside it.
+ * measured. Returns null whenever both files were read and used — there is a
+ * real answer then, and this sentence would be noise beside it. (Until
+ * 2026-09-14 that said "whenever the library WAS read", and an unusable
+ * descriptor fell through to a silent `open`; see `sectionArmExclusivity`.)
  */
 export function sectionArmExclusivityUnknownNotice(
   w: SectionRasterWiring, sectionIndex: number,
 ): string | null {
   if (sectionArmExclusivity(w, sectionIndex).verdict !== 'unknown') return null;
-  return `Aurora could not read ${w.library.path}`
-    + `${w.library.reason ? ` (${w.library.reason})` : ''}, so it could not check whether section `
+  // WHICH FILE: the library when it is the unread one, else the descriptor, which
+  // is the file that says which record this section binds. A file that was read
+  // and not used gets its own sentence; see `WiringSource.read`.
+  const which = !w.library.parsed ? w.library : w.descriptor;
+  const head = which.read === true
+    ? `Aurora read ${which.path} but could not use it`
+    : `Aurora could not read ${which.path}`;
+  return head
+    + `${which.reason ? ` (${which.reason})` : ''}, so it could not check whether section `
     + `${sectionIndex}'s preset record binds a patched: program, which would make an `
     + 'editor-authored band structurally impossible here, since aeon\'s preset() refuses a '
     + 'raster: beside a patched:. The control is left ENABLED and the binding is still written: a '
