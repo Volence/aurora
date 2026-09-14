@@ -34,6 +34,7 @@ import {
 } from '../../formats/bg-library';
 import { serializeSectionMeta } from '../../formats/section-meta';
 import { serializeZonePalette } from '../../formats/palette';
+import { planPlayerPaletteWrite } from './player-palette';
 import { clearedChunkLinksText, serializeSectionChunkLinks } from '../../formats/section-chunk-links';
 import { effectsScenePath, serializeEffectsScene } from '../../formats/effects/scene';
 import { effectsPresetPath, serializeEffectsPreset } from '../../formats/effects/preset';
@@ -84,6 +85,33 @@ export interface AeonSavePlan {
   ledgers: { scenePaths: string[]; presetPaths: string[] };
   /** True when project.json was retargeted (it is then also present in files). */
   configChanged: boolean;
+  /**
+   * The planned writes (each also in `files`) to a file SHARED BY EVERY ZONE,
+   * each with the sentence the save's report must name it by. Today that is at
+   * most the player palette (CRAM line 0). The glue names the ones it actually
+   * wrote, so a write that changes every zone is never made in silence.
+   */
+  shared: AeonSharedWrite[];
+  /**
+   * Edits this plan will NOT save, each in a sentence for the author. Planned
+   * files are still written; these are what the report must add to them.
+   */
+  refusals: string[];
+}
+
+/** One write to a file every zone shares, and how the report names it. */
+export interface AeonSharedWrite {
+  path: string;
+  what: string;
+}
+
+/**
+ * The clause a save's report appends for the shared files it ACTUALLY wrote
+ * (the glue passes only those, never the planned ones): empty for none. Pure,
+ * so the wording is pinned in the node suite rather than only on screen.
+ */
+export function sharedWritesNote(whats: readonly string[]): string {
+  return whats.length ? ` · rewrote ${whats.join(' and ')}` : '';
 }
 
 /**
@@ -440,14 +468,11 @@ export async function buildAeonSavePlan(
     //      specifically so an editor palette save re-bakes. See the docblock on
     //      ZonePaletteFile.path.
     //
-    //   2. IT WRITES LINES 1 TO 3 AND CANNOT WRITE LINE 0. `serializeZonePalette`
-    //      starts its loop at ZONE_PALETTE_FIRST_LINE, so there is no argument
-    //      that makes this emit the player palette, and this plan never names
-    //      `art/palettes/SonicAndTails.bin` at all. Line 0 is Sonic and Tails,
-    //      one file for the whole game; an edit to it is refused at the gesture
-    //      (providers/palette-aeon.ts), which is the `refuse_line0` build of
-    //      owner card PALETTE-LINE0-BLAST-RADIUS. If that ruling changes, the
-    //      refusal is the thing that gets replaced, not this.
+    //   2. IT WRITES LINES 1 TO 3 ONLY. `serializeZonePalette` starts its loop at
+    //      ZONE_PALETTE_FIRST_LINE, so the ZONE's file never carries line 0.
+    //      Line 0 is Sonic and Tails, one shared file for the whole game, and it
+    //      has its own write below this loop (THE SHARED PLAYER PALETTE), made
+    //      once per plan rather than once per zone.
     //
     //   3. IT DECLINES ON `complete: false`, on the same rule the section loop's
     //      `understood()` gate states: a file the load did not fully read is
@@ -462,6 +487,25 @@ export async function buildAeonSavePlan(
       });
     }
   }
+
+  // ═══ THE SHARED PLAYER PALETTE (CRAM LINE 0) ═══════════════════════════════
+  //
+  // Owner ruling 2026-09-13 (decisions.jsonl `PALETTE-LINE0-BLAST-RADIUS-answered`,
+  // `write_shared_file`): line 0 saves, into the ONE file every zone reads it
+  // from, behind a warning the editor shows before the first edit. The rules
+  // are planPlayerPaletteWrite's (./player-palette.ts): the path the load read,
+  // only when line 0's meaning changed, never created, never grown, and a
+  // refusal in words for every edit that will not save.
+  //
+  // It is named in `shared` as well as pushed to `files`, because a write that
+  // changes every zone must be SAID in the save's report, not merely made.
+  const playerPlan = planPlayerPaletteWrite(project.zones);
+  const shared: AeonSharedWrite[] = [];
+  if (playerPlan.file && playerPlan.what) {
+    files.push({ path: playerPlan.file.path, bytes: playerPlan.file.bytes });
+    shared.push({ path: playerPlan.file.path, what: playerPlan.what });
+  }
+  const refusals = [...playerPlan.refusals];
 
   // Persist the current act's background (Plane B) to editor-owned paths,
   // mirroring the tileset rule above, per field: a declared `editorBgLayout` /
@@ -685,5 +729,7 @@ export async function buildAeonSavePlan(
     // whatever it could not actually remove before assigning it.
     ledgers: { scenePaths: scenePathsKept, presetPaths: presetPathsKept },
     configChanged,
+    shared,
+    refusals,
   };
 }

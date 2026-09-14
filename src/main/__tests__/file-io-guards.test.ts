@@ -46,9 +46,10 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import {
-  deleteProjectFile, fileMtime, probeDir, listProjectFiles, probePath,
+  deleteProjectFile, fileMtime, probeDir, listProjectFiles, listProjectSources, probePath,
   readBinaryFile, readManyFiles, writeProjectFile,
 } from '../file-io';
+import { chmodSync } from 'fs';
 import { isRelPathSafe } from '../../shared/rel-path';
 
 /**
@@ -493,6 +494,54 @@ describe('the deliberately unguarded primitives', () => {
     // The .asm one level up is a file it would have kept had it walked upward.
     expect(out.some((p) => p.includes('outside'))).toBe(false);
   });
+
+  /**
+   * `listProjectSources`, the sibling that must be able to say it could NOT
+   * look (the shared-palette warning reads it). Contained like its sibling, and
+   * the one thing its sibling cannot do: an unreadable folder comes back NAMED
+   * rather than as silence.
+   */
+  it('listProjectSources returns only contained paths of its extension, skipping dot folders', async () => {
+    mkdirSync(join(base, 'games', 'x'), { recursive: true });
+    mkdirSync(join(base, '.claude', 'wt'), { recursive: true });
+    writeFileSync(join(base, 'games', 'x', 'a.emp'), 'embed("a")');
+    writeFileSync(join(base, 'games', 'x', 'b.txt'), 'no');
+    writeFileSync(join(base, '.claude', 'wt', 'c.emp'), 'a second checkout, not a source');
+    writeFileSync(join(tmp, 'outside.emp'), 'outside');
+    const out = await listProjectSources(base, '.emp');
+    expect(out.files).toEqual(['games/x/a.emp']);
+    expect(out.files.every((p) => isRelPathSafe(p))).toBe(true);
+    expect(out.unreadable).toEqual([]);
+    expect(out.capped).toBe(false);
+  });
+
+  it('listProjectSources REPORTS a folder it could not read, instead of answering as if it were empty', async (ctx) => {
+    if (process.getuid?.() === 0) {
+      ctx.skip('SKIPPED, NOT PASSED: running as root, where chmod 000 does not stop a read, '
+        + 'so an unreadable folder cannot be made here and this row would measure nothing.');
+      return;
+    }
+    mkdirSync(join(base, 'locked'), { recursive: true });
+    writeFileSync(join(base, 'locked', 'hidden.emp'), 'x');
+    chmodSync(join(base, 'locked'), 0o000);
+    try {
+      const out = await listProjectSources(base, '.emp');
+      expect(out.files, 'it read through a folder it should not have been able to').toEqual([]);
+      expect(out.unreadable.map((u) => u.path)).toEqual(['locked']);
+      expect(out.unreadable[0].reason).toMatch(/EACCES|permission/i);
+    } finally {
+      chmodSync(join(base, 'locked'), 0o755);
+    }
+  });
+
+  it('listProjectSources says when it stopped at its depth limit', async () => {
+    // Deeper than any limit a real project tree reaches, so `capped` must fire.
+    const deep = Array.from({ length: 16 }, (_, i) => `d${i}`);
+    mkdirSync(join(base, ...deep), { recursive: true });
+    writeFileSync(join(base, ...deep, 'far.emp'), 'x');
+    const out = await listProjectSources(base, '.emp');
+    expect(out.capped, 'a walk that gave up early reported itself complete').toBe(true);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -522,6 +571,7 @@ describe('the census of primitives is derived from the module, not from this lis
     probeDir: true,
     readBinaryFile: true,      // guarded 2026-09-08; the retired exception is above
     listProjectFiles: false,   // no project-relative argument to guard
+    listProjectSources: false, // the same: a base and an extension, nothing relative
   };
 
   const source = readFileSync(
@@ -622,6 +672,7 @@ describe('every channel that takes a project-relative path reaches a guarded pri
    */
   const NO_RELATIVE_PATH: Record<string, string> = {
     LIST_PROJECT_FILES: 'takes a base only; contained by construction, see the row above',
+    LIST_PROJECT_SOURCES: 'a base and an extension only; contained by construction, see the rows above',
     SELECT_DIRECTORY: 'a dialog: the user picks an absolute path, with no root to escape',
     SELECT_FILES: 'a dialog, as above',
     SAVE_FILE: 'a save dialog: the user picks the absolute destination',

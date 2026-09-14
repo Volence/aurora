@@ -7,6 +7,14 @@
 // comment-stripped scan proving the teardown is still wired — every identifier
 // below is discussed at length in the port's docblocks, so a scan of raw source
 // would pass on the prose.
+//
+// LINE 0, SINCE 2026-09-13. Until the owner's ruling (decisions.jsonl
+// `PALETTE-LINE0-BLAST-RADIUS-answered`, `write_shared_file`) this file pinned
+// the `refuse_line0` build: line 0 locked in every zone mount, refused with a
+// sentence, refused as a copy target. Those rows are rewritten below to pin the
+// replacement: nothing locked, line 0 marked as shared, and every write to it
+// admitted only once the warning (providers/palette-line0-gate.ts, executed in
+// palette-line0-gate.test.ts) has been accepted.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -14,10 +22,10 @@ import { join } from 'node:path';
 import {
   AEON_ZONE_PALETTE_POLICY,
   AEON_SPRITE_STANDALONE_PALETTE_POLICY,
-  ZONE_LINE0_REFUSAL,
-  ZONE_UNSAVABLE_LINES,
-  zonePaletteLineRefusal,
-  zoneCopyTargetRefusal,
+  ZONE_SHARED_LINES,
+  ZONE_SHARED_LINE_NOTE,
+  isZoneSharedLine,
+  zonePaletteWriteAdmitted,
   aeonPaletteLines,
   aeonPaletteVersionKey,
   keepIndex0Transparent,
@@ -25,7 +33,7 @@ import {
 } from '../palette-aeon';
 import { isLineLocked, swatchClick } from '../../components/art-shared/palette-grid-model';
 import {
-  encodeGenesisColor, ZONE_PALETTE_FIRST_LINE, ZONE_PALETTE_LINE_COUNT,
+  encodeGenesisColor, PLAYER_PALETTE_LINE, ZONE_PALETTE_FIRST_LINE, ZONE_PALETTE_LINE_COUNT,
 } from '../../../core/formats/palette';
 import { PAL_BASE_FIRST_LINE, PAL_BASE_LAST_LINE } from '../../../core/aether/palette-push';
 import type { Color } from '../../../core/model/s4-types';
@@ -44,7 +52,7 @@ function callbackDeps(src: string, name: string): string | null {
   return /\}, (\[[^\]]*\])\);/.exec(src.slice(start))?.[1] ?? null;
 }
 
-describe('the aeon policies', () => {
+describe('the aeon policies (owner ruling 2026-09-13: line 0 edits behind a warning)', () => {
   /**
    * The lines a zone palette OWNS, derived here the way a reader would derive
    * them rather than typed as [1, 2, 3]: from the first line the authored file
@@ -53,27 +61,32 @@ describe('the aeon policies', () => {
   const ownedLines = Array.from(
     { length: ZONE_PALETTE_LINE_COUNT }, (_, i) => ZONE_PALETTE_FIRST_LINE + i);
 
-  it('locks line 0 in EVERY zone mount: it is the shared player palette', () => {
-    // Derived from the format, not typed: the locked set is every CRAM line
-    // below the first one the zone's own file owns.
-    expect([...ZONE_UNSAVABLE_LINES]).toEqual([0]);
-    expect(AEON_ZONE_PALETTE_POLICY.lockedLines).toBe(ZONE_UNSAVABLE_LINES);
-    expect(isLineLocked(0, AEON_ZONE_PALETTE_POLICY)).toBe(true);
-    expect(swatchClick(0, 4, AEON_ZONE_PALETTE_POLICY)).toEqual({ select: false, edit: false });
-    for (const line of ownedLines) {
+  /**
+   * WAS `locks line 0 in EVERY zone mount: it is the shared player palette`.
+   * The `refuse_line0` build locked it; the ruling made it editable behind a
+   * warning, so NO zone line is locked and a click on line 0 is allowed to
+   * select and edit (the port's `admit` is what asks first).
+   */
+  it('locks no zone line: line 0 is guarded by a warning, not locked', () => {
+    expect(AEON_ZONE_PALETTE_POLICY.lockedLines).toEqual([]);
+    for (const line of [PLAYER_PALETTE_LINE, ...ownedLines]) {
+      expect(isLineLocked(line, AEON_ZONE_PALETTE_POLICY), `line ${line}`).toBe(false);
       expect(swatchClick(line, 4, AEON_ZONE_PALETTE_POLICY), `line ${line}`)
         .toEqual({ select: true, edit: true });
     }
   });
 
+  /** The shared set is DERIVED from the format (every CRAM line below the zone
+   *  file's first), and it is exactly the player palette's line. */
+  it('marks exactly the lines below the zone file as shared: the player palette line', () => {
+    expect([...ZONE_SHARED_LINES]).toEqual([PLAYER_PALETTE_LINE]);
+    expect(isZoneSharedLine(PLAYER_PALETTE_LINE)).toBe(true);
+    for (const line of ownedLines) expect(isZoneSharedLine(line), `line ${line}`).toBe(false);
+  });
+
   /**
-   * WAS `unlocks the same line in the sprite mounts, where editing it is the
-   * job`. The sprite pane's zone mode used to hand out AEON_SPRITE_PALETTE_POLICY
-   * with `lockedLines: []`, so line 0 was editable there — and that edit reached
-   * neither disk (the save plan had no palette file at all) nor a running game
-   * (`palBaseOffset` throws on line 0). Now that lines 1 to 3 genuinely save,
-   * line 0 is locked in every zone mount and the standalone row is the only
-   * unlocked "line 0" left. See docs/reviews/2026-09-10-palette-write-target.md.
+   * The sprite pane's zone mode shares the zone policy, so the standalone row
+   * is the only other "line 0" there is, and it is not a CRAM line at all.
    */
   it('leaves the STANDALONE row unlocked, because it is not a CRAM line at all', () => {
     expect(AEON_SPRITE_STANDALONE_PALETTE_POLICY.lockedLines).toEqual([]);
@@ -81,69 +94,53 @@ describe('the aeon policies', () => {
       .toEqual({ select: true, edit: true });
   });
 
-  it('treats index 0 as the eraser in both mounts', () => {
+  it('treats index 0 as the eraser in both mounts, on every line', () => {
     for (const policy of [AEON_ZONE_PALETTE_POLICY, AEON_SPRITE_STANDALONE_PALETTE_POLICY]) {
       expect(policy.transparent).toBe('paint');
     }
-    // On an UNLOCKED line it binds the brush and opens nothing…
-    expect(swatchClick(1, 0, AEON_ZONE_PALETTE_POLICY)).toEqual({ select: true, edit: false });
-    // …and on the locked line the lock wins first.
-    expect(swatchClick(0, 0, AEON_ZONE_PALETTE_POLICY)).toEqual({ select: false, edit: false });
-  });
-
-  it('refuses line 0 with a sentence, and refuses nothing else', () => {
-    expect(zonePaletteLineRefusal(0)).toBe(ZONE_LINE0_REFUSAL);
-    for (const line of ownedLines) {
-      expect(zonePaletteLineRefusal(line), `line ${line}`).toBeNull();
+    // It binds the brush and opens nothing, line 0 included: a select-only
+    // click changes no colour, so nothing about the shared file applies.
+    for (const line of [PLAYER_PALETTE_LINE, ...ownedLines]) {
+      expect(swatchClick(line, 0, AEON_ZONE_PALETTE_POLICY), `line ${line}`)
+        .toEqual({ select: true, edit: false });
     }
-    // The sentence has to say WHOSE palette it is and that it is not saved
-    // here. Asserted on content, not on length: a refusal that names no owner
-    // reads as an arbitrary lock and gets filed as a bug.
-    expect(ZONE_LINE0_REFUSAL).toContain('Sonic and Tails');
-    expect(ZONE_LINE0_REFUSAL).toContain('every zone');
-    expect(ZONE_LINE0_REFUSAL).toContain('Lines 1 to 3');
   });
 
   /**
-   * THE COPY BRIDGE IS THE SECOND DOOR, and until 2026-09-10 it was open.
-   *
-   * The swatch grid's slider is not the only way to change a zone line:
-   * PaletteEditor's "Copy to" menu and its swatch/line drag-and-drop write one
-   * too, in a single gesture. That host computed its own lock as
-   * `line === 0 && !inSprite`, so with the palette open in the sprite pane the
-   * player palette was a legal copy TARGET while the slider refused it.
-   *
-   * FOUND BY A POISON THAT CAME BACK GREEN: putting `&& !inSprite` back passed
-   * the whole suite (595 files, 8863 rows), because nothing anywhere asserted
-   * the copy bridge's rule. This row is that assertion, and the source scan in
-   * art-shared/__tests__/palette-grid-wiring.test.ts is the other half.
+   * WAS `refuses line 0 with a sentence, and refuses nothing else` (and its
+   * copy-target twin). The decision is now "may this write go ahead without
+   * asking", and the only input that changes the answer for line 0 is whether
+   * the warning was accepted.
    */
-  it('refuses line 0 as a COPY TARGET too, in every mode but the standalone row', () => {
-    expect(zoneCopyTargetRefusal(0, false)).toBe(ZONE_LINE0_REFUSAL);
+  it('admits the zone\'s own lines at once, and the shared line only once acknowledged', () => {
     for (const line of ownedLines) {
-      expect(zoneCopyTargetRefusal(line, false), `line ${line}`).toBeNull();
+      expect(zonePaletteWriteAdmitted(line, false), `line ${line}`).toBe(true);
     }
-    // The standalone row is the sprite document's own 16 colours drawn as one
-    // row; its "line 0" is not a CRAM line and copying into it is the feature.
-    expect(zoneCopyTargetRefusal(0, true)).toBeNull();
+    expect(zonePaletteWriteAdmitted(PLAYER_PALETTE_LINE, false), 'line 0 was admitted without the warning')
+      .toBe(false);
+    expect(zonePaletteWriteAdmitted(PLAYER_PALETTE_LINE, true)).toBe(true);
+  });
+
+  /** The phrase every surface reads for line 0 says WHOSE it is and HOW FAR it
+   *  reaches. Asserted on content: a note that names no owner reads as noise. */
+  it('says whose the shared line is, in the one phrase every surface reads', () => {
+    expect(ZONE_SHARED_LINE_NOTE).toContain('Sonic and Tails');
+    expect(ZONE_SHARED_LINE_NOTE).toContain('every zone');
   });
 
   /**
-   * THE LOCKED SET AND THE LIVE-PUSH RANGE ARE ONE FACT, STATED TWICE.
-   *
-   * `core/aether/palette-push.ts` fixed `Pal_Base` at lines 1 to 3 long before
-   * this parcel and throws on line 0 ("it is the character palette and the
-   * engine never writes it"). It was written independently of
-   * `ZONE_PALETTE_FIRST_LINE`, so agreeing with it is evidence rather than a
-   * copy. If they ever disagree, the editor is locking one line and the live
-   * push is sending another, which is how a colour appears in the emulator and
-   * never in the file.
+   * WAS `locks exactly the lines the live CRAM push refuses to send`. The same
+   * two independent statements, still cross-checked: `core/aether/palette-push.ts`
+   * fixed `Pal_Base` at lines 1 to 3 and THROWS on line 0, and the shared set
+   * is derived from the zone file's first line. If they ever disagreed, a line
+   * 0 edit could be pushed to a game that never reads it, or a zone line could
+   * be treated as shared.
    */
-  it('locks exactly the lines the live CRAM push refuses to send', () => {
+  it('the shared lines are exactly the ones the live CRAM push never sends', () => {
     expect(ZONE_PALETTE_FIRST_LINE).toBe(PAL_BASE_FIRST_LINE);
     expect(ZONE_PALETTE_FIRST_LINE + ZONE_PALETTE_LINE_COUNT - 1).toBe(PAL_BASE_LAST_LINE);
-    for (const line of ZONE_UNSAVABLE_LINES) {
-      expect(line, `line ${line} is pushable but locked`).toBeLessThan(PAL_BASE_FIRST_LINE);
+    for (const line of ZONE_SHARED_LINES) {
+      expect(line, `line ${line} is shared and inside the live push range`).toBeLessThan(PAL_BASE_FIRST_LINE);
     }
   });
 });
@@ -290,48 +287,62 @@ describe('a palette drag through this port can never be stranded', () => {
   /**
    * THE SECOND LOCK, AND WHY IT NEEDS A ROW OF ITS OWN.
    *
-   * `AEON_ZONE_PALETTE_POLICY` stops the GRID from offering line 0, and the
-   * rows above prove that. It does not stop a caller: `preview` is a public
-   * port method, the policy is data a future mount supplies, and `previewZone`
-   * writes into the open document OUTSIDE the command system. So the port
-   * carries its own refusal, and this row is what goes red if someone deletes
-   * it as redundant.
+   * WAS `refuses line 0 inside previewZone, before anything is written`, which
+   * required the unconditional `zonePaletteLineRefusal`. Since the 2026-09-13
+   * ruling the lock is conditional: `previewZone` refuses a shared-line write
+   * the warning has not admitted for the open project. The grid's `admit` is
+   * the first check and the palette-line0-gate rows execute it; this is the
+   * second, because `preview` is a public port method that writes into the open
+   * document OUTSIDE the command system.
    *
-   * A SCAN, AND SAID SO. The hook needs a DOM and this suite has none, so this
-   * reads the comment-stripped source rather than executing the callback. What
-   * it can prove is that the refusal is consulted BEFORE the write and returns;
-   * what it cannot prove is that a real drag reaches it. The executable half is
-   * `zonePaletteLineRefusal` above.
+   * A SCAN, AND SAID SO. The hook needs a DOM and this suite has none. What it
+   * can prove is that the admission is consulted BEFORE the write and returns;
+   * the executable half is `zonePaletteWriteAdmitted` above.
    */
-  it('refuses line 0 inside previewZone, before anything is written', () => {
+  it('refuses an unadmitted shared-line write inside previewZone, before anything is written', () => {
     const body = /const previewZone = React\.useCallback\(([\s\S]*?)\}, \[/.exec(SRC)?.[1];
     expect(body, 'previewZone is no longer a useCallback: this scan measures nothing')
       .toBeTruthy();
-    expect(body!, 'previewZone no longer consults zonePaletteLineRefusal')
-      .toMatch(/zonePaletteLineRefusal\(line\)/);
-    // …and it must SHORT-CIRCUIT, not merely mention it.
-    //
-    // ⚠ THE FIRST VERSION OF THIS ASSERTION WAS VACUOUS, and the poison run is
-    // how it was found: it took `body.indexOf('return')` as "the refusal's
-    // return", which actually lands on the `if (!z) return;` two lines further
-    // down. Deleting the short-circuit while keeping the call left every
-    // ordering comparison true and the row came back GREEN. So the span is
-    // anchored: between the refusal and the first thing that touches the zone
-    // there must be a `return`, and nothing else in the callback can supply it.
-    const refusalAt = body!.indexOf('zonePaletteLineRefusal(line)');
+    expect(body!, 'previewZone no longer asks whether the write is admitted')
+      .toMatch(/zonePaletteWriteAdmitted\(line, isSharedLineAcknowledged\(\)\)/);
+    // …and it must SHORT-CIRCUIT, not merely mention it. Anchored as the old
+    // row was, because its first version was vacuous: between the admission
+    // check and the first thing that touches the zone there must be a `return`.
+    const gateAt = body!.indexOf('zonePaletteWriteAdmitted(line');
     const zoneAt = body!.indexOf('getCurrentZone');
     const writeAt = body!.indexOf('z.palette.lines[line].colors[idx]');
     const beginAt = body!.indexOf('beginZoneDrag(line, idx)');
     expect(writeAt, 'previewZone stopped writing the palette: this scan is aimed at nothing')
       .toBeGreaterThan(-1);
     expect(zoneAt, 'previewZone stopped reading the zone: this scan is aimed at nothing')
-      .toBeGreaterThan(refusalAt);
+      .toBeGreaterThan(gateAt);
     expect(
-      body!.slice(refusalAt, zoneAt),
-      'the refusal does not return, so a refused line falls through and is written',
+      body!.slice(gateAt, zoneAt),
+      'the admission check does not return, so an unadmitted line falls through and is written',
     ).toMatch(/\breturn;/);
-    expect(writeAt, 'the palette write is not behind the refusal').toBeGreaterThan(refusalAt);
-    expect(beginAt, 'the drag snapshot is taken before the refusal').toBeGreaterThan(refusalAt);
+    expect(writeAt, 'the palette write is not behind the admission check').toBeGreaterThan(gateAt);
+    expect(beginAt, 'the drag snapshot is taken before the admission check').toBeGreaterThan(gateAt);
+  });
+
+  /** The grid's first check: every zone line goes through the one door, and a
+   *  standalone row (not a CRAM line) is admitted at once. */
+  it('hands the grid an admit that asks the shared-line door for zone lines', () => {
+    expect(SRC, 'the port no longer tells the grid to ask before a zone edit')
+      .toMatch(/admit: \(line\) => \(standaloneMode \? true : admitZoneLine\(line\)\)/);
+  });
+
+  /**
+   * THE LIVE PUSH NEVER SENDS LINE 0, even after an admitted edit: `Pal_Base`
+   * does not hold it and `palBaseOffset` throws on it. The loop's lower bound
+   * is the push module's own first line, which the row above proves is past
+   * every shared line.
+   */
+  it('never pushes a shared line live: the push loop starts at the first Pal_Base line', () => {
+    expect(SRC, 'the push loop no longer starts at the first pushable line')
+      .toMatch(/for \(let line = PUSHABLE_FIRST_LINE; line <= PUSHABLE_LAST_LINE; line\+\+\)/);
+    expect(SRC, 'PUSHABLE_FIRST_LINE is no longer the push module\'s own constant')
+      .toMatch(/PAL_BASE_FIRST_LINE as PUSHABLE_FIRST_LINE/);
+    expect(PAL_BASE_FIRST_LINE).toBeGreaterThan(PLAYER_PALETTE_LINE);
   });
 
   it('commits AMBIENTLY, because the sprite pane has no aeon history focused', () => {

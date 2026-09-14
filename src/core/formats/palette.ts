@@ -236,21 +236,31 @@ export function buildPalette(entries: Array<{ data: Uint8Array; srcOffset: numbe
 // editor's live preview pushes CRAM straight into a running game, so the
 // emulator DID show the new colour. THE LIVE PATH WORKING IS WHAT HID IT.
 //
-// ═══ WHERE THE BYTES GO, AND WHY THREE LINES AND NOT FOUR ═════════════════
+// ═══ WHERE THE BYTES GO: TWO FILES, TWO WRITERS ═══════════════════════════
 //
 // An authored zone palette file is 48 big-endian CRAM words that load starting
-// at CRAM LINE 1. Line 0 is not in the file and must never be written from
-// here: it is the shared player palette (art/palettes/SonicAndTails.bin), one
-// file for the entire game. See ZONE_PALETTE_FIRST_LINE below.
+// at CRAM LINE 1. Line 0 is NOT in that file: it is the shared player palette
+// (Sonic and Tails, `art/palettes/SonicAndTails.bin` or its `sonic.bin`
+// fallback), one file for the entire game. See ZONE_PALETTE_FIRST_LINE below.
 //
-// Three independent statements of that geometry already exist in this
-// repository and they agree: `buildPalette`'s caller in project/aeon/load.ts
+// So a zone palette has two writers and they never overlap:
+//   • `serializeZonePalette` writes lines 1 to 3 into the zone's own file, and
+//     cannot emit line 0 at all;
+//   • `patchPlayerPaletteLine` writes line 0 into the SHARED file, entry by
+//     entry, and only the entries whose colour changed. Since the owner's
+//     2026-09-13 ruling (decisions.jsonl `PALETTE-LINE0-BLAST-RADIUS-answered`,
+//     `write_shared_file`) the editor may do that, behind a warning that says
+//     it changes every zone; project/aeon/player-palette.ts plans it.
+//
+// Three independent statements of the zone file's geometry already exist in
+// this repository and they agree: `buildPalette`'s caller in project/aeon/load.ts
 // reads the file at `destOffset: 16`; `aether/palette-push.ts` fixes
 // `PAL_BASE_BYTES = 96` over `PAL_BASE_FIRST_LINE = 1` to `PAL_BASE_LAST_LINE
-// = 3` and THROWS on line 0; and `agent/validation.ts` refuses a line-0 write
-// from the agent tool. The constants below are derived from the CRAM geometry
-// at the top of this file rather than typed as 1/3/96, and
-// __tests__/zone-palette-write.test.ts cross-checks them against the
+// = 3` and THROWS on line 0 (the engine never writes line 0, so a line 0 edit
+// is never pushed live); and `agent/validation.ts` refuses a line-0 write from
+// the agent tool, which has no person to warn. The constants below are derived
+// from the CRAM geometry at the top of this file rather than typed as 1/3/96,
+// and __tests__/zone-palette-write.test.ts cross-checks them against the
 // `PAL_BASE_*` set, which was written independently of this block.
 
 /**
@@ -278,9 +288,9 @@ export const ZONE_PALETTE_WORDS = ZONE_PALETTE_LINE_COUNT * CRAM_LINE_ENTRIES;
  *
  * LINE 0 IS NOT IN THE OUTPUT AND CANNOT BE PUT THERE. The loop starts at
  * `ZONE_PALETTE_FIRST_LINE`, so there is no argument, flag or palette shape
- * that makes this function emit the player palette. That is the `refuse_line0`
- * ruling expressed as a function signature rather than as a check someone can
- * forget.
+ * that makes this function emit the player palette into the ZONE's file. Line 0
+ * belongs to a different file with its own writer (`patchPlayerPaletteLine`
+ * below); putting it here would slide every line down by one.
  *
  * `tail` is whatever the file held PAST those 96 bytes. The format says there
  * is nothing there, and aeon's real file is exactly 96 bytes, but a file that
@@ -309,5 +319,71 @@ export function serializeZonePalette(
     }
   }
   out.set(tail, ZONE_PALETTE_BYTES);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// WRITING LINE 0 BACK: THE SHARED PLAYER PALETTE
+// ---------------------------------------------------------------------------
+
+/**
+ * The CRAM line the shared player palette (Sonic and Tails) occupies: every
+ * line below `ZONE_PALETTE_FIRST_LINE`, of which there is exactly one.
+ * __tests__ assert the two tile the CRAM, so neither can drift alone.
+ */
+export const PLAYER_PALETTE_LINE = 0;
+
+/** Bytes one CRAM line occupies in a palette file: the player line's size. */
+export const PLAYER_PALETTE_BYTES = CRAM_LINE_ENTRIES * CRAM_WORD_BYTES;
+
+/**
+ * The entries of line 0 whose DISPLAYED colour differs from what the project
+ * opened with. Compared through `sameGenesisColor`, so a word that only differs
+ * in bits the VDP ignores is not a change: an untouched line must plan no write
+ * to a file every zone shares.
+ */
+export function changedPlayerPaletteEntries(
+  loadedWords: readonly number[],
+  colors: readonly Color[],
+): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < CRAM_LINE_ENTRIES; i++) {
+    const now = colors[i] ? encodeGenesisColor(colors[i]) : 0;
+    if (!sameGenesisColor(now, loadedWords[i] ?? 0)) out.push(i);
+  }
+  return out;
+}
+
+/**
+ * The shared player palette file's new bytes: `raw` verbatim, with ONLY the
+ * listed entries of line 0 replaced by their new words.
+ *
+ * A PATCH, NOT A RE-SERIALIZATION, and each half of that is deliberate:
+ *   • entries nobody edited keep their bytes exactly, including any bits the
+ *     VDP does not display, so the file's diff is the edit and nothing else;
+ *   • every byte past line 0 (the tail) rides through untouched, and the
+ *     output is the SAME LENGTH as `raw`: this never grows a file.
+ *
+ * Throws on a `raw` shorter than one line. The caller's gate
+ * (`PlayerPaletteFile.complete`) is the real refusal; this is the backstop, so
+ * a short file can never be padded out with this reader's black.
+ */
+export function patchPlayerPaletteLine(
+  raw: Uint8Array,
+  colors: readonly Color[],
+  entries: readonly number[],
+): Uint8Array {
+  if (raw.length < PLAYER_PALETTE_BYTES) {
+    throw new Error(
+      `a player palette file must hold at least ${PLAYER_PALETTE_BYTES} bytes to be patched; `
+      + `this one holds ${raw.length}`,
+    );
+  }
+  const out = raw.slice();
+  for (const i of entries) {
+    const word = colors[i] ? encodeGenesisColor(colors[i]) : 0;
+    out[i * CRAM_WORD_BYTES] = (word >> 8) & 0xff;
+    out[i * CRAM_WORD_BYTES + 1] = word & 0xff;
+  }
   return out;
 }

@@ -205,6 +205,7 @@
     "harness:panel-overflow": "node scratchpad/panel-overflow-harness.mjs",
     "harness:palette-drag": "node scratchpad/palette-drag-harness.mjs",
     "harness:palette-grid": "node scratchpad/palette-grid-harness.mjs",
+    "harness:palette-line0-warning": "node scratchpad/palette-line0-warning-harness.mjs",
     "harness:palette-push": "node scratchpad/palette-push-harness.mjs",
     "harness:paste-pan": "node scratchpad/paste-pan-harness.mjs",
     "harness:plane-y-referent": "node scratchpad/plane-y-referent-capture.mjs",

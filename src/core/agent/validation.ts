@@ -14,8 +14,22 @@ export function validateGenesisColor(word: number): string | null {
   return null;
 }
 
+/**
+ * Why the agent tool refuses palette line 0, and where the change CAN be made.
+ *
+ * Line 0 is the shared player palette (Sonic and Tails, one file for the whole
+ * game). Since the owner's 2026-09-13 ruling the EDITOR may change it, behind a
+ * warning a person reads first (providers/palette-line0-gate.ts). The agent tool
+ * has no person to warn, so it keeps refusing, and the sentence points at the
+ * door that exists rather than calling the line reserved.
+ */
+export const AGENT_LINE0_REFUSAL
+  = 'palette line 0 is the Sonic and Tails palette, one file shared by every zone, so the agent '
+  + 'tool does not write it; a person can change it in Aurora\'s palette editor, behind a warning '
+  + 'that it changes every zone';
+
 export function validatePaletteLine(line: number, colors: number[]): string | null {
-  if (line === 0) return 'palette line 0 is reserved for player/sprite art';
+  if (line === 0) return AGENT_LINE0_REFUSAL;
   if (!Number.isInteger(line) || line < 1 || line > 3) return `palette line must be 1-3, got ${line}`;
   if (colors.length !== 16) return `expected 16 colors, got ${colors.length}`;
   for (let i = 0; i < 16; i++) {

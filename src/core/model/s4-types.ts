@@ -537,6 +537,44 @@ export interface ZonePaletteFile {
   tail: Uint8Array;
 }
 
+/**
+ * Where CRAM LINE 0 of a zone palette came from, and whether an edit to it may
+ * be written back there. Line 0 is Sonic and Tails: it is NOT in the zone's own
+ * palette file, it is read from ONE player palette file the whole game shares
+ * (core/project/aeon/player-palette.ts, PLAYER_PALETTE_CANDIDATES), so a write
+ * here changes the characters in every zone.
+ *
+ * Owner ruling 2026-09-13 (decisions.jsonl `PALETTE-LINE0-BLAST-RADIUS-answered`,
+ * option `write_shared_file`): the editor MAY write it, behind a warning. This
+ * record is what makes that write go back to the file the load actually read,
+ * and never create or grow one.
+ */
+export interface PlayerPaletteFile {
+  /**
+   * The project-relative file line 0 is saved into: the first candidate the
+   * load did not find ABSENT. Null when every candidate was absent, in which
+   * case there is nothing to write to and Aurora creates nothing.
+   *
+   * A candidate that EXISTS but could not be read is still this path (with
+   * `readFailure` set): falling past it to the next candidate would aim the
+   * save at a file the game does not read.
+   */
+  path: string | null;
+  /** The file's bytes exactly as read, tail included. Empty when not read. */
+  bytes: Uint8Array;
+  /** True when `bytes` holds the whole line (PLAYER_PALETTE_BYTES or more).
+   *  False blocks the write: the missing entries are this reader's black. */
+  complete: boolean;
+  /** Why `path` could not be read, or null when it was (or is absent). */
+  readFailure: string | null;
+  /**
+   * The CRAM words line 0 showed when the project opened. The save compares the
+   * live line against THESE to decide whether line 0's meaning changed, so an
+   * untouched project plans no write to the shared file.
+   */
+  loadedWords: readonly number[];
+}
+
 export interface Zone {
   id: string;
   name: string;
@@ -545,6 +583,8 @@ export interface Zone {
   palette: Palette;
   /** See ZonePaletteFile: where lines 1 to 3 came from and whether they may go back. */
   paletteFile: ZonePaletteFile;
+  /** See PlayerPaletteFile: where line 0 came from and whether it may go back. */
+  playerPaletteFile: PlayerPaletteFile;
 }
 
 /**

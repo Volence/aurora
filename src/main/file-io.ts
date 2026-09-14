@@ -2,7 +2,7 @@ import { readFile, readdir, stat, unlink } from 'fs/promises';
 import { mkdirSync, renameSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { isRelPathSafe } from '../shared/rel-path';
-import type { DeleteOutcome, DirListing, PathProbe, ReadManyEntry, WriteOutcome } from '../shared/ipc-types';
+import type { DeleteOutcome, DirListing, PathProbe, ReadManyEntry, SourceListing, WriteOutcome } from '../shared/ipc-types';
 
 /**
  * Write ONE project-relative file, atomically. The only writing primitive behind
@@ -325,4 +325,48 @@ export async function listProjectFiles(basePath: string): Promise<string[]> {
   }
   await walk(basePath, '', 0);
   return out;
+}
+
+/**
+ * Recursively list project-relative paths of files ending in `extension`, for a
+ * search the renderer runs over the project's own sources (the shared-palette
+ * warning's `embed(...)` scan, core/project/aeon/shared-palette-warning.ts).
+ *
+ * THE SIBLING OF listProjectFiles ABOVE, AND DELIBERATELY NOT A WIDENING OF IT.
+ * That one swallows an unreadable directory (`catch { return; }`), which is fine
+ * for a best-effort sprite scan and wrong for a warning that must say when it
+ * could not look. Here an unreadable directory is REPORTED in `unreadable`, and
+ * reaching the depth or count limit sets `capped`, so a partial listing can
+ * never read as a complete one (SourceListing, shared/ipc-types.ts). Same skip
+ * set and limits as the sibling, so the two agree on what a project's tree is.
+ *
+ * No project-relative argument, like its sibling: every path it returns is
+ * composed by the walk from below `basePath`, so it is contained by construction.
+ */
+export async function listProjectSources(basePath: string, extension: string): Promise<SourceListing> {
+  const files: string[] = [];
+  const unreadable: { path: string; reason: string }[] = [];
+  let capped = false;
+  const want = extension.toLowerCase();
+  async function walk(dir: string, rel: string, depth: number): Promise<void> {
+    if (depth > MAX_DEPTH || files.length >= MAX_FILES) { capped = true; return; }
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch (err) {
+      unreadable.push({ path: rel || '.', reason: (err as Error)?.message ?? String(err) });
+      return;
+    }
+    for (const e of entries) {
+      if (files.length >= MAX_FILES) { capped = true; return; }
+      const childRel = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        if (!SKIP_DIRS.has(e.name) && !e.name.startsWith('.')) await walk(resolve(dir, e.name), childRel, depth + 1);
+      } else if (e.isFile() && e.name.toLowerCase().endsWith(want)) {
+        files.push(childRel);
+      }
+    }
+  }
+  await walk(basePath, '', 0);
+  return { files, unreadable, capped };
 }

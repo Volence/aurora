@@ -317,6 +317,10 @@ describe('§B every confirm door in src/', () => {
       'renderer/shell/tab-activation/canvas.ts',       // tab close (canvas)
       'renderer/shell/tab-activation/level.ts',        // tab close (act switch)
       'renderer/components/setup/ProjectSetupTab.tsx', // setup Apply
+      // 2026-09-13: the shared-palette warning before an aeon zone's line 0
+      // edit, and its refusal when the shared file cannot be saved. Its
+      // accepting button is `danger`, so this file's rows must cover it.
+      'renderer/providers/palette-line0-gate.ts',
     ]) expect(files).toContain(f);
     expect(allSites.length).toBeGreaterThanOrEqual(8);
   });

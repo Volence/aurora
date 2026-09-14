@@ -12,7 +12,7 @@
 // edits were gone. Multi-act is a designed configuration, so the loop is the
 // fix rather than a note to remember later.
 
-import { buildAeonSavePlan, type AeonSaveRemoval } from '../../core/project/aeon/save';
+import { buildAeonSavePlan, sharedWritesNote, type AeonSaveRemoval } from '../../core/project/aeon/save';
 import { planFileNeedsWrite } from '../../core/project/aeon/save-skip';
 import { noteEffectsScenesPersisted } from '../../core/formats/effects/scene';
 import { noteEffectsPresetsPersisted } from '../../core/formats/effects/preset';
@@ -51,6 +51,14 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
     s.setLoading(true);
     const fa = createIpcFileAccess(config.basePath);
     const written: string[] = [];
+    // Writes to a file EVERY zone reads (the player palette, CRAM line 0), by
+    // path, holding the sentence the report names each by. Filled only when the
+    // bytes actually went to disk: a planned write the skip below found already
+    // on disk changed nothing and must not be announced as a game-wide change.
+    const sharedWritten = new Map<string, string>();
+    // Edits the plans said they will NOT save, deduplicated: every act's plan
+    // repeats a project-wide refusal.
+    const refusals = new Set<string>();
     // Removals are collected across every act's plan and applied AFTER all of
     // them — see the ordering argument on `removalsFor` in core. The effects
     // libraries are per-PROJECT while a plan is per-ACT, so the same removal
@@ -98,7 +106,10 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
         if (!planFileNeedsWrite(f.compare, old, f.bytes)) continue;
         await window.api.writeBinaryFile(config.basePath, f.path,
           f.bytes.buffer.slice(f.bytes.byteOffset, f.bytes.byteOffset + f.bytes.byteLength) as ArrayBuffer);
+        const shared = plan.shared.find((s) => s.path === f.path);
+        if (shared) sharedWritten.set(shared.path, shared.what);
       }
+      for (const r of plan.refusals) refusals.add(r);
       for (const r of plan.removals) pendingRemovals.set(r.path, r);
       ledgers = plan.ledgers;
       written.push(key);
@@ -182,13 +193,24 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
       : removed.length > 1
         ? ` · removed ${removed.length} files: ${nameSome(removed)}`
         : '';
+    // A WRITE THAT CHANGES EVERY ZONE IS NAMED on the same line, for the reason
+    // a deletion is: it is the part of this save the author most needs to see.
+    const sharedNote = sharedWritesNote([...sharedWritten.values()]);
     if (withheld.length) {
       useToastStore.getState().addToast(
-        `Project saved, but edits made during the save are still unsaved; save again${removedNote}`,
+        `Project saved, but edits made during the save are still unsaved; save again${sharedNote}${removedNote}`,
         'info',
       );
     } else {
-      useToastStore.getState().addToast(`Project saved${removedNote}`, 'success');
+      useToastStore.getState().addToast(`Project saved${sharedNote}${removedNote}`, 'success');
+    }
+    // An edit the save REFUSED is its own channel and colour, like a failed
+    // removal below: the save happened, and this part of it did not.
+    if (refusals.size > 0) {
+      useToastStore.getState().addToast(
+        `Project saved, but not all of it: ${[...refusals].join(' ')}`,
+        'error',
+      );
     }
     // A failed removal is its own channel and its own colour: the save DID
     // happen, and folding this into the green line would be the same defect

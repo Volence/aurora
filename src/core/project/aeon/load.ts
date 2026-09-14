@@ -51,9 +51,10 @@ import {
 import { loadEffectsPresetLibrary } from '../../formats/effects/preset';
 import { loadBgOverride } from '../../formats/bg-override/bg-override-io';
 import {
-  buildPalette, CRAM_LINE_ENTRIES,
+  buildPalette, encodeGenesisColor, CRAM_LINE_ENTRIES, PLAYER_PALETTE_LINE,
   ZONE_PALETTE_BYTES, ZONE_PALETTE_FIRST_LINE, ZONE_PALETTE_WORDS,
 } from '../../formats/palette';
+import { readPlayerPalette } from './player-palette';
 import { parseNametable } from '../../formats/s4-nametable';
 import { parseCollAttr } from '../../formats/s4-collattr';
 import { parseSectionChunkLinks } from '../../formats/section-chunk-links';
@@ -503,6 +504,12 @@ async function loadFullProject(
   // markUnreadable — and folded by summarizeUnreadable below.
   const unreadableFiles: UnreadableItem[] = [];
 
+  // THE SHARED PLAYER PALETTE (CRAM line 0, Sonic and Tails), read ONCE: it is
+  // one file for the whole game, so every zone below builds its line 0 from the
+  // same bytes. See ./player-palette.ts for which file answers and why a save
+  // may write it (owner ruling 2026-09-13, `write_shared_file`).
+  const player = await readPlayerPalette(fa, notices);
+
   for (const zoneConfig of config.zones) {
     // Load tileset
     const tileData = await fa.read(zoneConfig.tileset);
@@ -512,13 +519,14 @@ async function loadFullProject(
     // Load palette — level art at CRAM lines 1–3 (destOffset 16), and the shared
     // player palette (Sonic/Tails) into line 0, which every zone carries in-game.
     //
-    // THE TWO SOURCES ARE NOT SYMMETRIC ON THE WAY OUT, and `paletteFile` below
-    // is what carries that asymmetry to the save. The zone's own file is this
-    // zone's to write; `art/palettes/SonicAndTails.bin` is ONE file for the
-    // entire game, so an edit to line 0 would recolour Sonic and Tails in every
-    // zone. Aurora refuses that edit rather than writing the shared file — see
-    // formats/palette.ts serializeZonePalette, which cannot emit line 0 at all,
-    // and providers/palette-aeon.ts, which refuses the gesture with a sentence.
+    // THE TWO SOURCES GO BACK TO TWO DIFFERENT FILES, and `paletteFile` and
+    // `playerPaletteFile` below are what carry that to the save. The zone's own
+    // file (lines 1 to 3) is this zone's to write. Line 0 comes from the shared
+    // player palette, ONE file for the entire game, so an edit to it recolours
+    // Sonic and Tails in every zone: the editor may make it only behind a
+    // warning that says so (providers/palette-line0-gate.ts), and the save
+    // writes it back only to the file this load read, only when it changed,
+    // and never creates or grows it (./player-palette.ts).
     const palData = await fa.read(zoneConfig.palette);
     const paletteWordsRead = Math.min(ZONE_PALETTE_WORDS, Math.floor(palData.length / 2));
     const paletteFile: ZonePaletteFile = {
@@ -549,16 +557,19 @@ async function loadFullProject(
       destOffset: ZONE_PALETTE_FIRST_LINE * CRAM_LINE_ENTRIES,
       length: paletteWordsRead,
     }];
-    try {
-      const playerPal = await fa.read('art/palettes/SonicAndTails.bin');
-      sources.unshift({ data: playerPal, srcOffset: 0, destOffset: 0, length: 16 });
-    } catch {
-      try {
-        const playerPal = await fa.read('art/palettes/sonic.bin');
-        sources.unshift({ data: playerPal, srcOffset: 0, destOffset: 0, length: 16 });
-      } catch { /* no player palette — line 0 stays empty */ }
-    }
+    if (player.display) {
+      sources.unshift({
+        data: player.display, srcOffset: 0,
+        destOffset: PLAYER_PALETTE_LINE * CRAM_LINE_ENTRIES, length: CRAM_LINE_ENTRIES,
+      });
+    } // no player palette at all: line 0 stays empty, and an edit to it refuses
     const palette = buildPalette(sources);
+    // The save's baseline for "did line 0's meaning change": the words this
+    // zone's line 0 SHOWS now, per zone, because each zone holds its own copy.
+    const playerPaletteFile = {
+      ...player.file,
+      loadedWords: palette.lines[PLAYER_PALETTE_LINE].colors.map(encodeGenesisColor),
+    };
 
     // Load acts
     const acts: Act[] = [];
@@ -850,6 +861,7 @@ async function loadFullProject(
       tileset,
       palette,
       paletteFile,
+      playerPaletteFile,
     });
 
     // Load the zone's BG library (editor-owned, optional): index JSON of
