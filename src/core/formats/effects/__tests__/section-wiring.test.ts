@@ -1619,6 +1619,21 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
     patchedArm: libraryPatchedArmBindings(lib),
     library: { path: RLIB, parsed: true },
   });
+  /**
+   * The table as the second instrument read it, ASSERTED SEEN before any row
+   * iterates it. A loop over nothing asserts nothing: with the pin moved to a
+   * revision that has no region table (M12's control, 2026-09-14), the pairing
+   * row went GREEN on zero iterations while the instrument row beside it went red.
+   * Each row must fail on its own when its subject is missing, not lean on a
+   * neighbour's red.
+   */
+  const table = (): ReturnType<typeof regionRowsByLine> => {
+    const t = regionRowsByLine(desc, 'OJZ_ACT1_REGION_ROWS');
+    expect(t.rows.length, `the second instrument saw no region rows in ${where}, so every loop `
+      + 'over them in this row would assert nothing').toBeGreaterThan(0);
+    expect(t.rows.length, `${where}: one row line per declared entry`).toBe(t.declared);
+    return t;
+  };
 
   it('the run SAID it read aeon at AEON_REGIONS_PIN, out of the object database', (ctx) => {
     if (!need(ctx)) return;
@@ -1650,7 +1665,7 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
 
   it('THE READER AGAINST IT: one binding per region row, none unkeyed, none contested', (ctx) => {
     if (!need(ctx)) return;
-    const t = regionRowsByLine(desc, 'OJZ_ACT1_REGION_ROWS');
+    const t = table();
     const expected: Record<number, string> = {};
     for (const r of t.rows) expected[r.secs[0]] = r.presets[0];
     const rows = descriptorEffectsRows(desc, 'ojz');
@@ -1677,7 +1692,7 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
     // row above measures it), so a reader that finds `sec: N` and searches
     // FORWARD for `effects:` gives section N the NEXT row's preset and still
     // returns a tidy map.
-    const t = regionRowsByLine(desc, 'OJZ_ACT1_REGION_ROWS');
+    const t = table();
     const b = descriptorEffectsRows(desc, 'ojz').bindings;
     t.rows.forEach((own, i) => {
       const next = t.rows[i + 1];
@@ -1690,7 +1705,7 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
   it('THE LOAD\'S READING IS PARSED: condition 1 answers, the act-sets line has its inputs, no "could not read"', (ctx) => {
     if (!need(ctx)) return;
     const w = loaded();
-    const n = regionRowsByLine(desc, 'OJZ_ACT1_REGION_ROWS').rows.length;
+    const n = table().rows.length;
     expect(w.descriptor, `the load marks ${where} unparsed: ${w.descriptor.reason ?? ''}`)
       .toMatchObject({ parsed: true, read: true });
     expect(w.unkeyedRows, where).toEqual([]);
@@ -1711,7 +1726,7 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
   it('SECTIONS 0 AND 7 COME BACK BARRED, and the barred set is DERIVED from the patched: declarations', (ctx) => {
     if (!need(ctx)) return;
     const w = loaded();
-    const t = regionRowsByLine(desc, 'OJZ_ACT1_REGION_ROWS');
+    const t = table();
     const n = t.rows.length;
     const lib2 = presetsBindingPatched(lib);
     expect(lib2.declared, `aeon:${LIB_REL} at ${AEON_REGIONS_PIN}: the second instrument found `
