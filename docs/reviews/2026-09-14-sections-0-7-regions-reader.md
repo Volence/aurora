@@ -13,7 +13,8 @@ aeon's working tree. Governing bar: `docs/OVERSEER-REVIEW-BARS.md` bar 19. Follo
 | `d7c378ff` | row 8 ("SECTIONS 1 TO 4") asserts its instrument saw a record |
 | `55c2de28` | an unusable descriptor makes arm exclusivity `unknown`, never a silent `open` (a RULE CHANGE, in its own commit) |
 | `4ee10559` | the currency rows assert the second instrument saw the region table before looping over it |
-| this commit, and one after | this packet and ROADMAP row 179; then the full-suite totals |
+| `90f19730` | this packet and ROADMAP row 179 |
+| the commit after it | the full-suite totals below, measured on `90f19730` |
 
 ## The defect, re-measured at aeon `6bd8ed89`
 
@@ -268,7 +269,36 @@ Two controls:
 
 ## Full suite
 
-Filled in by the next commit, from the full `npm test` run on this one.
+`VITEST_MAX_WORKERS=4 npm test`, in the foreground, on `90f19730` (this branch's code plus this
+packet), with `git status --porcelain` empty at the start. Totals:
+
+- **Test Files:** 621 passed | 3 skipped (624)
+- **Tests:** 9668 passed | 9 skipped (9677)
+- **0 failed**, exit 0, 21:42:54 to 21:43:46 -0400 (vitest `Duration 34.05s`)
+
+The chain is `&&`-joined, so vitest ran only after every pre-vitest gate and `tsc --noEmit`
+exited 0. Each of these printed its own OK or pass line in the output:
+- check-test-collection
+- check-pseudo-skip
+- check-peer-path-literals
+- check-cited-paths
+- check-doc-citations
+- check-object-stringify
+- check-tsx-dashes
+- check-src-dashes
+- check-test-dashes
+- check-guide-text
+- check-prose-constants
+- check-scripts-dashes
+- check-ledger-timestamps
+- check-python-resolver
+
+`scratchpad/check-harness-guards.mjs` passed by the chain; I did not find its own line in the
+output.
+
+Seventeen output lines contain the word "failed". Every one is a test title or a toast string from
+a test that exercises a failure path, and no line begins `FAIL`. The 9 skipped tests are not this
+file's: in this run it counted 76 tests.
 
 ## UI, for the controller (not run here: no CDP, no Electron)
 
