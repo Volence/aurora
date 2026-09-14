@@ -216,7 +216,11 @@ This belongs to the REGIONS work, which is sequenced separately. No product file
   check-doc-citations, check-object-stringify, check-tsx-dashes, check-src-dashes,
   check-test-dashes, check-guide-text, check-prose-constants, check-scripts-dashes,
   check-ledger-timestamps, check-python-resolver, and scratchpad/check-harness-guards.
-- Full `VITEST_MAX_WORKERS=4 npm test`: SUITE-TOTALS-PENDING
+- Full `VITEST_MAX_WORKERS=4 npm test` on `527f9913`, in the foreground, with an empty porcelain at
+  the start: **9603 passed | 9 skipped (9612); 618 files passed | 3 skipped (621); 0 failed**, exit
+  0, 20:14:04 to 20:15:00 -0400 (vitest `Duration 38.22s`). **Nothing else fails**, so there is no
+  second red to reproduce on master. The 9 skipped tests are not this file's: with aeon present it
+  runs 62 of 62.
 
 ## Noticed, not fixed
 
