@@ -132,3 +132,134 @@ are mounted.
 **What the rule changes on screen:** the primitive declares 13px for both branches, so the **35 distinct
 chips at 11px today grow to 13px**: every option-bar chip (sprite, canvas, art, Effects), the sprite palette
 header's Zone and Standalone, the band card's Hide, and the three spans. The 57 at 13px do not change size.
+
+This is the OPPOSITE direction from the fix the 2026-09-12 packet held back (§B.3 there shrank every button
+chip to 11px). The card offered that as option 1; the owner answered with a rule instead, and the rule
+picked the other size.
+
+---
+
+## 7. What was applied
+
+At the cause, `function Chip` in `src/renderer/components/ui/primitives.tsx` (commit `6097db89`):
+
+- **`:274` `fontSize: T.tBase`** in the shared `style`, declared ONCE and read by both elements: the
+  `<span>` at `:277` and the `<button>`.
+- **`:295-298` the button's style** is now `{ ...style, fontFamily: 'inherit', fontWeight: 'inherit',
+  fontStyle: 'inherit', lineHeight: 1, margin: 0, textAlign: 'left' }`: longhands instead of the `font:
+  'inherit'` shorthand, and the duplicate `fontSize` key gone. The shorthand was only ever wanted for the
+  family a UA `<button>` overrides. This is the longhand form §B.3 of the 2026-09-12 packet wrote, carried
+  to the other size, so no later key can erase an earlier one.
+- **`:263-268`**: a comment above the style naming the size, the rule and this packet. **`:285-294`**: the
+  comment above the button's style said "a chip in a 13px bar is still 11px", the opposite of what the code
+  did. It now says what the code does and why the shorthand must not come back.
+- **`:329-331`**: OptionBar's docblock claimed chips are 11px text; it now gives the 13px arithmetic (13 +
+  a 2px pad each side + a 2px border = 19px, inside the 30px content box), so its "exactly 32px" still holds.
+- **`src/renderer/components/ui/theme.ts:37`, `:39`**: `tXs` no longer lists chips; `tBase` does.
+
+## 8. Proof: declared and painted agree, for both elements
+
+Every run below is this worktree's own debug build, and says so on its own lines:
+
+```
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ad8549f666a0ee83b
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ad8549f666a0ee83b
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at <the build stamp in the table>), so window.__dbg is in this bundle
+```
+
+| state of `Chip` | build (UTC) | chip census | chunk-links |
+|---|---|---|---|
+| master's (the defect) | 22:57:18 | 5/10: S1, aeon.1, classic.1, sprite.1, canvas.1 red | 11/12: 4b red |
+| **the fix** | 23:41:10 | **10/10** | **12/12** |
+| M1: `font: 'inherit'` put back after the button's spread | 23:46:08 | 5/10: the same five red | 11/12: 4b red |
+| M2: `font: 'inherit'` on the span | 23:49:39 | 2/4 (`PART=static,aeon`): S1, aeon.1 red | not run |
+| restored from HEAD, rebuilt (final) | 23:50:57 | **10/10** | **12/12** |
+
+**Row `[4b]`, before and after.** Before, on master's `Chip`, under the new derivation (commit `91b93a81`),
+the same reading the 2026-09-12 run took:
+
+```
+FAIL  [4b] ... declared T.tXs var(--text-xs-size)="11px" computed="13px" inherited="13px" inline font-size="inherit"
+```
+
+After the fix, and again on the final rebuild:
+
+```
+PASS  [4b] ... declared T.tBase var(--text-base-size)="13px" computed="13px" inherited="13px" inline font-size="var(--text-base-size)"
+```
+
+**Its derivation changed, and the red was re-established before the fix, not assumed** (bar 7e). It used
+to read `--text-xs-size` by name, which would have gone on measuring the old token after the primitive
+moved. It now reads the token `Chip` declares out of `primitives.tsx` (`scratchpad/lib/chip-declared-size.mjs`,
+the parser the census uses, in the tree the run BUILT), reads that token's px from the live document, and
+adds a second clause: the button's inline font-size must read back as that token's `var()`. **Under M1 it
+went red on that clause alone**, `declared "13px" computed "13px" inline font-size="inherit"`. The declared
+and inherited sizes are both 13 in that panel now, so a returning shorthand paints the same px, and only
+the inline value shows it.
+
+**The census rows, under each mutation, shown on disk before the red run:**
+
+```
+M1  primitives.tsx:296:        ...style, font: 'inherit', fontFamily: 'inherit', fontWeight: 'inherit', fontStyle: 'inherit',
+M2  primitives.tsx:277:  if (!onClick) return <span title={title} style={{ ...style, font: 'inherit' }}>{children}</span>;
+```
+
+(each `git diff --stat`: 1 file changed, 1 insertion, 1 deletion). Under M1, every button reads `inline
+font-size=inherit` and the option-bar chips fall back to 11px: 331 of 336, 207 of 207, 135 of 135 and 110
+of 110 chip-screens disagree. Under M2 exactly the 5 SPAN chip-screens disagree (the two Detach spans, and
+"pan to move" on three screens), computed 13px but inline `inherit`, **which is what shows the rows reach
+the span branch.** Each mutation was undone by writing `git show HEAD:<path>` over the file (never `git
+checkout --`), `git diff` then read empty, and the tree was rebuilt before the next run.
+
+**After, in numbers:** 92 distinct chips, all 13px; 788 chip-screens, all 13px; the same 95 screens and the
+same 92 chips as before, so only the sizes moved. The call-site join reads 63 at 13px and the same 10 not
+rendered, and the source prediction now reads 13px for all 73 sites.
+
+**The other instruments moved onto the same derivation, and run:** `chunk-row9-probe.mjs` (a copy of 4b)
+went 11/12 with 4b red under M1 and 12/12 on the final build. `cdp-sweep-4-0912-harness.mjs` `PART=stamp`
+on the final build: 7/7 rows, `CL.FONT` FINDING-HOLDS at T.tBase. Its old regex spelled out the `font:
+'inherit'` shorthand, so it would have thrown the day the defect was fixed. CL.FONT is report-only and
+compares px only, so it cannot see M1 (13 equals 13), and it was not run under a mutation.
+
+## 9. Suite and gates
+
+`VITEST_MAX_WORKERS=4 npm test` on the final tree: every gate script and `typecheck` pass (the chain
+reaches vitest only if they do). Vitest: **Test Files 1 failed | 617 passed | 3 skipped (621); Tests 8
+failed | 9595 passed | 9 skipped (9612).**
+
+**The 8 are all in `src/core/formats/effects/__tests__/section-wiring.test.ts`, "against aeon's real
+ojz/act1"** (for example `section 5 owns its preset: expected 'no' to be 'yes'`), and **they are not this
+parcel's.** The control: the base commit's (`09e8675f`) versions of the only two `src` files this branch
+changes, written into the tree, give the same 8 failures against the live aeon. Against archive copies of
+aeon `1b414115` and `55c062a4` the file fails 9. The ninth was not diagnosed; the likely cause is a file
+the live tree has and an archive lacks. The file imports no renderer code. Reported, not fixed.
+
+## 10. Captures
+
+`docs/captures/2026-09-13-chip-font-majority/`: `before__*.png` and `after__*.png`, 19 each, the same screens
+in the same run order. Each is clipped to the union of the chips' rects on that screen, so a pair can
+differ in extent where a chip grew. Worth looking at first:
+
+- `*__sprite__document.png`: the option bar (16 24 32 48 64, New, Fit, Copy, Cut, Paste) grows; the header's
+  Undo, Redo, Save do not.
+- `*__canvas__new_256x256.png`: the canvas option bar (Fit, 8, 16, 256, Constraints, Clashes).
+- `*__aeon__Layout_tool_Stamp_Chunk.png`: the two Detach spans, 11px to 13px.
+- `*__aeon__Effects_Tile_anim_band.png`: the Effects option bar, and the band card's Hide.
+- `*__aeon__Layout_layout_.png`: the level header, which does NOT change: a control pair.
+
+`census-before.json` and `census-after.json` are the two runs' raw records.
+
+## 11. Noticed, not fixed
+
+- **The span branch has no `lineHeight: 1`; the button has.** At 13px a span chip is taller than a button
+  chip, so the Detach chips change height when hovering turns them from span to button. That was true at
+  11px too.
+- **`BandPresetPanel`:** after New created `chip_census` (the id field cleared), none of the preset editor's
+  chips mounted. Not diagnosed. `AnchorSweepPreview` and `CommitPlanView`'s palette offers were never rendered.
+- **Running `cdp-sweep-4` writes timestamped PNGs into the committed `docs/captures/2026-09-12-cdp-sweep-4/`.**
+  This run's four were deleted, not committed.
+- `check-harness-guards` prints a G9 note that `scratchpad/preset-schema-key-probe.mjs` is registered and
+  never prints PASS. It is untracked in this worktree, and not this parcel's.
+- **aeon's `origin/master` moved during the session** (`1b414115` to `55c062a4`). The copies differ only in
+  two aeon docs files, so every run here saw the same project data.
+- **The owner has not seen these captures.** The visible change is the 35 chips at 11px growing to 13px.
