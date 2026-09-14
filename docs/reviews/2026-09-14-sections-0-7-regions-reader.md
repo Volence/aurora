@@ -339,7 +339,8 @@ of aeon materialised at `6bd8ed89` (`git archive`):
 - **Covered:** `scratchpad/band-preset-harness.mjs` (`npm run harness:band-preset`) and
   `scratchpad/section-raster-select-harness.mjs` drive the band preset panel.
 - **Covered:** `scratchpad/effects-section-strip-harness.mjs` drives the strip.
-- **NOT covered:** no committed harness mentions `data-effects-arm-refusal` or
+- **NOT covered (superseded in Round 2 below: `[2e]`/`[2f]` now assert the refusal on
+  screen):** no committed harness mentions `data-effects-arm-refusal` or
   `data-effects-arm-unknown`. This was checked by grep over `scratchpad/`, with
   `data-effects-section-advisory` as the positive control, found in 4 harnesses. So the refusal
   sentence and the unknown notice on screen are asserted by nothing today.
@@ -373,6 +374,151 @@ of aeon materialised at `6bd8ed89` (`git archive`):
    `descriptor.parsed`. It is harmless because a refused or unparsed read publishes `{}`.
 7. **The provenance row passes whatever the pin is.** It names whatever `AEON_REGIONS_PIN` says,
    so M12 left it green. M11′ is its proof.
+
+## Round 2: the on-screen check
+
+The controller kept `55c2de28` and ran the CDP harnesses on master (`0f532d49`) and on this
+branch. The one difference: section-raster-select went 23/23 on master and aborted at `[2b]` on
+this branch. They asked for five things:
+- that difference explained;
+- the section-strip harness's independent parse repaired;
+- band-preset `[3a]` diagnosed;
+- a row asserting the refusal on screen;
+- master merged.
+
+| commit | what |
+|---|---|
+| `32695762` | master merged, not rebased: master's ROADMAP row 179 is kept, this branch's row renumbered 180 |
+| `fe51f4c0` | `scratchpad/lib/aeon-arm-truth.mjs`; section-raster-select derives its subjects and gains the census rows `[2e]`/`[2f]`; the strip's parse reads region rows |
+| `7e261f06` | the strip opens collapsed sections instead of toggling every header, and opens the presets section by id |
+
+### Why `[2b]` aborted: the select was there, disabled, under a different title
+
+The harness hardcoded `SEC_A = 0` and found the per-section select by its title,
+`/^Which raster band preset this section uses \(rasterRef\)/`. The panel renders:
+
+    <Select title={armRefusal ?? RASTER_REF_ROW.title}
+      disabled={act !== null && sectionBindingControlDisabled(…)}>
+
+(`src/renderer/components/effects/BandPresetPanel.tsx:574-576`). On a barred section the select
+IS rendered, DISABLED, and its title is the refusal sentence, so the title finder matched nothing.
+Master passed because section 0 was wrongly open there.
+
+Measured on screen by the new census. On the final build section 0 reads
+`0:DISABLED+refusal(refusal)`, meaning the select was found through the refusal-text title.
+
+Barred-means-disabled is the app's intended contract (`sectionBindingControlDisabled`), so the
+HARNESS is repaired and the app is not.
+
+**How the subjects are derived now.** They come from aeon's files through
+`scratchpad/lib/aeon-arm-truth.mjs`. That library has its own algorithm (one forward pass over
+masked text with a stack of open calls) and is not an import of `section-wiring.ts`.
+- **SEC_A:** the lowest section that is unbarred, unthreaded and has a sidecar. That is 4 at
+  `6bd8ed89`.
+- **SEC_B:** the next such section, 1.
+- **Why from the files:** derived from the FILES and not from what the copy's disk holds unbound,
+  so the fresh-copy refusal still catches a prior run's leftover binding.
+- **SEC_A is now made active before `[2b]`.** A freshly opened project leaves the active section
+  at 0, which is how every row had silently been about section 0.
+
+The library gives the same map as the product reader at both pins. At `6bd8ed89` it reads 9 row
+calls; at `31c0ddd8` it reads 18 (both forms). On a synthetic neighbour trap each preset keeps its
+own key.
+
+### The new rows, `[2e]` and `[2f]`
+
+This is a census of all nine sections.
+
+- **`[2e]`:** every section in the barred set derived from aeon's files shows the select DISABLED.
+  - The barred set at `6bd8ed89` is `[0, 7]`, and it is never a literal.
+  - The select sits under a `[data-effects-arm-refusal]` that starts `Section N binds the preset
+    record <record>, which passes patched: <program>`.
+  - Record and program also come from the independent parse.
+- **`[2f]`:** every other section shows the select ENABLED under its ordinary title, with no
+  refusal.
+- **Anti-vacuous checks:** the barred set is non-empty and is not every section, and the section
+  count equals the app's.
+
+**Red-first on the BUILT app.** Each mutation was shown on disk with `git diff`, rebuilt, and run on
+its own fresh copy. Each was then restored with `git restore --source=7e261f06 --
+src/core/formats/effects/section-wiring.ts`, after which `git diff --stat` was empty, and rebuilt.
+
+| | mutation, as on disk | result | red quoted |
+|---|---|---|---|
+| M13 | `sectionArmExclusivity`'s barred return becomes `return { verdict: 'open', record, patched: null }` | 24/25; `[2f]` green | `[2e]`: census `0:enabled(title) … 7:enabled(title)`; "section 0: expected "Section 0 binds the preset record OJZ_Preset_Sec0, which passes patched: OJZ_TwoChannel"; painted "(no refusal)"" |
+| M14 | `w.patchedArm[record] ?? (sectionIndex === 8 ? 'MUTANT_Program' : null)` (section 8 barred without cause) | 24/25; `[2e]` green | `[2f]`: census `… 8:DISABLED+refusal(refusal)` |
+
+After restoring, on the final build with a fresh copy: **25/25**.
+
+### effects-section-strip: two harness defects, neither of them the barred set
+
+1. **The independent parse split on `ojz_sec(sec: N`**, giving `bind[0]=undefined` on master and
+   on the branch alike. It now reads the region rows through the same library (`fe51f4c0`).
+   `[3b]`, `[3c]` and `[3d]` then passed.
+   - `[3b]` shows "✓ own preset OJZ_Preset_Sec0".
+   - `[3c]` builds its fixture again and shows "OJZ_Preset_Plain, shared with section 8".
+2. **`[2c]`, `[4a]`, `[4b]` and `[4c]` still read `raster select: {"found":false}`.** That was 11/15
+   at `fe51f4c0`, with the derived unbarred section 1 active, so the brief's hypothesis for `[2c]`
+   does not hold.
+
+   The cause is `[2b]`'s "open every collapsible" step:
+   - it CLICKED every pointer-cursor header, and those headers toggle;
+   - the raster band presets section (`aeon.effects.presets`) is open by default, so the step SHUT
+     it;
+   - `CollapsibleSection` persists the collapse through `savePanelState` into the later reloads.
+
+   The run now records the premise: `expand-all: already open
+   ["aeon.effects.presets","aeon.effects.timeline"] (the old toggle loop would have SHUT these)`.
+   Master's identical `[2c]` red is this.
+
+   The repair (`7e261f06`):
+   - `[2b]` opens only the sections marked `data-section-collapsed="true"`;
+   - the presets section is opened by id (`openEffectsSectionState` before `[2c]`,
+     `openEffectsSectionOrThrow` in `reopenAndRead`);
+   - `[2c]` and `[4a]` take the derived unbarred, unthreaded section. On a barred section the select
+     carries the refusal title, and `[4a]`'s "stays ENABLED" is false by design there.
+
+### band-preset `[3a]`: diagnosed, and left alone
+
+It fails identically on master and on the branch. The hover lacks three phrases:
+- "ONLY SECTION 5 IS WIRED"
+- "BINDING ANY OTHER SECTION STILL REACHES NOTHING"
+- "a preset split plus one call-site line"
+
+`RASTER_SECTION_BINDING_LIMIT` (`src/core/formats/raster-binding.ts:748`) was rewritten on
+2026-09-10 (`3962cc77`, `c051e769`). It now says the wired set is derived, `{5, 6}`, and "BINDING A
+SECTION OUTSIDE THE WIRED SET STILL REACHES NOTHING". The first phrase survives only in comments in
+that file, and the other two are absent from it.
+
+This is wording drift from three days before aeon's regions step 4, not this parcel's cause, so it is
+left and reported.
+
+### Results on the final build
+
+The source is `7e261f06` (the build and the three runs came before the docs commit, which touches
+no source). Each harness ran on its own fresh `git archive 6bd8ed89` copy, and every `root:` line
+names this worktree.
+
+- section-raster-select: `════ 25/25 rows · 36.4s ════`, exit 0
+- effects-section-strip: `════ 15/15 rows · 62.0s ════`, exit 0
+- band-preset: `=== 44 rows, 1 failed, 26.0s ===`, exit 1. The failure is `[3a]` only, as above.
+- `VITEST_MAX_WORKERS=4 npm test` on `7e261f06`, in the foreground, with the porcelain empty at the
+  start:
+  - **Test Files 621 passed | 3 skipped (624); Tests 9681 passed | 9 skipped (9690); 0 failed**
+  - exit 0, 22:12:00 to 22:12:51 -0400 (vitest `Duration 32.70s`)
+
+**The Round 1 UI tags, now:**
+- **UI-1 to UI-3:** asserted by `[2e]`/`[2f]`.
+- **UI-4:** asserted by strip `[3b]`/`[3d]`, with the act-sets line in `[4c]`
+  (`act: own preset 0,1,2,3,4,5,6,7,8 · threaded ? · bound 5,6`).
+- **UI-5 (a barred section already bound stays live):** still unmeasured. No barred section is bound
+  at `6bd8ed89`.
+- **UI-6:** strip `[4b]` asserts the select stays enabled with the descriptor unreadable. The
+  `[data-effects-arm-unknown]` text itself is still asserted by nothing.
+
+**Noticed, left alone:**
+- `scratchpad/check-harness-guards.mjs` reports one unguarded-untracked file,
+  `scratchpad/preset-schema-key-probe.mjs`. It is not this parcel's.
 
 ## Standing invariants
 
