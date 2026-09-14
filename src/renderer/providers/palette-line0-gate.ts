@@ -36,14 +36,25 @@
 // player-palette.ts `playerPaletteRefusal`), there is nothing to warn about:
 // an edit would never save. The same dialog says so and offers no way on,
 // rather than letting a person make an edit that evaporates.
+//
+// ═══ WHAT THE WARNING LISTS ═══════════════════════════════════════════════
+//
+// Two searches of the open project, both at warning time, both through the
+// same listing and batch-read channels (core/project/aeon/
+// shared-palette-warning.ts): what else embeds the shared file, and (hub
+// ruling 2026-09-14T00:24:36Z) whether the project's spring character-swap
+// check `tools/spring_line0_gate.py` reads it. Either search that cannot run
+// says Aurora could NOT check, never "nothing".
 
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useConfirmStore } from '../state/confirmStore';
 import { playerPaletteRefusal } from '../../core/project/aeon/player-palette';
 import {
-  EMBED_SOURCE_EXTENSION, scanEmbeds, sharedLine0Warning, type EmbedScan,
+  EMBED_SOURCE_EXTENSION, SPRING_LINE0_GATE_EXTENSION, scanEmbeds, scanSpringGate, sharedLine0Warning,
+  type SourceRead,
 } from '../../core/project/aeon/shared-palette-warning';
 import type { S4Project } from '../../core/model/s4-types';
+import type { SourceListing } from '../../shared/ipc-types';
 
 /**
  * The answer key that accepts the warning. Every other answer declines.
@@ -100,11 +111,14 @@ async function askOnce(): Promise<boolean> {
     return false;
   }
 
-  const scan = await scanProjectEmbeds(config.basePath, file.path);
+  const [scan, gate] = await Promise.all([
+    scanEmbeds(file.path, projectLister(config.basePath, EMBED_SOURCE_EXTENSION), projectReader(config.basePath)),
+    scanSpringGate(file.path, projectLister(config.basePath, SPRING_LINE0_GATE_EXTENSION), projectReader(config.basePath)),
+  ]);
   // The project can close or change while the sources are read; an answer
   // about one project must never be recorded against another.
   if (useProjectStore.getState().project !== project) return false;
-  const { title, body } = sharedLine0Warning(file.path, scan);
+  const { title, body } = sharedLine0Warning(file.path, scan, gate);
   // The accepting button is `danger`, so the dialog focuses Cancel and a stray
   // Enter or Space declines (shell/ConfirmDialog.tsx).
   const answer = await useConfirmStore.getState().ask({
@@ -120,28 +134,31 @@ async function askOnce(): Promise<boolean> {
   return true;
 }
 
-/** The embed search over the open project, through the two IPC channels. */
-async function scanProjectEmbeds(basePath: string, target: string): Promise<EmbedScan> {
-  const api = window.api;
-  return scanEmbeds(
-    target,
-    async () => {
-      if (typeof api?.listProjectSources !== 'function') {
-        throw new Error('this build of Aurora has no source-listing channel');
-      }
-      return api.listProjectSources(basePath, EMBED_SOURCE_EXTENSION);
-    },
-    async (paths) => {
-      const entries = await api.readManyFiles(basePath, paths);
-      const decoder = new TextDecoder();
-      return paths.map((path, i) => {
-        const e = entries[i];
-        return e?.bytes
-          ? { path, text: decoder.decode(e.bytes), reason: null }
-          : { path, text: null, reason: e ? (e.reason ?? e.outcome) : 'no answer from the batch read' };
-      });
-    },
-  );
+// The two searches the warning runs over the open project (what embeds the
+// shared file, and whether the spring check reads it) go through the same two
+// IPC channels: one project listing, asked per extension, and one batch read.
+
+function projectLister(basePath: string, extension: string): () => Promise<SourceListing> {
+  return async () => {
+    const api = window.api;
+    if (typeof api?.listProjectSources !== 'function') {
+      throw new Error('this build of Aurora has no source-listing channel');
+    }
+    return api.listProjectSources(basePath, extension);
+  };
+}
+
+function projectReader(basePath: string): (paths: string[]) => Promise<SourceRead[]> {
+  return async (paths) => {
+    const entries = await window.api.readManyFiles(basePath, paths);
+    const decoder = new TextDecoder();
+    return paths.map((path, i) => {
+      const e = entries[i];
+      return e?.bytes
+        ? { path, text: decoder.decode(e.bytes), reason: null }
+        : { path, text: null, reason: e ? (e.reason ?? e.outcome) : 'no answer from the batch read' };
+    });
+  };
 }
 
 /** Test seam: forget any acceptance, as a fresh app would. */
