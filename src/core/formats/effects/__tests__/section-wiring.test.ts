@@ -1419,6 +1419,13 @@ describe('against aeon\'s real ojz/act1: which sections are structurally barred'
     // section 0 a binding the gate will refuse."
     const w = real();
     for (const sec of [1, 2, 3, 4]) {
+      // ⚠ THE INSTRUMENT MUST SEE ITS SUBJECT (2026-09-14). `open` is also what
+      // an EMPTY binding map answers (no record, no arm), so until this line the
+      // row stayed GREEN against aeon after regions while the reader found
+      // nothing at all (docs/reviews/2026-09-13-section-wiring-off-live-aeon.md,
+      // noticed 1). A section that binds no record here cannot tell us it is open.
+      expect(sectionArmExclusivity(w, sec).record, `section ${sec} binds no record in this reading, `
+        + 'so "open" below would be the empty map\'s answer and would measure nothing').not.toBeNull();
       expect(sectionArmExclusivity(w, sec).verdict, `section ${sec} is not structural`)
         .toBe('open');
       expect(sectionArmExclusivityRefusal(w, sec, rasterChooserName('ojz', 'act1')),
