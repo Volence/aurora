@@ -206,16 +206,17 @@ export type SpringGateScan =
 const folderOf = (p: string): string => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
 
 /**
- * The quoted path-like literals in a Python source, full-line `#` comments
- * skipped. A literal must be one token of path characters, so prose between
- * two apostrophes in a docstring ("the spring's ... character's") never reads
- * as a path.
+ * The quoted literals in a Python source, one line at a time, full-line `#`
+ * comments skipped. Prose between two apostrophes in a docstring ("the
+ * spring's ... character's") can match too. It is harmless: it never equals
+ * the resolved path, and the partner rule keeps only literals in exactly the
+ * resolved path's folder.
  */
-function quotedPathLiterals(text: string): Set<string> {
+function quotedLiterals(text: string): Set<string> {
   const out = new Set<string>();
   for (const line of text.split('\n')) {
     if (line.trimStart().startsWith('#')) continue;
-    for (const m of line.matchAll(/(["'])([A-Za-z0-9_./-]+)\1/g)) out.add(m[2]);
+    for (const m of line.matchAll(/(["'])([^"'\n]+)\1/g)) out.add(m[2]);
   }
   return out;
 }
@@ -255,7 +256,7 @@ export async function scanSpringGate(
   if (!read || read.text === null) {
     return { kind: 'unmeasurable', reason: `${path} is in this project but could not be read: ${read?.reason ?? 'no answer'}` };
   }
-  const literals = quotedPathLiterals(read.text);
+  const literals = quotedLiterals(read.text);
   if (!literals.has(target)) return { kind: 'reads-other-file', path };
   const partners = [...literals].filter((l) => l !== target && folderOf(l) === folderOf(target)).sort();
   return { kind: 'present', path, partners };
