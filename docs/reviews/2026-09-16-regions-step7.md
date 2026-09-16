@@ -12,6 +12,11 @@ against aeon's golden), `384c0741` (the bus method and the panel's door), `6323d
 wiring suite meets the new `edges` key), `3739dfc7` (the gates this parcel's own copy tripped).
 **Suite:** `npm test` on `3739dfc7`: **636 files passed, 3 skipped (639); 9947 tests passed, 9
 skipped (9956), 0 failed**, exit 0.
+**On the MERGED tree** (`a7686a6e`, this branch with master `3e54bd50` — REGIONS 184 — merged in,
+because master moved after this branch was cut and both landings touch `RegionsPanel.tsx`):
+**637 files passed, 3 skipped (640); 9954 tests passed, 9 skipped (9963), 0 failed**, exit 0. The
+three skips are the two `test/live/` warp rows and `compose-bench`, none of them this parcel's; all
+four of this parcel's files RAN (16 + 5 + 4 + 5).
 
 ---
 
