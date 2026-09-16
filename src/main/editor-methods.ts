@@ -507,6 +507,36 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'not a READABLE preset: a ref the build cannot resolve is worse than no ref. ⚠ '
       + RASTER_SECTION_BINDING_LIMIT },
 
+  // ---- Regions: the migration off the per-section sidecars ----------------
+  //
+  // THE DESCRIPTION CARRIES THE TWO FACTS AN AGENT CANNOT GUESS and would get
+  // backwards from the tool's name alone:
+  //   • it is ONE undo step over the WHOLE act, not a per-section operation, and
+  //     it CLEARS every section sidecar in the same step — an agent that
+  //     expected a read-only conversion would be surprised by what it wrote;
+  //   • two of the four refs it clears have NOWHERE to go. `bgLayoutRef` and
+  //     `paletteRef` are read and dropped, because the regions file has no field
+  //     for either (editor spec §2.3: aeon deleted the section fields they fed,
+  //     for having no reader). The reply's `notes` name each one it dropped, so
+  //     the loss is in the answer and not only in a design document.
+  { name: 'migrate_sections', kind: 'migrate-sections', result: 'json',
+    params: {
+      dryRun: z.boolean().optional()
+        .describe('plan the migration and report it WITHOUT applying it. The same planning code '
+          + 'either way, so a preview is what the real call would do.'),
+    },
+    description: 'Convert this act from per-section effects sidecars to a regions document '
+      + '(regions.json), in ONE undo step. Produces one region per contiguous run of sections '
+      + 'that share a preset, sceneRef and rasterRef, plus one region for each act-descriptor row '
+      + 'that binds a preset to no section (the off-grid ones), and CLEARS all four refs '
+      + '(sceneRef, rasterRef, bgLayoutRef, paletteRef) on every section_N.meta.json in the same '
+      + 'step — with a regions document present the build refuses a sidecar that still carries '
+      + 'sceneRef or rasterRef, and never merges it. ⚠ bgLayoutRef and paletteRef are read and '
+      + 'DROPPED: the regions file has no field for them; the reply names each one dropped. '
+      + 'Refuses (by throwing) an act that already has regions, an act whose regions.json could '
+      + 'not be read, and an act descriptor Aurora could not read — "I could not look" is never '
+      + '"there are no bindings". Use dryRun first to read the plan and its refusals.' },
+
   // ---- Wave-1 surface 4: BgAnim bands -------------------------------------
   // Same registry, same rule as the scene block above: one entry lights the
   // capability up on BOTH MCP and Aether, so agent parity is a property of

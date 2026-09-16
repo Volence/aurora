@@ -42,6 +42,7 @@ import {
   type RegionsPanelState,
 } from '../../providers/regions-aeon';
 import { cloneRegionsDocument } from '../../../core/formats/regions/act-regions';
+import { planActMigration } from '../../providers/regions-migrate';
 import { BG_ACT_SENTINEL } from '../../../core/formats/regions/validate';
 
 /**
@@ -352,6 +353,66 @@ function SelectedRegion({ state }: { state: Extract<RegionsPanelState, { kind: '
 }
 
 // ---------------------------------------------------------------------------
+// Migration from sections (editor spec §4)
+// ---------------------------------------------------------------------------
+
+/**
+ * The one door to `migrate-sections` in the UI, shown on the screen the
+ * migration is FOR: an act with no regions document.
+ *
+ * ⚠ IT PLANS ON CLICK AND SHOWS WHAT THE PLAN SAID, both halves. A migration
+ * that refused silently would leave an author clicking a button that does
+ * nothing — and the refusals are the interesting output far more often than the
+ * success is, because every one of them names a thing about the act that has to
+ * change first (a descriptor Aurora could not read, a section with no preset, a
+ * descriptor row whose edges did not resolve).
+ *
+ * The NOTES are shown on success for the same reason: `bgLayoutRef` and
+ * `paletteRef` are read and DROPPED, and an author who bound a background to a
+ * section deserves to be told that binding did not survive rather than to
+ * discover it the next time they open the act.
+ */
+function MigrateSections(): React.ReactElement {
+  const act = useProjectStore((s) => getCurrentAct(s));
+  const zoneId = useProjectStore((s) => s.currentZoneId);
+  const [refusals, setRefusals] = React.useState<string[]>([]);
+  const [notes, setNotes] = React.useState<string[]>([]);
+  const [done, setDone] = React.useState<number | null>(null);
+  if (!act || !zoneId) return <></>;
+  const onClick = () => {
+    const offer = planActMigration(act, zoneId, act.rasterWiring);
+    setRefusals(offer.plan.refusals);
+    setNotes(offer.plan.notes);
+    setDone(offer.command === null ? null : offer.plan.document!.regions.length);
+    run(offer.command);
+  };
+  return (
+    <div data-regions-migrate>
+      <button type="button" data-migrate-sections onClick={onClick} style={{ font: 'inherit' }}>
+        Migrate sections
+      </button>
+      <Hint under style={{ marginBottom: 0 }}>
+        One undo step: builds a region per run of sections sharing a preset,
+        scene and raster, plus one per off-grid descriptor row, and clears all
+        four refs on every section sidecar. bgLayoutRef and paletteRef are
+        DROPPED — the regions file has no field for them.
+      </Hint>
+      {done !== null && (
+        <Hint under data-migrate-done style={{ marginBottom: 0 }}>
+          Migrated: {done} {done === 1 ? 'region' : 'regions'}.
+        </Hint>
+      )}
+      {refusals.map((r, i) => (
+        <Hint under tone="warning" key={i} data-migrate-refusal>{r}</Hint>
+      ))}
+      {notes.map((n, i) => (
+        <Hint under key={i} data-migrate-note>{n}</Hint>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // The status line
 // ---------------------------------------------------------------------------
 
@@ -403,11 +464,14 @@ export default function RegionsPanel(): React.ReactElement {
           {state.kind === 'none' && (
             // "NO FILE" AND "A FILE AURORA REFUSED" ARE DIFFERENT SCREENS. This
             // is the first: nothing on disk, and a save creates nothing.
-            <Hint style={{ marginBottom: 0 }}>
-              {state.actId} has no regions.json. Regions arrive from
-              &quot;Migrate sections&quot; (step 7) or from painting (step 8);
-              neither is built yet.
-            </Hint>
+            <>
+              <Hint style={{ marginBottom: T.s2 }}>
+                {state.actId} has no regions.json. Regions arrive from
+                &quot;Migrate sections&quot; below, or from painting (step 8,
+                not built yet).
+              </Hint>
+              <MigrateSections />
+            </>
           )}
           {state.kind === 'refused' && (
             <Hint tone="warning" style={{ marginBottom: 0 }}>
