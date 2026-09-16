@@ -31,10 +31,23 @@
  * §3.3: one gesture is ONE `SetRegionsCommand`, so a drag that splits three
  * rectangles is ONE undo step. A DRAW ON EMPTY GROUND would satisfy a naive
  * implementation trivially — one rectangle in, one command out — so it cannot
- * discriminate. THE CARVE CAN: it rewrites several `regions[]` entries at once,
- * and an implementation that pushed one command per rewritten entry would pass
- * every draw row and fail only here. Rows 6b/6d are therefore the point of this
- * file: 6b proves the carve really happened and 6d proves it cost one step.
+ * discriminate. A GESTURE THAT CARVES CAN: it rewrites several `regions[]`
+ * entries at once, and an implementation that pushed one command per rewritten
+ * entry would pass every draw row and fail only here.
+ *
+ * ⚠ THE GESTURE THESE ROWS PERFORM IS A **MOVE**, NOT A DRAW, AND THAT IS
+ * STATED BECAUSE THE FIRST VERSION OF THIS FILE CALLED IT A DRAW. The press
+ * lands inside the SELECTED region's rectangle, and §3.2's amended table says
+ * that is a move. It still carves — the moved rectangle trims everything it
+ * lands on and leaves UNASSIGNED ground behind, which is why `night` comes out
+ * as two entries — so it is a legitimate and in fact HARDER subject than a
+ * draw: more entries are rewritten in the one command. But the rows must say
+ * which gesture they drove, or a later reader takes this file as proof about a
+ * gesture it never performed. Row 6b pins the identity by asserting the
+ * selected region's own rectangle MOVED.
+ *
+ * Rows 6b/6c/6e are therefore the point of this file: they prove the gesture
+ * was a move, that it really carved, and that it cost exactly one undo step.
  *
  * HOW "ONE STEP" IS MEASURED, since `__dbg.canUndo()` is a BOOLEAN and not a
  * depth: the document is seeded to a known JSON, the gesture is performed, the
@@ -255,6 +268,40 @@ async function main() {
     if (!before) { throw new Error('seed did not take'); }
     const beforeJSON = JSON.stringify(before);
 
+    // ── A PICTURE FRAMED ON THE BOUNDARY, for the owner's palette question ──
+    //
+    // Every other capture in this file is panned so ONE region fills the view,
+    // which cannot answer the question 8A left open: how far apart two adjacent
+    // regions' hues actually read. The seed is two clean halves meeting at
+    // x = half, so this is the one moment in the run where the boundary is a
+    // straight line with a different region on each side. Taken BEFORE any
+    // gesture, because after the carve the shapes are no longer comparable.
+    const BOUNDARY_X = Math.floor(seeded.regions[1].rect.x);
+    const BZOOM = 0.25;
+    // ⚠ `setView(x, ...)` sets the viewport's TOP-LEFT corner, not its centre.
+    // The first version passed BOUNDARY_X straight in and captured a view whose
+    // LEFT EDGE was the seam -- one region filling the screen, which is the one
+    // thing this capture must not be. Half a screen of world pixels back.
+    const halfSpan = (env.rect.width / BZOOM) / 2;
+    await c.evalExpr(`window.__dbg.setView(${Math.round(BOUNDARY_X - halfSpan)}, 1200, ${BZOOM})`);
+    await sleep(900);
+    const bview = await c.json('window.__dbg.view()');
+    // AND THE ROW NOW CHECKS THE THING IT CLAIMS. The first version asserted
+    // only the ZOOM, so it passed green over a capture with no seam in it at
+    // all -- a guard aimed at the wrong observable, which planting a violation
+    // would never have revealed. This asserts the seam lies strictly INSIDE the
+    // visible world span, which is what "framed on the seam" means.
+    const spanW = env.rect.width / BZOOM;
+    const seamOnScreen = !!bview
+      && bview.x < BOUNDARY_X && BOUNDARY_X < bview.x + spanW;
+    check('4d', 'ANTI-VACUOUS: the boundary capture really has the seam ON SCREEN',
+      seamOnScreen,
+      `view() -> ${JSON.stringify(bview)}; visible world x spans `
+      + `${Math.round(bview?.x ?? 0)}..${Math.round((bview?.x ?? 0) + spanW)}; seam at x=${BOUNDARY_X}`);
+    await shot(c, 'region-hue-pair-at-the-boundary');
+    await c.evalExpr(`window.__dbg.setView(0, 0, ${ZOOM})`);
+    await sleep(700);
+
     // ── 5. THE REFUSAL ARM, FIRST, because "nothing selected" is where the
     //    app STARTS and needs no way to un-select ─────────────────────────
     //
@@ -347,23 +394,32 @@ async function main() {
 
     const nightEntries = (after?.regions ?? []).filter((r) => r.id === 'night').length;
     const forestEntries = (after?.regions ?? []).filter((r) => r.id === 'forest').length;
-    check('6b', 'ANTI-VACUOUS: the drag actually CARVED — a region is now several rectangles',
-      (after?.regions?.length ?? 0) > 2,
+    const forestBefore = before.regions.find((r) => r.id === 'forest').rect;
+    const forestAfter = (after?.regions ?? []).find((r) => r.id === 'forest')?.rect;
+    // WHICH GESTURE THIS WAS, asserted rather than assumed. The press is inside
+    // the selected region, so §3.2 says MOVE; if a later change made it a draw
+    // instead, every row below would still pass while this file's prose
+    // described something that no longer happens.
+    check('6b', 'the gesture was a MOVE of the selected region — its own rectangle travelled',
+      !!(forestAfter && (forestAfter.x !== forestBefore.x || forestAfter.y !== forestBefore.y)),
+      `forest rect ${JSON.stringify(forestBefore)} -> ${JSON.stringify(forestAfter)}`);
+    check('6c', 'ANTI-VACUOUS: and it CARVED — another region is now several rectangles',
+      nightEntries > 1,
       `forest=${forestEntries} entries, night=${nightEntries} entries, total ${after?.regions?.length}. `
-      + 'A draw that only appended would leave the total at 2 and row 6d could not discriminate.');
+      + 'A gesture that rewrote one entry would leave night at 1 and the undo row could not discriminate.');
 
     await shot(c, 'region-carve-on-real-art');
 
     // ── 5c. ONE GESTURE, ONE UNDO STEP ────────────────────────────────────
     const couldUndo = await c.json('window.__dbg.aeon.canUndo()');
-    check('6c', 'ANTI-VACUOUS: the gesture put something on the focused undo stack',
+    check('6d', 'ANTI-VACUOUS: the gesture put something on the focused undo stack',
       couldUndo === true, `canUndo() -> ${couldUndo}`);
 
     await ctrlZ(c);
     await sleep(900);
     const undone = await docNow(c);
     const undoneJSON = JSON.stringify(undone);
-    check('6d', 'ONE Ctrl+Z restores the document EXACTLY — one gesture was one command',
+    check('6e', 'ONE Ctrl+Z restores the document EXACTLY — one gesture was one command',
       undoneJSON === beforeJSON,
       undoneJSON === beforeJSON
         ? `back to the seeded ${undone.regions.length} entries, byte-identical`
