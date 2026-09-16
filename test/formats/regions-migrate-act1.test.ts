@@ -79,8 +79,37 @@ const AEON = siblingPathOrUnresolved('aeon');
  * same act is a check on the first.
  */
 const AEON_PIN = '807bfdd5c723c3eebf7fd613ef40a9709836d3cd';
-/** The revision the vendored golden was published at (its provenance sidecar's `aeon.revision`). */
-const GOLDEN_PIN = '97723264e3ec975e46b1c2569ad9aadb00f5074a';
+/**
+ * The revision the vendored golden was published at — READ FROM THE SIDECAR,
+ * never typed here.
+ *
+ * ⚠ IT WAS A TYPED CONSTANT AND THAT COST A RED MASTER, 2026-09-16. Two parcels
+ * landed the same night: one pinned this value by hand at aeon `97723264`, the
+ * other legitimately re-vendored the golden to `57132017` and updated the
+ * sidecar. Neither touched the other's lines, so git merged them clean and the
+ * byte comparison below failed on a tree where both halves were correct.
+ *
+ * A typed copy of a value that lives in a machine-readable file is a SECOND
+ * SOURCE OF TRUTH, and this repo already paid for that lesson and wrote it
+ * down: `src/core/formats/regions/aurora-regions.schema.provenance.json`'s
+ * `$why_a_sidecar_and_not_only_a_test_constant` records a pin that lived as a
+ * `const` in its drift test and as prose in two more files, and went THREE
+ * re-pins stale with nothing going red. The sidecar is the one place; the test
+ * reads it. The re-vendor is then a one-file edit and this row follows it.
+ */
+const GOLDEN_PIN: string = (() => {
+  const sidecar = JSON.parse(readFileSync(
+    new URL('../fixtures/regions/ojz_act1.regions.provenance.json', import.meta.url), 'utf8',
+  )) as { aeon?: { revision?: unknown } };
+  const rev = sidecar.aeon?.revision;
+  // Loud on unmeasurable: a missing or malformed pin must stop the row, never
+  // silently become `undefined` and read as "nothing to compare".
+  if (typeof rev !== 'string' || !/^[0-9a-f]{40}$/.test(rev)) {
+    throw new Error('ojz_act1.regions.provenance.json has no 40-hex aeon.revision, so the '
+      + `golden's published revision is unknown and nothing below can be checked: ${String(rev)}`);
+  }
+  return rev;
+})();
 
 const DESC_REL = 'games/sonic4/data/levels/ojz/act1/act_descriptor.emp';
 const metaRel = (i: number) => `games/sonic4/data/editor/ojz/act1/section_${i}.meta.json`;
