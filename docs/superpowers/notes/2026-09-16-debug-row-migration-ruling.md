@@ -1,5 +1,40 @@
 # Migrate-sections and a DEBUG-only descriptor row: read past it, say so, never carry it
 
+> ⚠ **THIS IS NOT THE RULING. THE QUESTION WAS ALREADY SETTLED WHEN THIS AGENT WAS DISPATCHED, AND
+> THIS NOTE IS THE INDEPENDENT CROSS-CHECK OF IT.** Header added by the overseer at the landing,
+> 2026-09-16. **The governing artifact is empyrean `docs/AURORA_REGIONS_SCHEMA.md` at `origin/main`,
+> section "The schema stays CLOSED, and the DEBUG eleventh row is a build-time delta (ruled
+> 2026-09-16T05:28:50Z)", plus its AMENDMENT 2026-09-16T09:0xZ — read it THERE, never from this
+> file.** Where the two differ, the banked ruling wins and this note is evidence, not authority.
+>
+> **Why it was allowed to finish rather than killed, and why the demotion had to happen BEFORE the
+> answer was known:** this agent's brief was written without the ruling in hand, so it is a
+> genuinely independent read of the same artifacts, and the hub said plainly it had no other
+> instrument for measuring whether a banked ruling is findable and followable from the artifacts
+> alone. It WAS: the agent located `39b8405` itself and reached the same outcome (exclude the row,
+> say so on screen) for the same reason — the closed schema makes the release-shaped document the
+> contract. **A cross-check chosen after the result is known is not a cross-check** (the hub's
+> formulation), which is why the demotion to evidence was recorded before this file was read.
+>
+> **THREE THINGS IN HERE THE BANKED RULING DOES NOT HAVE, which is why the note is kept at all:**
+> **(1)** *"release truth" is a misnomer* — Aurora cannot know which arm is release, only that the
+> row sits behind a build switch it cannot evaluate; the panel says "behind a build switch". Adopted.
+> **(2)** The overseer's own premise for the 09:0xZ amendment was FALSE and this note is what
+> measured it: `edges` is computed only on the key-less branch of `descriptorEffectsRows`, row 2 of
+> act 1 is keyed, so `OJZ_SEC2_X1` is never consulted and today's tree produces **zero** refusals —
+> 11 regions and no error at aeon `9332c1af`, against 10 at the pin `807bfdd5`. The amendment's
+> outcome is unaffected; its motivating sentence describes a state that does not exist. Filed back
+> to the hub.
+> **(3)** A cross-lane hazard filed to the hub for aeon: the ruling's guard names the row `sec2`
+> and Aurora's migration names it `sec_2` (editor spec §4). Aeon's vendored golden carries
+> `sec0`..`sec8`, so an emitter ensure keyed on the id STRING fails on a freshly migrated act 1
+> while the geometry matches exactly.
+>
+> The verdict text below is left exactly as the agent wrote it, including its own framing as a
+> ruling. Rewriting it would destroy the property that makes it worth keeping — that it was reached
+> without the answer in view.
+
+
 **2026-09-16. A ruling on the product question ROADMAP row 181 declined to settle and step 7
 (row 185) made consequential — taken under the owner's standing instruction of
 2026-09-16T05:2xZ** (empyrean `docs/OVERSEER.md` at `origin/main` `6ccb36f0`, verbatim: *"I'm
