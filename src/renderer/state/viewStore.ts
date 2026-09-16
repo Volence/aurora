@@ -62,6 +62,24 @@ export interface OverlayOptions {
    *  comes from core/model/screen.ts (mirrors aeon's SCREEN_WIDTH/HEIGHT).
    *  A reference the author asks for, so OFF by default like the lenses. */
   showScreenFrame: boolean;
+  /** The Regions facet's colour wash (canvas/region-overlay.ts): a hatched veil
+   *  over the ground each region owns, hued by its position in the panel's list
+   *  and captioned with the region and the background it binds.
+   *
+   *  ⚠ THE ONE KEY IN THIS RECORD THAT DEFAULTS TO `true`, and it departs from
+   *  its neighbours on purpose. `showPriority`, `showScreenFrame`,
+   *  `showSolidBothPlanes`, `showCrossover` and `playAnimatedArt` are all OFF
+   *  because each is a REFERENCE THE AUTHOR ASKS FOR, laid over the thing he
+   *  came to look at. The regions wash is not laid over the Regions facet's
+   *  subject, it IS that subject: a facet that opened showing nothing would be
+   *  the opposite of what it is for. So the polarity runs the other way — you
+   *  switch this OFF to look at the art, not ON to see the regions. Owner,
+   *  2026-09-16, and the "it" is the ART, not the wash: "Can we have it just
+   *  toggleable if we want to see it exactly?"
+   *
+   *  Aeon only: the regions document is an aeon act concept (see
+   *  OVERLAY_KEYS_BY_ENGINE below). */
+  showRegions: boolean;
 }
 
 // ═══ WHERE THE PARALLAX COMPOSITE WENT, AND WHY IT IS NOT AN OVERLAY KEY ═══
@@ -131,6 +149,13 @@ export const OVERLAY_KEYS_BY_ENGINE: Record<OpenEngine, readonly (keyof OverlayO
     // The screen frame (row G). Aeon only for now: classic's viewport is a
     // separate draw path (classic-surface) that does not read this key yet.
     'showScreenFrame',
+    // AEON ONLY, and structurally so: a region is a span of an aeon act bound
+    // to a background, and classic has no regions document at all — so in
+    // classic's menu this would be a checkbox that toggles nothing. Registered
+    // so the author can take the wash off and see the level art underneath;
+    // unlike every other key here it arrives ticked, for the reason
+    // `OverlayOptions.showRegions` gives.
+    'showRegions',
     // ⚠ `showCameraPreview` WAS HERE and is deliberately gone — see the block
     // above `ViewState`. The View menu still offers the parallax composite, but
     // from `ViewMenu`'s own effects-facet row rather than from this list, so it
@@ -217,6 +242,10 @@ export const useViewStore = create<ViewState>((set) => ({
     playAnimatedArt: false,
     // A reference, asked for: OFF like the lenses.
     showScreenFrame: false,
+    // ⚠ ON, and the only one here that is. Not a reference laid over the
+    // subject — on the Regions facet it IS the subject, so the author unticks
+    // it to see the art. OverlayOptions above carries the full reasoning.
+    showRegions: true,
   },
   screenFrame: { x: 0, y: 0 },
   parallaxPreview: loadPreviewChoice(),

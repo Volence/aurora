@@ -11,7 +11,10 @@
 // Both are one-character mistakes with no compile error and no runtime throw.
 
 import { describe, it, expect } from 'vitest';
+import type React from 'react';
 import { useViewStore, OVERLAY_KEYS_BY_ENGINE, type OverlayOptions } from '../viewStore';
+import ViewMenu from '../../shell/ViewMenu';
+import { renderHooked } from '../../../test/render-hooked';
 
 const defaults = (): OverlayOptions => useViewStore.getState().overlays;
 
@@ -133,5 +136,95 @@ describe('the screen frame (triage 2026-08-26 row G)', () => {
     expect(useViewStore.getState().screenFrame).toEqual({ x: 640, y: 224 });
     useViewStore.getState().setScreenFrame(-5, -5);
     expect(useViewStore.getState().screenFrame).toEqual({ x: 0, y: 0 });
+  });
+});
+
+// ═══ THE REGIONS WASH (owner, 2026-09-16) ═══
+//
+// "Can we have it just toggleable if we want to see it exactly?" The thing he
+// wants to see exactly is the LEVEL ART, so the key is a way to take Aurora's
+// own wash off it. That inverts the posture every other row above asserts, and
+// the inversion is the part worth holding in place.
+describe('the regions wash', () => {
+  it('arrives ON, which no other overlay in this record does', () => {
+    // Not a lens over the subject: on the Regions facet the wash IS the
+    // subject, so a facet that opened showing nothing would be the opposite of
+    // what the toggle was asked for. The control is the row beside it: the
+    // screen frame states the NORMAL posture, and if this assertion ever went
+    // green by reading some other key, that one would have to be true as well.
+    expect(defaults().showRegions).toBe(true);
+    expect(defaults().showScreenFrame).toBe(false);
+  });
+
+  it('is reachable from aeon and absent from classic, which has no regions', () => {
+    expect(OVERLAY_KEYS_BY_ENGINE.aeon).toContain('showRegions');
+
+    // The half below is ABSENCE-SHAPED and vacuous on its own: an empty list, a
+    // list that failed to load, and a list that spells the key some other way
+    // all satisfy `not.toContain` identically. So pin the classic list down
+    // first. It has content, and it holds a key that is certainly in it, which
+    // makes the third line read "the list is populated and this key is not in
+    // it" rather than "nothing was looked at".
+    expect(OVERLAY_KEYS_BY_ENGINE.s1.length).toBeGreaterThan(0);
+    expect(OVERLAY_KEYS_BY_ENGINE.s1).toContain('showObjects');
+    expect(OVERLAY_KEYS_BY_ENGINE.s1).not.toContain('showRegions');
+  });
+});
+
+/**
+ * Every word the View menu puts in a checkbox row, in render order.
+ *
+ * Walks CHILDREN only. The `Menu` wrapper carries its own trigger in a `label`
+ * PROP, and a walker that followed props would collect that too and let a row
+ * pass on text no author sees in the list.
+ */
+function rowLabels(node: unknown, out: string[] = []): string[] {
+  if (typeof node === 'string') {
+    const text = node.trim();
+    if (text) out.push(text);
+    return out;
+  }
+  if (Array.isArray(node)) {
+    for (const child of node) rowLabels(child, out);
+    return out;
+  }
+  if (!node || typeof node !== 'object') return out;
+  const el = node as React.ReactElement<{ children?: unknown }>;
+  return el.props ? rowLabels(el.props.children, out) : out;
+}
+
+describe('the regions wash in the View menu', () => {
+  // No project open, which is the branch that offers every key in the record
+  // rather than one engine's slice. What is under test here is the LABEL, and
+  // the aeon registration is the row above's job.
+  const labels = (): string[] => {
+    const menu = renderHooked(ViewMenu, {});
+    try {
+      return rowLabels(menu.el());
+    } finally {
+      menu.unmount();
+    }
+  };
+
+  it('renders rows at all, so the two assertions below are not vacuous', () => {
+    // The harness returning an empty tree, or a walker that followed the wrong
+    // branch, would make every `toContain` below fail loudly and every
+    // `not.toContain` pass silently. This row is the positive control for both.
+    const rows = labels();
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows).toContain('Play animations');
+  });
+
+  it('gives it a label that says what unticking the box will do', () => {
+    expect(labels()).toContain('Tint the ground by region');
+  });
+
+  it('and NOT the name `pretty()` would derive with no LABELS entry', () => {
+    // `pretty()` falls back to `key.replace('show', '')` plus spacing, which for
+    // this key is the single word "Regions" - the facet the author is already
+    // standing in, saying nothing about what the box does. Asserting its
+    // ABSENCE is what makes the row above fail rather than silently degrade if
+    // the LABELS entry is ever deleted.
+    expect(labels()).not.toContain('Regions');
   });
 });

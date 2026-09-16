@@ -1783,9 +1783,24 @@ export default function MapViewport() {
     // author is about to commit is on screen BEFORE the button comes up rather
     // than after the undo entry is written. That is the hazard `RegionPress.overId`
     // exists for one layer down, answered here where it is visible.
+    //
+    // ⚠ AND IT IS TOGGLEABLE, WITH ONE OVERRIDE. Owner, 2026-09-16: "Can we
+    // have it just toggleable if we want to see it exactly?" — "it" is the ART,
+    // so `showRegions` off means nothing of ours is over the level art at all,
+    // which is why the whole block is gated rather than only the draw call.
+    //
+    // THE `rd !== null` HALF IS AN OVERSEER'S CALL AND IS OVERTURNABLE. The
+    // owner did not ask for it. With the wash hidden, arming the region tool
+    // and dragging would be DRAWING BLIND: no rectangle, no carve preview, no
+    // feedback of any kind, and the document changes when the button comes up.
+    // What an in-flight `regionDrag` puts on screen is not "the regions
+    // overlay", it is feedback for the thing the author's hand is doing right
+    // now — and it costs nothing, because whoever is mid-drag is not inspecting
+    // art. Delete this disjunct and the toggle still reads correctly; what you
+    // lose is the gesture's own picture of itself.
     const regionsDoc = activeRegionsDocument();
-    if (regionsDoc) {
-      const rd = regionDrag.current;
+    const rd = regionDrag.current;
+    if (regionsDoc && (overlayOpts.showRegions || rd !== null)) {
       const pieces = rd
         ? regionDragPreview(regionsDoc, rd)
         : regionsDoc.regions.map((r) => ({ id: r.id, rect: r.rect }));
