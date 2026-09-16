@@ -322,6 +322,22 @@ The same shape reached sigil from the other side the same day: it had run the co
 parts of its landing procedure rather than the named script for eleven parcels, and both of
 its escapes went through that gap. **A procedure that exists only as a habit is a tendency.**
 
+⚠ **AND THE COMMIT THAT SKIPS IT IS THE DOCS-ONLY ONE** *(2026-09-16, this lane, found at the
+NEXT session's first landing)*. `9c06b72d` dropped a queue row to get under rule 7's 20-row
+ceiling and recorded that in a review packet — docs only, nothing a reader would call code —
+and the suite was never re-run, so **master was red from that commit until an unrelated
+landing's gates refused.** It boots clean: `git status` clean, the console `ok`, the queue
+orderly, and **nothing in a boot read measures whether master is green**, so the session that
+finds it is never the session that caused it — and it finds it while doing something else,
+which is exactly when a refusal reads as *"the thing I just did broke it"*. **"Docs only" is
+not an exemption in a repo whose gates read its own docs** (citations, bounds, provenance,
+generated tables); there is no such category here. Both of that session's refusals were
+comments, one of them written in the very commit adding a bound nobody was checking.
+*(The hub's ceiling flag started the chain — correct, and not the defect. Worth stating
+anyway: a correct prompt can start a silent failure two moves later, and nothing about
+issuing one would make anybody hesitate.)* Now shared protocol: `OVERSEER-PROTOCOL-REFERENCE.md`
+landing-lane section at empyrean `026214c`, read there rather than from this paragraph.
+
 **The order, and it is not optional now that the script refuses a dirty tree:**
 
 1. Merge the parcel branch, no fast-forward, with the finding in the commit message.
