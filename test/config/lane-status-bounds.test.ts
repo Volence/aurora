@@ -107,6 +107,11 @@ function withRows(doc: LaneStatus, rows: number): LaneStatus {
   return out;
 }
 
+/** Set `focus` to exactly `chars` ASCII characters. */
+function withFocusOf(doc: LaneStatus, chars: number): LaneStatus {
+  return { ...doc, focus: 'a'.repeat(chars) };
+}
+
 /** Set one existing row's title to exactly `chars` ASCII characters. */
 function withTitleOf(doc: LaneStatus, chars: number): LaneStatus {
   const queue = doc.queue.map((q, i) => (i === 2 ? { ...q, title: 'a'.repeat(chars) } : q));
@@ -115,19 +120,19 @@ function withTitleOf(doc: LaneStatus, chars: number): LaneStatus {
 
 // Derived once from the gate's own green run over the committed baseline.
 let green: { status: number | null; out: string };
-let BOUNDS: { title: number; rows: number; bytes: number };
+let BOUNDS: { title: number; rows: number; bytes: number; focus: number };
 
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), 'lane-status-bounds-'));
   green = run(BASELINE);
-  const m = /title<=(\d+) chars \(longest \d+\), queue<=(\d+) rows \(\d+\), file<=(\d+) bytes \(\d+\)/
+  const m = /title<=(\d+) chars \(longest \d+\), queue<=(\d+) rows \(\d+\), file<=(\d+) bytes \(\d+\), focus<=(\d+) chars \((?:\d+|unmeasurable)\)/
     .exec(green.out);
   if (!m) {
     throw new Error(
       `the gate printed no parseable bounds line, so every expectation below would be invented. `
       + `Output was:\n${green.out}`);
   }
-  BOUNDS = { title: Number(m[1]), rows: Number(m[2]), bytes: Number(m[3]) };
+  BOUNDS = { title: Number(m[1]), rows: Number(m[2]), bytes: Number(m[3]), focus: Number(m[4]) };
 });
 
 afterAll(() => {
@@ -149,10 +154,11 @@ describe('check-lane-status size bounds: the baseline and where the numbers come
     expect(green.out).toContain('check-lane-status: OK');
   });
 
-  it('the gate PRINTS its three bounds on a green run, which is where this file derives them', () => {
+  it('the gate PRINTS its four bounds on a green run, which is where this file derives them', () => {
     expect(BOUNDS.title).toBeGreaterThan(0);
     expect(BOUNDS.rows).toBeGreaterThan(0);
     expect(BOUNDS.bytes).toBeGreaterThan(0);
+    expect(BOUNDS.focus).toBeGreaterThan(0);
   });
 
   it('those printed bounds match docs/OVERSEER.md, this repo\'s committed statement of the contract', () => {
@@ -161,7 +167,7 @@ describe('check-lane-status size bounds: the baseline and where the numbers come
     // contract/LANE_STATUS.md rule 7. If someone widens a constant in the gate
     // to make a fat file green, this row is what goes red.
     const overseer = readFileSync(resolve(REPO, 'docs/OVERSEER.md'), 'utf8');
-    const m = /title ≤(\d+), ≤(\d+) rows,\s*≤(\d+) KB/.exec(overseer);
+    const m = /title ≤(\d+), ≤(\d+) rows,\s*≤(\d+) KB, focus ≤(\d+)/.exec(overseer);
     expect(m, 'docs/OVERSEER.md no longer states the three bounds in a readable form').toBeTruthy();
     expect(BOUNDS.title).toBe(Number(m![1]));
     expect(BOUNDS.rows).toBe(Number(m![2]));
@@ -169,6 +175,12 @@ describe('check-lane-status size bounds: the baseline and where the numbers come
     // reader, `empyrean/scripts/hub_check.py`, declares 12 * 1024. Two readers of
     // one contract disagreeing about a bound is worse than either bound.
     expect(BOUNDS.bytes).toBe(Number(m![3]) * 1024);
+    // The fourth bound was absent from that sentence until 2026-09-16, for the
+    // same reason it was absent from the gate: rule 7 names three and `focus`
+    // lives in the contract's field table. A local statement of the contract
+    // that lists a SUBSET is the shape that earns trust and is wrong in one
+    // corner, so this row exists to keep the two counts moving together.
+    expect(BOUNDS.focus).toBe(Number(m![4]));
   });
 
   it('the gate still DEFAULTS to the live docs/lane-status.json when given no argument', () => {
@@ -180,7 +192,7 @@ describe('check-lane-status size bounds: the baseline and where the numbers come
   });
 });
 
-describe('bound 1 of 3: a queue row title is at most the title bound, in characters', () => {
+describe('bound 1 of 4: a queue row title is at most the title bound, in characters', () => {
   it('a title of exactly the bound passes', () => {
     const p = write('title-at-bound.json', withTitleOf(baselineDoc(), BOUNDS.title));
     const r = run(p);
@@ -229,7 +241,7 @@ describe('bound 1 of 3: a queue row title is at most the title bound, in charact
   });
 });
 
-describe('bound 2 of 3: the queue holds at most the row bound', () => {
+describe('bound 2 of 4: the queue holds at most the row bound', () => {
   it('exactly the row bound passes', () => {
     const p = write('rows-at-bound.json', withRows(baselineDoc(), BOUNDS.rows));
     const r = run(p);
@@ -248,7 +260,7 @@ describe('bound 2 of 3: the queue holds at most the row bound', () => {
   });
 });
 
-describe('bound 3 of 3: the whole file is at most the byte bound, in BYTES', () => {
+describe('bound 3 of 4: the whole file is at most the byte bound, in BYTES', () => {
   it('exactly the byte bound passes', () => {
     const p = writeAtBytes('bytes-at-bound.json', baselineDoc(), BOUNDS.bytes);
     expect(readFileSync(p).length).toBe(BOUNDS.bytes);
@@ -367,5 +379,68 @@ describe('the gate is registered as a runnable script', () => {
 
   it('npm run check:lane-status runs this gate, which is the run OVERSEER.md asks for after every write', () => {
     expect(pkg.scripts!['check:lane-status']).toContain(GATE);
+  });
+});
+
+describe('bound 4 of 4: focus is at most the focus bound, and it is NOT in rule 7', () => {
+  it('ANTI-VACUOUS: the committed baseline really carries a focus string to measure', () => {
+    // Without this, every row below would pass against a document that has no
+    // focus at all, which is a different defect wearing this bound's clothes.
+    const doc = baselineDoc();
+    expect(typeof doc.focus).toBe('string');
+    expect([...String(doc.focus)].length).toBeGreaterThan(0);
+  });
+
+  it('a focus of exactly the bound passes', () => {
+    // EXACTLY the bound is the case this repo has actually met: aurora's own
+    // focus measured 120 on 2026-09-11, inside by nothing, with nothing
+    // watching. An off-by-one here would have reported that file as broken.
+    const p = write('focus-at-bound.json', withFocusOf(baselineDoc(), BOUNDS.focus));
+    const r = run(p);
+    expect(r.status, `gate output was:\n${r.out}`).toBe(0);
+  });
+
+  it('RED FIRST: one character over the bound fails, and the message names the length and the bound', () => {
+    const doc = withFocusOf(baselineDoc(), BOUNDS.focus + 1);
+    const p = write('focus-over-bound.json', doc);
+    // Shown applied, from disk, before anything is claimed about the exit code:
+    // an unapplied mutation and a restored baseline both print ok.
+    const onDisk = JSON.parse(readFileSync(p, 'utf8')) as LaneStatus;
+    expect([...String(onDisk.focus)].length).toBe(BOUNDS.focus + 1);
+
+    const r = run(p);
+    expect(r.status, `gate output was:\n${r.out}`).toBe(1);
+    expect(r.out).toContain('check-lane-status: FAIL');
+    expect(r.out).toContain(`focus is ${BOUNDS.focus + 1} characters`);
+    expect(r.out).toContain(`${BOUNDS.focus} character bound`);
+  });
+
+  it('counts CODE POINTS, so an astral character is one character and not two', () => {
+    const doc = { ...baselineDoc(), focus: `${'a'.repeat(BOUNDS.focus - 1)}\u{1F600}` };
+    const p = write('focus-astral-at-bound.json', doc);
+    expect(readFileSync(p, 'utf8')).toContain('\u{1F600}');
+    const r = run(p);
+    expect(r.status, `a ${BOUNDS.focus} code point focus containing one emoji must pass. Output:\n${r.out}`)
+      .toBe(0);
+  });
+
+  it('LOUD ON UNMEASURABLE: a MISSING focus is a named failure, never an implicit zero', () => {
+    // The failure this row exists for: length checks that read an absent field
+    // as 0 and report green. "I could not look" and "I looked and it is short"
+    // must not be the same answer.
+    const doc = baselineDoc();
+    delete (doc as Record<string, unknown>).focus;
+    const p = write('focus-missing.json', doc);
+    expect(JSON.parse(readFileSync(p, 'utf8'))).not.toHaveProperty('focus');
+
+    const r = run(p);
+    expect(r.status, `gate output was:\n${r.out}`).toBe(1);
+    expect(r.out).toContain('focus is MISSING');
+    expect(r.out).toContain('UNMEASURABLE');
+  });
+
+  it('the gate PRINTS the focus measurement on a green run, not only the bound', () => {
+    // A bound printed without its measurement cannot be read as approaching.
+    expect(green.out).toMatch(/focus<=\d+ chars \(\d+\)/);
   });
 });

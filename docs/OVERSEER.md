@@ -118,7 +118,13 @@ adopted back. Read them there, not from this summary.)*
 `docs/OVERSEER.md` is the boot read: target ~100 KB. Dated tails and closed narrative go to
 `docs/OVERSEER-LOG.md`, which nothing reads at boot. **A ruling that must survive a rotation is
 written HERE as well as there, never only there.** `docs/lane-status.json`: title ≤240, ≤20 rows,
-≤12 KB — assert the three in the script that writes it, don't read them back afterwards.
+≤12 KB, focus ≤120 — assert the four in the script that writes it, don't read them back
+afterwards. ⚠ **THE COUNT IN THAT SENTENCE WAS THREE UNTIL 2026-09-16 AND SO WAS THE GATE**: rule 7
+carries three and the FOURTH lives in the contract's field table, four hundred lines away, so a lane
+told to check rule 7 and doing so exactly is still unchecked on `focus` — and this lane's own focus
+had measured exactly 120, inside by nothing, with nothing watching. Fixed both sides at empyrean
+`b86aa93` (rule 7 names the fourth) and here in `scripts/check-lane-status.mjs` (BOUND 4 of 4).
+**Measure the count, never quote it — including from this sentence.**
 
 **Owner, 2026-09-13T21:53:38Z, verbatim: *"cut sounds good."*** — his go to the hub's proposal that each lane cut its own `OVERSEER.md` to about 40 KB by when a rule is read (his words at empyrean `492a2ac` `docs/OVERSEER.md` line 79, the proposal at line 81, both read there).
 

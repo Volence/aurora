@@ -11,7 +11,26 @@
 // re-asserting the invariant afterwards.
 import { readFileSync } from 'node:fs';
 
-// ═══ THE THREE SIZE BOUNDS, AND WHERE EACH NUMBER COMES FROM ═══
+// ═══ THE FOUR SIZE BOUNDS, AND WHERE EACH NUMBER COMES FROM ═══
+//
+// ⚠ THE COUNT IN ANY SENTENCE ABOUT THESE BOUNDS IS THE THING MOST LIKELY TO BE
+// WRONG. This block said THREE until 2026-09-16 and the script checked three,
+// because rule 7 names three and the fourth lives in the contract's FIELD TABLE,
+// four hundred lines away. A lane told to "check rule 7" and doing so exactly is
+// still unchecked on `focus`. Found here by measuring rather than by reading:
+// `grep -n focus scripts/check-lane-status.mjs` returned nothing while this
+// lane's own focus had measured EXACTLY 120 on 2026-09-11, inside by nothing,
+// with nothing watching. The hub's `scripts/hub_check.py` had been printing all
+// four under the label "rule 7" for weeks — right figures, wrong source, which
+// is the one defect that would have stopped anyone re-deriving where the fourth
+// bound lives. Both halves fixed at empyrean `b86aa93` (verified here an ancestor
+// of `origin/main`): rule 7 now names the fourth and its snippet measures it, and
+// the field table cell names rule 7 for the other three. MEASURE THE COUNT, never
+// quote it — including from this comment.
+//
+// BOUND 4's source is NOT rule 7: `contract/LANE_STATUS.md` field table, the
+// `focus` row, read at `origin/main` = b86aa93: "One sentence, ≤120 chars — this
+// is the FOURTH size bound and the only one not in rule 7".
 //
 // Suite contract `contract/LANE_STATUS.md` rule 7 ("Size bounds, so rule 6 is
 // measurable"), read in the empyrean repo at `origin/main` =
@@ -42,6 +61,9 @@ import { readFileSync } from 'node:fs';
 // in the hub's report, and the same row would be over on one reader and inside
 // on the other. `[...title].length` counts code points and the two agree.
 const MAX_TITLE_CHARS = 240;
+// Code points again, and for the same reason as the title bound: the hub's
+// Python `len()` is the reference reader.
+const MAX_FOCUS_CHARS = 120;
 const MAX_QUEUE_ROWS = 20;
 const MAX_FILE_BYTES = 12 * 1024;
 
@@ -163,7 +185,7 @@ if (!doc.updatedAt || Number.isNaN(Date.parse(doc.updatedAt))) {
 // with 22 rows and four titles over 240 characters." A 245 character title
 // passed this script again on 2026-09-12 and a human downstream caught it.
 
-// BOUND 1 of 3: a queue row's `title` is at most MAX_TITLE_CHARS code points.
+// BOUND 1 of 4: a queue row's `title` is at most MAX_TITLE_CHARS code points.
 const longTitles = queue
   .map((q, i) => ({ id: q?.id ?? `(row ${i}, no id)`, len: [...String(q?.title ?? '')].length }))
   .filter((r) => r.len > MAX_TITLE_CHARS);
@@ -177,7 +199,7 @@ if (longTitles.length) {
     + 'its id.');
 }
 
-// BOUND 2 of 3: `queue` holds at most MAX_QUEUE_ROWS rows.
+// BOUND 2 of 4: `queue` holds at most MAX_QUEUE_ROWS rows.
 if (queue.length > MAX_QUEUE_ROWS) {
   problems.push(
     `queue holds ${queue.length} rows, OVER the ${MAX_QUEUE_ROWS} row bound by `
@@ -186,7 +208,7 @@ if (queue.length > MAX_QUEUE_ROWS) {
     + 'it: a landed row goes to docs/lane-log.jsonl and a parked one to the queue doc.');
 }
 
-// BOUND 3 of 3: the whole file is at most MAX_FILE_BYTES BYTES.
+// BOUND 3 of 4: the whole file is at most MAX_FILE_BYTES BYTES.
 if (raw.length > MAX_FILE_BYTES) {
   problems.push(
     `${PATH} is ${raw.length} BYTES, OVER the ${MAX_FILE_BYTES} byte bound by `
@@ -194,6 +216,28 @@ if (raw.length > MAX_FILE_BYTES) {
     + 'recipe (wc -c) uses, not characters and not lines. Dominion reads all six lanes into one '
     + 'payload on every hub check and a fresh session in this lane reads this file at boot, so '
     + 'every reader pays for every night of history left in it.');
+}
+
+// BOUND 4 of 4: `focus` is at most MAX_FOCUS_CHARS code points. NOT in rule 7 —
+// see the header. A missing or non-string `focus` is NOT this bound's business
+// (rule 1 makes the field required and the console reports its absence); this
+// measures the length of what is there, and says so rather than rendering an
+// absent field as 0 characters and green.
+const focusRaw = doc.focus;
+if (typeof focusRaw !== 'string') {
+  problems.push(
+    `focus is ${focusRaw === undefined ? 'MISSING' : `a ${typeof focusRaw}`}, so its 120 character `
+    + 'bound is UNMEASURABLE. It is the one line he reads to answer "what is that lane doing", '
+    + 'and an absent field is not a short one.');
+} else {
+  const focusLen = [...focusRaw].length;
+  if (focusLen > MAX_FOCUS_CHARS) {
+    problems.push(
+      `focus is ${focusLen} characters, OVER the ${MAX_FOCUS_CHARS} character bound by `
+      + `${focusLen - MAX_FOCUS_CHARS}. It is written for the OWNER, not for a peer: one sentence `
+      + 'saying where this lane is, no SHAs, no bar numbers, no internal item ids. The detail goes '
+      + 'in the queue rows and this repo\'s own queue doc.');
+  }
 }
 
 if (problems.length) {
@@ -208,4 +252,5 @@ console.log(`check-lane-status: OK: ${queue.length} queue rows, exactly one next
 console.log(
   `check-lane-status: bounds: title<=${MAX_TITLE_CHARS} chars (longest ${longestTitle}), `
   + `queue<=${MAX_QUEUE_ROWS} rows (${queue.length}), `
-  + `file<=${MAX_FILE_BYTES} bytes (${raw.length}).`);
+  + `file<=${MAX_FILE_BYTES} bytes (${raw.length}), `
+  + `focus<=${MAX_FOCUS_CHARS} chars (${typeof doc.focus === 'string' ? [...doc.focus].length : 'unmeasurable'}).`);
