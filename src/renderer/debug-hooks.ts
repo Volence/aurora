@@ -41,6 +41,7 @@ import { serializeBgOverride } from '../core/formats/bg-override/bg-override';
 import { resolveDisplayedBg } from './providers/bganim-preview-aeon';
 import { lastGuideReport } from './canvas/effects-guides';
 import { lastCollisionMarkReport } from './canvas/collision-mark-report';
+import { lastRegionOverlayReport } from './canvas/region-overlay';
 import type { CollisionMarkReport } from './canvas/collision-mark-report';
 import type { GuideReport } from './canvas/effects-guides';
 import { lastScreenFrameReport, type ScreenFrameReport } from './canvas/screen-frame';
@@ -661,6 +662,20 @@ interface AeonProbeApi {
    * one aliased object that appears never to change.
    */
   regionsDocument(): unknown | null;
+  /**
+   * The region overlay's last published report, or null if it has never drawn.
+   *
+   * ⚠ `paints` IS THE ONLY WAY TO PROVE THE WASH STOPPED PAINTING. The
+   * showRegions toggle's whole subject is whether the overlay STOPS, and that
+   * is an absence: a node test can prove `MapViewport` READS the flag, and a
+   * screenshot can show a canvas with no hatch on it for a dozen reasons that
+   * have nothing to do with the toggle (nothing loaded, wrong facet, a throwing
+   * canvas). This counter advances on every publish, so a harness can force
+   * repaints and assert the number did NOT move — with the toggle ON as its own
+   * positive control, which is what stops "it stopped painting" and "it never
+   * painted" reading identically.
+   */
+  regionOverlayReport(): unknown | null;
   /**
    * Load a regions document into the current act, THROUGH THE REAL CODEC AND
    * THE REAL COMMAND.
@@ -1470,6 +1485,13 @@ function installAeonProbe(): AeonProbeApi {
       // the same object, and a row asking "did this change?" could never say no
       // -- or, worse, never say yes.
       return doc === null ? null : JSON.parse(JSON.stringify(doc));
+    },
+    regionOverlayReport: () => {
+      const r = lastRegionOverlayReport();
+      // `paints === 0` means it has never published. Reported as null rather
+      // than as an empty report, so "never drew" cannot be read as "drew
+      // nothing" -- the two are different answers and only one is a finding.
+      return r.paints === 0 ? null : JSON.parse(JSON.stringify(r));
     },
     setRegions: (json) => {
       const st = useProjectStore.getState();

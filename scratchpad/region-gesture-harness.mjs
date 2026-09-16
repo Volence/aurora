@@ -183,6 +183,8 @@ async function main() {
       setRegions: typeof window.__dbg.aeon.setRegions === 'function',
       regions: typeof window.__dbg.aeon.regions === 'function',
       regionsDocument: typeof window.__dbg.aeon.regionsDocument === 'function',
+      regionOverlayReport: typeof window.__dbg.aeon.regionOverlayReport === 'function',
+      setOverlay: typeof window.__dbg.setOverlay === 'function',
       canUndo: typeof window.__dbg.aeon.canUndo === 'function',
       view: typeof window.__dbg.view === 'function',
       setView: typeof window.__dbg.setView === 'function'
@@ -426,7 +428,78 @@ async function main() {
         : `after one undo: ${undone?.regions?.length} entries, seeded had ${before.regions.length}. `
           + 'A PARTIAL document here is the signature of a gesture that pushed more than one command.');
 
-    // ── 7. A picture for the owner, over real level art ───────────────────
+
+    // ══ 7. THE TOGGLE — the owner's answer, and the only rows that can prove
+    //    the wash actually STOPS ════════════════════════════════════════════
+    //
+    // Owner, verbatim: "Can we have it just toggleable if we want to see it
+    // exactly?" -- "it" being the level art, under a 45% wash.
+    //
+    // ⚠ WHY A SCREENSHOT CANNOT ANSWER THIS AND `paints` CAN. "The hatch is
+    // gone" is an ABSENCE, and a canvas with no hatch on it is what a hidden
+    // overlay, an unloaded project, the wrong facet and a throwing canvas all
+    // look like. The overlay publishes a paint counter on every draw, so the
+    // question becomes a NUMBER: force repaints and see whether it moved. Row
+    // 7a is the positive control that makes 7b mean anything -- without it,
+    // "stopped painting" and "never painted" are the same observation.
+    const report = () => c.json('window.__dbg.aeon.regionOverlayReport()');
+    const repaint = async (n = 3) => {
+      for (let i = 0; i < n; i += 1) {
+        await c.evalExpr(`window.__dbg.setView(${i * 8}, ${i * 8}, ${ZOOM})`);
+        await sleep(260);
+      }
+    };
+
+    await c.evalExpr('window.__dbg.setOverlay("showRegions", true)');
+    await sleep(500);
+    const onA = await report();
+    await repaint();
+    const onB = await report();
+    check('7a', 'CONTROL: with the toggle ON, forcing repaints advances the overlay paint count',
+      !!(onA && onB && onB.paints > onA.paints),
+      `paints ${onA?.paints} -> ${onB?.paints}. Without this row, row 7b cannot tell "the wash `
+      + 'stopped" from "the wash was never running".');
+
+    await c.evalExpr('window.__dbg.setOverlay("showRegions", false)');
+    await sleep(500);
+    const offA = await report();
+    await repaint();
+    const offB = await report();
+    check('7b', 'the toggle OFF actually STOPS the wash painting — the count does not move',
+      !!(offA && offB && offB.paints === offA.paints),
+      `paints ${offA?.paints} -> ${offB?.paints} across the same repaints that moved it in 7a`);
+    await shot(c, 'region-overlay-OFF-art-exactly');
+
+    // The overseer's call, on screen: a drag while the wash is hidden must still
+    // show itself, or the author is carving blind. Pressed and MOVED without
+    // releasing, so the gesture is live when the report is read.
+    const d0 = aim(0.45, 0.40); const d1 = aim(0.62, 0.58);
+    const beforeDrag = await report();
+    await mouse(c, 'mousePressed', d0.x, d0.y);
+    await sleep(160);
+    await mouse(c, 'mouseMoved', d1.x, d1.y, { buttons: 1 });
+    await sleep(500);
+    const midDrag = await report();
+    check('7c', 'but a drag IN PROGRESS still draws while hidden — no carving blind',
+      !!(beforeDrag && midDrag && midDrag.paints > beforeDrag.paints),
+      `paints ${beforeDrag?.paints} -> ${midDrag?.paints} with showRegions OFF and the button DOWN. `
+      + 'This is the overseer\'s call, not something the owner asked for, and it is overturnable.');
+    await shot(c, 'region-overlay-OFF-mid-drag');
+    await mouse(c, 'mouseReleased', d1.x, d1.y, { buttons: 0 });
+    await sleep(700);
+
+    // And back on, so the toggle is proven to work in BOTH directions rather
+    // than only to turn things off.
+    await c.evalExpr('window.__dbg.setOverlay("showRegions", true)');
+    await sleep(500);
+    const backA = await report();
+    await repaint();
+    const backB = await report();
+    check('7d', 'and ticking it back on resumes painting — the toggle works both ways',
+      !!(backA && backB && backB.paints > backA.paints),
+      `paints ${backA?.paints} -> ${backB?.paints}`);
+
+    // ── 8. A picture for the owner, over real level art ───────────────────
     await c.evalExpr(`window.__dbg.setView(0, 0, 1)`);
     await sleep(800);
     await shot(c, 'region-overlay-over-real-art-zoom1');
