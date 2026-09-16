@@ -24,6 +24,11 @@ import {
   type SectionSidecarTuple,
 } from '../migrate-sections';
 import { coverage, disjointness, type RegionPiece } from '../region-geometry';
+import {
+  parseRegionsDocument,
+  serializeRegionsDocument,
+  type RegionsDocument,
+} from '../../formats/regions/document';
 
 const SIZE = 2048;
 
@@ -190,6 +195,12 @@ describe('planSectionMigration: the key-less row carves, and is a region of its 
     expect(last.preset).toBe(night.preset);
     expect(last.rect).toEqual({ x: 3400, y: 0, w: 1400, h: SIZE });
     expect(last.id).toBe('zzz_preset_night');
+    // AND THE READABLE LABEL BESIDE THE UGLY ID, which is a CONDITION of the
+    // id ruling rather than a nicety. Its words: "the ugly id is acceptable
+    // precisely because nothing legible is lost". A migration that wrote the
+    // minted id and left `name` as the raw symbol would satisfy the line above
+    // and take the ruling's justification with it.
+    expect(last.name).toBe('Night');
 
     // And the act is STILL exactly tiled: no overlap, no hole. This is the
     // property a migration that appended without carving would break.
@@ -245,6 +256,146 @@ describe('planSectionMigration: the key-less row carves, and is a region of its 
     const p = pieces(input, plan.document!.regions);
     expect(disjointness(p).overlaps).toEqual([]);
     expect(coverage({ x: 0, y: 0, w: 3 * SIZE, h: 3 * SIZE }, p).unassigned).toEqual([]);
+  });
+});
+
+/**
+ * TWO KEY-LESS ROWS THAT MINT ONE ID REFUSE, AND THE REFUSAL NAMES BOTH LINES.
+ *
+ * Ruled with the id rule itself: empyrean `docs/AURORA_REGIONS_SCHEMA.md` at
+ * `origin/main`, "A KEY-LESS ROW'S ID IS ITS PRESET SYMBOL, LOWERCASED"
+ * (2026-09-16T09:39Z, OVERTURNABLE BY ONE WORD), and the editor spec's §4 item
+ * 3. No suffixing scheme: aeon already refuses duplicate ids at load, and a
+ * suffix would hand one of two indistinguishable rows an identity decided by
+ * the order they appear in a descriptor.
+ *
+ * Each row below asserts the refusal NAMES ITS EVIDENCE. A migration that
+ * refused with "duplicate id" and no line numbers would pass a test that only
+ * counted refusals, and would send an author to search a descriptor by hand.
+ */
+describe('planSectionMigration: two key-less rows that mint one id', () => {
+  /** Two rows, side by side across the top of the act, binding one preset. */
+  const twin = (presetA: string, presetB: string) => [
+    {
+      preset: presetA, edges: { x0: 0, x1: SIZE - 1, y0: 0, y1: SIZE - 1 },
+      line: 560, constructorName: 'zzz_region',
+    },
+    {
+      preset: presetB, edges: { x0: SIZE, x1: 2 * SIZE - 1, y0: 0, y1: SIZE - 1 },
+      line: 561, constructorName: 'zzz_region',
+    },
+  ];
+
+  it('REFUSES when they share a preset, and names both descriptor lines', () => {
+    const plan = planSectionMigration(nineDistinct({
+      unkeyed: twin('ZZZ_Preset_Night', 'ZZZ_Preset_Night'),
+    }));
+    expect(plan.document, 'a document was built for an act with two regions of one name')
+      .toBeNull();
+    // A refused plan clears nothing: the half state is the one the generator
+    // refuses outright.
+    expect(plan.sidecars).toEqual([]);
+    const said = plan.refusals.join('\n');
+    expect(said, 'the refusal does not name the id the two rows would share')
+      .toContain('zzz_preset_night');
+    expect(said, 'the refusal does not name the FIRST row\'s descriptor line').toContain('line 560');
+    expect(said, 'the refusal does not name the SECOND row\'s descriptor line').toContain('line 561');
+    // Said ONCE for the pair, not once per row: the sentence already names both.
+    expect(plan.refusals.filter((r) => r.includes('line 560') && r.includes('line 561')))
+      .toHaveLength(1);
+  });
+
+  it('REFUSES when two DIFFERENT presets collide after the 32-character truncation', () => {
+    // The quieter road to the same defect, and the reason the clash is computed
+    // on the MINTED id rather than on the preset: these two symbols are
+    // different, no eye would pair them, and `slice(0, 32)` makes them one name.
+    const a = 'ZZZ_Preset_Nightfall_Upper_Left_A';
+    const b = 'ZZZ_Preset_Nightfall_Upper_Left_B';
+    // Derived, not asserted from a typed literal: the point is that the first 32
+    // characters agree while the symbols do not.
+    expect(a).not.toBe(b);
+    expect(a.slice(0, 32)).toBe(b.slice(0, 32));
+    const plan = planSectionMigration(nineDistinct({ unkeyed: twin(a, b) }));
+    expect(plan.document, 'two presets truncating to one id produced a document').toBeNull();
+    const said = plan.refusals.join('\n');
+    expect(said).toContain('line 560');
+    expect(said).toContain('line 561');
+    // Both PRESETS are named too, since the ids are identical and the presets
+    // are the only thing that tells the author which row is which.
+    expect(said, 'the refusal names an id the author cannot find in the descriptor').toContain(a);
+    expect(said).toContain(b);
+  });
+
+  it('REFUSES a key-less row whose minted id collides with a SECTION RUN\'s', () => {
+    // ⚠ NOT THE RULED CASE, and said so at the site. The ruling covers two
+    // key-less rows; a key-less row landing on a run's `sec<N>` is unreachable
+    // through the whole-preset rule for a symbol shaped like `<ACT>_Preset_X`,
+    // and reachable only for a preset literally named `Sec4`. It is refused on
+    // the ruling's own grounds rather than suffixed, because an invented suffix
+    // is an identity Aurora chose for a row the author never named.
+    const plan = planSectionMigration(nineDistinct({
+      unkeyed: [{
+        preset: 'Sec4', edges: { x0: 0, x1: SIZE - 1, y0: 0, y1: SIZE - 1 },
+        line: 560, constructorName: 'zzz_region',
+      }],
+    }));
+    expect(plan.document).toBeNull();
+    const said = plan.refusals.join('\n');
+    expect(said).toContain('line 560');
+    expect(said).toContain('sec4');
+  });
+
+  it('and ONE key-less row is not a clash: the rows above are not refusing everything', () => {
+    // The control. Without it every row in this block passes under a migration
+    // that refuses any key-less row at all.
+    const plan = planSectionMigration(nineDistinct({
+      unkeyed: [{
+        preset: 'ZZZ_Preset_Night', edges: { x0: 0, x1: SIZE - 1, y0: 0, y1: SIZE - 1 },
+        line: 560, constructorName: 'zzz_region',
+      }],
+    }));
+    expect(plan.refusals, plan.refusals.join('; ')).toEqual([]);
+    expect(plan.document!.regions.some((r) => r.id === 'zzz_preset_night')).toBe(true);
+  });
+});
+
+describe('planSectionMigration: the id is MINTED ONCE and never re-derived', () => {
+  it('survives a preset rename through the codec, ugly rather than broken', () => {
+    // ⚠ THIS IS A TRIPWIRE, NOT A DISCOVERY, and it is worth having for exactly
+    // that reason. The ruling's own strongest objection is that a STABLE
+    // identity is derived from a MUTABLE cited name, and its answer is that the
+    // migration writes the id ONCE: a later preset rename must leave
+    // `zzz_preset_night` bound to some other preset, which is ugly and stable,
+    // rather than moving the id, which would be a rename nobody asked for. The
+    // property holds today because nothing but the migration mints an id. This
+    // row is what goes red the day a load path, a normaliser or a save plan
+    // starts deriving one -- the repair that would look like tidying.
+    const plan = planSectionMigration(nineDistinct({
+      unkeyed: [{
+        preset: 'ZZZ_Preset_Night', edges: { x0: 3400, x1: 4799, y0: 0, y1: SIZE - 1 },
+        line: 560, constructorName: 'zzz_region',
+      }],
+    }));
+    expect(plan.refusals, plan.refusals.join('; ')).toEqual([]);
+    const migrated = plan.document!;
+    const mintedId = migrated.regions[migrated.regions.length - 1].id;
+    expect(mintedId).toBe('zzz_preset_night');
+
+    // The author rebinds that region to a different preset and the document
+    // goes to disk and back through the real codec, which is everything that
+    // stands between the migration and every later read.
+    const renamed: RegionsDocument = {
+      ...migrated,
+      regions: migrated.regions.map((r) => (r.id === mintedId
+        ? { ...r, preset: 'ZZZ_Preset_Dawn' }
+        : r)),
+    };
+    const reloaded = parseRegionsDocument(serializeRegionsDocument(renamed), 'minted-once.json');
+    const row = reloaded.regions.find((r) => r.preset === 'ZZZ_Preset_Dawn');
+    expect(row, 'the renamed region is gone from the document entirely').toBeDefined();
+    expect(row!.id, 'the id was RE-DERIVED from the new preset: it is data, not a function of it')
+      .toBe(mintedId);
+    expect(row!.id).not.toBe('zzz_preset_dawn');
   });
 });
 
