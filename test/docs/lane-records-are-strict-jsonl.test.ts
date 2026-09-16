@@ -102,4 +102,56 @@ describe.each(RECORDS)('%s is strict JSONL', (rel) => {
 
     expect(missing, `every entry carries a timestamp:\n  ${missing.join('\n  ')}`).toEqual([]);
   });
+
+  // A SEPARATE ROW, not a widened predicate on the one above, because they are
+  // different properties and a merged row would report the first and hide the
+  // other. The row above asks whether the field is THERE; this one asks whether
+  // a clock reading actually reached it.
+  it('no entry carries a PRESENT BUT EMPTY `at`, which the row above cannot see', () => {
+    // THE DEFECT (2026-09-16, hit live by the empyrean hub, caught here before it
+    // cost us an entry): the standing rule is that `at` comes from `date -u`,
+    // never from a session's own sense of the time. It can be OBEYED and the
+    // field still arrive empty:
+    //
+    //     NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ) python3 - "$NOW"   # "$NOW" is EMPTY
+    //
+    // An assignment used as a command PREFIX is not in scope for the expansion on
+    // that same line. The clock was read correctly and the value was dropped in
+    // transit, and nothing in the output says so.
+    //
+    // The rule guards against a session INVENTING a number and is structurally
+    // blind to a correct number that never arrives. `typeof obj.at !== 'string'`
+    // is blind the same way: `typeof '' === 'string'`, so an empty timestamp is
+    // indistinguishable from a good one to the row above. `scripts/append-lane-log.mjs`
+    // already refuses this at WRITE time (`!entry[k]`), but that is a producer-side
+    // guard on a path anyone can walk around -- this lane appended an entry by hand
+    // on 2026-09-16 and bypassed it. A gate that only guards the door you chose to
+    // use is a habit. This row reads the committed file, so it judges entries
+    // however they got there.
+    const lines = entryLines(readFileSync(path, 'utf8'));
+    const parsed: { lineNo: number; obj: Record<string, unknown> }[] = [];
+    for (const { lineNo, text } of lines) {
+      try {
+        parsed.push({ lineNo, obj: JSON.parse(text) as Record<string, unknown> });
+      } catch {
+        /* the parseability row owns this failure and reports it properly */
+      }
+    }
+    expect(
+      parsed.length,
+      `no parseable entries in ${rel}: this row examined nothing, so its green would mean nothing`,
+    ).toBeGreaterThan(0);
+
+    // Whitespace counts as empty: a field holding " " reached the record with no
+    // reading in it either, and it renders as a blank cell in the console exactly
+    // the same way.
+    const blank = parsed
+      .filter(({ obj }) => typeof obj.at === 'string' && obj.at.trim() === '')
+      .map(({ lineNo }) => `${rel}:${lineNo}: \`at\` is present but empty`);
+
+    expect(
+      blank,
+      `a present-but-empty timestamp is a field that LOOKS like a measurement and is not:\n  ${blank.join('\n  ')}`,
+    ).toEqual([]);
+  });
 });
