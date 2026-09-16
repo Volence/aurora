@@ -203,9 +203,10 @@ Everything in §1 through §7 stands unless that verdict says otherwise, and the
 
 ### 8.1 RULED: the name is on every label, ALWAYS — and one of the three flagged items is settled here
 
-*Appended by the overseer 2026-09-16. The verdict is at empyrean `d945eb0`,
-`docs/superpowers/notes/2026-09-16-region-background-label-ruling.md`. Read it there; this is a
-pointer and a settlement, not a summary of it. Overturnable by one word from him.*
+*Appended by the overseer 2026-09-16. The verdict is at
+empyrean `d945eb0`, `docs/superpowers/notes/2026-09-16-region-background-label-ruling.md`.
+Read it there; this is a pointer and a settlement, not a summary of it. Overturnable by one
+word from him.*
 
 **It CONFIRMS §7's choice rather than replacing it**, and the hub verified that distinction
 against `4414f8ce` §7 itself rather than against the agent's citation of it — an agent that
