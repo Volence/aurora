@@ -224,3 +224,38 @@ No emulator was called and none may be from a background agent.
    reads as two things are the owner's eye and 8B's CDP harness, in the foreground.
 5. **No lane-log entry was written.** The landing procedure is the controller's and a
    same-second ledger entry refuses a landing.
+
+---
+
+## Overseer's landing note, 2026-09-16 — merged at master `1e2b1bd2`
+
+**Re-verified on the MERGED tree**, not taken from the packet: `npm test`, foreground,
+exit 0, **640 files passed / 3 skipped (643); 10,035 tests passed / 8 skipped (10,043)**.
+
+**One difference from the agent's own final run, named rather than papered over:** it
+reported 10,034 passed / 9 skipped, I measured 10,035 / 8. Same population (10,043) and
+same exit; one environment-conditional row ran for me that was skipped for the agent.
+This repo's `skip-report` gate makes that legible by construction — every skip names its
+reason — so the difference is accounted for by design rather than by my reading of it.
+It is NOT evidence about this parcel either way.
+
+**The premise under the design fork was checked firsthand before the merge, because the
+whole gesture model rests on it.** The agent resolved §3.2's *"drag inside a rect | move
+that rect"* against the Q1 carve ruling on the ground that a literal reading makes DRAW
+unreachable. That is true: `src/core/formats/regions/flatten.ts` throws a
+`RegionFlattenError` whenever `uncoveredRects` is non-empty — *"a hole is a place with no
+identity"* — so a document that can ship covers the act completely and has no empty ground
+for a plain drag to start on. Read at the merge commit, not from the packet's quotation of
+it. The resolution stands.
+
+**What I am NOT claiming.** Nothing here has been on a screen. The overlay's legibility
+over real level art, the orange/screen-frame pair, and the hue set's behaviour over a
+jungle palette are all untested by anything in this suite, and the palette work — good as
+its measurement is — is a simulation of a deuteranope's eye, not a person's. That is step
+8B's business and partly the owner's.
+
+**Both self-reported defects were the right call to report and neither changes the
+verdict.** The dirty-tree `git checkout --` contamination is invariant 8(b)'s exact named
+failure mode; it was caught by the agent, re-run from a committed baseline, and disclosed
+in the packet and the commit body. The M6 green-under-mutation was a vacuous row found by
+its own proof rather than by a reviewer, which is the instrument working.
