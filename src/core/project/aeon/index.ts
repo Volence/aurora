@@ -120,7 +120,11 @@ export const aeonAdapter: ProjectAdapter = {
         sprites: true,
         objects: 'json',
         build: false,
-        facets: ['layout', 'art', 'objects', 'rings', 'collision', 'palette', 'parallax'],
+        // `regions` is AEON-ONLY and deliberately absent from s1's grant: the
+        // document it edits is `{dataPath}regions.json` under an aeon act, and
+        // classic has no such file to offer.
+        facets: ['layout', 'art', 'objects', 'rings', 'collision', 'palette', 'parallax',
+          'regions'],
         // No 16px middle tier: the aeon ENGINE's 128px "block" is positional and
         // build-time, not an editor tier (spec §2.1). The editor's chunk is a
         // variable W×H stamp from the chunk library — pooled by id, but FLATTENED
