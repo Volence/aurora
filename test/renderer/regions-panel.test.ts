@@ -23,6 +23,7 @@ import {
   regionBindingCommand,
   regionBindingRows,
   regionBindingValue,
+  type RegionBindingKey,
   regionListRows,
   regionRectFindings,
   regionStatusRows,
@@ -370,6 +371,115 @@ describe('detach on edit and revert to inherited', () => {
     // ⚠ THE LOAD'S VERDICT IS NOT TOUCHED by an edit — step 5's M3.
     expect(act.regions.loadedPath).toBeNull();
     expect(act.regions.unreadable).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5b. A BINDING EDIT ON A REGION THAT IS SEVERAL ENTRIES (step 8B, item A)
+//
+// ⚠ EVERY ROW HERE ASSERTS ITS FIXTURE HOLDS ≥2 ENTRIES FOR THE ID *BEFORE*
+// THE EDIT. Without that floor each row passes identically on a single-entry
+// document — which is the shape that hid this defect for two steps: `findIndex`
+// edits entry 0, and on a one-entry region entry 0 IS the region.
+// ---------------------------------------------------------------------------
+
+/**
+ * `forest` as TWO entries, `night` as one — the shape a carve produces
+ * (`applyRegionGestureToDocument`: one `rect` per entry, so a region's area is a
+ * SET of entries).
+ *
+ * THE TWO `forest` ENTRIES ARE NOT ADJACENT, deliberately: `night` sits between
+ * them, so a fix that walks a contiguous run from the first match, or that stops
+ * at the second entry, fails here instead of passing by luck of the ordering.
+ */
+function carvedDoc(): RegionsDocument {
+  return docOf(
+    region({ id: 'forest', name: 'Forest', rect: { x: 0, y: 0, w: HALF, h: HALF } }),
+    region({ id: 'night', name: 'Night', rect: { x: HALF, y: 0, w: HALF, h: ACT.actH } }),
+    region({ id: 'forest', name: 'Forest', rect: { x: 0, y: HALF, w: HALF, h: HALF } }),
+  );
+}
+
+/** Every entry carrying `id`, in document order. The population each row edits. */
+const entriesOf = (doc: RegionsDocument, id: string) => doc.regions.filter((r) => r.id === id);
+
+/**
+ * A legal value for each binding, taken from the SAME vocabulary the panel's
+ * pickers offer, so no row asserts against a value the app could not produce.
+ */
+const A_VALUE: Record<RegionBindingKey, string> = {
+  preset: 'OJZ_Preset_Night',
+  scene: 'ojz_act1_start',
+  raster: 'ojz_sec5_showcase',
+  bg: 'cave_bg',
+};
+
+/** Every binding key's value on one entry — the census each row compares. */
+const bindingCensus = (r: Region) =>
+  BINDING_ORDER.map((k) => `${k}=${JSON.stringify(regionBindingValue(r, k))}`).join(' ');
+
+describe('a binding edit reaches EVERY entry of a multi-entry region (step 8B item A)', () => {
+  it('after an edit on ANY key, every entry of that id agrees on EVERY key', () => {
+    // The population is BINDING_ORDER, derived from the module, not a list of
+    // four keys typed here that would silently stop covering a fifth.
+    for (const key of BINDING_ORDER) {
+      const doc = carvedDoc();
+      // ⚠ THE ANTI-VACUOUS FLOOR. Without this the whole loop passes on a
+      // one-entry document, where "every entry agrees" is trivially true.
+      const before = entriesOf(doc, 'forest');
+      expect(before.length).toBeGreaterThanOrEqual(2);
+
+      const next = setRegionBinding(doc, 'forest', key, A_VALUE[key]);
+      expect(next, `${key}: the edit itself must not be refused`).not.toBeNull();
+
+      const after = entriesOf(next!, 'forest');
+      expect(after.length, `${key}: no entry may be added or dropped`).toBe(before.length);
+      // THE PROPERTY, as a CENSUS over every key and not just the edited one: a
+      // fix that wrote `key` to every entry but left the other three as they
+      // were on entry 0 would still leave the pieces disagreeing.
+      const censuses = new Set(after.map(bindingCensus));
+      expect([...censuses], `${key}: the pieces of one region must agree`).toHaveLength(1);
+      // And the edit actually landed — otherwise "they all agree" is satisfied
+      // by a function that wrote nothing at all.
+      for (const r of after) expect(regionBindingValue(r, key)).toBe(A_VALUE[key]);
+    }
+  });
+
+  it('no OTHER region\'s entries change when one region\'s binding is edited', () => {
+    const doc = carvedDoc();
+    expect(entriesOf(doc, 'forest').length).toBeGreaterThanOrEqual(2);
+    const nightBefore = JSON.stringify(entriesOf(doc, 'night'));
+    // The control: `night` is a region this document really has, so an empty
+    // "nothing changed" is not what is being measured.
+    expect(entriesOf(doc, 'night')).toHaveLength(1);
+
+    for (const key of BINDING_ORDER) {
+      const next = setRegionBinding(carvedDoc(), 'forest', key, A_VALUE[key])!;
+      expect(JSON.stringify(entriesOf(next, 'night')), `${key}`).toBe(nightBefore);
+    }
+  });
+
+  it('entries that have DRIFTED apart are repaired, never read as "already that value"', () => {
+    // The document the old short-circuit could not fix: entry 0 already carries
+    // the value the author is asking for, and the other entry does not. Asking
+    // the FIRST entry alone answers "no-op" and the disagreement becomes
+    // unfixable from the panel.
+    const doc = carvedDoc();
+    doc.regions[0].sceneRef = 'ojz_act1_start';
+    const drifted = entriesOf(doc, 'forest');
+    expect(drifted.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(drifted.map(bindingCensus)).size,
+      'the fixture must actually be drifted, or this row measures nothing').toBe(2);
+
+    const next = setRegionBinding(doc, 'forest', 'scene', 'ojz_act1_start');
+    expect(next, 'a drifted id must not short-circuit').not.toBeNull();
+    const after = entriesOf(next!, 'forest');
+    expect(new Set(after.map(bindingCensus))).toHaveLength(1);
+    for (const r of after) expect(r.sceneRef).toBe('ojz_act1_start');
+
+    // THE CONTROL, so the row above is not just "this function never returns
+    // null": with every entry already agreeing, the same call IS a no-op.
+    expect(setRegionBinding(next!, 'forest', 'scene', 'ojz_act1_start')).toBeNull();
   });
 });
 

@@ -381,34 +381,8 @@ export function regionBindingRows(
 // Detach on edit, and revert
 // ---------------------------------------------------------------------------
 
-/**
- * Set one binding of one region, returning a NEW document. `null` reverts to
- * inherited; anything else detaches.
- *
- * Returns null when the edit is a no-op or is refused, so the caller pushes no
- * undo entry — the `run(command)` null-guard's own rule. Two refusals:
- *   • `preset` cannot be null (the schema's `required`, and there is nothing to
- *     inherit from);
- *   • a value identical to the current one.
- *
- * THE WHOLE DOCUMENT IS CLONED, not spliced in place. `SetRegionsCommand`
- * records whole old/new halves and `writeActRegionsDocument` clones again on the
- * way in; a shared nested object between the two halves is the aliasing defect
- * step 5's M1 mutation exists to catch, reintroduced one layer up.
- */
-export function setRegionBinding(
-  doc: RegionsDocument,
-  regionId: string,
-  key: RegionBindingKey,
-  value: string | null,
-): RegionsDocument | null {
-  if (key === 'preset' && value === null) return null;
-  const index = doc.regions.findIndex((r) => r.id === regionId);
-  if (index < 0) return null;
-  if (regionBindingValue(doc.regions[index], key) === value) return null;
-
-  const next = cloneRegionsDocument(doc);
-  const region = next.regions[index];
+/** Write one binding into ONE entry, in place. The four keys' arms, once. */
+function writeRegionBinding(region: Region, key: RegionBindingKey, value: string | null): void {
   if (key === 'preset') region.preset = value as string;
   else if (key === 'scene') region.sceneRef = value;
   else if (key === 'raster') region.rasterRef = value;
@@ -424,6 +398,71 @@ export function setRegionBinding(
       region.bg = { ...(region.bg ?? {}), layoutRef: value };
     }
   }
+}
+
+/**
+ * Set one binding of one region, returning a NEW document. `null` reverts to
+ * inherited; anything else detaches.
+ *
+ * ═══ EVERY ENTRY SHARING THE ID IS EDITED, NOT THE FIRST ═══════════════════
+ *
+ * A REGION WITH SEVERAL RECTANGLES IS SEVERAL `regions[]` ENTRIES SHARING AN
+ * `id`, and that is forced rather than chosen: the landed contract carries one
+ * `rect` per entry (`aurora-regions.schema.json`), an L-shape is two engine
+ * rows (spec §2.1), and a carve splits one rectangle into as many as four.
+ * `applyRegionGestureToDocument`'s docblock states the invariant that pairs
+ * with this one — EVERY ENTRY OF ONE ID CARRIES IDENTICAL BINDINGS — and
+ * copies the bindings onto each piece it makes. A binding edit is the other
+ * half of that contract: this function must leave every piece agreeing, or one
+ * click on a carved region's `scene` picker silently gives its pieces two
+ * different scenes and the ROM two different answers for one named region.
+ *
+ * Until step 8B this used `findIndex` and edited only the FIRST entry. It was
+ * latent because nothing called the gesture layer; wiring the map is what makes
+ * a multi-entry region reachable, so the fix lands with the wiring.
+ *
+ * ═══ WHICH ENTRY IS THE REPRESENTATIVE, AND FOR WHAT ═══════════════════════
+ *
+ * For DISPLAY the representative is the FIRST entry with the id: that is what
+ * `regionsPanelState` resolves with `.find()` and hands to `regionBindingRows`,
+ * and it is what `applyRegionGestureToDocument` takes its template from.
+ *
+ * FOR THE NO-OP SHORT-CIRCUIT THERE IS NO REPRESENTATIVE, deliberately. The
+ * refusal is "every entry already carries this value", never "the first one
+ * does". A document whose entries have DRIFTED apart — hand-edited, or written
+ * by some future writer that does not hold the invariant — must not be read as
+ * already-that-value and skipped, because that is exactly the document a
+ * binding edit has to repair. Asking the first entry alone would refuse the one
+ * edit that converges them, and the disagreement would be unfixable from the
+ * panel. So a drifted id always writes, and writing always converges.
+ *
+ * Returns null when the edit is a no-op or is refused, so the caller pushes no
+ * undo entry — the `run(command)` null-guard's own rule. Two refusals:
+ *   • `preset` cannot be null (the schema's `required`, and there is nothing to
+ *     inherit from);
+ *   • a value every entry of the id already carries.
+ *
+ * THE WHOLE DOCUMENT IS CLONED, not spliced in place. `SetRegionsCommand`
+ * records whole old/new halves and `writeActRegionsDocument` clones again on the
+ * way in; a shared nested object between the two halves is the aliasing defect
+ * step 5's M1 mutation exists to catch, reintroduced one layer up.
+ */
+export function setRegionBinding(
+  doc: RegionsDocument,
+  regionId: string,
+  key: RegionBindingKey,
+  value: string | null,
+): RegionsDocument | null {
+  if (key === 'preset' && value === null) return null;
+  const indices: number[] = [];
+  for (let i = 0; i < doc.regions.length; i += 1) {
+    if (doc.regions[i].id === regionId) indices.push(i);
+  }
+  if (indices.length === 0) return null;
+  if (indices.every((i) => regionBindingValue(doc.regions[i], key) === value)) return null;
+
+  const next = cloneRegionsDocument(doc);
+  for (const i of indices) writeRegionBinding(next.regions[i], key, value);
   return next;
 }
 
