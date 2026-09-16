@@ -280,7 +280,8 @@ export interface DescriptorEffectsRows {
  * contents replaced by spaces. OFFSETS AND NEWLINES ARE PRESERVED, so a match
  * in the result has the same index, and the same line, as in the original.
  * `.emp` has no block comment in any file this module reads (checked at aeon
- * `31c0ddd8` and `6bd8ed89`), so none is handled.
+ * `31c0ddd8`, `6bd8ed89` and, for regions step 5, `807bfdd5`), so none is
+ * handled.
  */
 function maskCommentsAndStrings(src: string): string {
   const out = src.split('');

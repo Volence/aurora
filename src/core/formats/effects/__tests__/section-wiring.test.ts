@@ -203,19 +203,58 @@ const LIB = `aeon:${LIB_REL}@${AEON_PIN.slice(0, 8)}`;
 
 /**
  * THE AEON REVISION THE CURRENCY ROWS READ: aeon's published act 1 AFTER
- * regions step 4 (`1a657990`), with the section bindings in the region table
- * `OJZ_ACT1_REGION_ROWS`. A full SHA, so it cannot move.
+ * regions step 5, the commit that added the NIGHT region — the act's first
+ * identity edge off the section grid, and its first region row with no section
+ * key at all. A full SHA, so it cannot move.
  *
- * WHY THIS ONE (2026-09-14): it was aeon `origin/master`'s tip when this parcel
- * was cut, and the three blobs these rows read (act_descriptor `a25f55e7`,
- * ojz_effects `86b630e9`, effects_gen `0ba8a14c`) are byte-identical at aeon
- * `eec81e48`, the revision aeon's own answer was read at
- * (docs/reviews/2026-09-14-aeon-answer-sections-0-7.md). It is deliberately NOT
- * `origin/master`: a later aeon (its step 5 adds a region row with no section
- * key) is measured against the file when it is published, by re-pinning here
- * and re-running the derivation in the packet, never by following a branch.
+ * RE-PINNED 2026-09-15 (SECTIONS-STEP5-KEYLESS-ROW, packet
+ * docs/reviews/2026-09-15-sections-step5-keyless-row.md), from
+ * `6bd8ed8925d292d5f70f13ea24302161bef405bc`, which predates step 5 and so
+ * could not answer whether the reader surfaces a sectionless region at all.
+ *
+ * DERIVED FROM `git log`, NOT TAKEN FROM A QUEUE ROW. `git -C <aeon> log
+ * origin/master -- <act_descriptor.emp> <ojz_effects.emp>` names, newest first,
+ * `8fd994c7`, `7de53e2e`, `807bfdd5`, `1a657990`, … `807bfdd5` is
+ * "content(REGIONS-P2): the night region", it is an ancestor of aeon
+ * `origin/master`, and the two blobs these rows read at it are act_descriptor
+ * `a0b99cd3` and ojz_effects `8907dff1`. (Aurora's own queue row cited
+ * `b010032e` for step 5; `git show --stat b010032e` is a one-line change to
+ * `docs/decisions.jsonl` and touches neither file. A SHA in a queue row is a
+ * claim, not a measurement.)
+ *
+ * ⚠ WHY NOT THE NEWER TWO, WHICH IS A JUDGEMENT AND SO IS WRITTEN DOWN.
+ * `7de53e2e` ("fixture(REGIONS-P2 E2): a DEBUG-only palette SNAP edge at
+ * x=5600") adds a SECOND key-less row, and `8fd994c7` carries the same
+ * descriptor blob. Measured against both: the reader returns the same nine
+ * bindings and TWO unkeyed rows, `OJZ_Preset_NightSnap` at line 592 ahead of
+ * `OJZ_Preset_Night` at line 624. Two reasons this block stops short of them,
+ * and neither is that the newer text is harder to type:
+ *
+ *   1. THE SECOND INSTRUMENT'S OWN VALIDITY BECOMES UNMEASURABLE. `regionRowsByLine`
+ *      is only valid while the table is one row per line, and it asserts that by
+ *      comparing its row-line count to the DECLARED arity. At `807bfdd5` the
+ *      declaration is `[Region; 10]`, a literal. At `7de53e2e` it is
+ *      `[Region; OJZ_ACT1_REGION_ROW_COUNT]`, and that constant is
+ *      `10 + OJZ_E2_SNAP_ROWS_LEN` over `OJZ_E2_SNAP_ROWS = if DEBUG == 1 { … }
+ *      else { [] }` — two values, not one, and no static reader of that file can
+ *      say which. An arity that cannot be resolved is a BLOCKED row, never a
+ *      typed 10, so pinning there would have cost the precondition that makes
+ *      the instrument mean anything.
+ *   2. THE EXTRA ROW IS NOT SHIPPED BYTES. aeon's own comment above it: "THE
+ *      RELEASE TABLE IS UNTOUCHED. With DEBUG == 0 the extra row is `[]` … so
+ *      `OJZ_ACT1_REGION_ROWS` is the same ten rows". Whether Aurora should
+ *      surface a row that exists only under aeon's DEBUG flag is a product
+ *      question this block has no standing to settle, and a currency row that
+ *      quietly settled it would be the wrong place to find that out.
+ *
+ * WHAT A LATER RE-PIN OWES. Past `7de53e2e` the declared-arity assertion and the
+ * "exactly one key-less row" derivation both have to be re-cut — the first
+ * against a constant whose value depends on `DEBUG`, the second against a list
+ * of key-less rows rather than one. Re-pin by re-running the `git log` above and
+ * re-deriving, never by following a branch: `AEON_TIP` is the only thing in this
+ * file that may move on its own.
  */
-const AEON_REGIONS_PIN = '6bd8ed8925d292d5f70f13ea24302161bef405bc';
+const AEON_REGIONS_PIN = '807bfdd5c723c3eebf7fd613ef40a9709836d3cd';
 const regions = openAeonAt(AEON_REGIONS_PIN);
 const regionsProvenance = regions.ok ? regions.provenance : '';
 const regionsDesc = regions.ok ? readAeon(regions, DESC_REL) : '';
@@ -301,8 +340,14 @@ describe('the parse has no window: the defect that produced a wrong answer', () 
 // They are shaped like aeon's region rows because that is the shape the reader
 // has to survive, and they claim nothing about any aeon file: the rows that read
 // aeon are the pinned blocks further down. In particular the key-less row below
-// is NOT aeon's step-5 row, which was unpublished when this was written; it is
-// the smallest text that has no section key.
+// is NOT aeon's step-5 row; it is the smallest text that has no section key.
+//
+// ⚠ AMENDED 2026-09-15 (SECTIONS-STEP5-KEYLESS-ROW). When this was written
+// aeon's step-5 row was unpublished, so NOTHING read a real key-less row. It is
+// published now (aeon `807bfdd5`, the night region), and the last block of this
+// file reads it at `AEON_REGIONS_PIN`. These fixtures stay: they cover the
+// shapes that tree still cannot produce — two keys in one call, a key-less row
+// between two keyed ones, a file where NO row is keyed.
 
 /** Lines joined with '\n', so a fixture's line numbers are its argument positions + 1. */
 const lines = (...ls: string[]): string => ls.join('\n');
@@ -1536,6 +1581,17 @@ describe('against aeon\'s real ojz/act1: which sections are structurally barred'
 // with the bindings in `OJZ_ACT1_REGION_ROWS`, through git objects like the rest
 // of this file. aeon's working tree is never opened.
 //
+// ⚠ AMENDED 2026-09-15 (SECTIONS-STEP5-KEYLESS-ROW; packet
+// docs/reviews/2026-09-15-sections-step5-keyless-row.md). The pin moved forward
+// to aeon `807bfdd5`, regions step 5, where the table carries a TENTH row with
+// no section key: the night region, the act's first identity edge off the
+// section grid. So the table is no longer nine keyed rows, and every row in this
+// block that iterated `t.rows` as though each had a key now splits KEYED from
+// KEY-LESS and says which it is asserting about. The two new rows at the end
+// are the reader against that row and the control that it is the row off the
+// grid; `AEON_REGIONS_PIN`'s docblock says why the pin is this revision and not
+// the two newer ones.
+//
 // ⚠ THE EXPECTATIONS COME FROM A SECOND INSTRUMENT, NOT FROM THE READER. A reader
 // checked against itself is green whatever it does. So the map these rows
 // expect comes from `regionRowsByLine`, which reads the table one physical line
@@ -1545,33 +1601,111 @@ describe('against aeon\'s real ojz/act1: which sections are structurally barred'
 // readings are asserted too, as what both instruments returned at this pin, so
 // the two drifting together is red as well.
 
+/** One line of aeon's region table as the second instrument reads it. */
+type LineRow = {
+  line: number;
+  presets: string[];
+  secs: number[];
+  effectsBeforeSec: boolean;
+  /** The raw `x0:`…`y1:` argument text, UNRESOLVED: a literal or a constant expression. */
+  x0: string | null;
+  x1: string | null;
+  y0: string | null;
+  y1: string | null;
+};
+
 /**
  * aeon's region table read ONE PHYSICAL LINE AT A TIME: for each row line, the
- * `effects:` and the `sec:` written on that same line. Valid only while the
- * table is written one row per line, which it is at `AEON_REGIONS_PIN`, so the
- * row that uses it ASSERTS that formatting (declared length equals row lines,
- * one of each per line) instead of assuming it.
+ * `effects:`, the `sec:` and the x edges written on that same line. Valid only
+ * while the table is written one row per line, which it is at
+ * `AEON_REGIONS_PIN`, so the rows that use it ASSERT that formatting (declared
+ * length equals row lines, one `effects:` per line) instead of assuming it.
+ *
+ * ⚠ IT DOES NOT ASSUME EVERY ROW HAS A KEY, and since 2026-09-15 that is the
+ * point rather than caution. At `807bfdd5` the table's tenth row is the night
+ * region, which carries no `parallax:` and so no `sec:` at all. `secs` is
+ * therefore reported as written — one entry on the nine section rows, none on
+ * that one — and each caller says which population it is asserting about. A
+ * `secs[0]` read over the whole table would have been `undefined` on the last
+ * row, which `toBe`/`toEqual` would have compared against a missing binding and
+ * called equal.
+ *
+ * The four edges come back as TEXT and not as numbers on purpose: at this pin
+ * four of the forty are constant expressions (`OJZ_NIGHT_X0 - 1`), and turning
+ * those into a number is `resolveEdge`'s job, which refuses what it cannot
+ * resolve instead of yielding NaN.
  */
 function regionRowsByLine(desc: string, constName: string): {
   declared: number | null;
-  rows: { line: number; presets: string[]; secs: number[]; effectsBeforeSec: boolean }[];
+  rows: LineRow[];
 } {
   const ls = desc.split('\n');
   const start = ls.findIndex((l) => new RegExp(`^\\s*(?:pub\\s+)?const\\s+${constName}\\s*:`).test(l));
   if (start < 0) return { declared: null, rows: [] };
   const declared = /\[\s*Region\s*;\s*(\d+)\s*\]/.exec(ls[start]);
-  const rows: { line: number; presets: string[]; secs: number[]; effectsBeforeSec: boolean }[] = [];
+  const rows: LineRow[] = [];
   for (let i = start + 1; i < ls.length && !/^\s*\]\s*$/.test(ls[i]); i++) {
     const code = ls[i].split('//')[0];
     if (!/^\s*ojz_region\s*\(/.test(code)) continue;
+    const edge = (name: string): string | null => {
+      const m = new RegExp(`\\b${name}\\s*:\\s*([^,)]+)`).exec(code);
+      return m ? m[1].trim() : null;
+    };
     rows.push({
       line: i + 1,
       presets: [...code.matchAll(/\beffects\s*:\s*([A-Za-z_]\w*)/g)].map((m) => m[1]),
       secs: [...code.matchAll(/\bsec\s*:\s*(\d+)/g)].map((m) => Number(m[1])),
       effectsBeforeSec: code.search(/\beffects\s*:/) < code.search(/\bsec\s*:/),
+      x0: edge('x0'),
+      x1: edge('x1'),
+      y0: edge('y0'),
+      y1: edge('y1'),
     });
   }
   return { declared: declared ? Number(declared[1]) : null, rows };
+}
+
+/**
+ * THE VALUE OF A `const NAME = <integer>` IN THE DESCRIPTOR, or null.
+ *
+ * ⚠ WHY THIS EXISTS AT ALL, and why null is not 0. The night region's edges are
+ * NOT written as numbers in aeon's table: the row says `x0: OJZ_NIGHT_X0,
+ * x1: OJZ_NIGHT_X1`. An expectation that types those values in is a number
+ * copied out of a summary, and it would still read green on the day aeon moves
+ * the edge — which is the whole failure mode this file's banner is about. So the
+ * rows below resolve the constant out of the SAME bytes they are asserting on.
+ *
+ * It resolves a plain integer initializer and nothing else: no arithmetic, no
+ * `if`, no forwarding to another name. Anything else is null, and a caller that
+ * gets null must say it could not measure rather than substitute a value.
+ * Comments are stripped first so `// OJZ_NIGHT_X0 = 9999` in prose cannot win,
+ * and a name declared twice is null for the same reason a grep with two hits
+ * answers no question.
+ */
+function resolveIntConst(desc: string, name: string): number | null {
+  const code = desc.split('\n').map((l) => l.split('//')[0]).join('\n');
+  const hits = [...code.matchAll(
+    new RegExp(`^[ \\t]*(?:pub[ \\t]+)?const[ \\t]+${name}[ \\t]*=[ \\t]*(-?\\d+)[ \\t]*$`, 'gm'),
+  )];
+  return hits.length === 1 ? Number(hits[0][1]) : null;
+}
+
+/**
+ * One `x0:`/`x1:` argument as a number: a literal, a constant, or a constant
+ * plus or minus a literal. Null when the text is any other shape or the
+ * constant does not resolve — never a fallback.
+ */
+function resolveEdge(desc: string, text: string | null): number | null {
+  if (text === null) return null;
+  if (/^-?\d+$/.test(text)) return Number(text);
+  const plain = /^([A-Za-z_]\w*)$/.exec(text);
+  if (plain) return resolveIntConst(desc, plain[1]);
+  const shifted = /^([A-Za-z_]\w*)\s*([+-])\s*(\d+)$/.exec(text);
+  if (shifted) {
+    const base = resolveIntConst(desc, shifted[1]);
+    return base === null ? null : base + (shifted[2] === '+' ? 1 : -1) * Number(shifted[3]);
+  }
+  return null;
 }
 
 /**
@@ -1634,6 +1768,19 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
     expect(t.rows.length, `${where}: one row line per declared entry`).toBe(t.declared);
     return t;
   };
+  /**
+   * THE TWO POPULATIONS THE TABLE NOW HAS, kept apart everywhere below.
+   *
+   * Before regions step 5 every row carried a key and `t.rows` was the section
+   * rows. Since aeon `807bfdd5` it is not: the night region is a row with no
+   * `sec:` at all. Reading `secs[0]` over the whole table would hand `undefined`
+   * to assertions that compare it against a section's missing binding and find
+   * them equal, so each row below names the population it is about.
+   */
+  const keyed = (t: ReturnType<typeof regionRowsByLine>): LineRow[] =>
+    t.rows.filter((r) => r.secs.length === 1);
+  const keyless = (t: ReturnType<typeof regionRowsByLine>): LineRow[] =>
+    t.rows.filter((r) => r.secs.length === 0);
 
   it('the run SAID it read aeon at AEON_REGIONS_PIN, out of the object database', (ctx) => {
     if (!need(ctx)) return;
@@ -1644,35 +1791,52 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
     expect(regionsProvenance, 'the stamp declares itself incomplete').not.toContain('PROVENANCE INCOMPLETE');
   });
 
-  it('the second instrument SAW the table: one line per declared row, one preset and one key on each', (ctx) => {
+  it('the second instrument SAW the table: one line per declared row, one preset on each, at most one key', (ctx) => {
     if (!need(ctx)) return;
     const t = regionRowsByLine(desc, 'OJZ_ACT1_REGION_ROWS');
     expect(t.declared, `no [Region; N] declaration of OJZ_ACT1_REGION_ROWS in ${where}: the table `
-      + 'moved or was renamed; re-read the file before touching this row').not.toBeNull();
+      + 'moved, was renamed, or spells its arity as a constant rather than a literal (aeon '
+      + '7de53e2e does). Re-read the file and AEON_REGIONS_PIN\'s docblock before touching this row')
+      .not.toBeNull();
     expect(t.rows.length, `${where}: one row line per declared entry`).toBe(t.declared);
     for (const r of t.rows) {
       expect(r.presets, `${where} line ${r.line}: exactly one effects:`).toHaveLength(1);
-      expect(r.secs, `${where} line ${r.line}: exactly one sec:`).toHaveLength(1);
-      // THE TRAP'S PRECONDITION, measured here rather than taken from aeon's
-      // message: on every row the preset is written BEFORE the key.
+      expect(r.secs.length, `${where} line ${r.line}: a row keyed to several sections. This `
+        + 'instrument reads one line as one row, and a row naming two sections is a shape it '
+        + 'cannot split').toBeLessThanOrEqual(1);
+    }
+    // THE TRAP'S PRECONDITION, measured here rather than taken from aeon's
+    // message: on every row that HAS a key the preset is written before it.
+    for (const r of keyed(t)) {
       expect(r.effectsBeforeSec, `${where} line ${r.line}: effects: before sec:`).toBe(true);
     }
     // And every row names a DIFFERENT preset, so a neighbour shift is visible to
     // the pairing row below rather than landing on an equal value.
     expect(new Set(t.rows.map((r) => r.presets[0])).size, `${where}: the presets are distinct`)
       .toBe(t.rows.length);
+    // THE READING AT THIS PIN, stated so the split itself is pinned: the table
+    // is ten rows, nine of them keyed and exactly one of them key-less. A pin
+    // moved back before regions step 5 makes the last number 0 and reddens here
+    // rather than making the two key-less rows below pass over nothing.
+    expect([t.rows.length, keyed(t).length, keyless(t).length], `${where}: rows, keyed, key-less`)
+      .toEqual([10, 9, 1]);
   });
 
-  it('THE READER AGAINST IT: one binding per region row, none unkeyed, none contested', (ctx) => {
+  it('THE READER AGAINST IT: one binding per KEYED region row, none contested', (ctx) => {
     if (!need(ctx)) return;
     const t = table();
     const expected: Record<number, string> = {};
-    for (const r of t.rows) expected[r.secs[0]] = r.presets[0];
+    for (const r of keyed(t)) expected[r.secs[0]] = r.presets[0];
     const rows = descriptorEffectsRows(desc, 'ojz');
     expect(rows.bindings, `the reader disagrees with the region table read line by line in ${where}`)
       .toEqual(expected);
-    expect(rows.unkeyed, `${where}: a row the reader could not key`).toEqual([]);
     expect(rows.contested, `${where}: a section two rows disagree about`).toEqual([]);
+    // The KEY-LESS rows are this block's last two rows, not this one's: here it
+    // only matters that a row with no key bought no section a binding.
+    for (const r of keyless(t)) {
+      expect(Object.values(rows.bindings), `${where} line ${r.line}: ${r.presets[0]} has no `
+        + 'section key, so no section may be bound to it').not.toContain(r.presets[0]);
+    }
     // THE READING AT THIS PIN, as both instruments return it (and as aeon's
     // answer states it, which is a claim this row checked, not its source).
     expect(Object.keys(rows.bindings).map(Number), where).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
@@ -1680,10 +1844,6 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
       'OJZ_Preset_Sec0', 'OJZ_Preset_Sec1', 'OJZ_Preset_Sec2', 'OJZ_Preset_Sec3', 'OJZ_Preset_Depth',
       'OJZ_Preset_Sec5', 'OJZ_Preset_Sec6', 'OJZ_Preset_Sec7', 'OJZ_Preset_Plain',
     ]);
-    // ANTI-VACUOUS FOR `unkeyed: []`: this very file carries the declaration that
-    // WOULD be a key-less row if the reader took it for one.
-    expect(desc, `${where}: the ojz_region declaration this row relies on`)
-      .toMatch(/comptime fn ojz_region\([^)]*effects: Label/);
   });
 
   it('THE PAIRING TRAP: no section is given its neighbour\'s preset', (ctx) => {
@@ -1692,9 +1852,16 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
     // row above measures it), so a reader that finds `sec: N` and searches
     // FORWARD for `effects:` gives section N the NEXT row's preset and still
     // returns a tidy map.
+    //
+    // THE NEIGHBOUR IS TAKEN FROM THE WHOLE TABLE AND THE CLAIM FROM THE KEYED
+    // ROWS. The night region is the last line, so the last KEYED row's forward
+    // neighbour is a key-less one: a forward-searching reader would hand section
+    // 8 `OJZ_Preset_Night`, and only a `next` drawn from every row can name that
+    // in the message.
     const t = table();
     const b = descriptorEffectsRows(desc, 'ojz').bindings;
     t.rows.forEach((own, i) => {
+      if (own.secs.length !== 1) return;
       const next = t.rows[i + 1];
       expect(b[own.secs[0]], `section ${own.secs[0]} (${where} line ${own.line}) must bind `
         + `${own.presets[0]}, the preset in its own row`
@@ -1705,10 +1872,15 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
   it('THE LOAD\'S READING IS PARSED: condition 1 answers, the act-sets line has its inputs, no "could not read"', (ctx) => {
     if (!need(ctx)) return;
     const w = loaded();
-    const n = table().rows.length;
+    // THE SECTION COUNT IS THE KEYED ROWS, NOT THE TABLE'S LENGTH. Since regions
+    // step 5 the table has more rows than the act has sections, and `n` is fed
+    // to `ownPresetSections`/`wiredSections`/`armBarredSections` as "how many
+    // sections are there". Reading it off `t.rows.length` would have asked those
+    // three about a section 9 that does not exist and been answered without
+    // complaint.
+    const n = keyed(table()).length;
     expect(w.descriptor, `the load marks ${where} unparsed: ${w.descriptor.reason ?? ''}`)
       .toMatchObject({ parsed: true, read: true });
-    expect(w.unkeyedRows, where).toEqual([]);
     const CH = rasterChooserName('ojz', 'act1');
     for (let s = 0; s < n; s++) {
       const c1 = sectionWiringConditions(w, s, CH).ownPreset;
@@ -1727,14 +1899,16 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
     if (!need(ctx)) return;
     const w = loaded();
     const t = table();
-    const n = t.rows.length;
+    // The sections, not the rows — see the load row above for why the two are
+    // no longer the same number.
+    const n = keyed(t).length;
     const lib2 = presetsBindingPatched(lib);
     expect(lib2.declared, `aeon:${LIB_REL} at ${AEON_REGIONS_PIN}: the second instrument found `
       + 'fewer preset() records than there are sections, so it is not reading that file')
       .toBeGreaterThanOrEqual(n);
     expect(lib2.patched.size, 'the second instrument found no record binding patched:, so it '
       + 'measured nothing').toBeGreaterThan(0);
-    const derived = t.rows.filter((r) => lib2.patched.has(r.presets[0])).map((r) => r.secs[0])
+    const derived = keyed(t).filter((r) => lib2.patched.has(r.presets[0])).map((r) => r.secs[0])
       .sort((a, b) => a - b);
     expect(armBarredSections(w, n), `the barred set disagrees with the sections whose own row binds `
       + `a preset that passes patched:, derived independently from ${where}`).toEqual(derived);
@@ -1757,5 +1931,171 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
       expect(arm.verdict, `section ${s}`).toBe('open');
       expect(arm.record, `section ${s} binds a record`).not.toBeNull();
     }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // REGIONS STEP 5: the row that belongs to NO section (2026-09-15)
+  // ─────────────────────────────────────────────────────────────────────────
+  //
+  // `UnkeyedEffectsRow` was built on 2026-09-14 for a shape aeon had not shipped
+  // yet, so every row that exercised it was synthetic and nothing said the
+  // reader would meet the real one and recognise it. aeon `807bfdd5` ships it:
+  // the night region, one `ojz_region(...)` with no `parallax:` and therefore no
+  // `sec:`, cut out of the top row across the section line. These two rows are
+  // the pair that was owed — the reader against those bytes, and the control
+  // that the row it surfaced is that region and not any key-less text.
+
+  it('THE SECTIONLESS REGION: the key-less row is REPORTED, bound to no section, carried by the load', (ctx) => {
+    if (!need(ctx)) return;
+    const t = table();
+    const orphans = keyless(t);
+    // NOTHING HERE IS TYPED: the whole expectation is the second instrument's
+    // reading of the same bytes. `table()` has already asserted it saw the table
+    // and that the row count matches the declared arity, and the instrument row
+    // above pins the split at nine keyed and one key-less, so a pin that lost
+    // the night region reddens there rather than emptying this loop in silence.
+    expect(orphans.length, `${where}: no region row without a section key. This block is pinned `
+      + 'at aeon 807bfdd5 (regions step 5) for the night region; a pin before it cannot ask this '
+      + 'question, and a pin after it may have more than one such row').toBe(1);
+    const expected = orphans.map((r) => ({
+      preset: r.presets[0], constructorName: 'ojz_region', line: r.line, sectionKeys: [],
+    }));
+    const rows = descriptorEffectsRows(desc, 'ojz');
+    expect(rows.unkeyed, `the reader disagrees with the key-less rows read line by line in ${where}`)
+      .toEqual(expected);
+    // ⚠ THE DECLARATION IS THE ANTI-VACUOUS CONTROL FOR THE *EXACT* LIST ABOVE,
+    // and it belongs here rather than beside the bindings. This same file
+    // declares `comptime fn ojz_region(…, effects: Label, …)`, which a reader
+    // that did not exclude `fn` parameter lists would report as a key-less row
+    // naming a preset called `Label`. So `unkeyed` having exactly the table's
+    // one orphan in it is a statement about what the reader REFUSED as well as
+    // what it found.
+    expect(desc, `${where}: the ojz_region declaration this row's control relies on`)
+      .toMatch(/comptime fn ojz_region\([^)]*effects: Label/);
+    // A ROW THAT NAMES NO SECTION FALSIFIES NO SECTION'S READING, so the
+    // descriptor stays usable and the row travels with the wiring.
+    const w = loaded();
+    expect(w.descriptor, `a key-less row must not make ${where} unusable: `
+      + `${w.descriptor.reason ?? ''}`).toMatchObject({ parsed: true, read: true });
+    expect(w.unkeyedRows, `the load DROPPED the key-less row from ${where}`).toEqual(expected);
+    // And the bindings-only door has no seat for it, so it refuses by name
+    // rather than handing back the smaller map.
+    expect(() => descriptorEffectsBindings(desc, 'ojz'))
+      .toThrow(new RegExp(expected[0].preset));
+    // THE READING AT THIS PIN: aeon's night region, the act's first identity
+    // edge off the section grid. Its being that region, and not merely some row
+    // with no key, is the next row's subject.
+    expect(expected.map((e) => e.preset), where).toEqual(['OJZ_Preset_Night']);
+  });
+
+  it('AND IT IS THE ROW OFF THE SECTION GRID: its edges are CONSTANTS, resolved out of the same file', (ctx) => {
+    if (!need(ctx)) return;
+    const t = table();
+    const orphans = keyless(t);
+    expect(orphans.length, `${where}: no region row without a section key`).toBe(1);
+    const night = orphans[0];
+
+    // ⚠ THE EDGES ARE NAMED CONSTANTS AND THIS ROW MEASURES THAT FIRST. aeon's
+    // table says `x0: OJZ_NIGHT_X0, x1: OJZ_NIGHT_X1`, not two numbers. A
+    // previous relay of this row's subject arrived as the sentence "the night
+    // region is x 3400 to 4799", which is a value copied out of somebody's
+    // summary: type it in and this row stays green on the day aeon moves the
+    // edge, which is the one day it exists for.
+    expect(typeof night.x0 === 'string' && typeof night.x1 === 'string',
+      `${where} line ${night.line}: the instrument found no x0/x1 argument on the row at all `
+      + `(x0 ${String(night.x0)}, x1 ${String(night.x1)})`).toBe(true);
+    expect(night.x0, `${where} line ${night.line}: x0 is written as a bare number. The premise `
+      + 'of this row is that the edge is a NAME resolved out of the file; re-read the table '
+      + 'before relaxing it').not.toMatch(/^-?\d+$/);
+    expect(night.x1, `${where} line ${night.line}: x1 is written as a bare number`)
+      .not.toMatch(/^-?\d+$/);
+    const x0 = resolveEdge(desc, night.x0);
+    const x1 = resolveEdge(desc, night.x1);
+    // BLOCKED, NOT ASSUMED. `resolveEdge` returns null for any shape it cannot
+    // resolve, and this row goes red naming the text rather than substituting a
+    // number. The bytes WERE read (that is `need()`'s job), so this is a
+    // measured shape change and not a failure to look.
+    expect(x0, `${where} line ${night.line}: could not resolve x0 "${night.x0}" to an integer `
+      + 'out of this descriptor. NO VALUE IS SUBSTITUTED: re-read the file').not.toBeNull();
+    expect(x1, `${where} line ${night.line}: could not resolve x1 "${night.x1}" to an integer `
+      + 'out of this descriptor. NO VALUE IS SUBSTITUTED: re-read the file').not.toBeNull();
+
+    // THE SECTION GRID, and the first draft of this derivation was WRONG in a
+    // way worth recording: "every keyed row spans one section" is FALSE at this
+    // pin. Rows 1 and 2 were SHRUNK to make room for the night region, so the
+    // keyed x spans are three different numbers and no stride can be read off
+    // them. The instrument said so (three spans where one was asserted) rather
+    // than handing back the most common value.
+    //
+    // WHAT IS UNANIMOUS is the VERTICAL span: all ten rows, the night region
+    // included, are a full section tall, and every y edge in the table is a
+    // literal. That is the stride. It is cross-checked against the horizontal
+    // span of the rows the night region did NOT carve, so "the section is
+    // square" is measured on these bytes instead of assumed — and the two
+    // disagreeing reddens here rather than silently choosing one.
+    const spanOf = (rows: LineRow[], a: 'x0' | 'y0', b: 'x1' | 'y1'): number[] => [...new Set(rows
+      .map((r) => [resolveEdge(desc, r[a]), resolveEdge(desc, r[b])])
+      .filter((p): p is [number, number] => p[0] !== null && p[1] !== null)
+      .map(([lo, hi]) => hi - lo + 1))];
+    const tall = spanOf(t.rows, 'y0', 'y1');
+    expect(tall, `${where}: the region rows are not all one section tall, so no section grid can `
+      + 'be derived from them').toHaveLength(1);
+    const grid = tall[0];
+    expect(grid, `${where}: a zero or negative section height`).toBeGreaterThan(0);
+    const uncarved = keyed(t).filter((r) => /^\d+$/.test(r.x0 ?? '') && /^\d+$/.test(r.x1 ?? ''));
+    expect(uncarved.length, `${where}: fewer than two keyed rows keep both x edges as literals, `
+      + 'so the square-section cross-check below would rest on almost nothing')
+      .toBeGreaterThanOrEqual(2);
+    expect(spanOf(uncarved, 'x0', 'x1'), `${where}: the sections the night region did not carve `
+      + `are not ${grid}px wide, so the act's sections are not square and this row's stride is `
+      + 'the wrong one to test the x edges against').toEqual([grid]);
+
+    // THE PROPERTY THAT MAKES THE ROW KEY-LESS IN THE FIRST PLACE. aeon's own
+    // ensure beside these constants says it: an edge on a multiple of the
+    // section size "would be a section edge again". Neither edge of this region
+    // is on the grid, which is why no single section sidecar can key it, which
+    // is why Aurora has to report it instead of binding it.
+    expect(x0! % grid, `${where} line ${night.line}: x0 = ${x0} IS on the ${grid}px section grid, `
+      + 'so this region does not begin off it').not.toBe(0);
+    expect((x1! + 1) % grid, `${where} line ${night.line}: x1 + 1 = ${x1! + 1} IS on the ${grid}px `
+      + 'section grid, so this region does not end off it').not.toBe(0);
+    // AND IT STRADDLES A SECTION LINE: a region wholly inside one section could
+    // still have been keyed to that section. This one cannot be keyed to either
+    // of the two it overlaps, which is the reason there is no key to read.
+    expect(Math.floor(x1! / grid), `${where} line ${night.line}: the region lies inside one `
+      + 'section, so "no section owns it" is not established by its edges')
+      .toBeGreaterThan(Math.floor(x0! / grid));
+    // THE CARVE, from the other side and without the grid at all: the row to its
+    // left ENDS one pixel before it and the row to its right BEGINS one pixel
+    // after it, in the same y band, and those two rows are keyed to DIFFERENT
+    // sections. Two sections gave up part of their rectangle for this one.
+    const band = (r: LineRow): boolean =>
+      resolveEdge(desc, r.y0) === resolveEdge(desc, night.y0)
+      && resolveEdge(desc, r.y1) === resolveEdge(desc, night.y1);
+    const left = keyed(t).filter((r) => band(r) && resolveEdge(desc, r.x1) === x0! - 1);
+    const right = keyed(t).filter((r) => band(r) && resolveEdge(desc, r.x0) === x1! + 1);
+    expect([left.length, right.length], `${where} line ${night.line}: the rows abutting the `
+      + 'region on its left and right are not exactly one each, so the carve cannot be read')
+      .toEqual([1, 1]);
+    expect(left[0].secs[0] === right[0].secs[0], `${where} line ${night.line}: sections `
+      + `${left[0].secs[0]} and ${right[0].secs[0]} on either side are the SAME section, so this `
+      + 'region sits inside one section and could have carried its key').toBe(false);
+
+    // THE SAME ROW THE READER REPORTED, so this control is attached to Aurora's
+    // answer and not to a row of aeon's that Aurora never saw.
+    expect(descriptorEffectsRows(desc, 'ojz').unkeyed.map((u) => u.preset), where)
+      .toEqual([night.presets[0]]);
+    // THE READING AT THIS PIN, and it is an OUTPUT of everything above rather
+    // than an input to any of it: the derivation resolved `OJZ_NIGHT_X0` and
+    // `OJZ_NIGHT_X1` out of the descriptor and measured the grid off the keyed
+    // rows, and these are the three numbers that came back. Delete every line
+    // above and this one alone would be the copied sentence the block's banner
+    // warns about; keep them and it is a drift alarm on the pin.
+    //
+    // ⚠ ON A RE-PIN, RE-DERIVE IT. If aeon moves the night region this line goes
+    // red, and the fix is to read the new values off a run of the resolution
+    // above, never to edit the numbers until the row is green.
+    expect([grid, x0, x1], `${where}: the section grid and the night region's edges`)
+      .toEqual([2048, 3400, 4799]);
   });
 });
