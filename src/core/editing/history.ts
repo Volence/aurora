@@ -8,6 +8,7 @@ import {
   writeBgOverrideLayoutWord, writeBgOverrideTile, writeBgOverridePhaseBank,
 } from '../formats/bg-override/bg-override-view';
 import { ensureChunkLinks } from './chunk-links';
+import { writeActRegionsDocument } from '../formats/regions/act-regions';
 
 const MAX_HISTORY = 200;
 
@@ -186,6 +187,21 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     // leave the author's band edit unrecorded and therefore unsaved.
     if (!level.effectsPresets) throw new Error('set-effects-preset requires level.effectsPresets');
     placeEffectsPreset(level.effectsPresets, cmd.presetId, cmd.newPreset);
+    return;
+  }
+  if (cmd.type === 'set-regions') {
+    // Throw rather than skip — the rule set-palette-line states above. A silent
+    // no-op here would be the worst of the family: the author's carve would be
+    // absent from the model AND hold an undo slot, so Ctrl+Z would appear to
+    // undo a drag that had never happened.
+    if (!level.act) throw new Error('set-regions requires level.act');
+    // THROUGH THE ONE WRITER. `document` is the only field of ActRegionsState a
+    // command may move: `loadedPath` and `unreadable` are the LOAD's verdict
+    // about the file on disk, and an edit does not change what the load found.
+    // In particular a command must never clear `unreadable` — that would turn
+    // "Aurora refused this file" into "there is nothing here", which is exactly
+    // the collapse the save's gate exists to prevent.
+    writeActRegionsDocument(level.act, cmd.newDocument);
     return;
   }
   if (cmd.type === 'set-bg-override-band') {
@@ -404,6 +420,13 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'set-effects-preset') {
     if (!level.effectsPresets) throw new Error('set-effects-preset requires level.effectsPresets');
     placeEffectsPreset(level.effectsPresets, cmd.presetId, cmd.oldPreset);
+    return;
+  }
+  if (cmd.type === 'set-regions') {
+    // The SAME writer as apply, with the other half of the pair — not a second
+    // implementation, on the rule the band commands state above.
+    if (!level.act) throw new Error('set-regions requires level.act');
+    writeActRegionsDocument(level.act, cmd.oldDocument);
     return;
   }
   if (cmd.type === 'set-bg-override-band') {

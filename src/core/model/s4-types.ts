@@ -5,6 +5,7 @@ import type { EffectsPresetLibrary } from '../formats/effects/preset';
 import type { SectionRasterWiring } from '../formats/effects/section-wiring';
 import type { BgOverrideState } from '../formats/bg-override/bg-override-io';
 import type { BgLibraryUnresolvedEntry } from '../formats/bg-library';
+import type { ActRegionsState } from '../formats/regions/act-regions';
 
 export const SECTION_TILES_WIDE = 256;
 export const SECTION_TILES_HIGH = 256;
@@ -471,6 +472,21 @@ export interface Act {
    * advisories say "could not read", never "not allowed".
    */
   rasterWiring: SectionRasterWiring;
+  /**
+   * THIS ACT'S PAINTED REGIONS — `{dataPath}regions.json` — and the load's
+   * verdict about the file they came from. See `ActRegionsState`, which carries
+   * the argument for why a bare `RegionsDocument | null` is not enough.
+   *
+   * REQUIRED, on exactly the rule `S4Project.effectsScenes` states: an optional
+   * field reads downstream as "this act has no regions", which is a different
+   * claim from "nobody looked" — and at save time the two lead to opposite
+   * actions (create nothing, versus remove a file).
+   *
+   * Per ACT and not per project: the regions of an act are bound to that act's
+   * pixel space, and a project-level file would need a zone/act key in every
+   * region plus a second bind-by-path seam (editor spec §2.2).
+   */
+  regions: ActRegionsState;
   /**
    * The act's GENERATED-DATA directory — project.json's `stripPath`, verbatim
    * and project-root-relative, or null when the act declares none.

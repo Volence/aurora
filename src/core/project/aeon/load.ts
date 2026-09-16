@@ -58,6 +58,10 @@ import { readPlayerPalette } from './player-palette';
 import { parseNametable } from '../../formats/s4-nametable';
 import { parseCollAttr } from '../../formats/s4-collattr';
 import { parseSectionChunkLinks } from '../../formats/section-chunk-links';
+import { parseRegionsDocument } from '../../formats/regions/document';
+import {
+  noRegionsLoaded, regionsPathFor, type ActRegionsState,
+} from '../../formats/regions/act-regions';
 import { parseStrips, STRIP_COLS, STRIP_ROWS } from '../../formats/s4-strips';
 import { createSection, SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../model/s4-types';
 import { migrateChunkTilesIntoTileset } from '../../art/atlas-migration';
@@ -731,6 +735,63 @@ async function loadFullProject(
       // order (acts are processed sequentially).
       unreadableFiles.push(...ledger.unreadable);
 
+      // ═══ THIS ACT'S PAINTED REGIONS — `{dataPath}regions.json` ═══════════
+      //
+      // ABSENT IS THE ORDINARY CASE and stays completely silent: every act that
+      // exists today has none, and an act that never gets one is not a fault.
+      // The three states this produces, and why they cannot be collapsed, are
+      // in `ActRegionsState`'s header.
+      //
+      // ⚠ IT DOES NOT ENTER `ledger.loaded`. That ledger is the STRANDED
+      // SECTION FILE sweep's permission (save.ts's `removalsFor` call), and a
+      // path in it that the section loop does not re-write on the next save is
+      // a path the save DELETES. `regions.json` is not a `section_N` file and
+      // is never written by that loop, so admitting it there would make every
+      // save unlink the act's regions. Its own permission is
+      // `Act.regions.loadedPath`, read by the regions branch of the save and by
+      // nothing else.
+      //
+      // ⚠ ITS REFUSAL GETS ITS OWN NOTICE rather than joining
+      // `unreadableFiles`. That collection is folded by `summarizeUnreadable`,
+      // whose plural sentence says "N SECTION FILES exist but could not be
+      // read" — true of everything else in it and false of this one, and a
+      // summary that miscounts the kind of file sends the author to the wrong
+      // directory. The coalescing pressure `notice.ts` warns about does not
+      // arise: an act has exactly one regions document, so this can produce at
+      // most one notice per act, not one per suffix per section.
+      let regions: ActRegionsState = noRegionsLoaded();
+      const regionsPath = regionsPathFor(actConfig.dataPath);
+      try {
+        const regionsRaw = await fa.read(regionsPath);
+        regions = {
+          document: parseRegionsDocument(new TextDecoder().decode(regionsRaw), regionsPath),
+          loadedPath: regionsPath,
+          unreadable: null,
+        };
+      } catch (e) {
+        // `markUnreadable`'s rule, spelled out here because there is no
+        // `Section` to mark: A PROBE THAT COULD NOT ANSWER MEANS THE FILE MAY
+        // BE THERE. Guessing 'absent' would make the save's gate unreachable
+        // for exactly the failures that need it most (a parent directory
+        // without execute permission, a volume that dropped out), and the file
+        // would then be overwritten or removed. Guessing 'present' costs one
+        // notice and a file left alone.
+        let present = true;
+        try { present = await fa.exists(regionsPath); } catch { present = true; }
+        if (present) {
+          const reason = e instanceof Error ? e.message : String(e);
+          regions = { document: null, loadedPath: null, unreadable: { path: regionsPath, reason } };
+          console.warn(`[load] ${regionsPath} exists but could not be read: ${reason}`);
+          notices.push({
+            severity: 'error',
+            message:
+              `${regionsPath} exists but could not be read (${reason}). `
+              + 'Aurora is showing this act with NO regions and will neither overwrite nor remove '
+              + 'the file; fix it by hand and reopen.',
+          });
+        }
+      }
+
       // Load bg layout if present
       let bgLayout: Uint16Array | null = null;
       let bgTiles: Tile[] | null = null;
@@ -843,6 +904,11 @@ async function loadFullProject(
         bgLayout,
         bgTiles,
         rasterWiring,
+        // WHAT `{dataPath}regions.json` HELD AND WHETHER AURORA UNDERSTOOD IT —
+        // the record the save's write/remove/refuse branch is gated on. See
+        // ActRegionsState for why "no document" and "a document I refused" are
+        // two values and not one.
+        regions,
         // Act-level effects scene (AURORA_EFFECTS_SCHEMA.md §4). null and absent
         // are the same fact — "no editor assignment, the engine's hand-authored
         // act_parallax_config stands" — so they collapse to null here rather
