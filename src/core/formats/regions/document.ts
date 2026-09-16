@@ -161,6 +161,20 @@ export interface Region {
   name?: string;
 }
 
+/**
+ * The sentinel `bg.layoutRef` value meaning "the act's own background" — the
+ * spelling `resolveDisplayedBg` already uses. It resolves by definition and is
+ * never looked up in the library.
+ *
+ * ⚠ DEFINED HERE, AND RE-EXPORTED BY `validate.ts` RATHER THAN RESTATED THERE.
+ * It moved down to this module on 2026-09-16 because `flatten.ts` needs it to
+ * collapse the sentinel and `flatten.ts` must not import `validate.ts`, which
+ * pulls the whole editing layer (`region-geometry`, `notice`) into a pure
+ * codec's import graph. Copying the string into a second file instead would be
+ * a second source of truth for the one value both sides of the seam agree on.
+ */
+export const BG_ACT_SENTINEL = '@act';
+
 /** One act's regions document. */
 export interface RegionsDocument {
   /** Always 1. Absent: refused. */

@@ -97,11 +97,15 @@ export interface ActExtent {
 }
 
 /**
- * The sentinel `bg.layoutRef` value meaning "the act's own background" — the
- * spelling `resolveDisplayedBg` already uses. It resolves by definition and is
- * never looked up in the library.
+ * The sentinel `bg.layoutRef` value meaning "the act's own background".
+ *
+ * RE-EXPORTED, NOT RESTATED. It is defined in `document.ts` since 2026-09-16 so
+ * that `flatten.ts` can collapse it without importing this module (which would
+ * drag the editing layer into a pure codec). Every existing importer keeps
+ * reading it from here, and there is exactly one definition.
  */
-export const BG_ACT_SENTINEL = '@act';
+export { BG_ACT_SENTINEL } from './document';
+import { BG_ACT_SENTINEL } from './document';
 
 /**
  * Rules 2 and 3 over one document, as notices for the author.

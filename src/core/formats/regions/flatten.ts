@@ -47,11 +47,53 @@
 // passes for the wrong reason. A document this module accepts can still be
 // refused by aeon's build for one of those three.
 
-import type { Region, RegionRect, RegionsDocument } from './document';
+import type { Region, RegionBg, RegionRect, RegionsDocument } from './document';
+import { BG_ACT_SENTINEL } from './document';
 
 // ---------------------------------------------------------------------------
 // Model
 // ---------------------------------------------------------------------------
+
+/**
+ * The background half of one row: `Region.rg_bg_layout` and `Region.rg_bg_span`
+ * as the document can state them.
+ *
+ * ⚠ THE ROW STATES THE ENGINE VALUE, NOT THE DOCUMENT'S SPELLING, and that is
+ * the whole design of this field rather than a normalisation convenience. The
+ * contract gives ONE engine fact — "this region shows the act's background",
+ * `rg_bg_layout = 0` — THREE legal document spellings: `bg` absent,
+ * `bg.layoutRef` explicitly `null`, and `bg.layoutRef` the sentinel `"@act"`.
+ * All three flatten to `{ layoutRef: null, span: null }` here. Carrying `"@act"`
+ * through verbatim would hand every downstream reader two spellings of one fact
+ * to re-collapse, and a reader that forgot would put a STRING where the engine
+ * dereferences a POINTER. Aeon's `_check_region_bg` collapses at the same single
+ * conversion site and says so in the same words; `toInclusive` below is the
+ * precedent, the document's form crossing into the engine's form once.
+ */
+export interface RegionRowBg {
+  /**
+   * The layout the region shows, or `null` for the act's own — WHICH IS WHAT THE
+   * SENTINEL BECOMES. `null` here is `rg_bg_layout = 0`.
+   */
+  layoutRef: string | null;
+  /**
+   * The layout's height in pixels (`rg_bg_span`), or `null`.
+   *
+   * ⚠ DERIVED FROM THE REFERENCED LAYOUT AND NEVER AUTHORED (part 2 §6.2 item
+   * 1) — AND THIS MODULE CANNOT DERIVE IT. Aurora's flattener has no layout
+   * library, so it forwards what the document says and normalises an absent
+   * `span` to `null`; it never computes a height and never invents one, on the
+   * same rule as the three per-row checks this file's header declines to
+   * restate. `RegionBg.span`'s own doc comment in `document.ts` records the same
+   * hole at the codec layer. Today every legal document reaches here with no
+   * `span` at all, because a `layoutRef` other than the sentinel is refused by
+   * aeon's generator, so this is `null` on every row of every act that exists.
+   * The day `layoutRef` opens, DERIVING THIS IS WHAT AURORA OWES — and the seam
+   * will say so loudly, because aeon's rows will carry the derived height and
+   * this will still be `null`.
+   */
+  span: number | null;
+}
 
 /**
  * One row of the engine's Region table, in the INCLUSIVE form the engine reads.
@@ -83,6 +125,16 @@ export interface RegionRow {
   sceneRef: string | null;
   /** Explicit `null` when absent, for the same reason as `sceneRef`. */
   rasterRef: string | null;
+  /**
+   * ALWAYS PRESENT, never absent, even when the document carries no `bg` at all
+   * — `sceneRef`'s rule one level down. Aeon's `ROW_KEYS` has been a ten-element
+   * tuple ending in `bg` since `5713201`, and its `load_act_regions` emits the
+   * pair for every row; a row that simply omitted the key would compare equal to
+   * one that said `null` under a field-by-field loop and unequal under a deep
+   * equality, which is the two-answers-from-one-table shape the seam exists to
+   * refuse.
+   */
+  bg: RegionRowBg;
 }
 
 /**
@@ -223,6 +275,29 @@ export function toInclusive(rect: RegionRect): Pick<RegionRow, 'x0' | 'x1' | 'y0
   return { x0: x, x1: x + w - 1, y0: y, y1: y + h - 1 };
 }
 
+/**
+ * A region's `bg` block as the row's engine-valued pair. THE SECOND CONVERSION
+ * SITE IN THIS FILE, and the only place the sentinel is collapsed.
+ *
+ * `undefined` in, `{ layoutRef: null, span: null }` out — an absent `bg` is not
+ * a missing binding to be reported, it is the DEFAULT, and the default is the
+ * act's own background. The three-spellings-one-fact rule is on `RegionRowBg`
+ * above.
+ *
+ * It does not refuse a named layout. Rule 6 ("`bg.layoutRef` other than `"@act"`
+ * or null while the engine has no consumer") is the GENERATOR's refusal, the way
+ * `REGION_MIN_SPAN` and the reachable-edge family are — `validate.ts`'s header
+ * says so at length and this file's header says why none of them are restated
+ * here. A document this function flattens can still be refused by aeon's build.
+ */
+export function bgToRow(bg: RegionBg | undefined): RegionRowBg {
+  const layoutRef = bg?.layoutRef ?? null;
+  return {
+    layoutRef: layoutRef === BG_ACT_SENTINEL ? null : layoutRef,
+    span: bg?.span ?? null,
+  };
+}
+
 /** One region as its row, at `index`. Bindings normalised to explicit nulls. */
 export function regionToRow(region: Region, index: number): RegionRow {
   return {
@@ -232,6 +307,7 @@ export function regionToRow(region: Region, index: number): RegionRow {
     preset: region.preset,
     sceneRef: region.sceneRef ?? null,
     rasterRef: region.rasterRef ?? null,
+    bg: bgToRow(region.bg),
   };
 }
 
