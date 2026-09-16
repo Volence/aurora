@@ -307,10 +307,20 @@ describe('one gesture, one new document', () => {
     });
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    const east = out.document.regions.filter((r) => r.id === 'east');
-    expect(east.length).toBe(2);
-    const bindings = east.map((r) => JSON.stringify({ ...r, rect: null }));
-    expect(new Set(bindings).size).toBe(1);
+    expect(out.document.regions.filter((r) => r.id === 'east').length).toBe(2);
+    // A CENSUS over every id, not a spot check on the one that split. The first
+    // spelling of this row asserted only `east`, and a mutation that took each
+    // entry's bindings from the entry at the SAME POSITION left it green while
+    // making `west`'s two pieces disagree: a two-case test invites stopping at
+    // the case you were thinking about.
+    const seen = new Map<string, string>();
+    for (const r of out.document.regions) {
+      const bindings = JSON.stringify({ ...r, rect: null });
+      const first = seen.get(r.id);
+      if (first === undefined) seen.set(r.id, bindings);
+      else expect(bindings).toBe(first);
+    }
+    expect(seen.size).toBeGreaterThan(1);
   });
 
   it('drops the entry of a region the gesture emptied', () => {
