@@ -151,3 +151,55 @@ and **a wrapper that resolves to no region is itself a finding** rather than a s
 stranger. A prefix convention can be collided with by an author naming a record the same way; a
 derivation from a required unique key cannot. That is a stronger answer to the cost than the one
 this lane asked for, so the ask is amended to it.
+
+## RULED 2026-09-16: neither A nor B, and this lane's cost is GONE rather than paid
+
+**Aeon's ruling at their `origin/master` `3fc9ffa5`.** Their agent refused both options and
+proposed a third: the choosers re-key to the **preset record**, gating on agreement rather than
+uniqueness. Two regions binding the same record and the same document is correct by construction -
+that is what sharing a record means - so only a genuine disagreement is refused, naming both
+regions. 0 ROM bytes, 19 mechanical edits, contract untouched.
+
+**Consequence here: there is no second class of emitted record.** Nothing for the editor to
+distinguish, nothing to key on, nothing to resolve. The read-back cost this lane filed is retired,
+not discharged.
+
+⛔ **The region-id derivation rule is STRUCK for this ruling** - there are no wrappers to name.
+Struck in place rather than deleted: a constraint left standing against an option nobody took is
+the stale-assertion failure, and aeon flagged it as such before this lane could. **Its reusable
+half is kept and is worth more than the option was:** prefer a name derived from a required unique
+key over one that follows a convention, because a convention is a filter and can be collided with,
+while a derivation is a check whose failures are findings. That applies to the next thing in this
+repo that generates a name.
+
+## A correction to the finding this lane got RIGHT, which is the subtler half
+
+**"Choosers move to the row" was never one option; it has two readings, and nobody had
+disambiguated them** - not aeon, not the hub, not this lane. A cheap re-key at 0 bytes that needs a
+gate forbidding L-shapes, or the row carrying the channel at +4 B per pointer per row. **Only the
+second falsifies line 43.**
+
+So the schema-sentence cost this lane identified was **correct, and aimed at one of two readings of
+an option nobody had split.** That is not the same as being wrong, and it is not the same as being
+right either: **a cost attached to an undisambiguated option is a cost whose subject is unknown,**
+and it survived three exchanges between two lanes and the hub without anyone noticing the option
+had two halves. Worth more than the finding it qualifies. (Also: section 5.2 blurs two populations,
+and the scene chooser was already called from the region row, so only the five preset-channel
+choosers were ever the hard part.)
+
+## The seam re-opens: the golden now exists
+
+**The re-open condition written into this parcel's landing is met.** Aeon's shared golden landed at
+their `e3b21e72`, `tools/fixtures/regions/ojz_act1.{regions,rows}.json`. It validates clean against
+the contract schema (jsonschema 4.26, 0 errors), and **the rows fixture was typed by hand from the
+descriptor rather than generated from the flattener**, so a comparison against it is not circular.
+
+**The property their fixture defends is the one to preserve in ours:** the night region straddles
+the section line at 4096 with neither edge on a multiple of 2048, and a test asserts the fixture
+KEEPS that. A later tidy-up onto the grid fails rather than quietly hollowing the fixture out - the
+same defect class as a poison that must resemble reality.
+
+Act 1's ten rows came back exactly on the first run, against both the hand fixture and a gate that
+reads the table out of the assembled ROM per axis. **So the three-way comparison resolved with no
+disagreement to adjudicate**, which is the outcome this lane asked for and the least interesting of
+the possible ones. Booked as `REGIONS-SEAM-LEG`.
