@@ -383,6 +383,22 @@ describe('migrate aeon\'s act 1', () => {
       expect(desc!.split('\n')[snapLine - 1],
         'the reported line does not hold the row it claims to').toContain('OJZ_Preset_NightSnap');
 
+    });
+
+  it('AT THE REVISION CARRYING THE DEBUG DELTA IT MIGRATES TO TEN, sec2 whole, row NAMED on screen',
+    (ctx) => {
+      if (!need(ctx)) return;
+      // The second half of the row above, split off so a failure here is about
+      // the DOCUMENT and a failure there is about the READER. One property per
+      // row is not quite reachable when every property needs the same 200 ms of
+      // git reads, but two rows put the reader's three lists and the migrated
+      // document on separate lines of the report.
+      const desc = read(GOLDEN_PIN, DESC_REL);
+      expect(desc, `aeon:${DESC_REL} at ${GOLDEN_PIN} could not be read`).not.toBeNull();
+      const snapLine = descriptorEffectsRows(desc!, 'ojz').conditional[0]?.line;
+      expect(snapLine, 'no build-switched row was reported, so there is nothing to be named')
+        .toBeGreaterThan(0);
+
       // ── Ten regions, and section 2's right edge back where the grid puts it ─
       const input = act1Input(GOLDEN_PIN);
       const plan = planSectionMigration(input);
