@@ -42,6 +42,8 @@ import { saveFileFor } from '../../formats/bg-override/bg-override-io';
 import { serializeNametable } from '../../formats/s4-nametable';
 import { serializeCollAttr } from '../../formats/s4-collattr';
 import { jsonFileText } from '../../formats/canonical-json';
+import { serializeRegionsDocument } from '../../formats/regions/document';
+import { regionsPathFor } from '../../formats/regions/act-regions';
 import { serializeTiles } from '../../export/tile-dedup';
 import type { S4Project } from '../../model/s4-types';
 import type { SaveCompare } from './save-skip';
@@ -506,6 +508,66 @@ export async function buildAeonSavePlan(
     shared.push({ path: playerPlan.file.path, what: playerPlan.what });
   }
   const refusals = [...playerPlan.refusals];
+
+  // ═══ THIS ACT'S PAINTED REGIONS — `{dataPath}regions.json` ═══════════════
+  //
+  // The three-way shape of the meta and chunklinks sidecars above, with ONE
+  // branch different, and the difference is the contract's and not a choice:
+  // `regions` is `minItems: 1` in `aurora-regions.schema.json`, so there is no
+  // "cleared regions document" to overwrite a stale file with the way those two
+  // do. The honest answer to "the author deleted every region" is therefore to
+  // REMOVE the file:
+  //
+  //   • regions in the model            → write them;
+  //   • none, but this load READ a file → remove it (or the deleted regions are
+  //                                       back on the next open);
+  //   • none, and nothing was read      → create nothing. The common case, and
+  //                                       what every act looks like today.
+  //
+  // THE `understood()` GATE IS THE SAME GATE, and it matters here for exactly
+  // the reason the chunklinks comment gives one screen up — more, in fact,
+  // because this branch can DELETE. A regions.json Aurora refused leaves the
+  // model with no regions, which is indistinguishable from an author who
+  // deleted them all; without the gate, the removal branch would then unlink
+  // the very file the refusal was protecting. So `unreadable` is checked FIRST
+  // and it suppresses both branches.
+  //
+  // ⚠ THE REMOVAL IS GATED ON `loadedPath`, NEVER ON A PROBE. `removalsFor`'s
+  // docblock carries the argument: the removable set comes from what this
+  // session actually READ, never from what is on disk. Deriving the path here
+  // and probing `fa.exists` for it would delete a hand-written regions.json in
+  // a checkout this Aurora had never opened successfully.
+  const regionsPath = regionsPathFor(dataPath);
+  const actRegions = act.regions;
+  if (actRegions.unreadable !== null) {
+    refusals.push(
+      `${actRegions.unreadable.path} could not be read when this project was opened `
+      + `(${actRegions.unreadable.reason}), so this act's regions are NOT being saved and the `
+      + 'file is left exactly as it is. Fix it by hand and reopen.',
+    );
+  } else if (actRegions.document !== null) {
+    // Serialization VALIDATES on the way out (the codec's closed schema), and a
+    // document that fails is a refusal rather than a thrown save: the author's
+    // other work in this plan must still reach disk, and a save that dies
+    // wholesale on one bad document is how an hour of map editing is lost to a
+    // regions bug. The sentence names the file, so the refusal is not silent.
+    try {
+      files.push({
+        path: regionsPath,
+        bytes: new TextEncoder().encode(serializeRegionsDocument(actRegions.document)),
+        compare: 'json',
+      });
+    } catch (e) {
+      refusals.push(
+        `${regionsPath} was NOT written: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  } else if (actRegions.loadedPath !== null) {
+    removals.push({
+      path: actRegions.loadedPath,
+      what: `the regions of ${zone.id}/${act.id} (every region was deleted)`,
+    });
+  }
 
   // Persist the current act's background (Plane B) to editor-owned paths,
   // mirroring the tileset rule above, per field: a declared `editorBgLayout` /
