@@ -898,11 +898,15 @@ async function main() {
               ? el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : null,
           })),
           rows: document.querySelectorAll('[data-region-row]').length,
+          doorStillThere: !!document.querySelector('[data-migrate-sections]'),
+          receipt: !!document.querySelector('[data-migrate-receipt]'),
         }))()`);
       check('9b', 'the migration RAN and refused nothing, so the note below is a real migration\'s',
         typeof after.done === 'string' && /Migrated: \d+ regions?/.test(after.done)
         && after.refusals.length === 0,
-        `done=${JSON.stringify(after.done)} refusals=${JSON.stringify(after.refusals)}`);
+        `done=${JSON.stringify(after.done)} refusals=${JSON.stringify(after.refusals)} `
+        + `regionRowsOnScreen=${after.rows} migrateDoorStillThere=${after.doorStillThere} `
+        + `receiptOnScreen=${after.receipt}`);
       const said = after.notes.find((n) => n.text.includes(switched)) ?? null;
       check('9c', `the left-out row is NAMED on screen (${switched}) — excluded, never silently dropped`,
         said !== null,
