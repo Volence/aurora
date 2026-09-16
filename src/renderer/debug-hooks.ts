@@ -20,7 +20,11 @@ import { useClassicLevelStore, type LayoutPlane } from './state/classicLevelStor
 import { stampLayoutCell, type StampLayoutCellReport } from './debug-level-edit';
 import { useClassicObjectArtStore } from './state/classicObjectArtStore';
 import { useProjectStore, getCurrentAct, getCurrentZone } from './state/projectStore';
+import { getActiveLevel } from './state/projectStore';
 import { useEditorStore, focusedHistory, focusedDocId } from './state/editorStore';
+import { executeCommand } from './state/editorStore';
+import { parseRegionsDocument } from '../core/formats/regions/document';
+import { cloneRegionsDocument } from '../core/formats/regions/act-regions';
 import { isBlockAligned, effectiveGranularity } from '../core/editing/map-clipboard';
 import { COLLISION_CELL_OWNED_MASK, COLLISION_CELL_UNOWNED_MASK } from '../core/editing/collision-word';
 import { lastPasteGhostReport, type PasteGhostReport } from './canvas/region-preview';
@@ -620,6 +624,46 @@ interface AeonProbeApi {
    * so a harness can assert it rather than assume it.
    */
   setFacet(facet: string): { facet: string; tool: string } | null;
+  /**
+   * THE CURRENT ACT'S REGIONS, as the MODEL holds them.
+   *
+   * ⚠ IT IS AN ANTI-VACUOUS INSTRUMENT, NOT THE SUBJECT. The Regions facet's
+   * badges, list rows and status line are read OFF THE SCREEN by the harness —
+   * a debug report of the same strings would be the harness asserting against a
+   * second copy of the derivation, which is the failure the whole facet's
+   * derivations/rendering split exists to avoid. This exists so a harness can
+   * prove the panel HAD a subject: a badge row that finds four distinct strings
+   * proves nothing if the act carried no regions at all.
+   *
+   * `kind` carries `ActRegionsState`'s three states, never collapsing "refused"
+   * into "none".
+   */
+  regions(): {
+    kind: 'no-project' | 'none' | 'refused' | 'open';
+    actId: string | null;
+    count: number;
+    ids: string[];
+    selectedRegionId: string | null;
+  };
+  /**
+   * Load a regions document into the current act, THROUGH THE REAL CODEC AND
+   * THE REAL COMMAND.
+   *
+   * `parseRegionsDocument` then `set-regions` through `executeCommand`: a
+   * harness fixture therefore travels exactly the path a hand-written file
+   * would, schema refusal included, and lands on the undo stack like an edit.
+   * Nothing here writes the model directly.
+   *
+   * ⚠ IT DOES NOT TOUCH DISK, in either direction. It cannot create the file a
+   * load would have read, and it deliberately leaves `loadedPath` null, so a
+   * save still has no permission to remove anything. A debug door that could
+   * authorise a deletion would be a door onto the one dangerous operation in
+   * the whole regions path.
+   *
+   * Returns the codec's refusal message instead of throwing, so a harness row
+   * can assert a REFUSAL as a result rather than as an exception.
+   */
+  setRegions(json: string): { ok: true; count: number } | { ok: false; error: string };
   /** Arm the collision palette exactly as a click on it would. Returns the word
    *  `selectedCollisionWord` now yields, so a harness asserts on the app's own
    *  encoding rather than recomputing it. */
@@ -1390,6 +1434,39 @@ function installAeonProbe(): AeonProbeApi {
       if (!tabId) return null;
       switchFacet(tabId, facet as FacetCapability);
       return { facet: useWorkspaceStore.getState().facetFor(tabId), tool: useEditorStore.getState().tool };
+    },
+    regions: () => {
+      const st = useProjectStore.getState();
+      const act = getCurrentAct(st);
+      const selectedRegionId = useEditorStore.getState().selectedRegionId;
+      if (!act) return { kind: 'no-project', actId: null, count: 0, ids: [], selectedRegionId };
+      // `unreadable` FIRST: a refused file leaves `document` null, and reporting
+      // that as 'none' is the collapse ActRegionsState exists to prevent.
+      const kind = act.regions.unreadable !== null ? 'refused' as const
+        : act.regions.document === null ? 'none' as const : 'open' as const;
+      const ids = act.regions.document?.regions.map((r) => r.id) ?? [];
+      return { kind, actId: act.id, count: ids.length, ids, selectedRegionId };
+    },
+    setRegions: (json) => {
+      const st = useProjectStore.getState();
+      const act = getCurrentAct(st);
+      const level = getActiveLevel(st);
+      if (!act || !level) return { ok: false, error: 'no act is open' };
+      let doc;
+      try {
+        doc = parseRegionsDocument(json, 'debug-hooks setRegions');
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
+      executeCommand({
+        type: 'set-regions',
+        description: 'Debug: load regions',
+        sectionIndex: -1,
+        oldDocument: act.regions.document === null
+          ? null : cloneRegionsDocument(act.regions.document),
+        newDocument: doc,
+      }, level);
+      return { ok: true, count: doc.regions.length };
     },
     armCollisionBrush: (sel) => {
       const e = useEditorStore.getState();
