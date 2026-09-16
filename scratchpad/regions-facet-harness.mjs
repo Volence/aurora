@@ -816,6 +816,122 @@ async function main() {
         !s1pills.includes('Regions'), `classic pills = ${JSON.stringify(s1pills)}`);
       await shot(c, '06-classic');
     }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // 9. THE BUILD-SWITCHED ROW, AND THE SENTENCE AN AUTHOR READS
+    // ───────────────────────────────────────────────────────────────────────
+    //
+    // aeon's act 1 descriptor carries a region row written behind a build
+    // switch (`if DEBUG == 1`). Aurora EXCLUDES it and SAYS SO — empyrean
+    // `docs/AURORA_REGIONS_SCHEMA.md` at `origin/main`, "The schema stays
+    // CLOSED, and the DEBUG eleventh row is a build-time delta" plus its
+    // "AMENDMENT 2026-09-16T09:0xZ", ruled by the hub in the owner's place and
+    // OVERTURNABLE BY ONE WORD FROM HIM.
+    //
+    // ⚠ THE NODE SUITE PROVES THE STRING; ONLY THIS PROVES IT REACHED A SCREEN.
+    // `planSectionMigration` returning the right note and the RegionsPanel
+    // rendering it are two claims, and this repo's own precedent is a row that
+    // asserted a derivation and never proved delivery.
+    //
+    // ⚠ WHY IT RUNS LAST, AFTER ITS OWN RELOAD. The migrate door only appears
+    // on an act with NO regions document, and section 7 installed fixtures
+    // through `setRegions`. A fresh open is the only state this can be measured
+    // in. Clicking Migrate changes the OPEN MODEL only — nothing here saves, so
+    // aeon's checkout is not written.
+    await c.evalExpr('localStorage.clear()');
+    await c.send('Page.reload');
+    await sleep(4000);
+    await waitDbg();
+    await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(AEONDIR)})`)
+      .catch((e) => console.log('        aeon reopen threw:', e.message));
+    let st9 = null;
+    for (let i = 0; i < 40; i++) {
+      st9 = await c.json('window.__dbg.aeon.state()').catch(() => null);
+      if (st9 && st9.open) break;
+      await sleep(400);
+    }
+    await sleep(2500);
+    await c.json('window.__dbg.aeon.setFacet("regions")').catch(() => null);
+    await sleep(1200);
+
+    // THE EXPECTATION COMES OUT OF AEON'S OWN DESCRIPTOR, never typed here: the
+    // preset named by an `effects:` inside the `if DEBUG` block. If that block
+    // is not found the row is UNMEASURABLE and LOUD — never a pass, and never
+    // rendered as a zero.
+    const DESC = `${AEONDIR}/games/sonic4/data/levels/ojz/act1/act_descriptor.emp`;
+    let switched = null;
+    if (existsSync(DESC)) {
+      const src9 = readFileSync(DESC, 'utf8');
+      const blockAt = /=\s*if\s+[A-Za-z_]\w*\s*==[^\n]*\{[\s\S]{0,400}?\}\s*else/.exec(src9);
+      const named = blockAt === null
+        ? null : /\beffects\s*:\s*([A-Za-z_]\w*)/.exec(blockAt[0]);
+      switched = named === null ? null : named[1];
+    }
+    if (switched === null) {
+      cannotMeasure('9a', 'the sentence naming the build-switched row is on screen',
+        `no \`= if … { … } else\` block with an \`effects:\` was found in ${DESC}, so what the `
+        + 'note should NAME could not be derived from aeon and nothing was measured. This is '
+        + 'not a pass. Either aeon retired the fixture (in which case this row retires with '
+        + 'it) or this harness is reading the wrong file.');
+    } else {
+      note('the build-switched preset, DERIVED from aeon\'s descriptor:', switched);
+      const door = await c.json(String.raw`
+        (() => {
+          const btn = document.querySelector('[data-migrate-sections]');
+          return { present: !!btn, rects: btn ? btn.getClientRects().length : 0 };
+        })()`);
+      check('9a', 'ANTI-VACUOUS: the migrate door is on screen at all, so a click can reach it',
+        door.present === true && door.rects > 0, JSON.stringify(door));
+      await c.evalExpr(
+        '(() => { const b = document.querySelector("[data-migrate-sections]");'
+        + ' if (b) b.click(); return !!b; })()');
+      await sleep(1500);
+      const after = await c.json(String.raw`
+        (() => ({
+          done: (document.querySelector('[data-migrate-done]') || {}).textContent || null,
+          refusals: [...document.querySelectorAll('[data-migrate-refusal]')]
+            .map((el) => (el.textContent || '').trim()),
+          notes: [...document.querySelectorAll('[data-migrate-note]')].map((el) => ({
+            text: (el.textContent || '').trim(),
+            rects: el.getClientRects().length,
+            visible: typeof el.checkVisibility === 'function'
+              ? el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : null,
+          })),
+          rows: document.querySelectorAll('[data-region-row]').length,
+          doorStillThere: !!document.querySelector('[data-migrate-sections]'),
+          receipt: !!document.querySelector('[data-migrate-receipt]'),
+        }))()`);
+      check('9b', 'the migration RAN and refused nothing, so the note below is a real migration\'s',
+        typeof after.done === 'string' && /Migrated: \d+ regions?/.test(after.done)
+        && after.refusals.length === 0,
+        `done=${JSON.stringify(after.done)} refusals=${JSON.stringify(after.refusals)} `
+        + `regionRowsOnScreen=${after.rows} migrateDoorStillThere=${after.doorStillThere} `
+        + `receiptOnScreen=${after.receipt}`);
+      const said = after.notes.find((n) => n.text.includes(switched)) ?? null;
+      check('9c', `the left-out row is NAMED on screen (${switched}) — excluded, never silently dropped`,
+        said !== null,
+        said === null ? `notes on screen = ${JSON.stringify(after.notes.map((n) => n.text))}`
+          : said.text);
+      // THE BOXES, AS A SEPARATE CLAIM. This file's own rule: text is the
+      // subject, rects say it is painted, and neither stands in for the other.
+      check('9d', 'and that sentence is PAINTED, not sitting in a display:none subtree',
+        said !== null && said.rects > 0 && said.visible !== false,
+        said === null ? 'no such note' : `rects=${said.rects} visible=${said.visible}`);
+      // ⚠ THE WORDING IS THE RULING'S OWN SUBJECT. "We could not evaluate this
+      // row, sorry" sends an author to fix something that is not theirs to fix,
+      // when nothing of theirs is missing. The sentence must read as a decision
+      // and a completion, and must claim no knowledge of which build ships.
+      const APOLOGY = ['sorry', 'could not', 'cannot', 'unsupported', 'unable',
+        'not supported', 'limitation', 'failed', 'release truth'];
+      const lower = said === null ? '' : said.text.toLowerCase();
+      const guilty = APOLOGY.filter((w) => lower.includes(w));
+      check('9e', 'it reads as EXPECTED AND COMPLETE, not as an apology or a limitation',
+        said !== null && ['behind a build switch', 'as intended', 'there is nothing to fix']
+          .every((phrase) => lower.includes(phrase)) && guilty.length === 0,
+        said === null ? 'no such note'
+          : `apology words found: ${JSON.stringify(guilty)} | ${said.text}`);
+      await shot(c, '07-build-switched-note');
+    }
   } finally {
     try { c?.close(); } catch { /* closing */ }
     killTree(child);

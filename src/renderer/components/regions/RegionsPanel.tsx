@@ -387,19 +387,35 @@ function SelectedRegion({ state }: { state: Extract<RegionsPanelState, { kind: '
  * `paletteRef` are read and DROPPED, and an author who bound a background to a
  * section deserves to be told that binding did not survive rather than to
  * discover it the next time they open the act.
+ *
+ * ⚠ WHICH IS WHY THE OUTCOME DOES NOT LIVE IN THIS COMPONENT (fixed 2026-09-16,
+ * MEASURED ON SCREEN, not reasoned about). This door renders ONLY while the act
+ * has no regions document, and a SUCCESSFUL migration gives it one — so for a
+ * year of parcels every note a successful migration wrote was mounted and
+ * unmounted in the same React commit and no author could ever have read one.
+ * `scratchpad/regions-facet-harness.mjs` §9 caught it: the migrate button was on
+ * screen, the click produced ten regions, and `[data-migrate-note]` was empty.
+ * Only the REFUSAL path, which leaves the act without a document, was ever
+ * visible — and a refusal is exactly the case whose notes matter least.
+ *
+ * So the outcome is lifted to `RegionsPanel`, which renders in both states, and
+ * this component reports it upward. The BUTTON stays here: the door genuinely
+ * does belong to an act with no document. It is the RECEIPT that has to outlive
+ * the state change that the receipt is about.
  */
-function MigrateSections(): React.ReactElement {
+function MigrateSections({ onOutcome }: { onOutcome: (o: MigrationOutcome) => void })
+: React.ReactElement {
   const act = useProjectStore((s) => getCurrentAct(s));
   const zoneId = useProjectStore((s) => s.currentZoneId);
-  const [refusals, setRefusals] = React.useState<string[]>([]);
-  const [notes, setNotes] = React.useState<string[]>([]);
-  const [done, setDone] = React.useState<number | null>(null);
   if (!act || !zoneId) return <></>;
   const onClick = () => {
     const offer = planActMigration(act, zoneId, act.rasterWiring);
-    setRefusals(offer.plan.refusals);
-    setNotes(offer.plan.notes);
-    setDone(offer.command === null ? null : offer.plan.document!.regions.length);
+    onOutcome({
+      actId: act.id,
+      refusals: offer.plan.refusals,
+      notes: offer.plan.notes,
+      done: offer.command === null ? null : offer.plan.document!.regions.length,
+    });
     run(offer.command);
   };
   return (
@@ -413,16 +429,57 @@ function MigrateSections(): React.ReactElement {
         four refs on every section sidecar. bgLayoutRef and paletteRef are
         DROPPED: the regions file has no field for them.
       </Hint>
-      {done !== null && (
-        <Hint under data-migrate-done style={{ marginBottom: 0 }}>
-          Migrated: {done} {done === 1 ? 'region' : 'regions'}.
-        </Hint>
+    </div>
+  );
+}
+
+/** What one click of Migrate said, kept by the panel so it outlives the door. */
+interface MigrationOutcome {
+  /** The act it was about, so switching acts cannot leave a stale receipt behind. */
+  actId: string;
+  done: number | null;
+  refusals: string[];
+  notes: string[];
+}
+
+/**
+ * THE RECEIPT, rendered wherever the act now stands.
+ *
+ * ⚠ EVERY MARKER IS ON A WRAPPING `<div>`, NOT ON THE `<Hint>`, and that is the
+ * SECOND defect §9 of the harness found. `Hint`'s own docblock states it: "a
+ * hyphenated JSX attribute on a COMPONENT is silently dropped and TypeScript
+ * does not catch it". So `<Hint under data-migrate-note>` — which is what this
+ * panel carried from the day the door landed — put NOTHING in the DOM, and
+ * anything looking for `[data-migrate-note]` read zero nodes for sentences that
+ * were, in the refusal case, genuinely on screen. The same trap had already
+ * been paid for once in EffectsScenePanel, which is why `Hint` documents it.
+ * A component that swallows an attribute and a panel that renders nothing are
+ * indistinguishable from outside, so the markers go on plain elements.
+ *
+ * Refusals are the warning tone and notes are not, which is the same split the
+ * status line makes: a refusal is something the author must act on, a note is
+ * something they should know. The build-switched row's sentence is a NOTE, on
+ * purpose — nothing of the author's is missing and there is nothing for them to
+ * do (empyrean `docs/AURORA_REGIONS_SCHEMA.md` at `origin/main`, the DEBUG
+ * build-time delta ruling of 2026-09-16 and its amendment).
+ */
+function MigrationReceipt({ outcome }: { outcome: MigrationOutcome | null })
+: React.ReactElement {
+  if (outcome === null) return <></>;
+  return (
+    <div data-migrate-receipt>
+      {outcome.done !== null && (
+        <div data-migrate-done>
+          <Hint under style={{ marginBottom: 0 }}>
+            Migrated: {outcome.done} {outcome.done === 1 ? 'region' : 'regions'}.
+          </Hint>
+        </div>
       )}
-      {refusals.map((r, i) => (
-        <Hint under tone="warning" key={i} data-migrate-refusal>{r}</Hint>
+      {outcome.refusals.map((r, i) => (
+        <div data-migrate-refusal key={i}><Hint under tone="warning">{r}</Hint></div>
       ))}
-      {notes.map((n, i) => (
-        <Hint under key={i} data-migrate-note>{n}</Hint>
+      {outcome.notes.map((n, i) => (
+        <div data-migrate-note key={i}><Hint under>{n}</Hint></div>
       ))}
     </div>
   );
@@ -469,6 +526,13 @@ export default function RegionsPanel(): React.ReactElement {
   const selectedRegionId = useEditorStore((s) => s.selectedRegionId);
   const setSelectedRegionId = useEditorStore((s) => s.setSelectedRegionId);
   const state = regionsPanelState(act, project, selectedRegionId);
+  // THE RECEIPT OUTLIVES THE DOOR — see `MigrateSections`. Held here because
+  // this component renders in every `state.kind`, and dropped the moment the
+  // panel is looking at a different act, so a receipt never describes an act it
+  // is not sitting next to.
+  const [outcome, setOutcome] = React.useState<MigrationOutcome | null>(null);
+  const shownOutcome = outcome !== null && 'actId' in state && outcome.actId === state.actId
+    ? outcome : null;
 
   return (
     <Panel width={280} scroll column="aeon-regions">
@@ -486,9 +550,13 @@ export default function RegionsPanel(): React.ReactElement {
                 &quot;Migrate sections&quot; below, or from painting (step 8,
                 not built yet).
               </Hint>
-              <MigrateSections />
+              <MigrateSections onOutcome={setOutcome} />
             </>
           )}
+          {/* AFTER the kind switch, so a migration that SUCCEEDED — which is
+              exactly the case that changes `kind` out from under the door —
+              still leaves its sentences on screen. */}
+          <MigrationReceipt outcome={shownOutcome} />
           {state.kind === 'refused' && (
             <Hint tone="warning" style={{ marginBottom: 0 }}>
               {state.actId} HAS a regions document and Aurora refused it:{' '}

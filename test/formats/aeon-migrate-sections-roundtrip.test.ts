@@ -245,12 +245,12 @@ describe('migrate-sections, end to end', () => {
     expect(allRefs(act)).toEqual([NULLS, NULLS, NULLS, NULLS]);
 
     // The refs are not gone: they are on the regions now.
-    expect(doc.regions.find((r) => r.id === 'sec_0')!.sceneRef).toBe('ojz_act1_start');
-    expect(doc.regions.find((r) => r.id === 'sec_1')!.rasterRef).toBe('ojz_sec1_showcase');
-    expect(doc.regions.find((r) => r.id === 'sec_2')!.sceneRef).toBe('ojz_act1_depth');
+    expect(doc.regions.find((r) => r.id === 'sec0')!.sceneRef).toBe('ojz_act1_start');
+    expect(doc.regions.find((r) => r.id === 'sec1')!.rasterRef).toBe('ojz_sec1_showcase');
+    expect(doc.regions.find((r) => r.id === 'sec2')!.sceneRef).toBe('ojz_act1_depth');
 
     // The key-less row carved the two runs it crosses, and is a region itself.
-    expect(doc.regions.find((r) => r.id === 'sec_0')!.rect)
+    expect(doc.regions.find((r) => r.id === 'sec0')!.rect)
       .toEqual({ x: 0, y: 0, w: NIGHT_X0, h: SECTION_PIXEL_SIZE });
     expect(doc.regions[doc.regions.length - 1].preset).toBe('OJZ_Preset_Night');
 

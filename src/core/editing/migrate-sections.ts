@@ -55,7 +55,7 @@
 // `rg_effects` are the same region for every engine purpose; an L-shape is two
 // rows" (§2.1, from `structs.emp`'s comment block). So a run whose area is not
 // one rectangle becomes SEVERAL entries with the same bindings and distinct ids
-// (`sec_4`, `sec_4_b`, …), never one entry with a rectangle bigger than the run.
+// (`sec4`, `sec4_a`, …), never one entry with a rectangle bigger than the run.
 // Ids must differ because §2.5 rule 1 refuses a duplicate id; the AREA is what
 // carries identity to the engine, and the suffix is an editor label.
 //
@@ -190,6 +190,37 @@ export interface MigrationInput {
   presetsUnusableReason?: string;
   /** Rows the descriptor could not key: `SectionRasterWiring.unkeyedRows`. */
   unkeyed: MigrationUnkeyedRow[];
+  /**
+   * Rows the reader LEFT OUT because they sit inside a build condition:
+   * `SectionRasterWiring.conditionalRows`. They are not migrated — that is the
+   * 2026-09-16 ruling, see `ConditionalEffectsRow` — and they are here only so
+   * the plan can say they were left out.
+   *
+   * ⚠ NOT A REFUSAL AND NOT A GAP. The amendment of 2026-09-16T09:0xZ rules the
+   * conditional row and the conditional edge it mutates ONE delta with ONE
+   * treatment: both excluded, both reported, neither an error. A build-only row
+   * is not part of the act the author edits, so a document without it is
+   * COMPLETE, and the note below has to read that way.
+   *
+   * Optional because a hand-built input in a test omits it; the provider always
+   * sets it, and an omission means "none", which is the only thing an absent
+   * list can honestly mean here — the reader never returns undefined.
+   */
+  conditional?: MigrationConditionalRow[];
+}
+
+/**
+ * One row left out of the migration because its call sits inside a build
+ * condition — `SectionRasterWiring.conditionalRows`, narrowed to what the note
+ * has to name: which preset, which row, which line, and the condition verbatim.
+ */
+export interface MigrationConditionalRow {
+  preset: string;
+  /** 1-based descriptor line, so the author can find the row. */
+  line: number;
+  constructorName: string;
+  /** The condition as the descriptor writes it, e.g. `DEBUG == 1`. Never evaluated. */
+  condition: string;
 }
 
 /** One section's sidecar, before and after. `next` is always all-null. */
@@ -318,7 +349,7 @@ function runName(run: readonly number[]): string {
  * An id for a key-less row, from the preset it binds.
  *
  * §8 Q5's recommendation, which the owner left standing ("Doesn't matter too
- * much"): "the preset name when the preset is explicit and `sec_N` otherwise".
+ * much"): "the preset name when the preset is explicit and `secN` otherwise".
  * A key-less row HAS no section list to be named after, so the preset is the
  * only thing about it an author would recognise. Lowercased and punctuation
  * folded to `_` so it satisfies the contract's id pattern, with the pattern
@@ -329,9 +360,43 @@ function idFromPreset(preset: string): string {
   return folded;
 }
 
-/** `a`, `b`, `c`… for the second and later rectangles of one run. */
+/**
+ * `_a`, `_b`, `_c`… for the second and later rectangles of one run.
+ *
+ * THE UNDERSCORE STAYS HERE even though it left the base id (see `runId`): it
+ * is the only thing separating the suffix from the run's index, and `sec10a`
+ * against `sec1` followed by `0a` is a reading nobody should have to make. It
+ * is also not a cross-tool spelling — a multi-rect run is an Aurora shape aeon
+ * has no row for — so nothing on the other side names it.
+ */
 function pieceSuffix(n: number): string {
   return `_${String.fromCharCode('a'.charCodeAt(0) + n - 1)}`;
+}
+
+/**
+ * The id of one rectangle of a section run: AEON'S SPELLING, `sec<lowest index>`.
+ *
+ * ⚠ NO UNDERSCORE, AND THAT IS A CONTRACT SURFACE RATHER THAN A LABEL. Until
+ * 2026-09-16 this emitted `sec_2` where aeon's own regions table, and the DEBUG
+ * delta ruling's `ensure`, both say `sec2` — so a freshly migrated act 1 would
+ * have failed aeon's build ON THE ID ALONE, with identical geometry. The
+ * divergence came from empyrean's editor spec §4, which invented a second
+ * spelling for an id that already had one; it is corrected there, at
+ * `docs/superpowers/specs/2026-09-14-aurora-regions-editor-design.md` §4 item 2
+ * and its note (d), and the ruling is empyrean `docs/AURORA_REGIONS_SCHEMA.md`
+ * at `origin/main`, "REGION IDS ARE A CROSS-TOOL CONTRACT SURFACE, and the
+ * canonical spelling is aeon's" (ruled 2026-09-16T09:2xZ, OVERTURNABLE BY ONE
+ * WORD).
+ *
+ * The schema's `id` PATTERN does not settle it — `^[a-z][a-z0-9_]{0,31}$` admits
+ * both — but its `id` DESCRIPTION does: "Used by the editor and by the
+ * generator's emitted symbol names". An id that names an emitted symbol is not a
+ * tool's to spell. The guard that would have caught this was never the problem:
+ * keying the `ensure` on the id is deliberate, so a renamed row fails the build
+ * instead of silently cutting the wrong one.
+ */
+function runId(lowestIndex: number, piece: number): string {
+  return `sec${lowestIndex}${piece === 0 ? '' : pieceSuffix(piece)}`;
 }
 
 /**
@@ -342,6 +407,46 @@ export function planSectionMigration(input: MigrationInput): MigrationPlan {
   const refusals: string[] = [];
   const notes: string[] = [];
   const total = input.gridWidth * input.gridHeight;
+
+  // ── THE BUILD-ONLY ROWS, SAID FIRST AND SAID AS A COMPLETION ─────────────
+  //
+  // ⚠ THE WORDING IS THE POINT OF THIS BLOCK, and getting it wrong is the
+  // failure the 2026-09-16 ruling names. "We could not evaluate this row,
+  // sorry" sends an author to look for something of theirs to fix WHEN THERE IS
+  // NOTHING OF THEIRS TO FIX AND NOTHING WAS LOST: the excluded row is a
+  // build-time look-fixture, and by the ruling's own sentences — "an Aurora
+  // author has no DEBUG and no release", "the document describes the game, a
+  // look-fixture is not the game" — it is not part of the act they edit. So the
+  // sentence says the row was left out AS INTENDED, says the document is
+  // complete without it, and says there is nothing to fix. It reports Aurora's
+  // decision, never Aurora's limitation.
+  //
+  // IT ALSO CLAIMS NO KNOWLEDGE IT DOES NOT HAVE. "Behind a build switch", never
+  // "the debug row" and never "the release truth": Aurora has no DEBUG and no
+  // release, so which arm ships is not a thing it can say. What it can say is
+  // that the row is switched, and it quotes the switch in the descriptor's own
+  // words rather than interpreting it.
+  //
+  // IT IS A REPRESENTED STATE, NOT AN ABSENCE: an excluded row always produces
+  // this note, in every plan, refusal or not (`notes` rides both exits). A row
+  // left out with nothing on screen would be a drop wearing an exclusion's
+  // name, which is the thing the reader's `conditional` list exists to prevent.
+  const buildOnly = input.conditional ?? [];
+  if (buildOnly.length > 0) {
+    const one = buildOnly.length === 1;
+    const named = buildOnly
+      .map((r) => `${r.preset} (${r.constructorName} at descriptor line ${r.line}, inside `
+        // The reader reports an else arm as the bare word, so the sentence does
+        // not print "inside `if else`" — it says which arm, in the file's words.
+        + (r.condition === 'else' ? 'an `else` arm)' : `\`if ${r.condition}\`)`))
+      .join('; ');
+    notes.push(
+      `${buildOnly.length} descriptor ${one ? 'row sits' : 'rows sit'} behind a build switch and `
+      + `${one ? 'was' : 'were'} left out, as intended: ${named}. A row behind a build switch `
+      + `belongs to one build of the ROM rather than to the act you edit, so your document is `
+      + `complete without ${one ? 'it' : 'them'} and there is nothing to fix.`,
+    );
+  }
 
   if (!ID_PATTERN.test(input.actKey)) {
     refusals.push(
@@ -478,7 +583,7 @@ export function planSectionMigration(input: MigrationInput): MigrationPlan {
       );
     }
     rects.forEach((rect, n) => {
-      const id = `sec_${run[0]}${n === 0 ? '' : pieceSuffix(n)}`;
+      const id = runId(run[0], n);
       usedIds.add(id);
       regions.push(regionOf(id, runName(run), t.preset, rect, t.sidecar));
     });
