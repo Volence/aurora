@@ -289,3 +289,58 @@ was re-checked afterwards. The totals above are the run after that removal.
 * **The save's refusal sentences are pinned in the node suite and have never been
   read on screen**, because the save report's rendering is renderer glue this
   parcel did not touch.
+
+---
+
+## Overseer's landing note, 2026-09-16 — merged at master `b70ec81b`
+
+Verified firsthand on the MERGED tree, not on the branch and not from the report:
+`npm test` exit **0**, `Test Files 631 passed | 3 skipped (634)`, `Tests 9867 passed
+| 8 skipped (9875)`, zero failures, all fifteen `check:*` gates and `tsc --noEmit`
+inside that green. (My run shows one more test passed and one fewer skipped than the
+agent's; totals agree at 9875 and the difference is a test that RAN here, which is
+strictly more coverage, not less.)
+
+**M6 re-proved independently, because it is the row this parcel was dispatched to get
+right.** I applied my own narrower mutation — a plain `else` on the three-state branch
+in `save.ts`, writing `{}` only in the genuinely-absent case — quoted it back from
+`git diff` before the run, and got **1 failed / 7 passed**, the failure being exactly
+*"an act with NO regions.json creates no file and removes nothing"*. The agent reported
+2 failed for M6 because its `else if (true)` also hijacked the `loadedPath` removal
+case. Both reddens prove the row; mine isolates the absent case, so the assertion is
+non-vacuous on its own terms and not only as collateral of a broader break. Tree was
+clean before the mutation and `git status --porcelain` empty after the restore.
+
+### RULED: coverage and non-overlap stay OUT of load-time notices
+
+The agent asked. The answer is its own recommendation, and the reason is the owner's
+Q1 ruling rather than a preference: under Q1 an UNASSIGNED area is a **first-class
+editing state**, not a malformed document. A load-time error on every open would make
+an ordinary half-finished act shout at its author, which is the behaviour the ruling
+exists to prevent. They belong in the Regions facet's status line (§3.4, step 6),
+where the author is looking at the thing being judged. The instruments already exist
+in `region-geometry.ts`; step 6 wires them to a surface, not to a notice.
+
+### Booked, not built
+
+- **Rule 4 (minimum span, reachable edge) is BLOCKED on a parcel, not on effort.** It
+  needs `CENTRE_{X,Y}_{MIN,MAX}` / `REGION_MIN_SPAN` from the act descriptor, which
+  Aurora does not read. "Aurora reads an act descriptor" is that parcel. Rules 5 and 6
+  remain out of step 5's scope by the spec.
+- **`documentIdFromPath` is the inverse of `effectsScenePath`/`effectsPresetPath` by
+  TRANSCRIPTION, not construction.** If either ever nests an id under a directory,
+  rule 3's "exists but was refused" half silently degrades to "missing" — a wrong
+  notice, not a crash. Booked as a small row.
+
+### One correction to the packet's environment finding, which is MINE, not the agent's
+
+The packet reports the worktree's nested `node_modules/node_modules` as reproduced at
+the base commit and absent in the primary checkout — both true, and the implication
+that it pre-existed the parcel is **wrong**. I caused it during worktree setup. My
+first command ran `cp -al` and then counted the result with `ls`, which is aliased to
+`eza` in this shell and errored; I read the compound command's error as the `cp`
+having failed, and re-ran it. The destination now existed, so the second `cp` nested a
+full copy inside the first. 211 entries + 1 nested = the 212 I measured and misread as
+success. The agent had no way to see either call and its report is honest about what it
+could observe. The cost was real: 225 failures across 10 renderer files from two
+resolvable copies of React, and the agent spent time proving it was not its own doing.
