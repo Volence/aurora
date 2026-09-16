@@ -103,7 +103,7 @@ export const REGION_HATCH_ALPHA = 0.45;
  * Wraps rather than clamping: the top of a range is a sentinel in some of this
  * suite's encodings, and a palette is not one of them. A region past the
  * palette's length repeats a hue and is separated by the hatch ANGLE instead
- * (`regionHatchAngle`), so the first `REGION_HUES.length * 2` regions of an act
+ * (`regionHatchSlope`), so the first `REGION_HUES.length * 2` regions of an act
  * are all distinct pairs.
  */
 export function regionHue(index: number): string {
@@ -410,8 +410,18 @@ function clampToCanvas(r: CanvasRect, canvas: CanvasRect): CanvasRect {
  * A CONSTANT because the overlay, a test and 8B's harness must take the sentence
  * from here rather than retyping it; a retyped expectation goes green against a
  * map saying different words (`ACT_ROW_NOTE`'s reason, one layer down).
+ *
+ * ⚠ IT NAMES THE STATE AND NOT THE BUILD'S ANSWER TO IT. The first spelling
+ * ended "and the build refuses it", and the engine-claim register refused it
+ * (`test/formats/engine-claim-register.test.ts`): a module-level string constant
+ * is STANDING copy, true of every document or not typed at all, and nothing in
+ * this module has read a generator. The consequence belongs to the panel's
+ * status line, which composes it from rules it has actually run
+ * (`regionStatusRows`, spec §3.4). The gate
+ * was right and the shorter label is the better one anyway: a map label names
+ * the thing under it.
  */
-export const UNASSIGNED_LABEL = 'unassigned: no region owns this, and the build refuses it';
+export const UNASSIGNED_LABEL = 'unassigned: no region owns this';
 
 // ---------------------------------------------------------------------------
 // What the last repaint actually drew — a PUBLISH, not a re-derivation, for the

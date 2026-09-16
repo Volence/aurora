@@ -483,20 +483,39 @@ export const ANCHOR_PREVIEW_PLAYHEAD = '#E8EAF2';
 // qualitative set is designed for that reader, so it is taken as published
 // rather than re-derived.
 //
-// THREE OF THE EIGHT ARE DROPPED, each for a reason on THIS canvas:
+// ⚠ WHICH FIVE OF THE SEVEN CHROMATIC MEMBERS SURVIVE WAS MEASURED, AND THE
+// MEASUREMENT OVERTURNED THE SET THIS FILE FIRST SHIPPED WITH (aurora
+// 080ecdfc, whose message states the refuted reasons; see
+// docs/reviews/2026-09-16-regions-step8-gestures.md). That first set dropped
+// VERMILLION "as the nearest member to the refusal red" and ORANGE "because it
+// reads as SCREEN_FRAME_LINE". Both sentences reason from hue NAMES. Under a
+// deuteranopia simulation, over every subset of the seven, the two members that
+// actually collapse are a GREEN and a YELLOW:
 //
-//   • BLACK is invisible on CANVAS_VOID.
-//   • VERMILLION (#D55E00) is the nearest member to the refusal red below, and
-//     the refusal is the one answer that must never be mistaken for a region.
-//   • ORANGE (#E69F00) reads as SCREEN_FRAME_LINE. The screen frame is the one
-//     other overlay GUARANTEED to share this facet's screen (spec §3.5, step 9)
-//     and it is the reference mark the author lays regions against, so a region
-//     that reads as the frame breaks the comparison the frame exists for.
+//     bluishgreen vs the refusal red   50.8      vermillion vs the refusal red   97.1
+//     yellow      vs the screen frame  52.4      orange     vs the screen frame  63.4
 //
-// Five survive. The sixth axis is not a colour at all: `region-overlay.ts`
-// alternates the HATCH ANGLE every time the palette wraps, so the first ten
-// regions of an act are ten distinct (hue, angle) pairs and the redundancy
-// survives a reader who sees no colour at all.
+// (Vienot 1999, Euclidean in the simulated sRGB cube, whose diagonal is 441. The
+// gate in `region-overlay.test.ts` recomputes these on every run; the figures in
+// this comment are prose and go stale, the gate does not.)
+//
+// So the surviving five are the subset with the LARGEST worst-case separation,
+// and it keeps both hues the eye had thrown out. BLACK is dropped for a reason
+// that needs no simulation: it is invisible on CANVAS_VOID.
+//
+// THE ONE COLLISION THAT IS ACCEPTED, named rather than left to be found: ORANGE
+// against SCREEN_FRAME_LINE is this set's tightest pair on both axes. The screen
+// frame is the one other overlay guaranteed to share this facet's screen (spec
+// §3.5, step 9), so the pair is real. It is accepted because the two are
+// different WEIGHTS carrying different roles - the frame is a 1 px unfilled
+// outline with an amber caption plate, a region is a hatched wash with a hue
+// outline - and because every alternative subset is worse for the colourblind
+// reader, which is the constraint that cannot be worked around by looking harder.
+//
+// The sixth axis is not a colour at all: `region-overlay.ts` alternates the
+// HATCH ANGLE every time the palette wraps, so the first ten regions of an act
+// are ten distinct (hue, angle) pairs and the redundancy survives a reader who
+// sees no colour at all.
 //
 // WHAT IS NOT CLAIMED: the collision lens's blue, the parallax guides' cyan and
 // the band lens's magenta are all in the same neighbourhood as members of this
@@ -508,10 +527,10 @@ export const ANCHOR_PREVIEW_PLAYHEAD = '#E8EAF2';
 
 /** The per-region hue cycle. Index by the region's position in the document. */
 export const REGION_HUES: readonly string[] = [
+  '#E69F00', // orange
   '#56B4E9', // sky blue
-  '#009E73', // bluish green
-  '#F0E442', // yellow
   '#0072B2', // blue
+  '#D55E00', // vermillion
   '#CC79A7', // reddish purple
 ];
 

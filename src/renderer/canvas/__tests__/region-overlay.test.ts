@@ -15,7 +15,7 @@ import {
   regionHatchSlope, regionHue, regionOutlineSegments, unionBounds,
   type RegionOverlayInput, type RegionViewport,
 } from '../region-overlay';
-import { REGION_HUES, REGION_UNASSIGNED_FILL } from '../canvas-colors';
+import { REGION_HUES, REGION_UNASSIGNED_FILL, SCREEN_FRAME_LINE } from '../canvas-colors';
 import { REGION_GRAB_PX } from '../../../core/editing/region-marquee';
 import { coverage, type Rect, type RegionPiece } from '../../../core/editing/region-geometry';
 import { recordingContext } from './chrome-recorder';
@@ -117,13 +117,23 @@ const dist = (a: [number, number, number], b: [number, number, number]): number 
 /**
  * THE BAR THIS GATE HOLDS THE PALETTE TO, and it is the TEST's number rather
  * than a source constant: a categorical palette is only usable if no two of its
- * members collapse together for the reader it was chosen for. 40 of the 441 that
- * a full sRGB cube spans is roughly a tenth of the space, which the control
- * below shows is far more than a confusable pair survives.
+ * members collapse together for either reader it is drawn for. 55 of the 441 a
+ * full sRGB cube spans is an eighth of the space, and it is set where it BITES:
+ * the two Okabe-Ito members this palette leaves out sit at 50.8 and 52.4 for a
+ * deuteranope, so putting either back reddens this, which is the mutation that
+ * proved the gate.
  */
-const MIN_SEPARATION = 40;
+const MIN_SEPARATION = 55;
 
-describe('the palette a red-green colourblind reader sees', () => {
+/**
+ * THE POPULATION IS THE PALETTE PLUS THE TWO COLOURS IT SHARES A SCREEN WITH
+ * AND MUST NOT BE MISTAKEN FOR: the refusal red an unassigned hole is painted
+ * in, and the screen frame's amber (spec §3.5, step 9). A palette checked only
+ * against itself is checked against half the screen.
+ */
+const COHABITANTS = [REGION_UNASSIGNED_FILL, SCREEN_FRAME_LINE];
+
+describe('the palette both of its readers see', () => {
   it('the simulation is not the identity (the control this gate needs)', () => {
     // A salmon and a green that sRGB puts far apart and a deuteranope does not.
     // FOUND BY SEARCHING for the pair with a large sRGB gap and the smallest
@@ -136,20 +146,29 @@ describe('the palette a red-green colourblind reader sees', () => {
     expect(dist(deuteranope(salmon), deuteranope(green))).toBeLessThan(MIN_SEPARATION);
   });
 
-  it('keeps every pair of region hues apart', () => {
+  it('keeps every pair apart for a DEUTERANOPE, palette and cohabitants alike', () => {
+    const all = [...REGION_HUES, ...COHABITANTS];
     for (let i = 0; i < REGION_HUES.length; i += 1) {
-      for (let j = i + 1; j < REGION_HUES.length; j += 1) {
-        expect(dist(deuteranope(REGION_HUES[i]), deuteranope(REGION_HUES[j])))
-          .toBeGreaterThan(MIN_SEPARATION);
+      for (let j = i + 1; j < all.length; j += 1) {
+        expect(dist(deuteranope(all[i]), deuteranope(all[j]))).toBeGreaterThan(MIN_SEPARATION);
       }
     }
   });
 
-  it('keeps every region hue away from the refusal red UNASSIGNED is painted in', () => {
-    const asSeen = deuteranope(REGION_UNASSIGNED_FILL);
-    for (const hue of REGION_HUES) {
-      expect(dist(deuteranope(hue), asSeen)).toBeGreaterThan(MIN_SEPARATION);
+  it('and keeps every pair apart in FULL COLOUR too, for the other reader', () => {
+    const all = [...REGION_HUES, ...COHABITANTS];
+    for (let i = 0; i < REGION_HUES.length; i += 1) {
+      for (let j = i + 1; j < all.length; j += 1) {
+        expect(dist(channels(all[i]), channels(all[j]))).toBeGreaterThan(MIN_SEPARATION);
+      }
     }
+  });
+
+  it('the population really includes the cohabitants (anti-vacuous)', () => {
+    // A gate whose loop never reaches the frame and the refusal red would pass
+    // on a palette that reads as either of them.
+    expect(COHABITANTS.length).toBe(2);
+    expect(REGION_HUES.length).toBeGreaterThan(1);
   });
 });
 
