@@ -5,8 +5,23 @@
 // §2.5 numbers six rules and says the messages cite the numbers. This module
 // owns two of them:
 //
-//   rule 1  SHAPE: closed schema, unknown key, wrong type, bad id, duplicate id.
-//           NOT HERE — it is a REFUSAL, not a notice. `parseRegionsDocument`
+//   rule 1  SHAPE: closed schema, unknown key, wrong type, bad id.
+//           ⚠ THIS LINE USED TO END "…, duplicate id", AND NO SUCH REFUSAL HAS
+//           EVER EXISTED — not in `parseRegionsDocument`, not in the vendored
+//           schema (no uniqueness keyword), not in aeon's `region_flatten.py`,
+//           which uses the id only to name a complaint. Corrected 2026-09-16
+//           against empyrean `dc58782`, which banks the non-constraint in the
+//           contract schema's own `regions` description and says outright that
+//           "any validator comment claiming a duplicate-id refusal is describing
+//           a rule that has never existed". DUPLICATE IDS ARE DELIBERATE AND
+//           LOAD-BEARING: every emitted symbol is keyed by ROW INDEX and the id
+//           reaches the output only as a comment, so an L-shaped region is
+//           several entries sharing one id BY DESIGN — which is exactly what
+//           step 8's carve produces. The comment was wrong in the direction that
+//           would have stopped that parcel: a reader "fixing" the missing check
+//           would have made multi-rectangle regions unexpressible.
+//           NOT HERE — the rest of rule 1 is a REFUSAL, not a notice.
+//           `parseRegionsDocument`
 //           throws, the load records the file as `unreadable`, and the save then
 //           neither overwrites nor removes it. The author's notice for rule 1 is
 //           the refusal sentence load.ts pushes, which names the file and the
