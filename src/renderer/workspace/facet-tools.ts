@@ -36,28 +36,35 @@ export const FACET_TOOLS: Partial<Record<FacetCapability, readonly EditorTool[]>
   // from Layout would leave `stamp-chunk` armed over a canvas with no dock to
   // disarm it from.
   parallax: ['view', 'mark-band'],
-  // ═══ THE DISAMBIGUATOR, AND WHY IT IS `view` ALONE (editor spec §3.1) ═══
+  // ═══ THE DISAMBIGUATOR (editor spec §3.1), AND WHY `view` STILL LEADS ═══
   //
   // §3.1's whole point is that "the same drag means marquee in Map, collision
   // brush in Collision, and region rectangle here, and the facet is the only
-  // disambiguator". The region rectangle is STEP 8; step 6 draws nothing on the
-  // canvas. So this facet arms `view` — a pure pan — and NOT a `region` tool,
-  // because `TOOL_IDS`' own `eraser` note (core/project/adapter.ts) records what
-  // a vocabulary entry no canvas answers costs: a label, a hint and a dock icon
-  // for a button that does nothing, which is a promise to a profile author that
-  // nothing keeps. `eraser` was deleted for exactly that, not implemented.
+  // disambiguator". STEP 8B ADDED THE REGION RECTANGLE, so both halves of that
+  // sentence are now true here: arriving from Collision DISARMS the collision
+  // brush and arriving from Layout DISARMS the marquee (`toolForFacet` falls
+  // back to this list's first entry), and the drag this facet's own tool takes
+  // means a region and nothing else.
   //
-  // What step 6 CAN assert, and the CDP harness does, is the half of the
-  // disambiguation that is already true: arriving here from Collision DISARMS
-  // the collision brush, and arriving from Layout DISARMS the marquee, because
-  // `toolForFacet` falls back to this list's first entry. Step 8 appends its
-  // tool here and the same instrument then reads the other half.
+  // ⚠ `view` LEADS DELIBERATELY AND MUST KEEP LEADING. The first entry is the
+  // facet DEFAULT, so it is what a facet switch lands on, and a facet switch
+  // must land on a pure pan rather than an armed drawing tool — the same call
+  // `parallax: ['view', 'mark-band']` made, for the reason written above it: a
+  // facet whose arrival state is a document gesture turns every orienting click
+  // into an edit. Here that edit would be a CARVE, because the Q1 ruling made
+  // carve what every draw does, so the arrival state would be one click away
+  // from trimming a region the author had not looked at yet.
+  //
+  // Step 6 shipped this as `['view']` alone and was right to: `TOOL_IDS`' own
+  // `eraser` note (core/project/adapter.ts) records what a vocabulary entry no
+  // canvas answers costs — a label, a hint and a dock icon for a button that
+  // does nothing. `region` earns its entry now because `MapViewport` answers it.
   //
   // An EMPTY list would be the other reading and it is wrong for the reason
   // spelled out above `parallax`: `toolForFacet` returns the CURRENT tool for an
   // empty set, so arriving from Collision would leave `paint-collision` armed
   // over a canvas with no dock to disarm it from.
-  regions: ['view'],
+  regions: ['view', 'region'],
   // 'art' is absent: the Art facet runs the artStore tool system, not EditorTool.
 };
 

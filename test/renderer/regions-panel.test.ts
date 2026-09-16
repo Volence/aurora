@@ -23,6 +23,7 @@ import {
   regionBindingCommand,
   regionBindingRows,
   regionBindingValue,
+  type RegionBindingKey,
   regionListRows,
   regionRectFindings,
   regionStatusRows,
@@ -93,7 +94,7 @@ const NO_ACT_SCENE = actBindingDefaults(null);
 // ---------------------------------------------------------------------------
 
 describe('the list is in DOCUMENT order (the painter\'s-order sentence is superseded)', () => {
-  it('rows come back 1:1 with `regions[]`, unsorted, index matching position', () => {
+  it('one-entry-per-region: rows come back 1:1 with `regions[]`, unsorted, index matching position', () => {
     // Deliberately NOT in any geometric order: `zulu` is leftmost and last.
     const doc = docOf(
       region({ id: 'mid', rect: { x: HALF, y: 0, w: HALF / 2, h: ACT.actH } }),
@@ -122,6 +123,135 @@ describe('the list is in DOCUMENT order (the painter\'s-order sentence is supers
   it('an EMPTY document produces an empty list, and the fixture that is not empty proves the call works', () => {
     expect(regionListRows(docOf(), NO_ACT_SCENE, BG_LIB)).toEqual([]);
     expect(regionListRows(tiledDoc(), NO_ACT_SCENE, BG_LIB)).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 1b. A REGION THAT IS SEVERAL RECTANGLES LISTS ONCE (step 8B, item B)
+//
+// ⚠ EVERY ROW HERE ASSERTS THE FIXTURE REALLY HAS MORE ENTRIES THAN ROWS. On a
+// one-entry-per-region document every claim below is trivially true — that is
+// the shape the 1:1 mapping was correct for, and the shape that hid this.
+// ---------------------------------------------------------------------------
+
+/**
+ * `forest` as a genuine L: a tall-left block and a NARROWER one below it, with
+ * `night` filling the right. The notch matters — a fixture whose two pieces
+ * happen to tile a rectangle would make "the bounds are not the shape"
+ * unfalsifiable, because the bounds WOULD be the shape.
+ *
+ * The two `forest` entries are NOT adjacent, so a grouping that only merged
+ * neighbours would fail here.
+ */
+const L_TALL = { x: 0, y: 0, w: HALF, h: HALF };
+const L_FOOT = { x: 0, y: HALF, w: HALF / 2, h: HALF };
+function lShapedDoc(): RegionsDocument {
+  return docOf(
+    region({ id: 'forest', name: 'Forest', rect: L_TALL }),
+    region({ id: 'night', name: 'Night', rect: { x: HALF, y: 0, w: HALF, h: ACT.actH } }),
+    region({ id: 'forest', name: 'Forest', rect: L_FOOT }),
+  );
+}
+
+describe('a region with several rectangles is ONE row (step 8B item B)', () => {
+  it('lists once, at its FIRST entry\'s position, naming every entry it covers', () => {
+    const doc = lShapedDoc();
+    const rows = regionListRows(doc, NO_ACT_SCENE, BG_LIB);
+
+    // ⚠ THE ANTI-VACUOUS FLOOR: the document must really carry more entries
+    // than there are rows, or "lists once" is true of any correct 1:1 mapping.
+    expect(doc.regions.length).toBe(3);
+    expect(rows).toHaveLength(2);
+
+    expect(rows.map((r) => r.id)).toEqual(['forest', 'night']);
+    // FIRST-APPEARANCE ORDER: `forest` leads because entry 0 is forest's, even
+    // though its second entry comes after night's.
+    expect(rows[0].index).toBe(0);
+    expect(rows[0].entryIndices).toEqual([0, 2]);
+    expect(rows[1].index).toBe(1);
+    expect(rows[1].entryIndices).toEqual([1]);
+    // Every index a row claims really carries that row's id.
+    for (const r of rows) for (const i of r.entryIndices) expect(doc.regions[i].id).toBe(r.id);
+    // And every entry of the document is claimed by exactly one row.
+    expect(rows.flatMap((r) => r.entryIndices).sort()).toEqual([0, 1, 2]);
+  });
+
+  it('carries every piece, and its `rect` is the BOUNDS of them, which is not its shape', () => {
+    const doc = lShapedDoc();
+    const [forest] = regionListRows(doc, NO_ACT_SCENE, BG_LIB);
+    expect(forest.entryIndices.length).toBeGreaterThanOrEqual(2);
+
+    expect(forest.rects).toEqual([L_TALL, L_FOOT]);
+    // The bounds, DERIVED from the fixture's own constants: the tall block's
+    // width and the two blocks' stacked height.
+    expect(forest.rect).toEqual({ x: 0, y: 0, w: HALF, h: HALF * 2 });
+
+    // ⚠ THE POINT OF `rects`, asserted rather than asserted-about: the bounds
+    // hold strictly MORE area than the region does, so a panel that showed the
+    // bounds alone would be showing a shape the region does not have.
+    const boundsArea = forest.rect.w * forest.rect.h;
+    const pieceArea = forest.rects.reduce((a, r) => a + r.w * r.h, 0);
+    expect(pieceArea).toBeLessThan(boundsArea);
+  });
+
+  it('a ONE-rectangle region is unchanged: one piece, `rect` its own, `entryIndices` just itself', () => {
+    // The control for every row above. If grouping had broken the ordinary
+    // case, the three rows above would still pass.
+    const rows = regionListRows(tiledDoc(), NO_ACT_SCENE, BG_LIB);
+    expect(rows).toHaveLength(2);
+    for (const [i, r] of rows.entries()) {
+      expect(r.rects).toHaveLength(1);
+      expect(r.entryIndices).toEqual([i]);
+      expect(r.index).toBe(i);
+      expect(r.rect).toEqual(tiledDoc().regions[i].rect);
+    }
+  });
+
+  it('bindings and label come from the FIRST entry, the same representative `setRegionBinding` converges on', () => {
+    const doc = lShapedDoc();
+    doc.regions[0].bg = { layoutRef: 'cave_bg' };
+    doc.regions[2].bg = { layoutRef: 'forest_bg' };
+    const [forest] = regionListRows(doc, NO_ACT_SCENE, BG_LIB);
+    expect(forest.entryIndices).toEqual([0, 2]);
+    // ANTI-VACUOUS: the two entries deliberately DISAGREE here, so the row can
+    // tell "took the first" from "took whichever, they were the same". A
+    // document out of `setRegionBinding` or the gesture layer never disagrees;
+    // a hand-edited one can, and the panel must be predictable about it.
+    expect(BG_LIB.find((b) => b.id === 'cave_bg')!.name).not
+      .toBe(BG_LIB.find((b) => b.id === 'forest_bg')!.name);
+    expect(forest.bg.text).toBe('Cave');
+  });
+
+  it('an OVERLAP with another region is named ONCE per id, however many entry pairs overlap', () => {
+    // `night` is widened to cover BOTH of forest's pieces: two entry pairs, one
+    // pair of ids. Per-entry rows would have said it twice.
+    const doc = docOf(
+      region({ id: 'forest', rect: L_TALL }),
+      region({ id: 'night', rect: { x: 0, y: 0, w: ACT.actW, h: ACT.actH } }),
+      region({ id: 'forest', rect: L_FOOT }),
+    );
+    const rows = regionListRows(doc, NO_ACT_SCENE, BG_LIB);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].entryIndices.length).toBeGreaterThanOrEqual(2);
+    expect(rows[0].overlaps).toEqual(['night']);
+    expect(rows[1].overlaps).toEqual(['forest']);
+  });
+
+  it('a region does NOT name ITSELF when two of its own entries overlap, but the status row still does', () => {
+    const doc = docOf(
+      region({ id: 'forest', rect: { x: 0, y: 0, w: HALF, h: HALF } }),
+      region({ id: 'forest', rect: { x: 0, y: 0, w: HALF, h: HALF } }),
+    );
+    const rows = regionListRows(doc, NO_ACT_SCENE, BG_LIB);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].entryIndices).toEqual([0, 1]);
+    // The row's field is for "which OTHER region do I have to go and move".
+    expect(rows[0].overlaps).toEqual([]);
+    // ⚠ AND IT IS NOT SWALLOWED. Without this the row above would be
+    // indistinguishable from dropping the finding on the floor.
+    const overlap = statusOf(doc).find((r) => r.id === 'overlap');
+    expect(overlap!.tone).toBe('warning');
+    expect(overlap!.text).toContain('forest and forest');
   });
 });
 
@@ -370,6 +500,115 @@ describe('detach on edit and revert to inherited', () => {
     // ⚠ THE LOAD'S VERDICT IS NOT TOUCHED by an edit — step 5's M3.
     expect(act.regions.loadedPath).toBeNull();
     expect(act.regions.unreadable).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5b. A BINDING EDIT ON A REGION THAT IS SEVERAL ENTRIES (step 8B, item A)
+//
+// ⚠ EVERY ROW HERE ASSERTS ITS FIXTURE HOLDS ≥2 ENTRIES FOR THE ID *BEFORE*
+// THE EDIT. Without that floor each row passes identically on a single-entry
+// document — which is the shape that hid this defect for two steps: `findIndex`
+// edits entry 0, and on a one-entry region entry 0 IS the region.
+// ---------------------------------------------------------------------------
+
+/**
+ * `forest` as TWO entries, `night` as one — the shape a carve produces
+ * (`applyRegionGestureToDocument`: one `rect` per entry, so a region's area is a
+ * SET of entries).
+ *
+ * THE TWO `forest` ENTRIES ARE NOT ADJACENT, deliberately: `night` sits between
+ * them, so a fix that walks a contiguous run from the first match, or that stops
+ * at the second entry, fails here instead of passing by luck of the ordering.
+ */
+function carvedDoc(): RegionsDocument {
+  return docOf(
+    region({ id: 'forest', name: 'Forest', rect: { x: 0, y: 0, w: HALF, h: HALF } }),
+    region({ id: 'night', name: 'Night', rect: { x: HALF, y: 0, w: HALF, h: ACT.actH } }),
+    region({ id: 'forest', name: 'Forest', rect: { x: 0, y: HALF, w: HALF, h: HALF } }),
+  );
+}
+
+/** Every entry carrying `id`, in document order. The population each row edits. */
+const entriesOf = (doc: RegionsDocument, id: string) => doc.regions.filter((r) => r.id === id);
+
+/**
+ * A legal value for each binding, taken from the SAME vocabulary the panel's
+ * pickers offer, so no row asserts against a value the app could not produce.
+ */
+const A_VALUE: Record<RegionBindingKey, string> = {
+  preset: 'OJZ_Preset_Night',
+  scene: 'ojz_act1_start',
+  raster: 'ojz_sec5_showcase',
+  bg: 'cave_bg',
+};
+
+/** Every binding key's value on one entry — the census each row compares. */
+const bindingCensus = (r: Region) =>
+  BINDING_ORDER.map((k) => `${k}=${JSON.stringify(regionBindingValue(r, k))}`).join(' ');
+
+describe('a binding edit reaches EVERY entry of a multi-entry region (step 8B item A)', () => {
+  it('after an edit on ANY key, every entry of that id agrees on EVERY key', () => {
+    // The population is BINDING_ORDER, derived from the module, not a list of
+    // four keys typed here that would silently stop covering a fifth.
+    for (const key of BINDING_ORDER) {
+      const doc = carvedDoc();
+      // ⚠ THE ANTI-VACUOUS FLOOR. Without this the whole loop passes on a
+      // one-entry document, where "every entry agrees" is trivially true.
+      const before = entriesOf(doc, 'forest');
+      expect(before.length).toBeGreaterThanOrEqual(2);
+
+      const next = setRegionBinding(doc, 'forest', key, A_VALUE[key]);
+      expect(next, `${key}: the edit itself must not be refused`).not.toBeNull();
+
+      const after = entriesOf(next!, 'forest');
+      expect(after.length, `${key}: no entry may be added or dropped`).toBe(before.length);
+      // THE PROPERTY, as a CENSUS over every key and not just the edited one: a
+      // fix that wrote `key` to every entry but left the other three as they
+      // were on entry 0 would still leave the pieces disagreeing.
+      const censuses = new Set(after.map(bindingCensus));
+      expect([...censuses], `${key}: the pieces of one region must agree`).toHaveLength(1);
+      // And the edit actually landed — otherwise "they all agree" is satisfied
+      // by a function that wrote nothing at all.
+      for (const r of after) expect(regionBindingValue(r, key)).toBe(A_VALUE[key]);
+    }
+  });
+
+  it('no OTHER region\'s entries change when one region\'s binding is edited', () => {
+    const doc = carvedDoc();
+    expect(entriesOf(doc, 'forest').length).toBeGreaterThanOrEqual(2);
+    const nightBefore = JSON.stringify(entriesOf(doc, 'night'));
+    // The control: `night` is a region this document really has, so an empty
+    // "nothing changed" is not what is being measured.
+    expect(entriesOf(doc, 'night')).toHaveLength(1);
+
+    for (const key of BINDING_ORDER) {
+      const next = setRegionBinding(carvedDoc(), 'forest', key, A_VALUE[key])!;
+      expect(JSON.stringify(entriesOf(next, 'night')), `${key}`).toBe(nightBefore);
+    }
+  });
+
+  it('entries that have DRIFTED apart are repaired, never read as "already that value"', () => {
+    // The document the old short-circuit could not fix: entry 0 already carries
+    // the value the author is asking for, and the other entry does not. Asking
+    // the FIRST entry alone answers "no-op" and the disagreement becomes
+    // unfixable from the panel.
+    const doc = carvedDoc();
+    doc.regions[0].sceneRef = 'ojz_act1_start';
+    const drifted = entriesOf(doc, 'forest');
+    expect(drifted.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(drifted.map(bindingCensus)).size,
+      'the fixture must actually be drifted, or this row measures nothing').toBe(2);
+
+    const next = setRegionBinding(doc, 'forest', 'scene', 'ojz_act1_start');
+    expect(next, 'a drifted id must not short-circuit').not.toBeNull();
+    const after = entriesOf(next!, 'forest');
+    expect(new Set(after.map(bindingCensus))).toHaveLength(1);
+    for (const r of after) expect(r.sceneRef).toBe('ojz_act1_start');
+
+    // THE CONTROL, so the row above is not just "this function never returns
+    // null": with every entry already agreeing, the same call IS a no-op.
+    expect(setRegionBinding(next!, 'forest', 'scene', 'ojz_act1_start')).toBeNull();
   });
 });
 

@@ -23,6 +23,10 @@ const TOOL_ICONS: Record<EditorTool, React.FC<{ size?: number }>> = {
   'mark-band': Icons.IconEyedrop,
   // The dither grid: a repeating cell pattern, which is what the stamp lays.
   'stamp-band': Icons.IconDither,
+  // An L-SHAPE, its own glyph: a region is a UNION of rectangles, which is what
+  // distinguishes it from paint-block's IconRect and marquee's IconSelect —
+  // both plain boxes, both already in a map dock.
+  region: Icons.IconRegion,
 };
 
 export function MapFacetDock({ facet }: { facet: FacetCapability }) {

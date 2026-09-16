@@ -81,6 +81,11 @@ import {
   validateRectInAct,
   type RegionPiece,
 } from '../../core/editing/region-geometry';
+// THE OVERLAY'S `unionBounds`, IMPORTED AND NOT COPIED. Both modules are under
+// `src/renderer`, so this import is legal where a `src/core` one would not be,
+// and a second copy of the arithmetic is how the panel's box and the map's
+// label anchor come to disagree about where a carved region is.
+import { unionBounds } from '../canvas/region-overlay';
 
 // ---------------------------------------------------------------------------
 // The act's side of the two-level inheritance
@@ -162,20 +167,79 @@ export function regionBgLabel(
 // The list
 // ---------------------------------------------------------------------------
 
-/** One row of the region list, in DOCUMENT order. */
+/**
+ * One row of the region list: ONE ROW PER REGION `id`, in first-appearance
+ * document order.
+ *
+ * ⚠ ONE ROW PER ID, NOT PER `regions[]` ENTRY — changed at step 8B. A region
+ * with several rectangles is several entries sharing an `id` (forced by the
+ * contract: one `rect` per entry, an L-shape is two engine rows, a carve splits
+ * one rect into up to four — `applyRegionGestureToDocument`'s docblock), and a
+ * 1:1 mapping listed an L-shaped region TWICE, as two selectable rows that
+ * select the same region, carry the same bindings, and differ only in a
+ * rectangle the panel cannot edit. Latent until 8B wired the gesture layer.
+ *
+ * FIRST-APPEARANCE ORDER, AND STILL NO SORT: the header's point 1 stands — list
+ * order carries no meaning and nothing here reorders anything. Grouping by id
+ * only removes repeats; each id keeps the position of its first entry.
+ */
 export interface RegionListRow {
-  /** Index into `doc.regions` — the row's identity for selection and for edits. */
+  /**
+   * Index into `doc.regions` of this region's FIRST entry.
+   *
+   * ⚠ ITS MEANING CHANGED AT 8B: it is no longer "the row's position", because
+   * a row can cover several entries. It is kept because a row still needs one
+   * canonical entry to stand for it, and the first one is that entry
+   * everywhere else too — `regionsPanelState` resolves `selected` with
+   * `.find()`, and `applyRegionGestureToDocument` takes its bindings template
+   * from the id's first entry. SELECTION IS BY ID (`selectedRegionId`), never by
+   * this number.
+   */
   index: number;
+  /**
+   * EVERY `doc.regions` index this row covers, in document order. Length ≥ 1,
+   * and > 1 exactly when the region is several rectangles.
+   *
+   * Added ALONGSIDE `index` rather than folded into it: the per-entry view is a
+   * real question (which rows of the file does this region own) and a caller
+   * that needs it must not have to re-derive it by scanning for the id.
+   */
+  entryIndices: number[];
   id: string;
   /** `name` when the document carries one, else the id. Never empty. */
   label: string;
+  /**
+   * THE UNION BOUNDS OF EVERY PIECE — `unionBounds`, imported from the overlay
+   * rather than copied, so the panel's box and the map's label anchor are the
+   * same arithmetic.
+   *
+   * ⚠ FOR A CARVED REGION THIS IS NOT THE REGION'S SHAPE. An L-shape's bounds
+   * include the notch that was carved out of it. `rects` below is what makes
+   * that legible instead of silent: a row showing bounds as if they were the
+   * shape is the quiet lie this pair exists to prevent, and the panel says
+   * "N rects" from it.
+   */
   rect: RegionRect;
+  /**
+   * Every piece's own rectangle, in document order. `rects.length` is the row's
+   * rectangle count — §3.4's mock prints exactly that ("1 rect", "2 rects").
+   */
+  rects: RegionRect[];
   /** The background, in words, always (the 2026-09-16 ruling). */
   bg: RegionBgLabel;
   /**
-   * Ids of other regions this one shares pixels with. EMPTY IS THE NORMAL CASE
+   * Ids of OTHER regions this one shares pixels with. EMPTY IS THE NORMAL CASE
    * and means the set is disjoint, which is what the ruling requires. A
    * non-empty list is the successor to §3.4's "hidden" mark — see the header.
+   *
+   * ⚠ A REGION NEVER NAMES ITSELF HERE, even when two of its own entries
+   * overlap. The hazard this mark exists for is the one the Q1 ruling created:
+   * "where two regions share a pixel the engine's answer depends on its own
+   * scan order". Two entries of ONE id are not that — every scan order answers
+   * with the same region — so `overlaps: ['forest']` on forest's own row would
+   * be a warning about nothing, in the field an author reads to find out which
+   * OTHER region to move. It is not dropped from the panel either: a same-id
+   * overlap is still counted and named as a pair by the `overlap` status row.
    */
   overlaps: string[];
 }
@@ -219,11 +283,33 @@ export interface ActListRow {
 }
 
 /**
- * The list, in DOCUMENT ORDER. No sort — see the header, point 1.
+ * The document's entries grouped BY ID, in first-appearance order.
+ *
+ * The one place the per-id grouping is decided, so the list, the map overlay's
+ * inputs and anything else that asks "which entries are this region" cannot
+ * answer differently.
+ */
+export function regionEntryGroups(doc: RegionsDocument): Array<{ id: string; indices: number[] }> {
+  const order: string[] = [];
+  const byId = new Map<string, number[]>();
+  for (let i = 0; i < doc.regions.length; i += 1) {
+    const { id } = doc.regions[i];
+    let indices = byId.get(id);
+    if (indices === undefined) { indices = []; byId.set(id, indices); order.push(id); }
+    indices.push(i);
+  }
+  return order.map((id) => ({ id, indices: byId.get(id) as number[] }));
+}
+
+/**
+ * The list: ONE ROW PER REGION ID, in first-appearance DOCUMENT ORDER. No sort
+ * — see the header, point 1, and `RegionListRow` for why grouping is not one.
  *
  * Overlaps are computed once across the whole set rather than per row, because
  * `disjointness` answers about PAIRS and a per-row call would be quadratic in
- * the number of rows for an answer it already has.
+ * the number of rows for an answer it already has. They are then folded from
+ * pairs of ENTRIES onto pairs of IDS, which is the unit the row speaks in;
+ * same-id pairs are dropped there, for the reason `overlaps` documents.
  */
 export function regionListRows(
   doc: RegionsDocument,
@@ -231,21 +317,37 @@ export function regionListRows(
   bgLibrary: readonly BgLibraryEntry[],
 ): RegionListRow[] {
   const pieces: RegionPiece[] = doc.regions.map((r) => ({ id: r.id, rect: r.rect }));
-  const byIndex = new Map<number, Set<string>>();
+  const byId = new Map<string, Set<string>>();
+  const note = (a: string, b: string) => {
+    if (!byId.has(a)) byId.set(a, new Set());
+    byId.get(a)!.add(b);
+  };
   for (const o of disjointness(pieces).overlaps) {
-    if (!byIndex.has(o.indexA)) byIndex.set(o.indexA, new Set());
-    if (!byIndex.has(o.indexB)) byIndex.set(o.indexB, new Set());
-    byIndex.get(o.indexA)!.add(o.idB);
-    byIndex.get(o.indexB)!.add(o.idA);
+    if (o.idA === o.idB) continue;
+    note(o.idA, o.idB);
+    note(o.idB, o.idA);
   }
-  return doc.regions.map((r, index) => ({
-    index,
-    id: r.id,
-    label: r.name && r.name.length > 0 ? r.name : r.id,
-    rect: r.rect,
-    bg: regionBgLabel(r.bg?.layoutRef, defaults, bgLibrary),
-    overlaps: [...(byIndex.get(index) ?? [])],
-  }));
+  return regionEntryGroups(doc).map(({ id, indices }) => {
+    // THE FIRST ENTRY IS THE REPRESENTATIVE for everything that is not
+    // geometry — the same entry `setRegionBinding` converges the others onto
+    // and `applyRegionGestureToDocument` templates from.
+    const first = doc.regions[indices[0]];
+    const rects = indices.map((i) => doc.regions[i].rect);
+    return {
+      index: indices[0],
+      entryIndices: indices,
+      id,
+      label: first.name && first.name.length > 0 ? first.name : id,
+      // `unionBounds` returns null only when EVERY piece is empty, which the
+      // schema's "at least 1" forbids and a hand-edited file can still carry.
+      // The first entry's own rectangle is then the honest answer — it is what
+      // the row showed before grouping — rather than a fabricated box.
+      rect: unionBounds(rects) ?? first.rect,
+      rects,
+      bg: regionBgLabel(first.bg?.layoutRef, defaults, bgLibrary),
+      overlaps: [...(byId.get(id) ?? [])],
+    };
+  });
 }
 
 /** The act row. `bg` is resolved through the same function a region's is. */
@@ -381,34 +483,8 @@ export function regionBindingRows(
 // Detach on edit, and revert
 // ---------------------------------------------------------------------------
 
-/**
- * Set one binding of one region, returning a NEW document. `null` reverts to
- * inherited; anything else detaches.
- *
- * Returns null when the edit is a no-op or is refused, so the caller pushes no
- * undo entry — the `run(command)` null-guard's own rule. Two refusals:
- *   • `preset` cannot be null (the schema's `required`, and there is nothing to
- *     inherit from);
- *   • a value identical to the current one.
- *
- * THE WHOLE DOCUMENT IS CLONED, not spliced in place. `SetRegionsCommand`
- * records whole old/new halves and `writeActRegionsDocument` clones again on the
- * way in; a shared nested object between the two halves is the aliasing defect
- * step 5's M1 mutation exists to catch, reintroduced one layer up.
- */
-export function setRegionBinding(
-  doc: RegionsDocument,
-  regionId: string,
-  key: RegionBindingKey,
-  value: string | null,
-): RegionsDocument | null {
-  if (key === 'preset' && value === null) return null;
-  const index = doc.regions.findIndex((r) => r.id === regionId);
-  if (index < 0) return null;
-  if (regionBindingValue(doc.regions[index], key) === value) return null;
-
-  const next = cloneRegionsDocument(doc);
-  const region = next.regions[index];
+/** Write one binding into ONE entry, in place. The four keys' arms, once. */
+function writeRegionBinding(region: Region, key: RegionBindingKey, value: string | null): void {
   if (key === 'preset') region.preset = value as string;
   else if (key === 'scene') region.sceneRef = value;
   else if (key === 'raster') region.rasterRef = value;
@@ -424,6 +500,71 @@ export function setRegionBinding(
       region.bg = { ...(region.bg ?? {}), layoutRef: value };
     }
   }
+}
+
+/**
+ * Set one binding of one region, returning a NEW document. `null` reverts to
+ * inherited; anything else detaches.
+ *
+ * ═══ EVERY ENTRY SHARING THE ID IS EDITED, NOT THE FIRST ═══════════════════
+ *
+ * A REGION WITH SEVERAL RECTANGLES IS SEVERAL `regions[]` ENTRIES SHARING AN
+ * `id`, and that is forced rather than chosen: the landed contract carries one
+ * `rect` per entry (`aurora-regions.schema.json`), an L-shape is two engine
+ * rows (spec §2.1), and a carve splits one rectangle into as many as four.
+ * `applyRegionGestureToDocument`'s docblock states the invariant that pairs
+ * with this one — EVERY ENTRY OF ONE ID CARRIES IDENTICAL BINDINGS — and
+ * copies the bindings onto each piece it makes. A binding edit is the other
+ * half of that contract: this function must leave every piece agreeing, or one
+ * click on a carved region's `scene` picker silently gives its pieces two
+ * different scenes and the ROM two different answers for one named region.
+ *
+ * Until step 8B this used `findIndex` and edited only the FIRST entry. It was
+ * latent because nothing called the gesture layer; wiring the map is what makes
+ * a multi-entry region reachable, so the fix lands with the wiring.
+ *
+ * ═══ WHICH ENTRY IS THE REPRESENTATIVE, AND FOR WHAT ═══════════════════════
+ *
+ * For DISPLAY the representative is the FIRST entry with the id: that is what
+ * `regionsPanelState` resolves with `.find()` and hands to `regionBindingRows`,
+ * and it is what `applyRegionGestureToDocument` takes its template from.
+ *
+ * FOR THE NO-OP SHORT-CIRCUIT THERE IS NO REPRESENTATIVE, deliberately. The
+ * refusal is "every entry already carries this value", never "the first one
+ * does". A document whose entries have DRIFTED apart — hand-edited, or written
+ * by some future writer that does not hold the invariant — must not be read as
+ * already-that-value and skipped, because that is exactly the document a
+ * binding edit has to repair. Asking the first entry alone would refuse the one
+ * edit that converges them, and the disagreement would be unfixable from the
+ * panel. So a drifted id always writes, and writing always converges.
+ *
+ * Returns null when the edit is a no-op or is refused, so the caller pushes no
+ * undo entry — the `run(command)` null-guard's own rule. Two refusals:
+ *   • `preset` cannot be null (the schema's `required`, and there is nothing to
+ *     inherit from);
+ *   • a value every entry of the id already carries.
+ *
+ * THE WHOLE DOCUMENT IS CLONED, not spliced in place. `SetRegionsCommand`
+ * records whole old/new halves and `writeActRegionsDocument` clones again on the
+ * way in; a shared nested object between the two halves is the aliasing defect
+ * step 5's M1 mutation exists to catch, reintroduced one layer up.
+ */
+export function setRegionBinding(
+  doc: RegionsDocument,
+  regionId: string,
+  key: RegionBindingKey,
+  value: string | null,
+): RegionsDocument | null {
+  if (key === 'preset' && value === null) return null;
+  const indices: number[] = [];
+  for (let i = 0; i < doc.regions.length; i += 1) {
+    if (doc.regions[i].id === regionId) indices.push(i);
+  }
+  if (indices.length === 0) return null;
+  if (indices.every((i) => regionBindingValue(doc.regions[i], key) === value)) return null;
+
+  const next = cloneRegionsDocument(doc);
+  for (const i of indices) writeRegionBinding(next.regions[i], key, value);
   return next;
 }
 

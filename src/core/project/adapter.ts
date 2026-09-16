@@ -184,6 +184,15 @@ export const TOOL_IDS = [
   // band's `cols x rows` column-major slot pattern under the brush so a region
   // of Plane B is pointed at the band in one gesture instead of 32 picks.
   'stamp-band',
+  // The Regions facet's rectangle (editor spec §3.1, build-plan row 8): a drag
+  // gives a rectangle of the act to a region, and because the Q1 ruling made
+  // carve what EVERY draw does, the same drag also trims whatever it lands on.
+  // It exists as a vocabulary entry rather than hanging off View's mouseup for
+  // `mark-band`'s reason one line up — a facet whose only tool is View makes
+  // every pan-click a document gesture. Step 6 deliberately did NOT add it
+  // (`eraser`'s note: a tool no canvas answers is a label, a hint and a dock
+  // icon for a button that does nothing); step 8B adds it WITH the canvas.
+  'region',
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 
