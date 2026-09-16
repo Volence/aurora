@@ -31,6 +31,7 @@ import { sceneRefOptions, unassignableSceneRef } from '../../providers/effects-a
 import type { AnyCommand } from '../../../core/editing/commands';
 import type { RegionRect } from '../../../core/formats/regions/document';
 import {
+  ACT_ROW_NOTE,
   regionBindingCommand,
   regionBindingRows,
   regionsPanelState,
@@ -130,11 +131,23 @@ function RegionRow({ row, selected, onSelect }: {
  * `regions.json` to edit. What it shows is what a region's NULL inherits from,
  * which lives on the act (`Act.sceneRef`), on nothing at all (raster), and on
  * the act's own background.
+ *
+ * ⚠ THE REASON IS ON THE ROW, NOT ONLY IN THE TOOLTIP (the 2026-09-16 ruling's
+ * CALL 3). The `title` stays — a hover still answers — but `ACT_ROW_NOTE` is
+ * rendered as TEXT, because a row that takes no click and says nothing about why
+ * reads as broken rather than as scoped. The sentence is the provider's
+ * constant, never composed here, so the node row and the CDP harness can both
+ * take it from one place.
+ *
+ * EXPORTED for `__tests__/act-row-visible-reason.test.ts`, which calls it as a
+ * plain function and walks the element tree it returns: that is the only way a
+ * suite with no DOM can tell a TEXT child from an attribute, which is the whole
+ * property. It takes no hooks, so no renderer is needed.
  */
-function ActRow({ state }: { state: Extract<RegionsPanelState, { kind: 'open' }> }) {
+export function ActRow({ state }: { state: Extract<RegionsPanelState, { kind: 'open' }> }) {
   const { actRow, defaults } = state;
   return (
-    <Card title="The act's own values. A region binding left null inherits these.">
+    <Card title={ACT_ROW_NOTE}>
       <div data-region-row="act" style={{ paddingBottom: T.s2 }}>
         <div style={{ display: 'flex', gap: T.s2, alignItems: 'baseline' }}>
           <span style={{ fontWeight: T.wSemibold }}>act</span>
@@ -144,6 +157,9 @@ function ActRow({ state }: { state: Extract<RegionsPanelState, { kind: 'open' }>
         <div style={{ ...NOTE, marginBottom: 0 }}>
           scene {defaults.sceneRef ?? 'default'} · raster none · no act preset
         </div>
+        {/* CALL 3's visible line. `data-region-note` is what an instrument
+            addresses; the text is `ACT_ROW_NOTE`, never composed here. */}
+        <div data-region-note="act" style={{ ...NOTE, marginBottom: 0 }}>{ACT_ROW_NOTE}</div>
       </div>
     </Card>
   );
