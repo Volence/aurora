@@ -469,3 +469,70 @@ export const ANCHOR_PREVIEW_ENVELOPE = 'rgba(52, 211, 153, 0.22)';
 export const ANCHOR_PREVIEW_CURVE = '#34D399';
 /** The playhead — where the anchor is NOW. Mirrors `--text-hi`. */
 export const ANCHOR_PREVIEW_PLAYHEAD = '#E8EAF2';
+
+// ---- The regions overlay (canvas/region-overlay.ts, editor spec §3.4) -------
+//
+// A region is an area's IDENTITY, and the overlay has to answer two questions
+// over busy level art at any zoom: whose is this, and is any of it nobody's.
+//
+// ⚠ THE FAMILY IS OKABE-ITO, AND THAT IS THE WHOLE REASON FOR IT. Every other
+// lens on this canvas picks ONE hue and spends it on one meaning; regions need a
+// SET of hues that stay distinct from each other, and picking N pleasant colours
+// by eye is exactly how a categorical palette comes to have two members a
+// red-green colourblind reader cannot separate. Okabe and Ito's eight-colour
+// qualitative set is designed for that reader, so it is taken as published
+// rather than re-derived.
+//
+// THREE OF THE EIGHT ARE DROPPED, each for a reason on THIS canvas:
+//
+//   • BLACK is invisible on CANVAS_VOID.
+//   • VERMILLION (#D55E00) is the nearest member to the refusal red below, and
+//     the refusal is the one answer that must never be mistaken for a region.
+//   • ORANGE (#E69F00) reads as SCREEN_FRAME_LINE. The screen frame is the one
+//     other overlay GUARANTEED to share this facet's screen (spec §3.5, step 9)
+//     and it is the reference mark the author lays regions against, so a region
+//     that reads as the frame breaks the comparison the frame exists for.
+//
+// Five survive. The sixth axis is not a colour at all: `region-overlay.ts`
+// alternates the HATCH ANGLE every time the palette wraps, so the first ten
+// regions of an act are ten distinct (hue, angle) pairs and the redundancy
+// survives a reader who sees no colour at all.
+//
+// WHAT IS NOT CLAIMED: the collision lens's blue, the parallax guides' cyan and
+// the band lens's magenta are all in the same neighbourhood as members of this
+// set. They are EFFECTS- and COLLISION-facet lenses and the regions overlay is
+// armed only in the Regions facet, so they do not share a screen. That is the
+// same argument the band lens makes about COLLISION_UNKNOWN, and it is recorded
+// here because it is the argument that would stop holding if a later parcel let
+// two of these facets show at once.
+
+/** The per-region hue cycle. Index by the region's position in the document. */
+export const REGION_HUES: readonly string[] = [
+  '#56B4E9', // sky blue
+  '#009E73', // bluish green
+  '#F0E442', // yellow
+  '#0072B2', // blue
+  '#CC79A7', // reddish purple
+];
+
+/** Backing plate under a region's label, the guides' label language. */
+export const REGION_LABEL_BG = 'rgba(10, 12, 18, 0.82)';
+/** The label's own text. The hue goes on the outline, not on the words, so a
+ *  yellow region and a blue one are equally readable. */
+export const REGION_LABEL_TEXT = 'rgba(232, 234, 242, 0.97)';
+/** The background name's line when the ref does not resolve (the 2026-09-16
+ *  ruling's third arm). Mirrors CAMERA_PREVIEW_LABEL_WARN: read this twice. */
+export const REGION_LABEL_WARN = 'rgba(240, 198, 116, 0.98)';
+
+// UNASSIGNED IS RED, AND IT IS ALSO A DIFFERENT TREATMENT.
+//
+// The ruled model makes an area no region holds a first-class answer that the
+// build REFUSES (region-geometry.ts's header), not a fallback, so it carries the
+// same red the effects guides use for a refusal - one hue, one meaning, across
+// the two surfaces. But hue alone is the wrong amount of signal here: it is the
+// one answer that must survive a reader who cannot tell it from a region's
+// colour, so it is ALSO the only area on the overlay drawn as a CROSS hatch. No
+// region ever uses both angles at once.
+export const REGION_UNASSIGNED_FILL = 'rgba(255, 96, 96, 0.95)';
+export const REGION_UNASSIGNED_LABEL_BG = 'rgba(40, 10, 12, 0.90)';
+export const REGION_UNASSIGNED_LABEL_TEXT = 'rgba(255, 205, 200, 0.97)';
