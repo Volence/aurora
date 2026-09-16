@@ -14,6 +14,8 @@
 // and derive the size of the gesture from the document itself.
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   beginRegionDrag,
   describeRegionGesture,
@@ -21,6 +23,7 @@ import {
   regionDragCommand,
   regionGestureOf,
   updateRegionDrag,
+  NO_REGIONS_HERE,
   NO_SELECTION_ADVICE,
 } from '../map-region-gesture';
 import {
@@ -320,6 +323,20 @@ describe('a gesture that changes nothing, and a gesture the layer refuses', () =
     expect(JSON.stringify(outcome.command)).not.toContain(NO_SELECTION_ADVICE);
     // It CARVED, which is what every draw does under the Q1 ruling.
     expect(outcome.trimmedIds).toEqual(['night']);
+  });
+
+  it('the no-document sentence names a control the panel actually builds', () => {
+    // ⚠ A TOAST THAT NAMES A BUTTON NOBODY BUILT sends the author looking for
+    // it. `Migrate sections` is the one door into a first regions document and
+    // RegionsPanel renders exactly that label, READ FROM THE COMPONENT rather
+    // than retyped here -- a retyped expectation goes green against a renamed
+    // button, which is the failure this row exists for.
+    const panel = readFileSync(
+      join(__dirname, '..', 'regions', 'RegionsPanel.tsx'), 'utf8',
+    );
+    const label = 'Migrate sections';
+    expect(panel, 'the panel no longer renders this label').toContain(label);
+    expect(NO_REGIONS_HERE).toContain(label);
   });
 
   it('a minted id never collides with one the document already holds', () => {
