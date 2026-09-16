@@ -109,7 +109,7 @@ repo's own row `⚠ AT AEON'S LATER REVISION THE SAME READING GIVES ELEVEN REGIO
 tested limit; the measurement above extends it to the tip.
 
 **The ruling the arms must be consistent with.** empyrean `39b8405` (ancestor of `origin/main`),
-`docs/AURORA_REGIONS_SCHEMA.md`, ruled 2026-09-16T05:28:50Z on the card
+empyrean's `docs/AURORA_REGIONS_SCHEMA.md`, ruled 2026-09-16T05:28:50Z on the card
 `REGIONS-EMITTER-DEBUG-ROW`: *"THE VERDICT: the delta (aeon's option 3). This schema is NOT
 amended and stays closed."* Its reasons: *"an Aurora author has no DEBUG and no release. Any key
 that encodes build shape … is a build concept sitting in a document edited through a GUI, where a
