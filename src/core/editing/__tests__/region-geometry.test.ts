@@ -32,6 +32,52 @@
  * revision that does not resolve is a LOUD SKIP naming what went unmeasured, and
  * a path that is absent AT a resolved revision is a red row, because that is a
  * measurement.
+ *
+ * ═══ RED-FIRST LOG, 2026-09-15 ═══
+ *
+ * Every mutation below was APPLIED ON DISK, run, and then restored from the
+ * committed baseline `75b9ba22`. The counts are out of 47 rows.
+ *
+ *   M1  subtractRect's left and right pieces cut to the WHOLE rectangle's rows
+ *       instead of the overlap's rows                        8 red
+ *   M2  `toInclusive` drops the `- 1` (half-open read as inclusive)
+ *                                                            7 red
+ *   M3  `resolveRegion` returns the first match instead of `ambiguous`
+ *                                                            1 red
+ *   M4  the right-edge rule made the mirror of the left one (`x1 + 1 <=` becomes
+ *       `x1 <=`), which is the asymmetry aeon actually writes
+ *                                                            1 red
+ *   M5  the minimum-span comparison moved one pixel (`<` becomes `<=`)
+ *                                                            1 red
+ *   M6  `deleteRegion` keeps the region (a delete that vacates nothing)
+ *                                                            5 red
+ *   M7  `coverage` always reports a fully painted act        8 red
+ *   M8  the property generator spaced so NO draw can overlap anything, which is
+ *       the vacuous-property state the census exists to catch
+ *                                                            1 red, on the
+ *       census assertion itself ("expected 0 to be greater than 0")
+ *   M9  the aeon row parser shifts every row's left edge by one pixel, which is
+ *       what a golden that was not really reading aeon would survive
+ *                                                            5 red
+ *
+ * ⚠ M8 WAS WRONG THE FIRST TIME AND THE SUITE STAYED GREEN, which is worth more
+ * than the nine reds. The first attempt moved the draws to x, y around 10000 so
+ * they would miss the act. They did, and the census still counted hundreds of
+ * overlaps, because THE DISPLACED DRAWS OVERLAPPED EACH OTHER. A mutation that
+ * leaves the property it is aimed at intact is not evidence of anything; the
+ * second attempt spaces the draws 500 px apart, wider than any generated
+ * rectangle, so the "no overlapping pair was ever generated" state is real.
+ *
+ * SEPARATELY, the aeon rows were proven to SKIP rather than pass when aeon
+ * cannot be read: with `AEON_DIR` pointed at a directory that is not a git
+ * checkout, 13 rows skipped and the skip reporter printed each reason, ending
+ * "skip-report: OK. Every skip named its reason." Nothing silently passed.
+ *
+ * M7 DID NOT RED THE PROPERTY ROW, and the reason is a real bound on it: in that
+ * row the act is fully painted at every step, so "assigned plus unassigned
+ * equals the act" holds just as well when `unassigned` is hardcoded to zero. The
+ * rows that catch a coverage that lies are the delete rows and the empty-act row,
+ * not the property row.
  */
 
 import { describe, it, expect } from 'vitest';
