@@ -971,6 +971,29 @@ const EXEMPT = [
        + 'from a committed baseline. The unopenability is the subject; deleting the path '
        + 'would delete the finding. Untracked by contract (empyrean contract/LANE_STATUS.md), '
        + 'so it cannot be made openable.' },
+
+  // Added 2026-09-16. THIRD entry on this token, and the repetition is the thing
+  // worth reading: every one so far is a document saying what a lane's board did,
+  // and none of them can ever be repaired, because the file is untracked BY
+  // CONTRACT rather than by accident. I did NOT generalise it to "any citation of
+  // docs/lane-status.json is provenance". That would delete the judgement this
+  // gate exists to force -- a review COULD cite the board file as evidence for a
+  // claim ("it said X, take my word"), which is the excuse on the bar's
+  // never-list, and a blanket rule would wave that through unread. Three
+  // hand-written rows that each must still fire is the cheaper mistake.
+  //
+  // This one caught the LANDING, not the writing: master was left red by
+  // 9c06b72d, the commit before this session booted, which added the sentence and
+  // never re-ran the suite. So the gate did its job late rather than not at all,
+  // and the lesson belongs to the landing habit (suite and push as ONE act),
+  // which is the rule 9c06b72d skipped.
+  { file: 'docs/reviews/2026-09-16-regions-step5.md', token: 'docs/lane-status.json',
+    why: 'the sentence STATES PROVENANCE: a queue row was dropped from the board file to free '
+       + 'the 20-row slot, and it names the file the row left so a reader knows the removal '
+       + 'lives on disk and in no commit. It says in the same breath that the FACT the row '
+       + 'carried is recorded in two TRACKED places and cites both, so the unopenable path is '
+       + 'not doing any evidential work. Untracked by contract (empyrean '
+       + 'contract/LANE_STATUS.md), so it cannot be made openable.' },
 ];
 
 // ---------------------------------------------------------------------------
