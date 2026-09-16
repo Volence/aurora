@@ -81,8 +81,8 @@
       "properties": {
         "layoutRef": {
           "type": ["string", "null"],
-          "description": "A background layout library id, or the sentinel \"@act\" meaning inherit the act's layout (the spelling aurora's resolveDisplayedBg already uses), or null meaning the same. The engine reads this as Region.rg_bg_layout.",
-          "pattern": "^(@act|[a-z][a-z0-9_]{0,31})$"
+          "description": "A background layout library id, or the sentinel \"@act\" meaning inherit the act's layout (the spelling aurora's resolveDisplayedBg already uses), or null meaning the same. The engine reads this as Region.rg_bg_layout. PATTERN WIDENED 2026-09-16 (aeon's finding): this field CITES aurora's background library rather than minting an id, and the library's real ids are hyphenated and timestamped (deep-forest-v15-marching-colonnade-1781232423352), so the old minted-id pattern ^(@act|[a-z][a-z0-9_]{0,31})$ matched 0 of 17 real entries and no background was spellable in a legal document. Modelled on preset above, which cites the game's effects library the same way: accept the cited namespace's spelling here, and let the GENERATOR validate that the id resolves. Existence is not this schema's job.",
+          "pattern": "^(@act|[a-z][a-z0-9_-]{0,127})$"
         },
         "span": {
           "type": "integer",
