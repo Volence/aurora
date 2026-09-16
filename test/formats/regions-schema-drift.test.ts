@@ -109,9 +109,18 @@ describe('regions schema: vendored copy drift gate', () => {
   });
 
   /**
-   * The sidecar cannot describe a file other than the one on disk. Catches a
-   * schema edited by hand to make something else pass, and a provenance record
-   * edited away from it.
+   * The sidecar is internally consistent and names a usable currency branch.
+   *
+   * ⚠ WHAT THIS ROW DOES NOT DO, measured by the overseer at review rather than
+   * reasoned: it does NOT catch a schema edited by hand. `vendored.bytes` is a
+   * byte COUNT, so any same-length edit passes it - `"maxLength": 64` to
+   * `"maxLength": 65` was planted on disk and this row stayed green while the
+   * blob row above went red, which is the whole of the repo's byte-count-neutral
+   * caution in one line. The disk relationship is proven by that row above
+   * (`gitBlobHash(bytes)` against the pinned blob) and by the currency rows
+   * below; this one is about the SIDECAR. The row name is kept identical to the
+   * two existing drift gates on purpose, so the three stay greppable as one
+   * family; the older two carry no comment making this promise.
    *
    * IT ALSO ASSERTS THE FIELD THE CURRENCY BLOCK STEERS BY, and this row is
    * where that assertion has to live: it needs no peer checkout, so it is the
