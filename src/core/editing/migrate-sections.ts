@@ -55,7 +55,7 @@
 // `rg_effects` are the same region for every engine purpose; an L-shape is two
 // rows" (§2.1, from `structs.emp`'s comment block). So a run whose area is not
 // one rectangle becomes SEVERAL entries with the same bindings and distinct ids
-// (`sec_4`, `sec_4_b`, …), never one entry with a rectangle bigger than the run.
+// (`sec4`, `sec4_a`, …), never one entry with a rectangle bigger than the run.
 // Ids must differ because §2.5 rule 1 refuses a duplicate id; the AREA is what
 // carries identity to the engine, and the suffix is an editor label.
 //
@@ -349,7 +349,7 @@ function runName(run: readonly number[]): string {
  * An id for a key-less row, from the preset it binds.
  *
  * §8 Q5's recommendation, which the owner left standing ("Doesn't matter too
- * much"): "the preset name when the preset is explicit and `sec_N` otherwise".
+ * much"): "the preset name when the preset is explicit and `secN` otherwise".
  * A key-less row HAS no section list to be named after, so the preset is the
  * only thing about it an author would recognise. Lowercased and punctuation
  * folded to `_` so it satisfies the contract's id pattern, with the pattern
@@ -360,9 +360,43 @@ function idFromPreset(preset: string): string {
   return folded;
 }
 
-/** `a`, `b`, `c`… for the second and later rectangles of one run. */
+/**
+ * `_a`, `_b`, `_c`… for the second and later rectangles of one run.
+ *
+ * THE UNDERSCORE STAYS HERE even though it left the base id (see `runId`): it
+ * is the only thing separating the suffix from the run's index, and `sec10a`
+ * against `sec1` followed by `0a` is a reading nobody should have to make. It
+ * is also not a cross-tool spelling — a multi-rect run is an Aurora shape aeon
+ * has no row for — so nothing on the other side names it.
+ */
 function pieceSuffix(n: number): string {
   return `_${String.fromCharCode('a'.charCodeAt(0) + n - 1)}`;
+}
+
+/**
+ * The id of one rectangle of a section run: AEON'S SPELLING, `sec<lowest index>`.
+ *
+ * ⚠ NO UNDERSCORE, AND THAT IS A CONTRACT SURFACE RATHER THAN A LABEL. Until
+ * 2026-09-16 this emitted `sec_2` where aeon's own regions table, and the DEBUG
+ * delta ruling's `ensure`, both say `sec2` — so a freshly migrated act 1 would
+ * have failed aeon's build ON THE ID ALONE, with identical geometry. The
+ * divergence came from empyrean's editor spec §4, which invented a second
+ * spelling for an id that already had one; it is corrected there, at
+ * `docs/superpowers/specs/2026-09-14-aurora-regions-editor-design.md` §4 item 2
+ * and its note (d), and the ruling is empyrean `docs/AURORA_REGIONS_SCHEMA.md`
+ * at `origin/main`, "REGION IDS ARE A CROSS-TOOL CONTRACT SURFACE, and the
+ * canonical spelling is aeon's" (ruled 2026-09-16T09:2xZ, OVERTURNABLE BY ONE
+ * WORD).
+ *
+ * The schema's `id` PATTERN does not settle it — `^[a-z][a-z0-9_]{0,31}$` admits
+ * both — but its `id` DESCRIPTION does: "Used by the editor and by the
+ * generator's emitted symbol names". An id that names an emitted symbol is not a
+ * tool's to spell. The guard that would have caught this was never the problem:
+ * keying the `ensure` on the id is deliberate, so a renamed row fails the build
+ * instead of silently cutting the wrong one.
+ */
+function runId(lowestIndex: number, piece: number): string {
+  return `sec${lowestIndex}${piece === 0 ? '' : pieceSuffix(piece)}`;
 }
 
 /**
@@ -549,7 +583,7 @@ export function planSectionMigration(input: MigrationInput): MigrationPlan {
       );
     }
     rects.forEach((rect, n) => {
-      const id = `sec_${run[0]}${n === 0 ? '' : pieceSuffix(n)}`;
+      const id = runId(run[0], n);
       usedIds.add(id);
       regions.push(regionOf(id, runName(run), t.preset, rect, t.sidecar));
     });

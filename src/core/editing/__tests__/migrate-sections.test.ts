@@ -100,7 +100,7 @@ describe('planSectionMigration: one region per contiguous run', () => {
     expect(run, 'the shared run produced no region at all').toBeDefined();
     // ONE RECT FOR THE WHOLE ROW — §4's "a full row of cells is one rect".
     expect(run.rect).toEqual({ x: 0, y: 0, w: 3 * SIZE, h: SIZE });
-    expect(run.id).toBe('sec_0');
+    expect(run.id).toBe('sec0');
     expect(run.name).toBe('Sections 0, 1, 2');
     // And the act is still tiled, which is what the merge must not break.
     const act = { x: 0, y: 0, w: 3 * SIZE, h: 3 * SIZE };
@@ -117,7 +117,7 @@ describe('planSectionMigration: one region per contiguous run', () => {
     const plan = planSectionMigration(input);
     expect(plan.refusals, plan.refusals.join('; ')).toEqual([]);
     const diag = plan.document!.regions.filter((r) => r.preset === 'ZZZ_Diag');
-    expect(diag.map((r) => r.id)).toEqual(['sec_0', 'sec_4']);
+    expect(diag.map((r) => r.id)).toEqual(['sec0', 'sec4']);
     expect(diag.map((r) => r.rect)).toEqual([
       { x: 0, y: 0, w: SIZE, h: SIZE },
       { x: SIZE, y: SIZE, w: SIZE, h: SIZE },
@@ -135,7 +135,7 @@ describe('planSectionMigration: one region per contiguous run', () => {
     const plan = planSectionMigration(input);
     expect(plan.refusals, plan.refusals.join('; ')).toEqual([]);
     const same = plan.document!.regions.filter((r) => r.preset === 'ZZZ_Same');
-    expect(same.map((r) => r.id)).toEqual(['sec_0', 'sec_1']);
+    expect(same.map((r) => r.id)).toEqual(['sec0', 'sec1']);
     expect(same.map((r) => r.sceneRef)).toEqual(['scene_a', 'scene_b']);
   });
 
@@ -177,8 +177,8 @@ describe('planSectionMigration: the key-less row carves, and is a region of its 
 
     // The two rows it crosses are SHRUNK, exactly as aeon's hand table has them:
     // the left one ends one pixel before it, the right one begins one after.
-    const sec1 = doc.regions.find((r) => r.id === 'sec_1')!;
-    const sec2 = doc.regions.find((r) => r.id === 'sec_2')!;
+    const sec1 = doc.regions.find((r) => r.id === 'sec1')!;
+    const sec2 = doc.regions.find((r) => r.id === 'sec2')!;
     expect(sec1.rect).toEqual({ x: SIZE, y: 0, w: night.edges.x0 - SIZE, h: SIZE });
     expect(sec2.rect).toEqual({
       x: night.edges.x1 + 1, y: 0, w: 3 * SIZE - (night.edges.x1 + 1), h: SIZE,
@@ -215,7 +215,7 @@ describe('planSectionMigration: the key-less row carves, and is a region of its 
       unkeyed: [{ ...night, edges: { x0: 0, x1: SIZE - 1, y0: 0, y1: SIZE - 1 } }],
     }));
     expect(plan.refusals, plan.refusals.join('; ')).toEqual([]);
-    expect(plan.document!.regions.some((r) => r.id === 'sec_0')).toBe(false);
+    expect(plan.document!.regions.some((r) => r.id === 'sec0')).toBe(false);
     expect(plan.notes.join('\n')).toMatch(/Sections 0 became no region/);
   });
 
@@ -234,7 +234,7 @@ describe('planSectionMigration: the key-less row carves, and is a region of its 
     const plan = planSectionMigration(input);
     expect(plan.refusals, plan.refusals.join('; ')).toEqual([]);
     const top = plan.document!.regions.filter((r) => r.preset === 'ZZZ_Top');
-    expect(top.map((r) => r.id)).toEqual(['sec_0', 'sec_0_a']);
+    expect(top.map((r) => r.id)).toEqual(['sec0', 'sec0_a']);
     expect(top.map((r) => r.rect)).toEqual([
       { x: 0, y: 0, w: SIZE, h: SIZE },
       { x: 2 * SIZE, y: 0, w: SIZE, h: SIZE },
@@ -291,10 +291,10 @@ describe('planSectionMigration: the sidecars it clears', () => {
     );
     // The refs reached the regions, rather than being cleared into nothing.
     const doc = plan.document!;
-    expect(doc.regions.find((r) => r.id === 'sec_0')!.sceneRef).toBe('scene_start');
-    expect(doc.regions.find((r) => r.id === 'sec_5')!.rasterRef).toBe('sec5_showcase');
+    expect(doc.regions.find((r) => r.id === 'sec0')!.sceneRef).toBe('scene_start');
+    expect(doc.regions.find((r) => r.id === 'sec5')!.rasterRef).toBe('sec5_showcase');
     // A binding the file cannot carry is NOT written anywhere on the region.
-    expect(Object.keys(doc.regions.find((r) => r.id === 'sec_0')!))
+    expect(Object.keys(doc.regions.find((r) => r.id === 'sec0')!))
       .toEqual(['id', 'name', 'preset', 'rect', 'sceneRef']);
   });
 

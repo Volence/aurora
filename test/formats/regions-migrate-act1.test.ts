@@ -19,10 +19,14 @@
 // computation matched aeon's own reading of the same act.
 //
 // ⚠ AND THE COMPARISON IS FIELD BY FIELD EXCEPT FOR TWO KEYS, BY DESIGN. §4
-// names the migration's ids (`sec_<lowest index>`) and names ("Sections a, b,
-// c"); aeon's golden was hand-authored with `sec0` and "Forest, upper left".
-// Neither is a wire value — the engine reads no region id (§2.3) — so they are
-// compared as a KNOWN difference rather than quietly excluded.
+// named the migration's ids (`sec_<lowest index>`) and names ("Sections a, b,
+// c"); aeon's table says `sec0` and "Forest, upper left". THE ID HALF OF THAT
+// WAS WRONG and was ruled so on 2026-09-16: an id names an emitted symbol, so it
+// is a cross-tool contract surface and aeon's spelling is canonical. The
+// migration now emits `sec0` and the ids are compared TO AEON'S rather than each
+// to its own literal — see the golden row for why that distinction is the whole
+// lesson. `name` is still a stated difference: nothing has ruled those must
+// agree.
 //
 // ⚠ ONE ROW OF THIS ACT IS LEFT OUT ON PURPOSE, and the last row in this file
 // is about that. aeon's descriptor carries a region row written behind a build
@@ -112,9 +116,12 @@ function read(rev: string, rel: string): string | null {
   return r.ok ? r.text : null;
 }
 
+/** Where the vendored copy of aeon's act 1 regions table lives in this repo. */
+const GOLDEN_REL = 'test/fixtures/regions/ojz_act1.regions.json';
+
 /** The vendored golden — aeon's own regions.json for act 1, bytes unchanged. */
 function golden() {
-  const path = join(process.cwd(), 'test/fixtures/regions/ojz_act1.regions.json');
+  const path = join(process.cwd(), GOLDEN_REL);
   return parseRegionsDocument(readFileSync(path, 'utf8'), path);
 }
 
@@ -248,7 +255,8 @@ describe('migrate aeon\'s act 1', () => {
 
   it('AND IT REPRODUCES AEON\'S OWN GOLDEN, rect for rect and binding for binding', (ctx) => {
     if (!need(ctx)) return;
-    const plan = planSectionMigration(act1Input());
+    const input = act1Input();
+    const plan = planSectionMigration(input);
     expect(plan.refusals, plan.refusals.join('; ')).toEqual([]);
     const mine = plan.document!.regions;
     const theirs = golden().regions;
@@ -256,11 +264,21 @@ describe('migrate aeon\'s act 1', () => {
       .toHaveLength(10);
     expect(mine).toHaveLength(theirs.length);
 
-    // BY POSITION IS LEGITIMATE HERE AND ONLY HERE: §4 fixes the order (section
-    // runs in ascending lowest-index order, key-less rows appended after), and
-    // aeon's table is written in that same order with the night row appended as
-    // row 9. The ids differ by design, so there is no id to diff by — which is
-    // why the shape of the comparison is stated rather than assumed.
+    // ── THE VENDORED GOLDEN IS AEON'S OWN FILE, checked and not assumed ────
+    //
+    // Everything below compares against `test/fixtures/regions/`, a copy. A copy
+    // that has drifted would make every agreement below an agreement with
+    // ourselves, so the bytes are compared to aeon's at a COMMITTED revision,
+    // read through git rather than off the working tree.
+    const theirBytes = read(GOLDEN_PIN, 'tools/fixtures/regions/ojz_act1.regions.json');
+    expect(theirBytes, `aeon's own regions table is not at that path at ${GOLDEN_PIN}`)
+      .not.toBeNull();
+    expect(theirBytes, 'the vendored golden has drifted from aeon\'s file')
+      .toBe(readFileSync(join(process.cwd(), GOLDEN_REL), 'utf8'));
+
+    // BY POSITION IS LEGITIMATE HERE: §4 fixes the order (section runs in
+    // ascending lowest-index order, key-less rows appended after), and aeon's
+    // table is written in that same order with the night row appended as row 9.
     const strip = (r: typeof mine[number]) => ({
       preset: r.preset,
       rect: r.rect,
@@ -269,13 +287,50 @@ describe('migrate aeon\'s act 1', () => {
     });
     expect(mine.map(strip)).toEqual(theirs.map(strip));
 
-    // THE KNOWN DIFFERENCE, asserted rather than excluded: ids and names. Neither
-    // is a wire value — the engine reads no region id.
-    expect(mine.map((r) => r.id))
-      .toEqual(['sec_0', 'sec_1', 'sec_2', 'sec_3', 'sec_4', 'sec_5', 'sec_6', 'sec_7', 'sec_8',
-        'ojz_preset_night']);
-    expect(theirs.map((r) => r.id))
-      .toEqual(['sec0', 'sec1', 'sec2', 'sec3', 'sec4', 'sec5', 'sec6', 'sec7', 'sec8', 'night']);
+    // ── THE ID, WHICH THIS ROW USED TO RATIFY AS A DIFFERENCE ─────────────
+    //
+    // ⚠ THE LESSON OF THIS PARCEL, and it is worth more than the rename. Until
+    // 2026-09-16 the two id lists below were asserted SIDE BY SIDE against typed
+    // literals — `sec_0…` for mine, `sec0…` for aeon's — with a comment calling
+    // the difference "by design". Nothing compared them TO EACH OTHER. So the
+    // field under dispute was present in the file and still green, because two
+    // separate assertions about one field cannot disagree with each other.
+    //
+    // The id is a CROSS-TOOL CONTRACT SURFACE: empyrean
+    // `docs/AURORA_REGIONS_SCHEMA.md` at `origin/main`, "REGION IDS ARE A
+    // CROSS-TOOL CONTRACT SURFACE, and the canonical spelling is aeon's" (ruled
+    // 2026-09-16T09:2xZ, OVERTURNABLE BY ONE WORD), with the spec that invented
+    // the second spelling corrected at
+    // `docs/superpowers/specs/2026-09-14-aurora-regions-editor-design.md` §4
+    // item 2 and note (d). A migrated act 1 with the old spelling would have
+    // failed aeon's build on the id alone, with identical geometry.
+    //
+    // So the section-run ids are now asserted AGAINST AEON'S, not against a
+    // literal. The count of them is derived: §4 appends the key-less rows last.
+    const runCount = mine.length - input.unkeyed.length;
+    expect(runCount, 'every region came from a key-less row, so there is no run id to compare')
+      .toBeGreaterThan(0);
+    expect(mine.slice(0, runCount).map((r) => r.id),
+      'the migration spells a section-run id differently from aeon, whose build `ensure` keys on it')
+      .toEqual(theirs.slice(0, runCount).map((r) => r.id));
+
+    // ── AND THE ONE ID THAT STILL DIVERGES, TAGGED RATHER THAN RATIFIED ───
+    //
+    // ⚠ TAGGED FOR THE CONTROLLER, NOT SETTLED. The ruling covers the section-run
+    // spelling; it says nothing about what a KEY-LESS row's region should be
+    // called, and §4 item 3 does not name one either. Aurora derives it from the
+    // preset (`idFromPreset`), which gives `ojz_preset_night` where aeon's table
+    // says `night` — and `night` is not derivable from `OJZ_Preset_Night` by any
+    // rule Aurora has been given, so inventing one here would be designing
+    // policy rather than applying it. The difference is therefore asserted on
+    // BOTH sides, in one expectation that would go red if either moved, and
+    // reported upward rather than quietly closed.
+    expect([mine.slice(runCount).map((r) => r.id), theirs.slice(runCount).map((r) => r.id)],
+      'the key-less row\'s id: UNRULED, and this row is the disclosure of it')
+      .toEqual([['ojz_preset_night'], ['night']]);
+
+    // `name` is NOT in this: aeon's golden carries human labels and §4 carries
+    // "Sections a, b, c". Nothing has ruled they must agree, so they are stated.
     expect(mine[0].name).toBe('Sections 0');
     expect(theirs[0].name).toBe('Forest, upper left');
   });
@@ -344,8 +399,8 @@ describe('migrate aeon\'s act 1', () => {
       // Neither number is typed here.
       const theirSec2 = regionById(golden().regions, 'sec2');
       expect(theirSec2, 'the vendored golden has no sec2 to compare against').toBeDefined();
-      const mySec2 = regionById(doc.regions, 'sec_2');
-      expect(mySec2, 'the migration produced no sec_2').toBeDefined();
+      const mySec2 = regionById(doc.regions, theirSec2!.id);
+      expect(mySec2, `the migration produced no ${theirSec2!.id}`).toBeDefined();
       expect(rightEdge(mySec2!.rect),
         'section 2\'s right edge is the section grid\'s, and the golden is where aeon puts it')
         .toBe(rightEdge(theirSec2!.rect));
