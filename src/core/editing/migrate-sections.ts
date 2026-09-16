@@ -190,6 +190,37 @@ export interface MigrationInput {
   presetsUnusableReason?: string;
   /** Rows the descriptor could not key: `SectionRasterWiring.unkeyedRows`. */
   unkeyed: MigrationUnkeyedRow[];
+  /**
+   * Rows the reader LEFT OUT because they sit inside a build condition:
+   * `SectionRasterWiring.conditionalRows`. They are not migrated — that is the
+   * 2026-09-16 ruling, see `ConditionalEffectsRow` — and they are here only so
+   * the plan can say they were left out.
+   *
+   * ⚠ NOT A REFUSAL AND NOT A GAP. The amendment of 2026-09-16T09:0xZ rules the
+   * conditional row and the conditional edge it mutates ONE delta with ONE
+   * treatment: both excluded, both reported, neither an error. A build-only row
+   * is not part of the act the author edits, so a document without it is
+   * COMPLETE, and the note below has to read that way.
+   *
+   * Optional because a hand-built input in a test omits it; the provider always
+   * sets it, and an omission means "none", which is the only thing an absent
+   * list can honestly mean here — the reader never returns undefined.
+   */
+  conditional?: MigrationConditionalRow[];
+}
+
+/**
+ * One row left out of the migration because its call sits inside a build
+ * condition — `SectionRasterWiring.conditionalRows`, narrowed to what the note
+ * has to name: which preset, which row, which line, and the condition verbatim.
+ */
+export interface MigrationConditionalRow {
+  preset: string;
+  /** 1-based descriptor line, so the author can find the row. */
+  line: number;
+  constructorName: string;
+  /** The condition as the descriptor writes it, e.g. `DEBUG == 1`. Never evaluated. */
+  condition: string;
 }
 
 /** One section's sidecar, before and after. `next` is always all-null. */
@@ -342,6 +373,46 @@ export function planSectionMigration(input: MigrationInput): MigrationPlan {
   const refusals: string[] = [];
   const notes: string[] = [];
   const total = input.gridWidth * input.gridHeight;
+
+  // ── THE BUILD-ONLY ROWS, SAID FIRST AND SAID AS A COMPLETION ─────────────
+  //
+  // ⚠ THE WORDING IS THE POINT OF THIS BLOCK, and getting it wrong is the
+  // failure the 2026-09-16 ruling names. "We could not evaluate this row,
+  // sorry" sends an author to look for something of theirs to fix WHEN THERE IS
+  // NOTHING OF THEIRS TO FIX AND NOTHING WAS LOST: the excluded row is a
+  // build-time look-fixture, and by the ruling's own sentences — "an Aurora
+  // author has no DEBUG and no release", "the document describes the game, a
+  // look-fixture is not the game" — it is not part of the act they edit. So the
+  // sentence says the row was left out AS INTENDED, says the document is
+  // complete without it, and says there is nothing to fix. It reports Aurora's
+  // decision, never Aurora's limitation.
+  //
+  // IT ALSO CLAIMS NO KNOWLEDGE IT DOES NOT HAVE. "Behind a build switch", never
+  // "the debug row" and never "the release truth": Aurora has no DEBUG and no
+  // release, so which arm ships is not a thing it can say. What it can say is
+  // that the row is switched, and it quotes the switch in the descriptor's own
+  // words rather than interpreting it.
+  //
+  // IT IS A REPRESENTED STATE, NOT AN ABSENCE: an excluded row always produces
+  // this note, in every plan, refusal or not (`notes` rides both exits). A row
+  // left out with nothing on screen would be a drop wearing an exclusion's
+  // name, which is the thing the reader's `conditional` list exists to prevent.
+  const buildOnly = input.conditional ?? [];
+  if (buildOnly.length > 0) {
+    const one = buildOnly.length === 1;
+    const named = buildOnly
+      .map((r) => `${r.preset} (${r.constructorName} at descriptor line ${r.line}, inside `
+        // The reader reports an else arm as the bare word, so the sentence does
+        // not print "inside `if else`" — it says which arm, in the file's words.
+        + (r.condition === 'else' ? 'an `else` arm)' : `\`if ${r.condition}\`)`))
+      .join('; ');
+    notes.push(
+      `${buildOnly.length} descriptor ${one ? 'row sits' : 'rows sit'} behind a build switch and `
+      + `${one ? 'was' : 'were'} left out, as intended: ${named}. A row behind a build switch `
+      + `belongs to one build of the ROM rather than to the act you edit, so your document is `
+      + `complete without ${one ? 'it' : 'them'} and there is nothing to fix.`,
+    );
+  }
 
   if (!ID_PATTERN.test(input.actKey)) {
     refusals.push(

@@ -165,6 +165,18 @@ export interface SectionRasterWiring {
    */
   unkeyedRows?: UnkeyedEffectsRow[];
   /**
+   * Descriptor rows LEFT OUT because their call sits inside a build condition,
+   * exactly as `descriptorEffectsRows` reported them — see
+   * `ConditionalEffectsRow` for the ruling that makes this an exclusion.
+   *
+   * ⚠ CARRIED SO IT CAN BE SAID, which is the difference between this and a
+   * drop. The migration reads it and writes one note (`migrate-sections.ts`);
+   * without it the author's document would simply be one region smaller than
+   * aeon's DEBUG table with nothing on screen accounting for the difference.
+   * Absent on a wiring built by hand; the load always sets it.
+   */
+  conditionalRows?: ConditionalEffectsRow[];
+  /**
    * EVERY `EffectsPreset` RECORD THE LIBRARY DECLARES — the vocabulary a painted
    * region's `preset` key must name (ruling Q8). From the SAME
    * `<zone>_effects.emp` read as `threadedBy`; see `libraryPresetRecordNames`.
@@ -306,6 +318,60 @@ export interface UnkeyedEffectsRow {
   edges?: RowInclusiveEdges | null;
 }
 
+/**
+ * A region row this reader EXCLUDED because its call sits BEHIND A BUILD SWITCH
+ * — inside `if DEBUG == 1 { … }`, or inside its `else` arm.
+ *
+ * ⚠ EXCLUDED AND REPORTED, NEVER DROPPED AND NEVER INCLUDED. This is the shape
+ * of `unkeyed` one step further on: `unkeyed` is "I read this row and cannot
+ * key it", this is "I read this row and it is not unconditionally in the file".
+ * The row is kept out of `bindings`, out of `unkeyed`, and out of everything the
+ * migration reads, and it rides here so the layer above can SAY it was left out.
+ *
+ * ═══ WHY EXCLUDE AND NOT REFUSE, WHICH IS A RULING AND NOT A PREFERENCE ═════
+ *
+ * empyrean `docs/AURORA_REGIONS_SCHEMA.md` at `origin/main`, section "The schema
+ * stays CLOSED, and the DEBUG eleventh row is a build-time delta (ruled
+ * 2026-09-16T05:28:50Z)" and its amendment "AMENDMENT 2026-09-16T09:0xZ: the
+ * edge-mutation is the SAME delta, so it is excluded and NOT refused". Both
+ * ruled by the hub in the owner's place and OVERTURNABLE BY ONE WORD FROM HIM.
+ *
+ * The governing sentences are "an Aurora author has no DEBUG and no release"
+ * and "the document describes the game, a look-fixture is not the game". A row
+ * behind a build switch belongs to a particular build rather than to the act its
+ * author edits, so carrying it into their document would put a build concept in
+ * a file edited through a GUI. Refusing on it would be worse still: it would
+ * reject the author's whole migration over a fact about somebody else's ROM.
+ *
+ * ⚠ AND AURORA DOES NOT KNOW WHICH ARM IS WHICH. It has no DEBUG and no release
+ * — that is the ruling's own sentence — so it cannot call one arm the release
+ * truth and the other the fixture. All it knows is that the row sits behind a
+ * switch it cannot evaluate, and every sentence built from this record says
+ * exactly that and no more.
+ *
+ * ⚠ WHAT THIS DOES **NOT** DECIDE. The hub explicitly did not rule the general
+ * policy for a conditional row, and this reader cannot tell a look-fixture from
+ * a conditional that is genuinely part of the game. What is settled is the
+ * DEFAULT DIRECTION — exclude and say so, never include — and that is all this
+ * type implements. There is no mechanism here for distinguishing kinds of
+ * conditional and no config key, deliberately. Meet a conditional whose
+ * treatment looks wrong and REPORT it; do not design policy in this file.
+ */
+export interface ConditionalEffectsRow {
+  /** The preset record the row's `effects:` names. */
+  preset: string;
+  /** The constructor the row is written with, e.g. `ojz_region`. */
+  constructorName: string;
+  /** 1-based line of the row's `effects:` argument in the descriptor. */
+  line: number;
+  /**
+   * The condition as the descriptor WRITES it — `DEBUG == 1` — or the bare word
+   * `else` for a row in an else arm. Reported verbatim and never evaluated: the
+   * point of this record is that nothing here knows what it means.
+   */
+  condition: string;
+}
+
 /** One section that two keyed rows bind to DIFFERENT presets. Aurora picks neither. */
 export interface ContestedSection {
   section: number;
@@ -324,6 +390,12 @@ export interface DescriptorEffectsRows {
   unkeyed: UnkeyedEffectsRow[];
   /** Sections two keyed rows bind to different presets. In neither `bindings` nor `unkeyed`. */
   contested: ContestedSection[];
+  /**
+   * Rows left out because their call sits inside a build condition — see
+   * `ConditionalEffectsRow`. In NONE of the three above: not a binding, not a
+   * key-less row, not a contest. Reported so the exclusion can be said out loud.
+   */
+  conditional: ConditionalEffectsRow[];
 }
 
 /**
@@ -369,6 +441,50 @@ function enclosingOpenParen(code: string, pos: number): number {
   return -1;
 }
 
+/** Index of the innermost `{` left open before `pos`, or -1 at top level. */
+function enclosingOpenBrace(code: string, pos: number): number {
+  let depth = 0;
+  for (let i = pos - 1; i >= 0; i--) {
+    if (code[i] === '}') depth++;
+    else if (code[i] === '{') {
+      if (depth === 0) return i;
+      depth--;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The build condition a position sits inside, as the descriptor writes it, or
+ * null when it sits inside none.
+ *
+ * ⚠ IT WALKS OUTWARD, ALL THE WAY. A row nested inside a plain block inside an
+ * `if` is still conditional, and answering from the innermost brace alone would
+ * call it unconditional. So every enclosing `{` is examined and the first
+ * condition found wins.
+ *
+ * WHAT COUNTS AS A CONDITION is an `if` or an `else` keyword with NO brace
+ * between it and the `{` it opens — which reads aeon's two shapes,
+ * `const X: array = if DEBUG == 1 {` and `} else {`, and does not read
+ * `comptime fn f(…) {`, `struct R {` or a `use …{A, B}` import list. The text is
+ * already comment-and-string-masked, so an `if` in prose cannot win.
+ *
+ * IT NEVER EVALUATES. `DEBUG == 1` comes back as those five characters. Aurora
+ * has no DEBUG and no release (the 2026-09-16 ruling's own sentence), so there
+ * is nothing here for it to be right or wrong about.
+ */
+function enclosingCondition(code: string, pos: number): string | null {
+  for (let at = pos; ;) {
+    const open = enclosingOpenBrace(code, at);
+    if (open < 0) return null;
+    const head = code.slice(Math.max(0, open - 240), open);
+    const iff = /\bif\b([^{}]*)$/.exec(head);
+    if (iff !== null) return iff[1].trim() === '' ? 'if' : iff[1].trim();
+    if (/\belse\b[^{}]*$/.test(head)) return 'else';
+    at = open;
+  }
+}
+
 /** Index of the `)` that closes the `(` at `open`, or the end of the text if none does. */
 function matchingCloseParen(code: string, open: number): number {
   let depth = 0;
@@ -392,6 +508,32 @@ function matchingCloseParen(code: string, open: number): number {
  * null for the reason a grep with two hits answers no question. `code` is the
  * comment-and-string-masked text, so `// OJZ_NIGHT_X0 = 9999` in prose cannot
  * win.
+ *
+ * ⚠ A CONDITIONAL INITIALIZER IS ONE OF THE "NOTHING ELSE" CASES, and it is the
+ * OTHER HALF of the same build-time delta `ConditionalEffectsRow` exists for.
+ * aeon writes `const OJZ_SEC2_X1 = if DEBUG == 1 { OJZ_SNAP_X0 - 1 } else { 6143 }`
+ * — the edge the DEBUG row shortens `sec2` to. The 2026-09-16T09:0xZ amendment
+ * rules the row and this edge ONE delta with ONE treatment: both excluded, both
+ * reported, NEITHER refused.
+ *
+ * ON AEON'S DESCRIPTOR THAT NEEDS NO SECOND MECHANISM HERE, and the reason is
+ * MEASURED rather than argued: `sec2`'s row is KEYED, so the migration takes its
+ * rectangle from the section grid and NEVER ASKS THIS FUNCTION for
+ * `OJZ_SEC2_X1` at all — `rowEdges` is called on the key-less branch only.
+ * Dropping the conditional row returns `sec2`'s RIGHT edge to its grid value on
+ * its own, with no fallback rule written anywhere. (Its LEFT edge is 4800
+ * because the night region carved it, not because of the grid; the grid claim is
+ * about the right edge alone.) There is therefore NO REFUSAL TO REMOVE here and
+ * no test is written asserting one stopped: nothing refuses before the change
+ * either, and such a row would be green both sides of it.
+ *
+ * ⚠ THE CASE THAT DOES REACH HERE, so that it behaves in the same voice: a
+ * KEY-LESS row whose edge names a conditional constant. aeon has none today, and
+ * nothing here goes looking to make one reachable. Such a row would already have
+ * been excluded at the row level if it sat behind the switch itself; one that
+ * does not, and merely borrows a switched constant, resolves to null and the
+ * migration refuses NAMING THE ROW — a measurement it could not make, which is a
+ * different sentence from an exclusion and stays one.
  *
  * The shape is transcribed from the instrument in
  * `__tests__/section-wiring.test.ts` (`resolveIntConst`), which has been reading
@@ -459,6 +601,7 @@ export function descriptorEffectsRows(desc: string, zoneId: string): DescriptorE
   const constructors = new Set([`${zoneId}_region`, `${zoneId}_sec`]);
   const keyed = new Map<number, { preset: string; constructorName: string; line: number }[]>();
   const unkeyed: UnkeyedEffectsRow[] = [];
+  const conditional: ConditionalEffectsRow[] = [];
   const effects = /\beffects\s*:\s*([A-Za-z_][A-Za-z0-9_]*)/g;
   let m: RegExpExecArray | null;
   while ((m = effects.exec(code)) !== null) {
@@ -474,6 +617,23 @@ export function descriptorEffectsRows(desc: string, zoneId: string): DescriptorE
     const row = {
       preset: m[1], constructorName: head[2], line: code.slice(0, m.index).split('\n').length,
     };
+    // ── THE BUILD-CONDITION EXCLUSION, BEFORE ANY OTHER READING OF THE ROW ──
+    //
+    // Keyed or key-less, a row written inside `if DEBUG == 1 { … }` is not
+    // unconditionally in the file, so it is not part of the act its author
+    // edits. It goes to `conditional` and to nothing else — see that type for
+    // the ruling, for why this is an exclusion and not a refusal, and for the
+    // scope limit (the general policy is NOT settled here).
+    //
+    // THE TEST IS APPLIED UNIFORMLY, to a keyed row as well as a key-less one,
+    // because the alternative is two stories about one descriptor: a key-less
+    // conditional row left out with a sentence and a keyed one quietly binding
+    // a section's preset from a build nobody in Aurora has.
+    const condition = enclosingCondition(code, open);
+    if (condition !== null) {
+      conditional.push({ ...row, condition });
+      continue;
+    }
     if (keys.length === 1) {
       const list = keyed.get(keys[0]) ?? [];
       list.push(row);
@@ -491,7 +651,7 @@ export function descriptorEffectsRows(desc: string, zoneId: string): DescriptorE
     if (new Set(rows.map((r) => r.preset)).size === 1) bindings[section] = rows[0].preset;
     else contested.push({ section, rows });
   }
-  return { bindings, unkeyed, contested };
+  return { bindings, unkeyed, contested, conditional };
 }
 
 /**
@@ -579,10 +739,17 @@ export function descriptorWiringSource(path: string, rows: DescriptorEffectsRows
  * parse flag first, and a partial map would only be a second way to be wrong.
  */
 export function readDescriptorWiring(path: string, desc: string, zoneId: string)
-: Pick<SectionRasterWiring, 'bindings' | 'descriptor' | 'unkeyedRows'> {
+: Pick<SectionRasterWiring, 'bindings' | 'descriptor' | 'unkeyedRows' | 'conditionalRows'> {
   const rows = descriptorEffectsRows(desc, zoneId);
   const descriptor = descriptorWiringSource(path, rows, zoneId);
-  return { descriptor, bindings: descriptor.parsed ? rows.bindings : {}, unkeyedRows: rows.unkeyed };
+  return {
+    descriptor,
+    bindings: descriptor.parsed ? rows.bindings : {},
+    unkeyedRows: rows.unkeyed,
+    // Carried whatever the parse verdict was, for the same reason `unkeyedRows`
+    // is: a row nobody mentions is a row that was dropped.
+    conditionalRows: rows.conditional,
+  };
 }
 
 /**

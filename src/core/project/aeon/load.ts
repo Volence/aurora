@@ -857,6 +857,10 @@ async function loadFullProject(
           rasterWiring.descriptor = read.descriptor;
           rasterWiring.bindings = read.bindings;
           rasterWiring.unkeyedRows = read.unkeyedRows;
+          // And the rows left out because they sit inside a build condition —
+          // excluded from everything the migration reads and carried here so it
+          // can say so. See `ConditionalEffectsRow` for the ruling.
+          rasterWiring.conditionalRows = read.conditionalRows;
         } catch (e) {
           rasterWiring.descriptor = {
             path: wiringAt.descriptor, parsed: false,

@@ -24,6 +24,13 @@
 // Neither is a wire value — the engine reads no region id (§2.3) — so they are
 // compared as a KNOWN difference rather than quietly excluded.
 //
+// ⚠ ONE ROW OF THIS ACT IS LEFT OUT ON PURPOSE, and the last row in this file
+// is about that. aeon's descriptor carries a region row written behind a build
+// switch (`if DEBUG == 1`), which Aurora's textual reader cannot evaluate and
+// does not try to: it EXCLUDES the row and REPORTS it, so the author's document
+// describes the act and not a build of it. Ruled 2026-09-16 and amended the same
+// day — the last row cites both by document and section.
+//
 // SKIPPED LOUDLY WITHOUT AEON, never passed: a row that cannot reach aeon's
 // object database measured nothing.
 
@@ -35,6 +42,7 @@ import { peerRepo, resolveRev, readAtRev } from '../support/peer-repo';
 import { descriptorEffectsRows } from '../../src/core/formats/effects/section-wiring';
 import { parseSectionMeta } from '../../src/core/formats/section-meta';
 import { parseRegionsDocument } from '../../src/core/formats/regions/document';
+import type { RegionRect } from '../../src/core/formats/regions/document';
 import {
   planSectionMigration,
   type MigrationInput,
@@ -55,10 +63,16 @@ const AEON = siblingPathOrUnresolved('aeon');
  * difference is measured rather than waved at — see the last row in this file.
  * `807bfdd5` is an ancestor of `9772326`; the nine sidecar blobs are IDENTICAL
  * at both (checked with `git rev-parse <rev>:<path>` on each), and the
- * descriptor differs by a DEBUG-conditional eleventh row that arrived after the
- * pin. The golden is the RELEASE shape of that table, which is the shape this
- * pin's descriptor carries outright, so the pair is comparable — and the row
- * below states what a reader at the newer revision would get instead.
+ * descriptor differs by a build-switched extra row that arrived after the pin.
+ *
+ * ⚠ AND SINCE 2026-09-16 THE PAIR IS COMPARABLE FOR A STRONGER REASON. The
+ * reader now EXCLUDES a row written behind a build switch (the ruling in
+ * empyrean `docs/AURORA_REGIONS_SCHEMA.md` at `origin/main`, cited in full on
+ * the last row of this file), so the migration produces the same ten regions at
+ * BOTH revisions — and the last row makes the golden comparison at `9772326`
+ * itself, which is the like-for-like one. This pin is kept because the three
+ * rows above it are the landed §7 row and because a second revision reading the
+ * same act is a check on the first.
  */
 const AEON_PIN = '807bfdd5c723c3eebf7fd613ef40a9709836d3cd';
 /** The revision the vendored golden was published at (its provenance sidecar's `aeon.revision`). */
@@ -141,7 +155,39 @@ function act1Input(rev = AEON_PIN): MigrationInput {
     unkeyed: rows.unkeyed.map((u) => ({
       preset: u.preset, edges: u.edges ?? null, line: u.line, constructorName: u.constructorName,
     })),
+    // The rows the reader left out because they sit behind a build switch. Not
+    // migrated; carried so the plan can name them. Empty at `AEON_PIN`, one row
+    // at `GOLDEN_PIN` — which is the whole subject of the last row in this file.
+    conditional: rows.conditional.map((c) => ({
+      preset: c.preset, line: c.line, constructorName: c.constructorName, condition: c.condition,
+    })),
   };
+}
+
+/**
+ * One `const NAME = <integer>` out of the descriptor text, or null.
+ *
+ * ⚠ SO NO EDGE IN THIS FILE IS A TYPED NUMBER. The act's geometry belongs to
+ * aeon, and a figure retyped here would be a second home for it that goes stale
+ * silently. Null when the name is absent or declared more than once, and every
+ * caller asserts non-null first, so an unreadable descriptor is LOUD rather than
+ * arriving as a zero.
+ */
+function intConst(desc: string, name: string): number | null {
+  const hits = [...desc.matchAll(
+    new RegExp(`^[ \\t]*(?:pub[ \\t]+)?const[ \\t]+${name}[ \\t]*=[ \\t]*(-?\\d+)\\b`, 'gm'),
+  )];
+  return hits.length === 1 ? Number(hits[0][1]) : null;
+}
+
+/** A region of the migrated document by id, or undefined. */
+function regionById(regions: readonly { id: string; rect: RegionRect }[], id: string) {
+  return regions.find((r) => r.id === id);
+}
+
+/** The INCLUSIVE right edge of a half-open rect, which is the form aeon writes. */
+function rightEdge(rect: RegionRect): number {
+  return rect.x + rect.w - 1;
 }
 
 describe('migrate aeon\'s act 1', () => {
@@ -234,41 +280,113 @@ describe('migrate aeon\'s act 1', () => {
     expect(theirs[0].name).toBe('Forest, upper left');
   });
 
-  it('⚠ AT AEON\'S LATER REVISION THE SAME READING GIVES ELEVEN REGIONS, and here is why', (ctx) => {
-    if (!need(ctx)) return;
-    // A MEASURED LIMIT, not a failure. At `9772326` (the revision the golden was
-    // published at) act 1's descriptor gained a DEBUG-only region row:
-    //
-    //   const OJZ_E2_SNAP_ROWS: array = if DEBUG == 1 {
-    //       [ ojz_region(x0: OJZ_SNAP_X0, x1: 6143, …, effects: OJZ_Preset_NightSnap) ]
-    //   } else { [] }
-    //
-    // Aurora's descriptor reader is textual: it pairs each `effects:` with the
-    // `sec:` inside its own call and does not evaluate `if DEBUG == 1`. So that
-    // row reads as a SECOND key-less row, and a migration run against that
-    // revision would emit it as a region and carve section 2 at x 5600 — a
-    // document that matches the DEBUG shape of the table and not the release
-    // shape aeon's own golden carries.
-    //
-    // This row exists so the limit is a tested statement rather than a surprise
-    // during somebody's migration. It is TAGGED for the controller in the
-    // parcel's review packet.
-    const desc = read(GOLDEN_PIN, DESC_REL);
-    expect(desc, `aeon:${DESC_REL} at ${GOLDEN_PIN} could not be read`).not.toBeNull();
-    const rows = descriptorEffectsRows(desc!, 'ojz');
-    // ⚠ IN THIS ORDER, which is the file's and not the table's: the DEBUG row is
-    // DECLARED above `OJZ_ACT1_REGION_ROWS` (as `OJZ_E2_SNAP_ROWS`, appended to
-    // the table with `++`), and this reader walks the text. So the migration
-    // would append it BEFORE the night region — one more way a reader that
-    // cannot see `if DEBUG == 1` differs from the table the build emits.
-    expect(rows.unkeyed.map((u) => u.preset))
-      .toEqual(['OJZ_Preset_NightSnap', 'OJZ_Preset_Night']);
-    // The debug row's own rectangle resolves, which is exactly why it would be
-    // emitted rather than refused.
-    expect(rows.unkeyed[0].edges).toEqual({ x0: 5600, x1: 6143, y0: 0, y1: 2047 });
-    // And the pin this file reads carries only the release shape, which is what
-    // makes the golden comparison above a like-for-like one.
-    const atPin = descriptorEffectsRows(read(AEON_PIN, DESC_REL)!, 'ojz');
-    expect(atPin.unkeyed.map((u) => u.preset)).toEqual(['OJZ_Preset_Night']);
-  });
+  it('AT THE REVISION CARRYING THE DEBUG DELTA IT IS STILL TEN, and the left-out row is NAMED',
+    (ctx) => {
+      if (!need(ctx)) return;
+      // ═══ THE ROW THIS PARCEL INVERTED, AND WHY IT NOW ASSERTS TEN ═════════
+      //
+      // Until 2026-09-16 this row asserted ELEVEN, as a disclosure: at
+      // `GOLDEN_PIN` act 1's descriptor carries
+      //
+      //   const OJZ_E2_SNAP_ROWS: array = if DEBUG == 1 {
+      //       [ ojz_region(x0: OJZ_SNAP_X0, x1: 6143, ..., effects: OJZ_Preset_NightSnap) ]
+      //   } else { [] }
+      //
+      // and Aurora's textual reader cannot evaluate the switch, so it read that
+      // row as unconditional, emitted it, and carved section 2 short.
+      //
+      // TEN IS CORRECT AND ELEVEN WAS THE BUG. empyrean
+      // `docs/AURORA_REGIONS_SCHEMA.md` at `origin/main`, "The schema stays
+      // CLOSED, and the DEBUG eleventh row is a build-time delta (ruled
+      // 2026-09-16T05:28:50Z)" and its "AMENDMENT 2026-09-16T09:0xZ": a row
+      // behind a build switch is EXCLUDED from the author's document and
+      // REPORTED, never included and never refused. Ruled by the hub in the
+      // owner's place and OVERTURNABLE BY ONE WORD FROM HIM.
+      //
+      // ⚠ AND A COUNT ALONE CANNOT SAY THIS. The expectation below is DERIVED
+      // from the input, so a reader that returns no key-less rows at all — a
+      // broken regex, an unreadable file — moves the expectation with it and
+      // ten comes out either way. So the row the reader must STILL FIND is
+      // asserted by name first, and the row it must have LEFT OUT is asserted
+      // by name too. Neither is implied by the count.
+      const desc = read(GOLDEN_PIN, DESC_REL);
+      expect(desc, `aeon:${DESC_REL} at ${GOLDEN_PIN} could not be read`).not.toBeNull();
+      const rows = descriptorEffectsRows(desc!, 'ojz');
+
+      // ── The key-less row that must SURVIVE: the night region, with edges ──
+      expect(rows.unkeyed.map((u) => u.preset),
+        'the reader found no key-less row at all, so the ten below would be ten for the wrong '
+        + 'reason').toEqual(['OJZ_Preset_Night']);
+      expect(rows.unkeyed[0].edges,
+        'the night row\'s edges are named constants and NO VALUE IS SUBSTITUTED').not.toBeNull();
+
+      // ── The row that must be LEFT OUT, named, with the switch verbatim ────
+      expect(rows.conditional.map((c) => `${c.preset} ${c.constructorName} if ${c.condition}`),
+        'the build-switched row must be REPORTED, not silently dropped')
+        .toEqual(['OJZ_Preset_NightSnap ojz_region if DEBUG == 1']);
+      const snapLine = rows.conditional[0].line;
+      expect(desc!.split('\n')[snapLine - 1],
+        'the reported line does not hold the row it claims to').toContain('OJZ_Preset_NightSnap');
+
+      // ── Ten regions, and section 2's right edge back where the grid puts it ─
+      const input = act1Input(GOLDEN_PIN);
+      const plan = planSectionMigration(input);
+      expect(plan.refusals, plan.refusals.join('; ')).toEqual([]);
+      const doc = plan.document!;
+      const tuples = new Set(input.sections.map((s) => JSON.stringify(
+        [input.presets[s!.index], s!.sidecar.sceneRef, s!.sidecar.rasterRef],
+      )));
+      expect(doc.regions).toHaveLength(tuples.size + input.unkeyed.length);
+
+      // DERIVED FROM AEON, TWICE OVER, because this edge is the whole subject:
+      // the golden's own `sec2` says where the release shape puts it, and the
+      // descriptor's `OJZ_SNAP_X0` says where the DEBUG shape would have cut it.
+      // Neither number is typed here.
+      const theirSec2 = regionById(golden().regions, 'sec2');
+      expect(theirSec2, 'the vendored golden has no sec2 to compare against').toBeDefined();
+      const mySec2 = regionById(doc.regions, 'sec_2');
+      expect(mySec2, 'the migration produced no sec_2').toBeDefined();
+      expect(rightEdge(mySec2!.rect),
+        'section 2\'s right edge is the section grid\'s, and the golden is where aeon puts it')
+        .toBe(rightEdge(theirSec2!.rect));
+      const snapX0 = intConst(desc!, 'OJZ_SNAP_X0');
+      expect(snapX0, `aeon:${DESC_REL} at ${GOLDEN_PIN} declares no single OJZ_SNAP_X0, so the `
+        + 'DEBUG edge this row must NOT be at could not be derived').not.toBeNull();
+      expect(rightEdge(mySec2!.rect),
+        'section 2 is cut to the DEBUG shape: the build-switched row was migrated after all')
+        .not.toBe(snapX0! - 1);
+
+      // ── And at this revision it reproduces aeon's golden outright ─────────
+      //
+      // `GOLDEN_PIN` is the revision the vendored golden was published at, so
+      // this is a like-for-like comparison at ONE revision — which the earlier
+      // rows, reading `AEON_PIN`, could not make while the switched row was
+      // being migrated.
+      const strip = (r: { preset: string; rect: RegionRect; sceneRef?: string | null;
+        rasterRef?: string | null; }) => ({
+        preset: r.preset, rect: r.rect, sceneRef: r.sceneRef ?? null, rasterRef: r.rasterRef ?? null,
+      });
+      expect(doc.regions.map(strip)).toEqual(golden().regions.map(strip));
+
+      // ── THE SENTENCE THE AUTHOR READS, which is where this is judged ──────
+      //
+      // It must name the row (so it is a report and not a shrug) and must read
+      // as "expected, and your document is complete" — never as an apology and
+      // never as a limitation. The forbidden vocabulary is asserted because the
+      // trap the ruling names is a WORDING one: "we could not evaluate this
+      // row, sorry" sends an author to fix something that is not theirs.
+      const note = plan.notes.find((n) => n.includes('OJZ_Preset_NightSnap'));
+      expect(note, `the left-out row is not mentioned anywhere the author will see: `
+        + `${JSON.stringify(plan.notes)}`).toBeDefined();
+      expect(note).toContain('behind a build switch');
+      expect(note).toContain('as intended');
+      expect(note).toContain('there is nothing to fix');
+      expect(note).toContain(`line ${snapLine}`);
+      for (const apology of ['sorry', 'could not', 'cannot', 'unsupported', 'unable',
+        'not supported', 'limitation', 'failed']) {
+        expect(note!.toLowerCase(),
+          `the note reads as a failure of Aurora's ("${apology}") when nothing of the author's `
+          + 'is missing').not.toContain(apology);
+      }
+    });
 });

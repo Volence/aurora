@@ -27,6 +27,7 @@ import {
   type MigrationPlan,
   type MigrationSection,
   type MigrationUnkeyedRow,
+  type MigrationConditionalRow,
 } from '../../core/editing/migrate-sections';
 import type { SectionRasterWiring } from '../../core/formats/effects/section-wiring';
 
@@ -125,6 +126,16 @@ export function planActMigration(
     constructorName: row.constructorName,
   }));
 
+  // The rows the reader left out because they sit inside a build condition.
+  // NOT migrated (the 2026-09-16 ruling) and NOT refused (its 09:0xZ
+  // amendment) — passed on only so the plan can say they were left out.
+  const conditional: MigrationConditionalRow[] = (wiring.conditionalRows ?? []).map((row) => ({
+    preset: row.preset,
+    line: row.line,
+    constructorName: row.constructorName,
+    condition: row.condition,
+  }));
+
   const plan = planSectionMigration({
     actKey: actRegionsKey(zoneId, act.id),
     gridWidth: act.gridWidth,
@@ -136,6 +147,7 @@ export function planActMigration(
     presetsUnusableReason: wiring.descriptor.reason
       ?? `${wiring.descriptor.path} published no section bindings`,
     unkeyed,
+    conditional,
   });
 
   if (disagreeing.length > 0) {
