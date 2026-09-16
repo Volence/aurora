@@ -7,11 +7,24 @@ taken from their account.
 
 ## The defect, which is the reusable part
 
-Sections 2.3, 2.5, 3.2 and 5.2 still carry **superseded prose**. The supersession is stated in
-section 8, at the end of the document, **by the document about itself** - it is not an inference
-from reading two paragraphs against each other. And **a reader starts at the section they need**,
-which is what anyone does, so nobody reaches section 8. The same shape as this repo's own rule that
-a stale label at the FRONT of a row survives every correction appended to its back.
+The supersession was stated in section 8, at the end of the document, **by the document about
+itself** - not an inference from reading two paragraphs against each other. Sections 2.3, 2.5, 3.2
+and 5.2 carried the old prose with nothing at their heads, and **a reader starts at the section they
+need**, which is what anyone does, so nobody reached section 8. The same shape as this repo's own
+rule that a stale label at the FRONT of a row survives every correction appended to its back.
+
+⚠ **ALREADY FIXED BY THE HUB AT empyrean `dba58f4`, within the hour, and verified here** (ancestor
+of `origin/main`; all four sections now open with a `SUPERSEDED BY THE OWNER'S Q1 RULING` banner,
+and 2.3's says *"Write codec vectors from the schema, never from this sketch"*). They banked it as
+their rule 5a: **put the correction where the wrong path leads, not where the record is kept.**
+
+**This paragraph is the worked example of the rule it describes.** The sentence above it was
+written as *"sections 2.3, 2.5, 3.2 and 5.2 still carry superseded prose"* - a present-tense claim
+about **another repo's live file**, which was false before the commit asserting it finished
+pushing. This repo has paid for that exact shape three times in one morning over a sigil relink
+hold. **The durable half is the procedure and the lesson; the state belongs to the hub's document
+and is read there.** So: read the four sections at `origin/main` and believe their banners, never
+this file's account of whether a banner exists.
 
 ## What was ruled
 
