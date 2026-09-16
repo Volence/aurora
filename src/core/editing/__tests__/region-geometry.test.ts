@@ -44,8 +44,9 @@
  *                                                            7 red
  *   M3  `resolveRegion` returns the first match instead of `ambiguous`
  *                                                            1 red
- *   M4  the right-edge rule made the mirror of the left one (`x1 + 1 <=` becomes
- *       `x1 <=`), which is the asymmetry aeon actually writes
+ *   M4  the right-edge rule's pixel-out dropped (`x1 + 1 <=` becomes `x1 <=`):
+ *       the naive REUSE of the left rule's expression shape, which is wrong on
+ *       exactly the two band-endpoint edges and nowhere else
  *                                                            1 red
  *   M5  the minimum-span comparison moved one pixel (`<` becomes `<=`)
  *                                                            1 red
@@ -820,14 +821,28 @@ describe('the two per-rect rules, against the derived constants', () => {
 
     // An interior RIGHT edge one pixel too far right, with the left edge on the
     // act. The far edge is x1 = w - 1, so w = centreXMax puts x1 one INSIDE the
-    // band and w = centreXMax + 1 puts it one outside: the boundary is here, and
-    // it is not the mirror of the left edge's.
+    // band and w = centreXMax + 1 puts it one outside.
+    //
+    // CORRECTED 2026-09-16: an earlier version of this comment said the right
+    // rule is "not the mirror" of the left one. It IS its mirror, and the
+    // correction came from empyrean (spec fixed at 41e8b54). Both rules say the
+    // same thing about their own crossing pair -- the two pixels either side of
+    // the edge, (x0 - 1, x0) on the left and (x1, x1 + 1) on the right -- namely
+    // that BOTH lie in the reachable band. The expressions differ because a
+    // reflection is what makes them differ, not because aeon wrote an asymmetry.
+    //
+    // What IS a trap is the word "mirrored" read as REUSE THE EXPRESSION with x1
+    // (`x1 - 1 >= MIN && x1 <= MAX`). That reflects nothing, and it disagrees
+    // with the engine on exactly TWO edges in the whole act: x = centreXMin and
+    // x = centreXMax. So a suite that never places an edge exactly on a band
+    // endpoint passes with it, which is why the rows below sit on the endpoints
+    // rather than near them.
     const tooRight: Rect = { x: 0, y: 0, w: rules.centreXMax + 1, h: rules.actH };
     expect(validateRect(tooRight, rules).map((f) => f.code)).toContain('edge-right-unreachable');
     const rightOk: Rect = { x: 0, y: 0, w: rules.centreXMax, h: rules.actH };
     expect(validateRect(rightOk, rules).map((f) => f.code)).not.toContain('edge-right-unreachable');
 
-    // The same asymmetry on y.
+    // The same pairing on y, mirrored the same way.
     const tooHigh: Rect = { x: 0, y: rules.centreYMin, w: rules.actW, h: rules.actH - rules.centreYMin };
     expect(validateRect(tooHigh, rules).map((f) => f.code)).toContain('edge-top-unreachable');
     const topOk: Rect = {
