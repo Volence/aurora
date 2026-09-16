@@ -1,6 +1,8 @@
 # Regions step 5 (EDITOR spec): the command, the save plan, and the load-time notices
 
-2026-09-16, branch `regions-step5` off master `9893d69e`, tip `51b3da88`.
+2026-09-16, branch `regions-step5` off master `9893d69e`, tip `7df953cd`
+(the totals below were taken at `51b3da88`, the last commit that touches code;
+`7df953cd` is this packet and the ROADMAP row).
 
 ⚠ **STEP 5 OF THE EDITOR SPEC** — empyrean's `docs/superpowers/specs/2026-09-14-aurora-regions-editor-design.md`, read at `origin/main`, never through a sibling path. **Not** part 2's step 5: the two specs number their
 steps independently and the collisions are live (part 2's step 10 IS the editor
