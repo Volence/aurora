@@ -120,3 +120,34 @@ pin moves, the drift gate reddens, and the re-vendor is the act that teaches thi
 **No code here decides whether that key is coming.** That is the property to preserve when
 reviewing the parcel: any place the report or the types state the gap as settled rather than as
 "what the pinned contract says today" is a place to correct before landing.
+
+## The Q1 ruling made option A materially cheaper, and this lane has no argument left against it
+
+**2026-09-16, from aeon, verified here against the schema rather than taken from their account.**
+`$defs/region` has `required: [id, rect, preset]`, `rect` is a single `$ref` to one rect, and there
+is **no `rects` key**. So under the ruled model **one region is one rectangle is one row.**
+
+**Why that changes the pricing of the chooser question.** Section 5.2's chooser paragraph was
+written against the SUBTRACTION model, where one region could decompose into many rows. Under that
+model, "a per-row preset record wrapping the hand one" meant an **unbounded** number of wrappers
+per region - bounded only by a post-subtraction fragment count, which is derived, invisible to the
+author, and grows with how many things overlap. Under the ruled model it means **exactly one
+wrapper per region that binds a document**, bounded by a number the author typed and can see.
+
+**So the paragraph both lanes were pricing against overstated A's cost, and neither of us noticed
+until aeon checked the schema against the ruling instead of reading the paragraph.** They sent it
+because it moves the comparison toward the option this lane did not prefer. That is the right
+instinct and it is worth naming: the correction most likely to go unsent is the one that helps the
+other side.
+
+**This lane's answer: with the corrected number there is no remaining argument against A from the
+editor's side, and none will be manufactured.** The read-back cost stands, and it is payable.
+
+**And it is payable BETTER than first filed.** The original ask was a prefix or marker to key on.
+With one wrapper per document-binding region, the naming rule can instead be **derived from the
+region id**, which is already required and unique within the act. Then the editor's read-back is a
+lookup rather than a pattern match: take the wrapper's id, resolve it to a region in `regions.json`,
+and **a wrapper that resolves to no region is itself a finding** rather than a silently-tolerated
+stranger. A prefix convention can be collided with by an author naming a record the same way; a
+derivation from a required unique key cannot. That is a stronger answer to the cost than the one
+this lane asked for, so the ask is amended to it.
