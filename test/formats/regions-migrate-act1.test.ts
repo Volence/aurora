@@ -145,7 +145,7 @@ function act1Input(rev = AEON_PIN): MigrationInput {
 }
 
 describe('migrate aeon\'s act 1', () => {
-  it('THE INPUT IS AEON\'S OWN, AND IT CARRIES REFS — the non-vacuous half, asserted first', (ctx) => {
+  it('THE INPUT IS AEON\'S OWN, AND IT CARRIES REFS: the non-vacuous half, asserted first', (ctx) => {
     if (!need(ctx)) return;
     const input = act1Input();
     expect(input.sections).toHaveLength(9);
@@ -166,7 +166,7 @@ describe('migrate aeon\'s act 1', () => {
       + 'its edges are named constants and NO VALUE IS SUBSTITUTED').not.toBeNull();
   });
 
-  it('PRODUCES TEN REGIONS — nine runs plus the night row, counted from the input', (ctx) => {
+  it('PRODUCES TEN REGIONS: nine runs plus the night row, counted from the input', (ctx) => {
     if (!need(ctx)) return;
     const input = act1Input();
     const plan = planSectionMigration(input);

@@ -166,7 +166,7 @@ describe('planSectionMigration: the key-less row carves, and is a region of its 
     constructorName: 'zzz_region',
   };
 
-  it('IT CUTS THE RUNS IT CROSSES — the ruled model, not painter\'s order', () => {
+  it('IT CUTS THE RUNS IT CROSSES: the ruled model, not painter\'s order', () => {
     const input = nineDistinct({ unkeyed: [night] });
     const plan = planSectionMigration(input);
     expect(plan.refusals, plan.refusals.join('; ')).toEqual([]);
@@ -249,7 +249,7 @@ describe('planSectionMigration: the key-less row carves, and is a region of its 
 });
 
 describe('planSectionMigration: the sidecars it clears', () => {
-  it('EVERY SECTION IS LISTED — with what it CARRIED before, which is the anti-vacuous half', () => {
+  it('EVERY SECTION IS LISTED, with what it CARRIED before, which is the anti-vacuous half', () => {
     const input = nineDistinct({
       sections: [
         section(0, { sceneRef: 'scene_start', bgLayoutRef: 'forest-v15' }),
@@ -310,7 +310,7 @@ describe('planSectionMigration: the sidecars it clears', () => {
 });
 
 describe('planSectionMigration: what it refuses', () => {
-  it('a descriptor that binds no preset to a section — Aurora will not invent one', () => {
+  it('a descriptor that binds no preset to a section, and Aurora will not invent one', () => {
     const presets = { ...nineDistinct().presets };
     delete (presets as Record<number, string>)[4];
     const plan = planSectionMigration(nineDistinct({ presets }));

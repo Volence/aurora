@@ -199,7 +199,7 @@ const allRefs = (act: { sections: (Section | null)[] }) => act.sections.map(refs
 const NULLS = { bgLayoutRef: null, paletteRef: null, rasterRef: null, sceneRef: null };
 
 describe('migrate-sections, end to end', () => {
-  it('THE FIXTURE CARRIES REFS BEFORE ANYTHING RUNS — without which every row below is vacuous', async () => {
+  it('THE FIXTURE CARRIES REFS BEFORE ANYTHING RUNS, without which every row below is vacuous', async () => {
     const { act } = await open(fixtureFiles());
     // Field for field, not a count: the exact tuples the fixture wrote.
     expect(allRefs(act)).toEqual([
@@ -212,7 +212,7 @@ describe('migrate-sections, end to end', () => {
     expect(act.regions.document).toBeNull();
   });
 
-  it('MIGRATE, UNDO, REDO — §4\'s acceptance test, with the before-picture asserted first', async () => {
+  it('MIGRATE, UNDO, REDO: §4\'s acceptance test, with the before-picture asserted first', async () => {
     const files = fixtureFiles();
     const { act, level, plan } = await open(files);
 

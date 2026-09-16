@@ -530,11 +530,11 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'that share a preset, sceneRef and rasterRef, plus one region for each act-descriptor row '
       + 'that binds a preset to no section (the off-grid ones), and CLEARS all four refs '
       + '(sceneRef, rasterRef, bgLayoutRef, paletteRef) on every section_N.meta.json in the same '
-      + 'step — with a regions document present the build refuses a sidecar that still carries '
+      + 'step. With a regions document present the build refuses a sidecar that still carries '
       + 'sceneRef or rasterRef, and never merges it. ⚠ bgLayoutRef and paletteRef are read and '
       + 'DROPPED: the regions file has no field for them; the reply names each one dropped. '
       + 'Refuses (by throwing) an act that already has regions, an act whose regions.json could '
-      + 'not be read, and an act descriptor Aurora could not read — "I could not look" is never '
+      + 'not be read, and an act descriptor Aurora could not read: "I could not look" is never '
       + '"there are no bindings". Use dryRun first to read the plan and its refusals.' },
 
   // ---- Wave-1 surface 4: BgAnim bands -------------------------------------

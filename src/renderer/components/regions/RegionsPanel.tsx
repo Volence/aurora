@@ -395,7 +395,7 @@ function MigrateSections(): React.ReactElement {
         One undo step: builds a region per run of sections sharing a preset,
         scene and raster, plus one per off-grid descriptor row, and clears all
         four refs on every section sidecar. bgLayoutRef and paletteRef are
-        DROPPED — the regions file has no field for them.
+        DROPPED: the regions file has no field for them.
       </Hint>
       {done !== null && (
         <Hint under data-migrate-done style={{ marginBottom: 0 }}>

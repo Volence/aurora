@@ -404,7 +404,7 @@ export function planSectionMigration(input: MigrationInput): MigrationPlan {
   if (missingPreset.length > 0) {
     refusals.push(
       `the descriptor binds no preset to ${missingPreset.length === 1 ? 'section' : 'sections'} `
-      + `${missingPreset.join(', ')}, and \`preset\` is required on every region — Aurora will `
+      + `${missingPreset.join(', ')}, and \`preset\` is required on every region. Aurora will `
       + 'not invent one',
     );
   }
@@ -487,7 +487,7 @@ export function planSectionMigration(input: MigrationInput): MigrationPlan {
         `${runName(run)}: ${[
           t.sidecar.bgLayoutRef !== null ? `bgLayoutRef "${t.sidecar.bgLayoutRef}"` : null,
           t.sidecar.paletteRef !== null ? `paletteRef "${t.sidecar.paletteRef}"` : null,
-        ].filter((s) => s !== null).join(' and ')} was read and DROPPED — the regions file has no `
+        ].filter((s) => s !== null).join(' and ')} was read and DROPPED: the regions file has no `
         + 'field for it (§2.3: aeon deleted the section fields they fed, for having no reader)',
       );
     }

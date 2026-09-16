@@ -141,10 +141,13 @@ describe('migrate_sections', () => {
 
   it('is ONE undo step, and the undo restores the sidecars as well as the regions', async () => {
     await ask({ kind: 'migrate-sections' });
-    const level = { sections: act().sections, act: act() } as never;
     const history = actHistory();
     expect(history.canUndo).toBe(true);
-    history.undo(level);
+    // `BoundEditHistory.undo()` takes NO level: the stack owns the level it was
+    // bound to. Passing one compiled fine under vitest (which strips types) and
+    // was caught only by `npm test`'s typecheck — the chain's own recorded
+    // reason for putting tsc in front of the suite.
+    history.undo();
     expect(refs(), 'undo must restore all four refs on every section').toEqual(CARRIED);
     expect(act().regions.document).toBeNull();
     // ONE step: nothing is left to undo.
