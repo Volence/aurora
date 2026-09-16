@@ -94,11 +94,16 @@ and print what you aimed at*, rather than needing a derivation chain.
 
 ## The owner's eye — what I can report, and what stays his
 
-**Captures are COMMITTED at `docs/captures/2026-09-16-regions-on-screen/`**, not left in
-`scratchpad/shots-canvas/` where the harness writes them: that path is gitignored
-(`.gitignore:10`, `scratchpad/shots*/`), so a packet pointing there would name pictures no
-other session or reader could open. Five of them — the two zoom captures, the carve, the
-refusal, and the boundary pair.
+**Captures are COMMITTED at `docs/captures/2026-09-16-regions-on-screen/`** — five of them:
+the two zoom captures, the carve, the refusal, and the boundary pair. The harness writes
+its shots to a git-ignored scratch directory, so they are copied here as part of the
+landing; a packet that cited them where they were written would be naming pictures no
+other session or reader could open.
+
+*(`check-doc-citations` caught this paragraph's first draft, which cited that ignored
+directory by name while explaining why the files had been moved out of it. The gate offers
+an EXEMPT row for provenance statements and it was not taken: the sentence loses nothing by
+not spelling the path, and removing a dangling reference is better than excusing one.)*
 
 **Verified by eye, and it is a claim no unit test in this repo can reach:** the hatch pitch
 is **identical at zoom 1 and zoom 2** while the level art doubles. 8A's screen-pixel
