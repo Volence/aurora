@@ -12,6 +12,42 @@ import { writeActRegionsDocument } from '../formats/regions/act-regions';
 
 const MAX_HISTORY = 200;
 
+/**
+ * Write one half of a `migrate-sections` command's sidecar pairs onto the act's
+ * sections — `next` (all null) on apply, `old` (what the author had) on undo.
+ *
+ * ONE FUNCTION FOR BOTH DIRECTIONS, on the rule the band commands state: an
+ * apply and an undo written separately are exactly how the two drift into
+ * disagreeing about which fields they move. All FOUR refs travel, because all
+ * four are cleared and a restore that put back two would present as "undo lost
+ * my background binding".
+ *
+ * A MISSING SECTION THROWS rather than skipping. The command was built from a
+ * model in which every one of these slots held a section; a slot that is now
+ * empty means the act's shape moved under the history, and half-applying a
+ * migration is the one outcome §4 forbids outright.
+ */
+function applySidecarTuples(
+  level: S4Level,
+  cmd: Extract<AnyCommand, { type: 'migrate-sections' }>,
+  half: 'old' | 'next',
+): void {
+  for (const entry of cmd.sections) {
+    const section = level.sections[entry.index];
+    if (!section) {
+      throw new Error(
+        `migrate-sections: section ${entry.index} is not in this level, so its sidecar refs `
+        + 'cannot be written and the migration would be half applied',
+      );
+    }
+    const tuple = entry[half];
+    section.sceneRef = tuple.sceneRef;
+    section.rasterRef = tuple.rasterRef;
+    section.bgLayoutRef = tuple.bgLayoutRef;
+    section.paletteRef = tuple.paletteRef;
+  }
+}
+
 export class EditHistory {
   private undoStack: AnyCommand[] = [];
   private redoStack: AnyCommand[] = [];
@@ -201,6 +237,19 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     // In particular a command must never clear `unreadable` — that would turn
     // "Aurora refused this file" into "there is nothing here", which is exactly
     // the collapse the save's gate exists to prevent.
+    writeActRegionsDocument(level.act, cmd.newDocument);
+    return;
+  }
+  if (cmd.type === 'migrate-sections') {
+    // THE TWO HALVES MOVE TOGETHER OR NOT AT ALL (editor spec §4, and the
+    // command's own docblock). A migration that wrote the regions document and
+    // left one sidecar carrying a ref is the half state the generator refuses by
+    // name, so a missing prerequisite THROWS here rather than applying the half
+    // it can, on the rule `set-palette-line` states above.
+    if (!level.act) throw new Error('migrate-sections requires level.act');
+    applySidecarTuples(level, cmd, 'next');
+    // Through the ONE writer, exactly as `set-regions` does — `document` is the
+    // only field of `ActRegionsState` a command may move.
     writeActRegionsDocument(level.act, cmd.newDocument);
     return;
   }
@@ -426,6 +475,16 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     // The SAME writer as apply, with the other half of the pair — not a second
     // implementation, on the rule the band commands state above.
     if (!level.act) throw new Error('set-regions requires level.act');
+    writeActRegionsDocument(level.act, cmd.oldDocument);
+    return;
+  }
+  if (cmd.type === 'migrate-sections') {
+    // The SAME two writers as apply, with the other half of each pair — never a
+    // second implementation. Undo restores every sidecar tuple AND takes the
+    // regions document back to whatever the act had before (null, ordinarily),
+    // which is §4's stated acceptance condition.
+    if (!level.act) throw new Error('migrate-sections requires level.act');
+    applySidecarTuples(level, cmd, 'old');
     writeActRegionsDocument(level.act, cmd.oldDocument);
     return;
   }

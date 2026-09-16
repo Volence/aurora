@@ -4,6 +4,7 @@ import type { EffectsPreset, EffectsPresetLibrary } from '../formats/effects/pre
 import type { BgOverrideBand, BgOverrideDocument } from '../formats/bg-override/bg-override';
 import type { BandSlotPlan } from '../formats/bg-override/bg-anim-band';
 import type { RegionsDocument } from '../formats/regions/document';
+import type { SectionSidecarTuple } from './migrate-sections';
 
 export interface S4Level {
   sections: (Section | null)[];
@@ -506,6 +507,55 @@ export interface SetRegionsCommand extends EditCommand {
 }
 
 /**
+ * MIGRATION FROM SECTIONS — the regions document and every section sidecar it
+ * replaces, in ONE undo step (editor spec §4: "One command, `migrate-sections`,
+ * one undo step").
+ *
+ * ═══ WHY IT IS ITS OWN COMMAND AND NOT A BATCH ════════════════════════════
+ *
+ * Because the two halves must never be apart, and a batch is a list somebody can
+ * reorder or partly rebuild. §4's own sentence is the reason: "A half state,
+ * where a sidecar carries a ref beside a `regions.json`, is the exact state the
+ * generator refuses (§2.5 rule 5), so the command is atomic on the document
+ * store even when the save is not." Aurora's save writes a plan file by file and
+ * can be interrupted; what this command guarantees is the MODEL — after it, and
+ * after any number of undo/redo cycles, an act either has regions and clean
+ * sidecars or the sidecars and no regions, never both.
+ *
+ * It is the argument `set-bg-override-band` already makes one command over, with
+ * the same shape: halves that a history able to move them independently would
+ * silently corrupt.
+ *
+ * ⚠ AND THE SIDECAR HALF CARRIES FOUR REFS, NOT TWO. `sceneRef` and `rasterRef`
+ * are what the generator refuses beside a regions document; `bgLayoutRef` and
+ * `paletteRef` are nulled in the same step because §4 says so and because they
+ * had no reader — but they are the fields an undo has to put BACK, so the
+ * command records all four. A command that restored two of four would present as
+ * "undo lost my background binding".
+ *
+ * `sectionIndex` is -1: ACT-AMBIENT, like `set-regions`. This command writes
+ * EVERY section of the act, so there is no one section to record it on, and
+ * `commandDocId` routes an act-scoped command to the act's history.
+ */
+export interface MigrateSectionsCommand extends EditCommand {
+  type: 'migrate-sections';
+  /** Null when the act had no regions document, which is the ordinary case. */
+  oldDocument: RegionsDocument | null;
+  /** Never null: a migration that produced no regions is refused before it becomes a command. */
+  newDocument: RegionsDocument;
+  /**
+   * Every section of the act, with the four sidecar refs before and after.
+   * `next` is all-null on every entry; it is spelled out rather than implied so
+   * apply and undo read the same pair and cannot drift.
+   */
+  sections: Array<{
+    index: number;
+    old: SectionSidecarTuple;
+    next: SectionSidecarTuple;
+  }>;
+}
+
+/**
  * Groups several commands into one undo step. Children apply in order and undo
  * in reverse. Used for multi-tile pixel edits (a stroke/shape crossing several
  * chunk tiles edits each tileset tile, but undoes as a single action).
@@ -548,4 +598,5 @@ export type AnyCommand =
   | SetBgOverridePhasesCommand
   | SetBgOverrideDefaultOffCommand
   | SetRegionsCommand
+  | MigrateSectionsCommand
   | SetSectionsCommand;
