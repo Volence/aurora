@@ -38,6 +38,7 @@
 // and a duplicate would be the sentence that goes stale.
 
 import {
+  applyRegionGesture,
   applyRegionGestureToDocument,
   effectiveRegionSnap,
   moveRegionRect,
@@ -49,7 +50,7 @@ import {
   type RegionGesture,
   type RegionPress,
 } from '../../core/editing/region-marquee';
-import type { Rect } from '../../core/editing/region-geometry';
+import type { Rect, RegionPiece } from '../../core/editing/region-geometry';
 import type { Region, RegionsDocument } from '../../core/formats/regions/document';
 import type { SetRegionsCommand } from '../../core/editing/commands';
 import { cloneRegionsDocument } from '../../core/formats/regions/act-regions';
@@ -157,6 +158,24 @@ export function updateRegionDrag(
   return { ...drag, moved, rect: moveRegionRect(drag.startRect, drag.pressWorld, world, snap) };
 }
 
+/**
+ * The pieces as this gesture WOULD leave them: the live preview's subject.
+ *
+ * ⚠ THE PREVIEW IS THE REAL TRANSFORM, not a sketch of it. A drag that is about
+ * to trim three regions has to SHOW the trim before the button comes up: the Q1
+ * ruling made carve what every draw does, and a gesture whose destructive half
+ * only appears after the undo entry is written is the hazard `RegionPress.overId`
+ * was added to prevent one layer down. Running the same `applyRegionGesture` the
+ * commit will run is what makes the picture and the outcome the same answer.
+ *
+ * PIECE-LEVEL, so it works even for the draw the DOCUMENT level refuses: a draw
+ * with no selection has no preset and cannot become a document, but the author
+ * still has to see the rectangle they are dragging.
+ */
+export function regionDragPreview(doc: RegionsDocument, drag: RegionDrag): RegionPiece[] {
+  return applyRegionGesture(regionPieces(doc), regionGestureOf(drag)).pieces;
+}
+
 /** The finished gesture this drag is, in the layer's own vocabulary. */
 export function regionGestureOf(drag: RegionDrag): RegionGesture {
   if (drag.press.kind === 'draw') return { kind: 'draw', id: drag.drawId, rect: drag.rect };
@@ -188,6 +207,18 @@ export type RegionDragOutcome =
  * button in the panel yet (RegionsPanel.tsx builds none), and promising one
  * would be worse than saying nothing.
  */
+/**
+ * What the map says when the region tool is armed over an act that has no
+ * regions document at all.
+ *
+ * A CONSTANT beside the other one, for the same reason: the node row and any
+ * harness take the words from here. It names the door (`Migrate sections` is
+ * the button RegionsPanel actually builds) rather than leaving the author to
+ * find out that the only way to get a first region is the migration.
+ */
+export const NO_REGIONS_HERE = 'This act has no regions document, so there is nothing to give '
+  + 'a rectangle to. Use Migrate sections in the Regions panel first.';
+
 export const NO_SELECTION_ADVICE = 'Select a region in the list first, and the drag gives it '
   + 'this rectangle.';
 

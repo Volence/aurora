@@ -74,6 +74,13 @@ import {
   drawScreenFrame, screenFrameEdgeAt, dragScreenFrame, publishScreenFrameReport,
   screenFrameRect, type ScreenFrameAnchor,
 } from '../canvas/screen-frame';
+import { drawRegionOverlay, type RegionOverlayRegion } from '../canvas/region-overlay';
+import {
+  beginRegionDrag, regionDragCommand, regionDragPreview, updateRegionDrag,
+  NO_REGIONS_HERE, type RegionDrag,
+} from './map-region-gesture';
+import { regionListRows, actBindingDefaults } from '../providers/regions-aeon';
+import type { RegionsDocument } from '../../core/formats/regions/document';
 import { publishPriorityLensReport } from '../canvas/priority-lens';
 import { publishBothPlanesLensReport } from '../canvas/both-planes-lens';
 import { publishCrossoverLensReport } from '../canvas/crossover-lens';
@@ -186,6 +193,44 @@ const overlayRenderer = new OverlayRenderer();
 // `mapFacet('parallax')`) — is imported from providers/parallax-preview above,
 // together with `inEffectsFacet`. It was declared here until EW-SHAPE-PREVIEW
 // needed the same two facts outside this file.
+
+/**
+ * The Regions facet's key, and the gate for everything regions in this file.
+ *
+ * Spelled here rather than imported because there is no regions equivalent of
+ * `providers/parallax-preview` to own it: `facet-tools.ts` keys the same string
+ * and `FacetCapability` types it, so a typo is a compile error rather than a
+ * silent never-true predicate.
+ *
+ * ⚠ §3.1's WHOLE POINT IS THAT THE FACET IS THE ONLY DISAMBIGUATOR: "the same
+ * drag means marquee in Map, collision brush in Collision, and region rectangle
+ * here". So every region branch below asks this AND the tool, never the tool
+ * alone -- `region` is scoped to this facet by `FACET_TOOLS`, but a tool left
+ * armed by some future profile declaration must not paint regions over the
+ * collision brush's canvas.
+ */
+const REGIONS_FACET: FacetCapability = 'regions';
+
+function inRegionsFacet(): boolean {
+  const tabId = useSessionStore.getState().activeId;
+  return useWorkspaceStore.getState().facetFor(tabId) === REGIONS_FACET;
+}
+
+/**
+ * This act's regions document, or null.
+ *
+ * ⚠ READ AT CALL TIME, never closed over. The draw pass, the hit test and the
+ * commit all call this, so a gesture can never be measured against one document
+ * and committed against another -- the rule `activeGuideScene` states below for
+ * the same reason. `ActRegionsState.unreadable` is deliberately NOT consulted
+ * here: a refused file leaves `document` null and there is nothing to edit
+ * either way; the PANEL is where the refusal is shown, with its reason.
+ */
+function activeRegionsDocument(): RegionsDocument | null {
+  if (!inRegionsFacet()) return null;
+  const act = getCurrentAct(useProjectStore.getState());
+  return act?.regions.document ?? null;
+}
 
 /**
  * The scene whose layers draw as world-Y guides, or null for "no guides".
@@ -624,6 +669,20 @@ export default function MapViewport() {
   const frameHoverRef = useRef(false);
   frameHoverRef.current = frameHover;
   const screenFrame = useViewStore((s) => s.screenFrame);
+
+  // ---- The region drag (editor spec §3.2, step 8B) ------------------------
+  // THE SAME SHAPE AS THE SCREEN FRAME AND THE GUIDE DRAG, and for the same
+  // reasons: a REF for the gesture in flight (a mousemove is not a React
+  // render; `redraw` reads it at call time), the DOCUMENT untouched until
+  // release, and therefore ONE `SetRegionsCommand` for the whole gesture
+  // (§3.3) instead of one per pixel of travel. The machine itself is
+  // `map-region-gesture.ts`; this ref only says whether one is running.
+  const regionDrag = useRef<RegionDrag | null>(null);
+  // The selected region, SUBSCRIBED rather than read inside `redraw`: the
+  // overlay draws the selection heavier and the press hit-tests against it, and
+  // `redraw` is dependency-free by design so a list click would otherwise not
+  // repaint. Same reason `selectedEffectsSceneId` is subscribed for the guides.
+  const selectedRegionId = useEditorStore((s) => s.selectedRegionId);
 
   const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
 
@@ -1712,6 +1771,50 @@ export default function MapViewport() {
       });
     }
 
+    // ---- THE REGIONS OVERLAY (editor spec §3.2/§3.4, step 8B) -----------
+    //
+    // LAST, with the guides, and for the same reason: a region wash is
+    // authoring chrome over the art it names, not art. Gated on the FACET
+    // (`activeRegionsDocument` returns null anywhere else), so it costs a store
+    // read on every other facet's repaint and nothing more.
+    //
+    // ⚠ THE PIECES COME FROM THE GESTURE WHEN ONE IS RUNNING. `regionDragPreview`
+    // runs the SAME `applyRegionGesture` the release will run, so the carve the
+    // author is about to commit is on screen BEFORE the button comes up rather
+    // than after the undo entry is written. That is the hazard `RegionPress.overId`
+    // exists for one layer down, answered here where it is visible.
+    const regionsDoc = activeRegionsDocument();
+    if (regionsDoc) {
+      const rd = regionDrag.current;
+      const pieces = rd
+        ? regionDragPreview(regionsDoc, rd)
+        : regionsDoc.regions.map((r) => ({ id: r.id, rect: r.rect }));
+      // ONE ROW PER REGION ID, in document order, from the PANEL'S derivation.
+      // The overlay's hue is its index in this list, so the map and the list
+      // cannot disagree about which region is which colour, and the label and
+      // the background line are `regionListRows`' words rather than a second
+      // composition of the 2026-09-16 background ruling.
+      const rows = regionListRows(
+        regionsDoc, actBindingDefaults(act.sceneRef), state.project?.bgLibrary ?? [],
+      );
+      const regions: RegionOverlayRegion[] = rows.map((r) => ({
+        id: r.id, label: r.label, bgText: r.bg.text, bgMissing: r.bg.missing,
+      }));
+      drawRegionOverlay(ctx, dpr, viewport, {
+        // THE ACT'S OWN SIZE, FROM ITS GRID, never from the document being
+        // drawn: a bound taken from the thing under test makes the holes true
+        // by construction (the load's own rule, restated in regions-aeon.ts).
+        act: {
+          x: 0, y: 0,
+          w: act.gridWidth * SECTION_PIXEL_SIZE,
+          h: act.gridHeight * SECTION_PIXEL_SIZE,
+        },
+        pieces,
+        regions,
+        selectedId: useEditorStore.getState().selectedRegionId,
+      });
+    }
+
     // Realign the collision paint ghost after any pan/zoom/version change.
     drawCollisionPreview();
   }, [drawCollisionPreview, syncBandPreview]);
@@ -1748,6 +1851,10 @@ export default function MapViewport() {
     // The screen frame (row G): its pinned anchor (written once per release)
     // and the edge hover. Discrete changes, never a tick.
     screenFrame, frameHover,
+    // The regions overlay (step 8B): a list click changes which region is drawn
+    // heavy, and nothing else in this list would notice. The document itself
+    // arrives through `historyVersion` like every other committed edit.
+    selectedRegionId,
     redraw]);
 
   // Handle resize. The observer repaints through the SAME `redraw` the visual
@@ -2756,6 +2863,59 @@ export default function MapViewport() {
   }
 
   /**
+   * END THE REGION GESTURE: ONE `SetRegionsCommand`, OR NOTHING, OR A SENTENCE.
+   *
+   * §3.3's "one command per gesture, ordinary undo" is held HERE, and it is
+   * held by there being exactly one `executeCommand` on this path and no other
+   * write anywhere in the drag: the press and the move touch a ref and repaint,
+   * so a drag that splits three rectangles arrives here as one document.
+   *
+   * ⚠ THE DOCUMENT IS RE-READ AT COMMIT TIME, not carried from the press. An
+   * act switch, an undo or a project reopen during the drag leaves the ref
+   * pointing at a gesture measured against a document that is no longer open;
+   * re-reading and committing against whatever is open NOW is what the guide
+   * drag's witness does from the other side. A gesture whose document has gone
+   * entirely is dropped rather than applied to a stranger.
+   *
+   * THREE OUTCOMES, AND THEY ARE NOT COLLAPSED. `none` is silent on purpose --
+   * a click inside your own selection changed nothing and deserves no toast.
+   * `refused` MUST speak: the layer's reason is the only thing that explains
+   * why a drag the author watched on screen left no rectangle, and a refusal
+   * nobody sees is the defect this arm exists to prevent.
+   */
+  function endRegionDrag(): void {
+    const rd = regionDrag.current;
+    regionDrag.current = null;
+    if (!rd) return;
+    const doc = activeRegionsDocument();
+    const level = getActiveLevel();
+    if (!doc || !level) { redraw(); return; }
+
+    const outcome = regionDragCommand(doc, rd);
+    if (outcome.kind === 'refused') {
+      useToastStore.getState().addToast(outcome.reason, 'warning');
+      redraw();
+      return;
+    }
+    if (outcome.kind === 'none') { redraw(); return; }
+
+    executeCommand(outcome.command, level);
+
+    // WHAT THE GESTURE DESTROYED, SAID OUT LOUD AND ONLY WHEN IT DID. A draw
+    // trims every region it lands on (the Q1 ruling), and a region whose last
+    // rectangle goes is REMOVED WITH IT (§3.2's last row) -- which is a region
+    // disappearing out of the list, and the one outcome an author would not
+    // predict from watching the drag. Trims alone are visible on the canvas and
+    // say nothing; a removal is named.
+    if (outcome.removedIds.length > 0) {
+      useToastStore.getState().addToast(
+        `${outcome.removedIds.join(', ')} had no rectangle left and ${outcome.removedIds.length === 1 ? 'was' : 'were'} removed. Ctrl+Z undoes the whole gesture.`,
+        'warning',
+      );
+    }
+  }
+
+  /**
    * Write a scene's `v_offset`, clamped, as ONE undo step.
    *
    * Shared by the frame drag and the arrow keys so the two cannot disagree about
@@ -3513,6 +3673,47 @@ export default function MapViewport() {
       }
     }
 
+    // ═══ THE REGION RECTANGLE (editor spec §3.2, step 8B) ═══
+    //
+    // AFTER the guides and the screen frame, which are references and take
+    // their presses first, and BEFORE the pan fall-through. Gated on BOTH the
+    // tool and the facet: §3.1 makes the facet the only disambiguator between
+    // this drag and the marquee's, and a tool left armed by a future profile
+    // declaration must not paint regions on somebody else's canvas.
+    //
+    // SELECTION IS THE DISAMBIGUATOR WITHIN the facet (the spec's amended
+    // table, and 8A's resolution it was amended to match): a drag inside a rect
+    // OF THE SELECTED REGION moves it, on its edge resizes it, and anything
+    // else -- including inside another region's rect -- draws, and a draw
+    // carves. `regionPressAt` decides that; nothing here re-decides it.
+    //
+    // ⚠ THE REAL ZOOM GOES IN. The grab band is SCREEN pixels and the machine
+    // divides by this; a hardcoded 1 would make every resize handle unhittable
+    // at any zoom but 1, silently and only on a real display.
+    if (tool === 'region' && e.button === 0 && inRegionsFacet()) {
+      const doc = activeRegionsDocument();
+      if (doc) {
+        regionDrag.current = beginRegionDrag(
+          doc,
+          screenToWorld(e.clientX, e.clientY),
+          useEditorStore.getState().selectedRegionId,
+          useViewStore.getState().zoom,
+        );
+        redraw();
+        e.preventDefault();
+        return;
+      }
+      // NO DOCUMENT IS NOT A DRAG AND IS NOT A PAN EITHER: the act has no
+      // regions.json (or it was refused), the panel says so with its reason,
+      // and a press here has nothing to act on. Falling through to the pan
+      // would be the quieter answer and the wrong one -- the tool is armed, so
+      // the author is asking for a rectangle, and a silent pan reads as the
+      // gesture having been taken and dropped.
+      useToastStore.getState().addToast(NO_REGIONS_HERE, 'warning');
+      e.preventDefault();
+      return;
+    }
+
     // `mark-band` drags like View: the mark is the CLICK half of the gesture
     // (recorded above, committed on release), and a drag under it is the pan
     // it always was — which is why the harness's "a drag pans and marks
@@ -3926,6 +4127,27 @@ export default function MapViewport() {
     // `guideDrag.current` at call time.
     if (guideDrag.current) { updateGuideDrag(e.clientY); return; }
 
+    // The region drag (step 8B): the same preview-through-ref shape again. The
+    // DOCUMENT is untouched until release, so the undo stack gets one entry for
+    // the gesture; what moves is the ref, and `redraw` runs the real carve for
+    // the picture.
+    //
+    // ⚠ `e.ctrlKey` IS READ ON EVERY MOVE, NOT LATCHED AT THE PRESS. §3.2 makes
+    // Ctrl invert the snap, and the marquee's own snap modifier is written the
+    // same way for the reason `applyMarqueeSnap`'s docblock gives: a latch is
+    // how a modifier ends up governing a rectangle the author has since changed
+    // their mind about.
+    if (regionDrag.current) {
+      const before = regionDrag.current.rect;
+      const next = updateRegionDrag(
+        regionDrag.current, screenToWorld(e.clientX, e.clientY), e.ctrlKey,
+      );
+      regionDrag.current = next;
+      if (next.rect.x !== before.x || next.rect.y !== before.y
+        || next.rect.w !== before.w || next.rect.h !== before.h) redraw();
+      return;
+    }
+
     // The screen frame's drag (row G): the same preview-through-ref shape as
     // the guide drag above. The store is written once, on release.
     if (frameDrag.current) {
@@ -4236,6 +4458,7 @@ export default function MapViewport() {
     abandonStaleGestures();
     endGuideDrag();
     endFrameDrag();
+    endRegionDrag();
     endBgStroke();
     endBandStampGesture();
     endPaintStroke();
