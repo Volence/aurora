@@ -23,14 +23,20 @@
     "regions": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/region" },
-      "description": "Regions in author order. The ENGINE's resolution order and the sliver rule are not expressed here: the generator converts {x,y,w,h} to the inclusive bounds the engine reads (regions v1 section 1.3(b)), so a reader of this document must not assume the engine sees these numbers unchanged."
+      "items": {
+        "$ref": "#/$defs/region"
+      },
+      "description": "Regions in author order. The ENGINE's resolution order and the sliver rule are not expressed here: the generator converts {x,y,w,h} to the inclusive bounds the engine reads (regions v1 section 1.3(b)), so a reader of this document must not assume the engine sees these numbers unchanged. IDS ARE DELIBERATELY NOT UNIQUE, ruled 2026-09-16T14:42:58Z after aurora asked whether duplicates collide in aeon's emitter: they cannot. Every emitted symbol is keyed by ROW INDEX (`<act>_region_scene(row: N, hand: 0)`) and the id reaches the output only as a `// region: <id>` comment (editor design, 'Row order in the emitted table'). An L-shaped region is SEVERAL rows sharing one id by design - 'two pieces carrying the same bindings are the same region to the engine'. So no uniqueness constraint is added here, and any validator comment claiming a duplicate-id refusal is describing a rule that has never existed in this schema, in aeon's `region_flatten.py`, or anywhere else."
     }
   },
   "$defs": {
     "region": {
       "type": "object",
-      "required": ["id", "rect", "preset"],
+      "required": [
+        "id",
+        "rect",
+        "preset"
+      ],
       "unevaluatedProperties": false,
       "properties": {
         "id": {
@@ -38,23 +44,33 @@
           "pattern": "^[a-z][a-z0-9_]{0,31}$",
           "description": "Stable identity for this region within the act. Used by the editor and by the generator's emitted symbol names."
         },
-        "rect": { "$ref": "#/$defs/rect" },
+        "rect": {
+          "$ref": "#/$defs/rect"
+        },
         "preset": {
           "type": "string",
           "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
           "description": "RULING Q8: the record name of the EffectsPreset this region installs, validated by the generator against the game's own effects library. This is the region's total identity binding, because Region.rg_effects is a REQUIRED pointer to an EffectsPreset in the engine and a preset DOCUMENT cannot express the whole record (see the three measured reasons in this schema's description)."
         },
         "rasterRef": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "pattern": "^[a-z][a-z0-9_]{0,31}$",
           "description": "Optional id of a raster preset DOCUMENT (aurora-effects-preset.schema.json) whose program is a channel of the record `preset` names. Null or absent: this region installs no raster program. NOT a second home for identity: the record named by `preset` is what the engine binds, and this points at the document that generated one of its channels."
         },
         "sceneRef": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "pattern": "^[a-z][a-z0-9_]{0,31}$",
           "description": "Optional id of the parallax scene (a parallax_config) this region uses. THE BACKGROUND'S VERTICAL ANCHOR TRIPLE LIVES HERE AND NOT ON THE REGION: v_center_y, v_offset and v_factor_bg are parallax_config fields at $04, $06 and $01, and Region.rg_parallax already names a config, so the anchor is a region fact through one indirection and part 2 adds no new field for it."
         },
-        "bg": { "$ref": "#/$defs/bg" },
+        "bg": {
+          "$ref": "#/$defs/bg"
+        },
         "name": {
           "type": "string",
           "maxLength": 64,
@@ -64,14 +80,31 @@
     },
     "rect": {
       "type": "object",
-      "required": ["x", "y", "w", "h"],
+      "required": [
+        "x",
+        "y",
+        "w",
+        "h"
+      ],
       "unevaluatedProperties": false,
       "description": "World pixels. Edges need not fall on the section grid: that is the whole point of identity by rectangle. The generator converts to inclusive bounds.",
       "properties": {
-        "x": { "type": "integer", "minimum": 0 },
-        "y": { "type": "integer", "minimum": 0 },
-        "w": { "type": "integer", "minimum": 1 },
-        "h": { "type": "integer", "minimum": 1 }
+        "x": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "w": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "h": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "bg": {
@@ -80,7 +113,10 @@
       "description": "The region's background placement, which is what part 2 adds. Absent: the region inherits the act's background, which is every region's behaviour before part 2 and stays the default.",
       "properties": {
         "layoutRef": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "A background layout library id, or the sentinel \"@act\" meaning inherit the act's layout (the spelling aurora's resolveDisplayedBg already uses), or null meaning the same. The engine reads this as Region.rg_bg_layout. PATTERN WIDENED 2026-09-16 (aeon's finding): this field CITES aurora's background library rather than minting an id, and the library's real ids are hyphenated and timestamped (deep-forest-v15-marching-colonnade-1781232423352), so the old minted-id pattern ^(@act|[a-z][a-z0-9_]{0,31})$ matched 0 of 17 real entries and no background was spellable in a legal document. Modelled on preset above, which cites the game's effects library the same way: accept the cited namespace's spelling here, and let the GENERATOR validate that the id resolves. Existence is not this schema's job.",
           "pattern": "^(@act|[a-z][a-z0-9_-]{0,127})$"
         },
