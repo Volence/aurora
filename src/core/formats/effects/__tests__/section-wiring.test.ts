@@ -382,7 +382,12 @@ describe('the region-row reader: each `effects:` with the `sec:` inside its OWN 
     );
     const r = descriptorEffectsRows(desc, 'zzz');
     expect(r.unkeyed, 'the key-less row is REPORTED, with what a person needs to find it').toEqual([
-      { preset: 'ZZZ_Keyless', constructorName: 'zzz_region', line: 2, sectionKeys: [] },
+      // `edges` NULL, and that is a reading rather than a gap: this row writes
+      // only `x0:`, and the rectangle rule is ALL FOUR OR NOTHING — three edges
+      // and a guess is a rectangle nobody wrote. The migration refuses such a
+      // row rather than dropping it (editor spec §4); the row below is the same
+      // shape with all four edges present.
+      { preset: 'ZZZ_Keyless', constructorName: 'zzz_region', line: 2, sectionKeys: [], edges: null },
     ]);
     expect(Object.values(r.bindings), 'and it is ASSIGNED to no section, neighbour or otherwise')
       .not.toContain('ZZZ_Keyless');
@@ -404,7 +409,7 @@ describe('the region-row reader: each `effects:` with the `sec:` inside its OWN 
     );
     const r = descriptorEffectsRows(desc, 'zzz');
     expect(r.unkeyed).toEqual([
-      { preset: 'ZZZ_Two', constructorName: 'zzz_region', line: 1, sectionKeys: [1, 2] },
+      { preset: 'ZZZ_Two', constructorName: 'zzz_region', line: 1, sectionKeys: [1, 2], edges: null },
     ]);
     expect(r.bindings, 'neither key is picked').toEqual({});
     const read = readDescriptorWiring('g/act_descriptor.emp', desc, 'zzz');
@@ -1999,7 +2004,29 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
       + 'question, and a pin after it may have more than one such row').toBe(1);
     const expected = orphans.map((r) => ({
       preset: r.presets[0], constructorName: 'ojz_region', line: r.line, sectionKeys: [],
+      // ⚠ THE RECTANGLE, AND IT IS THIS FILE'S OWN RESOLVER THAT SUPPLIES IT.
+      // `edges` arrived on the row for editor spec §4's migration, which reads
+      // "the rectangle from the row" and has nowhere else to read it: a row with
+      // no section key is the only row whose rectangle cannot come from the
+      // section grid. The expectation is `resolveEdge`'s reading of the same
+      // bytes — the instrument that has been resolving these named constants
+      // since 2026-09-15 — so this line is TWO INDEPENDENT READERS OF ONE
+      // SYNTAX agreeing, and a product reader that started substituting a
+      // fallback reddens here.
+      edges: {
+        x0: resolveEdge(desc, r.x0), x1: resolveEdge(desc, r.x1),
+        y0: resolveEdge(desc, r.y0), y1: resolveEdge(desc, r.y1),
+      },
     }));
+    for (const e of expected) {
+      // NOT A NULL SMUGGLED INTO THE COMPARISON. If this file's own resolver
+      // could not read an edge, the row above would be asserting `null === null`
+      // and saying nothing; it goes red here instead, naming the revision.
+      expect(Object.values(e.edges).every((v) => typeof v === 'number'),
+        `${where}: this file's own resolver could not read all four edges of the key-less row at `
+        + `line ${e.line} (${JSON.stringify(e.edges)}), so the comparison below would be vacuous`)
+        .toBe(true);
+    }
     const rows = descriptorEffectsRows(desc, 'ojz');
     expect(rows.unkeyed, `the reader disagrees with the key-less rows read line by line in ${where}`)
       .toEqual(expected);

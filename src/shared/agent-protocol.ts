@@ -149,6 +149,15 @@ export type AgentRequest =
   | { kind: 'get-effects-preset'; id: string }
   | { kind: 'set-effects-preset'; id: string; preset: unknown | null }
   | { kind: 'assign-section-preset'; section: number; presetId: string | null }  // null = unbind
+  // ---- Regions: the migration off the per-section sidecars (editor spec §4) ----
+  //
+  // ONE CALL, NO PARAMETERS, and both of those are the design rather than
+  // omissions. The migration reads the whole act — every section's sidecar tuple
+  // and every row of its descriptor — so there is nothing to select; and
+  // `dryRun` exists because the interesting output is the REFUSALS and the
+  // notes, which an agent should be able to read before it spends an undo step
+  // on an act it has not looked at.
+  | { kind: 'migrate-sections'; dryRun?: boolean }
   // ---- Wave-1 surface 4: BgAnim bands (aeon EFFECTS_CONSUMER_CONTRACT §1.1/§1.2) ----
   //
   // PROMOTE IS THE PRIMARY OPERATION, not add. A band's slots are a PREFIX of

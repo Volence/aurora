@@ -330,6 +330,18 @@ const REGISTER: Row[] = [
   },
   {
     file: 'src/main/editor-methods.ts',
+    sentence: 'With a regions document present the build refuses a sidecar that still carries '
+      + 'sceneRef or rasterRef, and never merges it.',
+    source: { repo: 'aeon', path: 'tools/effects_gen.py' },
+    quote: 'section sidecar(s) still carry identity',
+    why: '`check_mode_conflict`, which fires when the act has a regions.json and any sidecar '
+      + 'still carries ACT_SCENE_REF_KEY or ACT_RASTER_REF_KEY, and refuses rather than picking '
+      + 'between two sources of truth. Its own message names the remedy this tool performs: '
+      + '"run Aurora\'s `Migrate sections`". Registered 2026-09-16 by regions step 7, whose '
+      + 'tool description is the sentence.',
+  },
+  {
+    file: 'src/main/editor-methods.ts',
     sentence: 'No numeric value is range-checked or clamped on this side, on purpose: the engine '
       + 'refuses out-of-budget bands with the measurement behind the rule.',
     source: { repo: 'aeon', path: 'engine/effects/raster_dsl.emp' },

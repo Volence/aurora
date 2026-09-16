@@ -41,6 +41,7 @@ import {
   promoteBandCommand, removeBandCommand,
 } from '../providers/bg-anim-aeon';
 import { regenerateShiftCommand } from '../providers/bg-anim-art';
+import { planActMigration } from '../providers/regions-migrate';
 import { BG_SECTION_BINDING_LIMIT } from '../../core/formats/bg-binding';
 import { RASTER_SECTION_BINDING_LIMIT } from '../../core/formats/raster-binding';
 import { makeSetBgOverrideTilesCommand } from '../../core/editing/bg-override-art';
@@ -1198,6 +1199,44 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         section: req.section, presetId: req.presetId, changed: true,
         binding: RASTER_SECTION_BINDING_LIMIT,
       };
+    }
+
+    // ---- Regions: migrate off the section sidecars (editor spec §4) --------
+    //
+    // ONE CALL, ONE UNDO STEP, and the reply is the PLAN rather than a bare
+    // `changed` — because everything interesting about a migration is what it
+    // refused and what it dropped. A caller that got `{changed: true}` would
+    // have no way to learn that a `bgLayoutRef` went in the bin (the regions
+    // file has no field for it) or that a run was swallowed whole by a key-less
+    // descriptor row.
+    //
+    // ⚠ IT REFUSES BY THROWING, like every other write tool here, and the
+    // refusal text is the planner's own sentences. There is no `{ok: false}`
+    // arm: a migration that reports failure in a field an agent may not read is
+    // how half an act gets migrated and nobody hears about it.
+    case 'migrate-sections': {
+      const ctx = requireProject();
+      const offer = planActMigration(ctx.act, ctx.zone.id, ctx.act.rasterWiring);
+      if (offer.command === null) {
+        throw new Error(`migrate_sections refused: ${offer.plan.refusals.join(' | ')}`);
+      }
+      const doc = offer.plan.document!;
+      const reply = {
+        act: doc.act,
+        regions: doc.regions.map((r) => ({
+          id: r.id, preset: r.preset, rect: r.rect,
+          sceneRef: r.sceneRef ?? null, rasterRef: r.rasterRef ?? null,
+        })),
+        sectionsCleared: offer.plan.sidecars.map((s) => s.index),
+        notes: offer.plan.notes,
+      };
+      // THE DRY RUN IS NOT A SECOND CODE PATH. It plans exactly what the real
+      // call plans and then does not execute it, so what an agent reads in a
+      // preview is what a migration does — the one property a separate
+      // "preview" implementation could not promise.
+      if (req.dryRun === true) return { ...reply, applied: false };
+      executeAmbientCommand(offer.command, ctx.level);
+      return { ...reply, applied: true };
     }
 
     // ---- Wave-1 surface 4: BgAnim bands ------------------------------------

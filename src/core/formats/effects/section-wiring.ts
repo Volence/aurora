@@ -255,6 +255,21 @@ export function unknownWiring(descriptorPath: string, libraryPath: string, reaso
 // modelled here.
 
 /**
+ * A region row's four edges as the descriptor WRITES them: INCLUSIVE, so a
+ * one-pixel column is `x0 === x1`. Aeon's own form (`ojz_region(x0:, x1:, y0:,
+ * y1:)`, whose ensure says so in as many words); the conversion to the editor's
+ * half-open `{x, y, w, h}` is `region-geometry.ts`'s `fromInclusive` and happens
+ * at the one place that needs a rectangle, never here. This module reports what
+ * the file says.
+ */
+export interface RowInclusiveEdges {
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+}
+
+/**
  * A descriptor row that names an `effects:` preset but cannot be given ONE
  * section: its own call carries no numeric `sec:`, or carries several.
  */
@@ -267,6 +282,28 @@ export interface UnkeyedEffectsRow {
   line: number;
   /** The distinct numeric `sec:` values inside the row's own call: none, or two or more. */
   sectionKeys: number[];
+  /**
+   * THE ROW'S OWN RECTANGLE, resolved out of the same file, or NULL.
+   *
+   * ⚠ WHY THIS KEY EXISTS, AND WHY NULL IS NOT A ZERO RECTANGLE. Editor spec §4
+   * (migration) turns such a row into a region "with the rectangle read from the
+   * row" — and a row with no section key is the ONLY row whose rectangle cannot
+   * be derived from the section grid, so the migration has nowhere else to get
+   * it. Before 2026-09-16 this interface carried the preset and the line and
+   * dropped the geometry, so the migration would have had to invent it.
+   *
+   * Null means THIS READER COULD NOT RESOLVE ALL FOUR EDGES — a missing
+   * argument, an expression shape `resolveRowEdge` does not read, a constant
+   * declared twice. No value is substituted and no edge is guessed from a
+   * neighbour: a caller that gets null must say it could not measure. The
+   * migration REFUSES on a null rather than dropping the row, because dropping
+   * it hands that area to whichever section region the row was cut out of,
+   * silently changing the act's identity.
+   *
+   * Absent (rather than null) only on a row built by hand in a test; the reader
+   * always sets it.
+   */
+  edges?: RowInclusiveEdges | null;
 }
 
 /** One section that two keyed rows bind to DIFFERENT presets. Aurora picks neither. */
@@ -343,6 +380,76 @@ function matchingCloseParen(code: string, open: number): number {
 }
 
 /**
+ * The value of a `const NAME = <integer>` in the descriptor, or null.
+ *
+ * ⚠ NULL IS NOT 0, and this exists because aeon's edges are NAMES. The night
+ * region's row is written `x0: OJZ_NIGHT_X0, x1: OJZ_NIGHT_X1`, with the numbers
+ * declared a few lines above it, so a reader that only understood literals would
+ * have found no rectangle at all on the one row that needs one.
+ *
+ * It resolves a plain integer initializer and NOTHING ELSE: no arithmetic in the
+ * initializer, no `if`, no forwarding to another name. A name declared TWICE is
+ * null for the reason a grep with two hits answers no question. `code` is the
+ * comment-and-string-masked text, so `// OJZ_NIGHT_X0 = 9999` in prose cannot
+ * win.
+ *
+ * The shape is transcribed from the instrument in
+ * `__tests__/section-wiring.test.ts` (`resolveIntConst`), which has been reading
+ * these same declarations out of aeon's real descriptor since 2026-09-15. Two
+ * readers of one syntax is a drift risk worth naming: this one is the product
+ * and that one is its independent check, and the test asserts they agree on
+ * aeon's bytes.
+ */
+function resolveIntConst(code: string, name: string): number | null {
+  const hits = [...code.matchAll(
+    new RegExp(`^[ \\t]*(?:pub[ \\t]+)?const[ \\t]+${name}[ \\t]*=[ \\t]*(-?\\d+)[ \\t]*$`, 'gm'),
+  )];
+  return hits.length === 1 ? Number(hits[0][1]) : null;
+}
+
+/**
+ * One `x0:`/`x1:`/`y0:`/`y1:` argument as a number: a literal, a constant, or a
+ * constant plus or minus a literal (aeon writes `x1: OJZ_NIGHT_X0 - 1`).
+ *
+ * Null for any other shape and for a constant that does not resolve — NEVER a
+ * fallback and never a partial reading.
+ */
+function resolveRowEdge(code: string, text: string | null): number | null {
+  if (text === null) return null;
+  if (/^-?\d+$/.test(text)) return Number(text);
+  const plain = /^([A-Za-z_]\w*)$/.exec(text);
+  if (plain) return resolveIntConst(code, plain[1]);
+  const shifted = /^([A-Za-z_]\w*)\s*([+-])\s*(\d+)$/.exec(text);
+  if (shifted) {
+    const base = resolveIntConst(code, shifted[1]);
+    return base === null ? null : base + (shifted[2] === '+' ? 1 : -1) * Number(shifted[3]);
+  }
+  return null;
+}
+
+/**
+ * The four inclusive edges of ONE row, from that row's OWN call span, or null
+ * when any one of them cannot be resolved.
+ *
+ * ALL FOUR OR NOTHING. Three edges and a guess is a rectangle nobody wrote, and
+ * the caller's only honest move on a partial reading is to refuse.
+ */
+function rowEdges(code: string, span: string): RowInclusiveEdges | null {
+  const arg = (name: string): string | null => {
+    // The row's own span only; `span` is already balanced to this call, and the
+    // nested `parallax: …(sec: N)` carries no edge argument to confuse this.
+    const m = new RegExp(`\\b${name}\\s*:\\s*([^,()]+)`).exec(span);
+    return m === null ? null : m[1].trim();
+  };
+  const x0 = resolveRowEdge(code, arg('x0'));
+  const x1 = resolveRowEdge(code, arg('x1'));
+  const y0 = resolveRowEdge(code, arg('y0'));
+  const y1 = resolveRowEdge(code, arg('y1'));
+  if (x0 === null || x1 === null || y0 === null || y1 === null) return null;
+  return { x0, x1, y0, y1 };
+}
+
+/**
  * Every section binding the act descriptor makes, and every row it could not
  * key. THE READER. Read the banner above before changing how a row is paired:
  * the pairing is by enclosing call, never by argument order.
@@ -372,7 +479,10 @@ export function descriptorEffectsRows(desc: string, zoneId: string): DescriptorE
       list.push(row);
       keyed.set(keys[0], list);
     } else {
-      unkeyed.push({ ...row, sectionKeys: keys });
+      // THE GEOMETRY RIDES THE ROW THAT NEEDS IT. A keyed row's rectangle is the
+      // section grid's and the migration derives it there; a key-less row has no
+      // section to derive from, so its rectangle is read here or nowhere.
+      unkeyed.push({ ...row, sectionKeys: keys, edges: rowEdges(code, span) });
     }
   }
   const bindings: Record<number, string> = {};
