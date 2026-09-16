@@ -358,8 +358,21 @@ describe('migrate aeon\'s act 1', () => {
       'the migration spells a section-run id differently from aeon, whose build `ensure` keys on it')
       .toEqual(theirs.slice(0, runCount).map((r) => r.id));
 
-    // ── AND THE KEY-LESS ROW'S ID, RULED AND NO LONGER A DISCLOSURE ───────
+    // ── THE KEY-LESS ROW'S ID AND LABEL ARE THEIR OWN ROW, BELOW ─────────
     //
+    // It used to be four more lines here. They moved so that a mutation which
+    // moves the key-less id reds an assertion ABOUT the key-less id rather than
+    // the whole-table projection above, which fires first and names ten rows.
+
+    // `name` on the SECTION RUNS is NOT in this: aeon's golden carries human
+    // labels and §4 carries "Sections a, b, c". Nothing has ruled they must
+    // agree, so they are stated.
+    expect(mine[0].name).toBe('Sections 0');
+    expect(theirs[0].name).toBe('Forest, upper left');
+  });
+
+  it('THE KEY-LESS ROW: the RULED id, and the readable label that is its condition', (ctx) => {
+    if (!need(ctx)) return;
     // ⚠ THIS WAS A DUAL-SPELLING ASSERTION AND IT WAS A HOLDING PATTERN. Row 188
     // installed `.toEqual([['ojz_preset_night'], ['night']])` — exact on both
     // arms — to keep an open question open and go red if either side moved
@@ -367,20 +380,36 @@ describe('migrate aeon\'s act 1', () => {
     // `docs/AURORA_REGIONS_SCHEMA.md` at `origin/main`, "A KEY-LESS ROW'S ID IS
     // ITS PRESET SYMBOL, LOWERCASED - AND AEON'S `night` MOVES" (2026-09-16T09:39Z,
     // OVERTURNABLE BY ONE WORD). Aurora's spelling won and aeon's fixture moved
-    // at aeon `a977fa64`. So the two arms are ONE arm now, asserted against the
-    // GOLDEN and not against a literal, the same way the run ids are.
+    // at aeon `a977fa64`, so the two arms are ONE arm now.
     //
     // ⚠ AND NOT §8 Q5. Q5 governs the `name` FIELD, spells ids `sec_N` in BOTH
     // of its arms, and would prove too much if it governed ids: sec4 binds
     // `OJZ_Preset_Depth`, so a preset-derived id rule renames it `depth` against
     // this very golden. The owner has not spoken on the id question.
-    expect(mine.slice(runCount).map((r) => r.id),
+    const input = act1Input();
+    const plan = planSectionMigration(input);
+    expect(plan.refusals, plan.refusals.join('; ')).toEqual([]);
+    const mine = plan.document!.regions;
+    const theirs = golden().regions;
+    const runCount = mine.length - input.unkeyed.length;
+    expect(runCount, 'every region came from a key-less row, so there is no key-less row to name')
+      .toBeLessThan(mine.length);
+    const mineKeyless = mine.slice(runCount);
+    const theirsKeyless = theirs.slice(runCount);
+
+    // THE SPELLING FIRST, and deliberately before the comparison below. An
+    // assertion that two lists agree is silent about WHICH spelling they agreed
+    // on: both sides moving back to `night` together would pass it, and so would
+    // a migration and a re-vendor that moved in step with nobody's ruling. This
+    // line is the ruling's own answer, quoted.
+    expect(mineKeyless.map((r) => r.id),
+      'the migration no longer mints the RULED id for a key-less row')
+      .toEqual(['ojz_preset_night']);
+    // And then across the seam, which is what makes it a cross-tool check rather
+    // than a restatement of `idFromPreset`.
+    expect(mineKeyless.map((r) => r.id),
       'the migration spells the key-less row\'s id differently from aeon, whose golden this is')
-      .toEqual(theirs.slice(runCount).map((r) => r.id));
-    // Anti-vacuous, and it is the rule and not the fixture: an assertion that
-    // two lists agree is silent about WHICH spelling they agreed on, and both
-    // sides moving together to `night` would pass the line above.
-    expect(mine.slice(runCount).map((r) => r.id)).toEqual(['ojz_preset_night']);
+      .toEqual(theirsKeyless.map((r) => r.id));
 
     // ── THE READABLE LABEL, WHICH IS A CONDITION OF THAT RULING ───────────
     //
@@ -390,20 +419,12 @@ describe('migrate aeon\'s act 1', () => {
     // would satisfy every line above and take the ruling's own justification
     // with it. Asserted against the GOLDEN's label, which aeon wrote before the
     // ruling and did not move with the id.
-    const mineKeyless = mine.slice(runCount);
-    const theirsKeyless = theirs.slice(runCount);
     expect(theirsKeyless.map((r) => r.name),
       'the golden carries no label on its key-less row, so this compares nothing')
       .toEqual(['Night']);
     expect(mineKeyless.map((r) => r.name),
       'the key-less region carries no readable label: the id ruling\'s condition is unmet')
       .toEqual(theirsKeyless.map((r) => r.name));
-
-    // `name` on the SECTION RUNS is NOT in this: aeon's golden carries human
-    // labels and §4 carries "Sections a, b, c". Nothing has ruled they must
-    // agree, so they are stated.
-    expect(mine[0].name).toBe('Sections 0');
-    expect(theirs[0].name).toBe('Forest, upper left');
   });
 
   it('AT THE REVISION CARRYING THE DEBUG DELTA IT IS STILL TEN, and the left-out row is NAMED',
