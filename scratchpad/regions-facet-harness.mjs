@@ -85,12 +85,30 @@ function declaredTools(facet) {
   if (ids.length === 0) throw new Error(`CANNOT MEASURE: FACET_TOOLS.${facet} parsed to nothing`);
   return ids;
 }
+// ── THE ACT ROW'S SENTENCE, ALSO PARSED FROM SOURCE ───────────────────────
+//
+// Same reason as the tool set above, and it is the harder half of the 2026-09-16
+// CALL 3 row: a sentence RETYPED here would go green against a panel showing
+// different words, and the property is "these exact words are on screen". The
+// provider holds one definition (`ACT_ROW_NOTE`); this reads it.
+const PROVIDER_SRC = `${ROOT}/src/renderer/providers/regions-aeon.ts`;
+function actRowNote() {
+  const src = readFileSync(PROVIDER_SRC, 'utf8');
+  const m = src.match(/export const ACT_ROW_NOTE\s*=\s*([\s\S]*?);\n/);
+  if (!m) throw new Error(`CANNOT MEASURE: ACT_ROW_NOTE not found in ${PROVIDER_SRC}`);
+  const parts = [...m[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)]
+    .map((x) => x[1].replace(/\\'/g, "'"));
+  if (parts.length === 0) throw new Error(`CANNOT MEASURE: ACT_ROW_NOTE parsed to nothing`);
+  return parts.join('');
+}
+const ACT_NOTE_TEXT = actRowNote();
+
 const REGION_TOOLS = declaredTools('regions');
 const COLLISION_TOOLS = declaredTools('collision');
 const LAYOUT_TOOLS = declaredTools('layout');
 
 // ── The fixture. Built from the act's OWN grid, read off the running app. ──
-function fixtureFor(actId, gridW, gridH, { hole = false, danglingBg = null } = {}) {
+function fixtureFor(actId, gridW, gridH, { hole = false, danglingBg = null, overlap = 0 } = {}) {
   const W = gridW * 2048;
   const H = gridH * 2048;
   const half = Math.floor(W / 2 / 16) * 16;
@@ -108,9 +126,13 @@ function fixtureFor(actId, gridW, gridH, { hole = false, danglingBg = null } = {
   // The SECOND region is what makes the act tile exactly; omitting it leaves an
   // UNASSIGNED hole, which is the fixture the coverage row needs.
   if (!hole) {
+    // `overlap` pulls the second region LEFT by that many pixels, so the two
+    // share a strip and the act is still covered edge to edge: the only status
+    // row that changes is `overlap`, which is what makes the CALL 1 pair below
+    // a measurement of that row rather than of the document generally.
     regions.push({
       id: 'night', name: 'Night', preset: 'OJZ_Preset_Night',
-      rect: { x: half, y: 0, w: W - half, h: H },
+      rect: { x: half - overlap, y: 0, w: W - half + overlap, h: H },
     });
   }
   return JSON.stringify({ schema: 1, act: actId, regions });
@@ -240,7 +262,34 @@ const STATUS_ROWS = String.raw`
 (() => [...document.querySelectorAll('[data-status-row]')].map((el) => ({
   id: el.getAttribute('data-status-row'),
   text: (el.textContent || '').trim(),
+  rects: el.getClientRects().length,
+  color: getComputedStyle(el).color,
 })))()`;
+
+/**
+ * THE ACT ROW'S NOTE LINE: its TEXT, and separately the tooltip it used to be.
+ *
+ * ⚠ `text` IS `textContent`, WHICH CANNOT SEE AN ATTRIBUTE. That is the whole
+ * point of the CALL 3 row: the defect was the sentence living in a `title=`, so
+ * a query that could match either would be green against it. `titleText` is
+ * read from the enclosing `[title]` and reported BESIDE the text, never as a
+ * substitute for it, so the two claims stay separable.
+ */
+const ACT_ROW_TEXT = String.raw`
+(() => {
+  const row = document.querySelector('[data-region-row="act"]');
+  if (!row) return null;
+  const note = row.querySelector('[data-region-note]');
+  const titled = row.closest('[title]');
+  return {
+    rowText: (row.textContent || '').trim(),
+    noteText: note ? (note.textContent || '').trim() : null,
+    noteRects: note ? note.getClientRects().length : 0,
+    noteVisible: note && typeof note.checkVisibility === 'function'
+      ? note.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : null,
+    titleText: titled ? titled.getAttribute('title') : null,
+  };
+})()`;
 
 const REVERTS = String.raw`
 (() => [...document.querySelectorAll('[data-binding-revert]')]
@@ -468,6 +517,32 @@ async function main() {
       rowIds.join(',') === 'forest,night,act', `rows on screen = ${JSON.stringify(rowIds)}`);
     await shot(c, '02-list');
 
+    // ═══ THE ACT ROW SAYS WHY IT IS READ-ONLY, IN TEXT — CALL 3 ═══════════
+    //
+    // ⚠ `textContent` CANNOT SEE AN ATTRIBUTE, AND THAT IS THE MEASUREMENT.
+    // The defect was this sentence living only in a `title=` on the row's Card:
+    // an author who never hovers never learns why the row takes no click. A
+    // query matching either would be green against exactly that, so the text
+    // and the tooltip are read into two separate fields and asserted on two
+    // separate rows. The sentence itself is parsed out of the provider
+    // (`ACT_ROW_NOTE`), never typed here.
+    const actRow = await c.json(ACT_ROW_TEXT);
+    check('3f', 'ANTI-VACUOUS: the act row is on screen with text of its own',
+      !!actRow && actRow.rowText.length > 0 && /\bact\b/.test(actRow.rowText),
+      actRow ? JSON.stringify(actRow.rowText.slice(0, 120)) : 'no act row at all');
+    check('3g', 'its read-only reason is in the RENDERED TEXT, not only in the tooltip',
+      !!actRow && actRow.noteText === ACT_NOTE_TEXT && actRow.rowText.includes(ACT_NOTE_TEXT),
+      `parsed from ${PROVIDER_SRC}: ${JSON.stringify(ACT_NOTE_TEXT)}\n        `
+      + `on screen: ${JSON.stringify(actRow?.noteText)}`);
+    check('3h', 'and that line is PAINTED, not sitting in an unpainted subtree',
+      !!actRow && actRow.noteRects > 0 && actRow.noteVisible !== false,
+      `rects=${actRow?.noteRects} checkVisibility=${actRow?.noteVisible}`);
+    check('3i', 'the tooltip is KEPT alongside it, saying the same words',
+      !!actRow && actRow.titleText === ACT_NOTE_TEXT,
+      `title=${JSON.stringify(actRow?.titleText)} — reported separately from the text above so `
+      + 'neither can stand in for the other');
+    await shot(c, '02a-act-row');
+
     // ───────────────────────────────────────────────────────────────────────
     // 4. THE BACKGROUND LABEL — ALWAYS, on every row (ruling 2026-09-16)
     // ───────────────────────────────────────────────────────────────────────
@@ -644,6 +719,76 @@ async function main() {
       !!cover2 && /UNASSIGNED/.test(cover2.text) && /belongs to no region/.test(cover2.text),
       cover2 ? cover2.text.slice(0, 160) : 'no unassigned row');
     await shot(c, '05-unassigned');
+
+    // ═══ THE OVERLAP ROW'S `ok` ARM — 2026-09-16 ruling, CALL 1 ═══════════
+    //
+    // ⚠ THE PAIR IS THE ROW. Until this ruling the overlap row was pushed only
+    // `if (overlaps.length > 0)`, so a clean document said NOTHING and a reader
+    // could not tell "checked, disjoint" from "this check did not run". The
+    // green half alone is vacuous in the other direction: "no overlap warning
+    // on a clean document" is also what a panel that renders no overlap row at
+    // all produces, which is precisely the defect. So the SAME id is demanded
+    // in BOTH documents, and the two arms are required to differ in tone.
+    const clean = await c.json(
+      `window.__dbg.aeon.setRegions(${JSON.stringify(
+        fixtureFor(st.act, st.gridWidth, st.gridHeight))})`);
+    check('7f', 'INSTRUMENT: the clean, exactly-tiling fixture is back',
+      clean.ok === true && clean.count === 2, JSON.stringify(clean));
+    await sleep(800);
+    const status3 = await c.json(STATUS_ROWS);
+    const ok3 = status3.find((r) => r.id === 'overlap');
+    const cover3 = status3.find((r) => r.id === 'unassigned');
+    check('7f2', 'a DISJOINT document still puts an `overlap` row on screen, and says it passed',
+      !!ok3 && /No two regions overlap/.test(ok3.text) && ok3.rects > 0,
+      ok3 ? `${JSON.stringify(ok3.text)} rects=${ok3.rects}`
+        : 'NO overlap row on a clean document: this is the defect the ruling named');
+    check('7f3', 'and it is drawn in the SAME tone as the other passing row, not as a warning',
+      !!ok3 && !!cover3 && ok3.color === cover3.color,
+      `overlap ${ok3?.color} vs unassigned(ok) ${cover3?.color} — the ok tone is taken from a `
+      + 'row known to be ok in this same list, never from a hex typed here');
+
+    // 16 px, because the fixture's own rectangles are 16-aligned; the number is
+    // the grid the fixture builder uses, not a constant of the app.
+    const OVER = 16;
+    const overlapped = await c.json(
+      `window.__dbg.aeon.setRegions(${JSON.stringify(
+        fixtureFor(st.act, st.gridWidth, st.gridHeight, { overlap: OVER }))})`);
+    check('7g', 'INSTRUMENT: an OVERLAPPING fixture is accepted by the codec (the load does not refuse it)',
+      overlapped.ok === true && overlapped.count === 2, JSON.stringify(overlapped));
+    await sleep(800);
+    const status4 = await c.json(STATUS_ROWS);
+    const bad4 = status4.find((r) => r.id === 'overlap');
+    check('7h', 'the SAME row flips to the warning arm, naming both regions and the shared rectangle',
+      !!bad4 && /forest and night/.test(bad4.text) && new RegExp(`${OVER}x`).test(bad4.text)
+      && !/No two regions overlap/.test(bad4.text),
+      bad4 ? bad4.text.slice(0, 170) : 'no overlap row on an OVERLAPPING document');
+    check('7i', 'and the two arms are drawn DIFFERENTLY, so the pass is not the warning in silence',
+      !!bad4 && !!ok3 && bad4.color !== ok3.color && bad4.rects > 0,
+      `warning ${bad4?.color} vs ok ${ok3?.color}`);
+    // The row mark on the list row is the other half of CALL 1 and already
+    // landed at step 6; it is read here only as a cross-check that the
+    // overlapping document really reached the panel and not just the status fn.
+    const marked = await c.json(String.raw`
+      (() => [...document.querySelectorAll('[data-region-overlap]')]
+        .map((el) => (el.textContent || '').trim()))()`);
+    check('7j', 'CROSS-CHECK: the list rows carry the symmetric `overlaps` mark for the same document',
+      marked.length === 2 && marked.every((t) => /^overlaps \S/.test(t)),
+      JSON.stringify(marked));
+    await shot(c, '05b-overlap');
+
+    const cleaned = await c.json(
+      `window.__dbg.aeon.setRegions(${JSON.stringify(
+        fixtureFor(st.act, st.gridWidth, st.gridHeight))})`);
+    check('7k', 'INSTRUMENT: the clean fixture is restored, and the mark goes with the overlap',
+      cleaned.ok === true && cleaned.count === 2, JSON.stringify(cleaned));
+    await sleep(800);
+    const unmarked = await c.json(String.raw`
+      (() => document.querySelectorAll('[data-region-overlap]').length)()`);
+    check('7l', 'the per-row mark is CONDITIONAL and the status row is not: mark gone, row still there',
+      unmarked === 0
+      && /No two regions overlap/.test((await c.json(STATUS_ROWS))
+        .find((r) => r.id === 'overlap')?.text ?? ''),
+      `marks on screen = ${unmarked}`);
 
     // ───────────────────────────────────────────────────────────────────────
     // 8. THE OTHER HALF OF THE GATING: classic does NOT get this facet
