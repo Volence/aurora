@@ -120,7 +120,16 @@ describe.each(RECORDS)('%s is strict JSONL', (rel) => {
     // transit, and nothing in the output says so.
     //
     // The rule guards against a session INVENTING a number and is structurally
-    // blind to a correct number that never arrives. `typeof obj.at !== 'string'`
+    // blind to a correct number that never arrives.
+    //
+    // ⚠ A RELATED CLAIM THIS LANE PASSED ON UNMEASURED, corrected here because it
+    // is in a landed commit message (`d45229c3`): "zsh has no PIPESTATUS" is
+    // FALSE. Measured on zsh 5.9.2 -- `false | tail -1` then `${pipestatus[1]}`
+    // reads 1, while bash's UPPERCASE `${PIPESTATUS[1]}` is the empty one. The
+    // advice does not change and gets stronger: the array is reset by the very
+    // next command, so one innocent `echo` between the pipe and the read prints
+    // 0, a false pass produced by the obvious way anyone would write it. The rule
+    // is DO NOT PIPE A GATING COMMAND, not "read the array carefully". `typeof obj.at !== 'string'`
     // is blind the same way: `typeof '' === 'string'`, so an empty timestamp is
     // indistinguishable from a good one to the row above. `scripts/append-lane-log.mjs`
     // already refuses this at WRITE time (`!entry[k]`), but that is a producer-side
