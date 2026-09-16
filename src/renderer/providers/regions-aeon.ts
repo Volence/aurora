@@ -180,6 +180,33 @@ export interface RegionListRow {
   overlaps: string[];
 }
 
+/**
+ * THE ACT ROW'S REASON, IN WORDS ON THE ROW.
+ *
+ * ⚠ IT LIVES HERE, AND NOT ONLY IN A `title=`. Until the 2026-09-16 ruling on
+ * §3.4's three open calls (`docs/superpowers/notes/
+ * 2026-09-16-regions-panel-three-calls.md`, CALL 3) this sentence was a tooltip
+ * on the act row's `Card` and nothing else, which is a state represented by the
+ * absence of a control plus a hover — the same house rule CALL 1's `ok` arm is
+ * about. A tooltip is not a representation: an author who never hovers never
+ * learns why the row does not take a click.
+ *
+ * WHY THE ROW IS READ-ONLY, AND WHY THAT IS A SCOPING RATHER THAN A GAP: Aurora
+ * has no writer for any of the three values it shows. `Act.sceneRef`'s own type
+ * says so (`src/core/model/s4-types.ts`: "Aurora does not WRITE this key. The
+ * save re-serialises the raw parsed project.json"), `raster` has no act-level
+ * home at all (`actBindingDefaults` types it `null` on purpose), and the act
+ * background is generator-gated to the `@act` sentinel. An editable act row
+ * would be Aurora's FIRST writer of a project.json act key, which is a contract
+ * question and not a panel one.
+ *
+ * It is a CONSTANT so that the node row and the CDP harness both take the
+ * sentence FROM HERE rather than retyping it; a retyped expectation goes green
+ * against a panel showing different words.
+ */
+export const ACT_ROW_NOTE = 'The act\'s own values. A region binding left null inherits '
+  + 'these. Aurora does not write them, so this row cannot be edited.';
+
 /** The fixed bottom row: what a null binding inherits. Never selectable. */
 export interface ActListRow {
   /** Literally "act" — §3.4's word, and the only part of that sentence that survives. */
@@ -518,6 +545,26 @@ export function regionStatusRows(input: RegionStatusInput): RegionStatusRow[] {
       text: `${overlaps.length} overlapping ${overlaps.length === 1 ? 'pair' : 'pairs'}: `
         + `${named.join('; ')}. Identity must be a function of the camera centre alone; `
         + 'where two regions overlap it depends on scan order instead.',
+    });
+  } else {
+    // ⚠ THIS ARM IS NOT DECORATION, and it was missing until the 2026-09-16
+    // ruling on §3.4's three open calls (`docs/superpowers/notes/
+    // 2026-09-16-regions-panel-three-calls.md`, CALL 1). Without it the overlap
+    // row was the ONLY status row that said nothing when it passed, so a reader
+    // could not tell "checked, disjoint" from "this check did not run" — the
+    // house rule this file states at `RegionStatusTone` (represent a state,
+    // never by absence) and the exact confusion the `unmeasurable` tone exists
+    // to prevent. The two rows beside it, `unassigned` and `sidecars`, each have
+    // their own `else`; this is the third.
+    //
+    // The COUNT is here for the same reason `unassigned`'s pixel figures are:
+    // "no two regions overlap" is also what a document with no regions at all
+    // produces, and the number says which of the two the reader is looking at.
+    rows.push({
+      id: 'overlap',
+      tone: 'ok',
+      text: `No two regions overlap (${pieces.length} `
+        + `${pieces.length === 1 ? 'region' : 'regions'} checked).`,
     });
   }
 

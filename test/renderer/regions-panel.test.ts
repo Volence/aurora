@@ -418,8 +418,48 @@ describe('the status line: §2.5 live, where the author is looking at the thing 
     expect(row.tone).toBe('warning');
     expect(row.text).toContain('forest and night');
     expect(row.text).toContain(`16x${ACT.actH} at ${HALF},0`);
-    // The control: a disjoint set emits NO overlap row at all.
-    expect(rowById(tiledDoc(), 'overlap')).toBeUndefined();
+    // The control: a disjoint set puts the SAME row in its `ok` arm, never
+    // nothing. (Before the 2026-09-16 CALL 1 ruling this line read
+    // `toBeUndefined()`; the arm it was pinning was the defect.)
+    expect(rowById(tiledDoc(), 'overlap')!.tone).toBe('ok');
+  });
+
+  it('a DISJOINT set SAYS SO: the overlap row has an `ok` arm, so silence never stands for a pass', () => {
+    // ⚠ THE PAIR IS THE WHOLE ROW, and one half alone is vacuous in a way worth
+    // spelling out: "on an overlapping document there is no `ok` row" passes
+    // identically against a `regionStatusRows` that pushes NOTHING for overlap
+    // at all, which is exactly the state this ruling ended. So both arms are
+    // asserted here, on one id, against the same pair of documents.
+    const clean = rowById(tiledDoc(), 'overlap');
+    expect(clean, 'a clean document must still produce the row').toBeDefined();
+    expect(clean!.tone).toBe('ok');
+    expect(clean!.text).toContain('No two regions overlap');
+    // The count is derived from the document, never typed: it is what tells a
+    // reader "two regions were compared" from "there was nothing to compare".
+    expect(clean!.text).toContain(`${tiledDoc().regions.length} regions checked`);
+
+    const overlapping = docOf(
+      region({ id: 'forest', rect: { x: 0, y: 0, w: HALF + 16, h: ACT.actH } }),
+      region({ id: 'night', rect: { x: HALF, y: 0, w: HALF, h: ACT.actH } }),
+    );
+    const bad = rowById(overlapping, 'overlap');
+    expect(bad, 'an overlapping document must produce the row too').toBeDefined();
+    expect(bad!.tone).toBe('warning');
+    // And the two arms are DIFFERENT text, so neither is the other's default.
+    expect(bad!.text).not.toContain('No two regions overlap');
+  });
+
+  it('the `ok` arm counts what it checked, so an EMPTY document cannot borrow a clean one\'s green', () => {
+    // A document with no regions trivially has no overlapping pair. It gets the
+    // same tone, and must not get the same sentence: the singular/plural count
+    // is the only thing on screen that separates "nothing overlaps" from
+    // "nothing is here".
+    const empty = rowById(docOf(), 'overlap')!;
+    expect(empty.tone).toBe('ok');
+    expect(empty.text).toContain('0 regions checked');
+    const one = rowById(docOf(region({ id: 'only' })), 'overlap')!;
+    expect(one.text).toContain('1 region checked');
+    expect(one.text).not.toContain('1 regions checked');
   });
 
   it('an unresolvable binding names the FILE, through the load\'s own function', () => {
