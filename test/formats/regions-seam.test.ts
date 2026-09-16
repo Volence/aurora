@@ -400,8 +400,8 @@ describe('THE SEAM: the bg collapse, anchored on the golden', () => {
     expect(
       spans.filter(s => s !== null),
       'the golden now carries a NON-NULL bg.span. Aurora\'s flatten.ts does not derive a span '
-      + 'from a layout height — it forwards the document\'s value and normalises absence to null '
-      + '— so the derived-span half of the contract is now OWED on this side. '
+      + 'from a layout height: it forwards the document\'s value and normalises absence to null. '
+      + 'So the derived-span half of the contract is now OWED on this side. '
       + '(aeon REGIONS-BG-GOLDEN-GAP)',
     ).toEqual([]);
   });
