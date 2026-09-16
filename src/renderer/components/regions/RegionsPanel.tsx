@@ -81,7 +81,22 @@ function run(command: AnyCommand | null): void {
 // ---------------------------------------------------------------------------
 
 /**
- * One region row.
+ * How many rectangles this region is, in §3.4's own words ("1 rect", "2 rects").
+ *
+ * ⚠ IT IS ON EVERY ROW, NOT ONLY ON CARVED ONES. `row.rect` is the UNION BOUNDS
+ * of the pieces, and for an L-shape those bounds include the notch — so a row
+ * that printed a size with no count would present a box as if it were the
+ * region's shape, silently, on exactly the regions where it is wrong. Showing
+ * "1 rect" on the ordinary case is what makes "2 rects" mean something; a mark
+ * that appears only in the bad case is a state represented by absence, which is
+ * the house rule this file's act row is also about.
+ */
+export function rectCountWord(n: number): string {
+  return `${n} ${n === 1 ? 'rect' : 'rects'}`;
+}
+
+/**
+ * One region row — ONE PER REGION ID (step 8B), never one per `regions[]` entry.
  *
  * TWO LINES, and the second one is the 2026-09-16 background ruling's: the
  * background this region resolves to is named IN WORDS on every row, in every
@@ -92,15 +107,21 @@ function run(command: AnyCommand | null): void {
 function RegionRow({ row, selected, onSelect }: {
   row: RegionListRow; selected: boolean; onSelect: () => void;
 }) {
+  const multi = row.rects.length > 1;
   return (
     <Card selected={selected} onClick={onSelect} domId={`region-row-${row.id}`}
-          title={`${row.id}: ${row.rect.w} by ${row.rect.h} at ${row.rect.x}, ${row.rect.y}`}>
+          title={`${row.id}: ${rectCountWord(row.rects.length)}, ${multi ? 'bounds ' : ''}`
+            + `${row.rect.w} by ${row.rect.h} at ${row.rect.x}, ${row.rect.y}`
+            + (multi ? ' — the bounds of its pieces, not its shape' : '')}>
       <div data-region-row={row.id} style={{ paddingBottom: T.s2 }}>
         <div style={{ display: 'flex', gap: T.s2, alignItems: 'baseline' }}>
           <span style={{ fontWeight: T.wSemibold }}>{row.label}</span>
           <span style={{ ...NOTE, marginBottom: 0 }}>{row.id}</span>
-          <span style={{ ...NOTE, marginBottom: 0, marginLeft: 'auto' }}>
-            {row.rect.w}x{row.rect.h}
+          <span data-region-rects={row.id} style={{ ...NOTE, marginBottom: 0, marginLeft: 'auto' }}>
+            {rectCountWord(row.rects.length)}
+          </span>
+          <span style={{ ...NOTE, marginBottom: 0 }}>
+            {multi ? 'bounds ' : ''}{row.rect.w}x{row.rect.h}
           </span>
         </div>
         {/* THE RULING'S LINE. `data-region-bg` is what an instrument addresses;
@@ -357,9 +378,29 @@ function SelectedRegion({ state }: { state: Extract<RegionsPanelState, { kind: '
     );
   }
   const rows = regionBindingRows(region, state.defaults);
+  // HOW MANY RECTANGLES THIS REGION IS, from the list row rather than counted a
+  // second time here.
+  const pieces = state.rows.find((r) => r.id === region.id)?.rects.length ?? 1;
   return (
     <div data-region-detail={region.id}>
       <Row><span style={{ fontWeight: T.wSemibold }}>{region.name ?? region.id}</span></Row>
+      {pieces > 1 && (
+        // ⚠ SAID OUT LOUD, BECAUSE THE FIELDS BELOW EDIT ONE OF THEM. `state.selected`
+        // and `RectFields`' `.find()` both resolve the region's FIRST entry, so on a
+        // carved region these four numbers are rectangle 1 and the others are not on
+        // screen at all. §3.4's mock answers this properly with a per-rect list
+        // ("rects #1 …" plus Carve / Fit to 16) and that list is not built yet — so
+        // until it is, the state is NAMED rather than left to be discovered by an
+        // author wondering why moving `x` moved a third of their region.
+        // The BINDINGS below are a different case and need no such note: they are
+        // identical across every entry by construction (`setRegionBinding`).
+        <div data-region-rect-of={region.id}>
+          <Hint under tone="warning">
+            {rectCountWord(pieces)}: these four numbers are rectangle 1. The others are
+            edited on the map; the list row shows the bounds of all of them.
+          </Hint>
+        </div>
+      )}
       <RectFields state={state} regionId={region.id} rect={region.rect} />
       {rows.map((r) => (
         <BindingRow key={r.key} state={state} regionId={region.id} row={r} />

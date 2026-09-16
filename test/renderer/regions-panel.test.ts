@@ -94,7 +94,7 @@ const NO_ACT_SCENE = actBindingDefaults(null);
 // ---------------------------------------------------------------------------
 
 describe('the list is in DOCUMENT order (the painter\'s-order sentence is superseded)', () => {
-  it('rows come back 1:1 with `regions[]`, unsorted, index matching position', () => {
+  it('one-entry-per-region: rows come back 1:1 with `regions[]`, unsorted, index matching position', () => {
     // Deliberately NOT in any geometric order: `zulu` is leftmost and last.
     const doc = docOf(
       region({ id: 'mid', rect: { x: HALF, y: 0, w: HALF / 2, h: ACT.actH } }),
@@ -123,6 +123,135 @@ describe('the list is in DOCUMENT order (the painter\'s-order sentence is supers
   it('an EMPTY document produces an empty list, and the fixture that is not empty proves the call works', () => {
     expect(regionListRows(docOf(), NO_ACT_SCENE, BG_LIB)).toEqual([]);
     expect(regionListRows(tiledDoc(), NO_ACT_SCENE, BG_LIB)).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 1b. A REGION THAT IS SEVERAL RECTANGLES LISTS ONCE (step 8B, item B)
+//
+// ⚠ EVERY ROW HERE ASSERTS THE FIXTURE REALLY HAS MORE ENTRIES THAN ROWS. On a
+// one-entry-per-region document every claim below is trivially true — that is
+// the shape the 1:1 mapping was correct for, and the shape that hid this.
+// ---------------------------------------------------------------------------
+
+/**
+ * `forest` as a genuine L: a tall-left block and a NARROWER one below it, with
+ * `night` filling the right. The notch matters — a fixture whose two pieces
+ * happen to tile a rectangle would make "the bounds are not the shape"
+ * unfalsifiable, because the bounds WOULD be the shape.
+ *
+ * The two `forest` entries are NOT adjacent, so a grouping that only merged
+ * neighbours would fail here.
+ */
+const L_TALL = { x: 0, y: 0, w: HALF, h: HALF };
+const L_FOOT = { x: 0, y: HALF, w: HALF / 2, h: HALF };
+function lShapedDoc(): RegionsDocument {
+  return docOf(
+    region({ id: 'forest', name: 'Forest', rect: L_TALL }),
+    region({ id: 'night', name: 'Night', rect: { x: HALF, y: 0, w: HALF, h: ACT.actH } }),
+    region({ id: 'forest', name: 'Forest', rect: L_FOOT }),
+  );
+}
+
+describe('a region with several rectangles is ONE row (step 8B item B)', () => {
+  it('lists once, at its FIRST entry\'s position, naming every entry it covers', () => {
+    const doc = lShapedDoc();
+    const rows = regionListRows(doc, NO_ACT_SCENE, BG_LIB);
+
+    // ⚠ THE ANTI-VACUOUS FLOOR: the document must really carry more entries
+    // than there are rows, or "lists once" is true of any correct 1:1 mapping.
+    expect(doc.regions.length).toBe(3);
+    expect(rows).toHaveLength(2);
+
+    expect(rows.map((r) => r.id)).toEqual(['forest', 'night']);
+    // FIRST-APPEARANCE ORDER: `forest` leads because entry 0 is forest's, even
+    // though its second entry comes after night's.
+    expect(rows[0].index).toBe(0);
+    expect(rows[0].entryIndices).toEqual([0, 2]);
+    expect(rows[1].index).toBe(1);
+    expect(rows[1].entryIndices).toEqual([1]);
+    // Every index a row claims really carries that row's id.
+    for (const r of rows) for (const i of r.entryIndices) expect(doc.regions[i].id).toBe(r.id);
+    // And every entry of the document is claimed by exactly one row.
+    expect(rows.flatMap((r) => r.entryIndices).sort()).toEqual([0, 1, 2]);
+  });
+
+  it('carries every piece, and its `rect` is the BOUNDS of them — which is not its shape', () => {
+    const doc = lShapedDoc();
+    const [forest] = regionListRows(doc, NO_ACT_SCENE, BG_LIB);
+    expect(forest.entryIndices.length).toBeGreaterThanOrEqual(2);
+
+    expect(forest.rects).toEqual([L_TALL, L_FOOT]);
+    // The bounds, DERIVED from the fixture's own constants: the tall block's
+    // width and the two blocks' stacked height.
+    expect(forest.rect).toEqual({ x: 0, y: 0, w: HALF, h: HALF * 2 });
+
+    // ⚠ THE POINT OF `rects`, asserted rather than asserted-about: the bounds
+    // hold strictly MORE area than the region does, so a panel that showed the
+    // bounds alone would be showing a shape the region does not have.
+    const boundsArea = forest.rect.w * forest.rect.h;
+    const pieceArea = forest.rects.reduce((a, r) => a + r.w * r.h, 0);
+    expect(pieceArea).toBeLessThan(boundsArea);
+  });
+
+  it('a ONE-rectangle region is unchanged: one piece, `rect` its own, `entryIndices` just itself', () => {
+    // The control for every row above. If grouping had broken the ordinary
+    // case, the three rows above would still pass.
+    const rows = regionListRows(tiledDoc(), NO_ACT_SCENE, BG_LIB);
+    expect(rows).toHaveLength(2);
+    for (const [i, r] of rows.entries()) {
+      expect(r.rects).toHaveLength(1);
+      expect(r.entryIndices).toEqual([i]);
+      expect(r.index).toBe(i);
+      expect(r.rect).toEqual(tiledDoc().regions[i].rect);
+    }
+  });
+
+  it('bindings and label come from the FIRST entry, the same representative `setRegionBinding` converges on', () => {
+    const doc = lShapedDoc();
+    doc.regions[0].bg = { layoutRef: 'cave_bg' };
+    doc.regions[2].bg = { layoutRef: 'forest_bg' };
+    const [forest] = regionListRows(doc, NO_ACT_SCENE, BG_LIB);
+    expect(forest.entryIndices).toEqual([0, 2]);
+    // ANTI-VACUOUS: the two entries deliberately DISAGREE here, so the row can
+    // tell "took the first" from "took whichever, they were the same". A
+    // document out of `setRegionBinding` or the gesture layer never disagrees;
+    // a hand-edited one can, and the panel must be predictable about it.
+    expect(BG_LIB.find((b) => b.id === 'cave_bg')!.name).not
+      .toBe(BG_LIB.find((b) => b.id === 'forest_bg')!.name);
+    expect(forest.bg.text).toBe('Cave');
+  });
+
+  it('an OVERLAP with another region is named ONCE per id, however many entry pairs overlap', () => {
+    // `night` is widened to cover BOTH of forest's pieces: two entry pairs, one
+    // pair of ids. Per-entry rows would have said it twice.
+    const doc = docOf(
+      region({ id: 'forest', rect: L_TALL }),
+      region({ id: 'night', rect: { x: 0, y: 0, w: ACT.actW, h: ACT.actH } }),
+      region({ id: 'forest', rect: L_FOOT }),
+    );
+    const rows = regionListRows(doc, NO_ACT_SCENE, BG_LIB);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].entryIndices.length).toBeGreaterThanOrEqual(2);
+    expect(rows[0].overlaps).toEqual(['night']);
+    expect(rows[1].overlaps).toEqual(['forest']);
+  });
+
+  it('a region does NOT name ITSELF when two of its own entries overlap — but the status row still does', () => {
+    const doc = docOf(
+      region({ id: 'forest', rect: { x: 0, y: 0, w: HALF, h: HALF } }),
+      region({ id: 'forest', rect: { x: 0, y: 0, w: HALF, h: HALF } }),
+    );
+    const rows = regionListRows(doc, NO_ACT_SCENE, BG_LIB);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].entryIndices).toEqual([0, 1]);
+    // The row's field is for "which OTHER region do I have to go and move".
+    expect(rows[0].overlaps).toEqual([]);
+    // ⚠ AND IT IS NOT SWALLOWED. Without this the row above would be
+    // indistinguishable from dropping the finding on the floor.
+    const overlap = statusOf(doc).find((r) => r.id === 'overlap');
+    expect(overlap!.tone).toBe('warning');
+    expect(overlap!.text).toContain('forest and forest');
   });
 });
 
