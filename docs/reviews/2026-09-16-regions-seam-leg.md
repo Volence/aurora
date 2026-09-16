@@ -275,3 +275,25 @@ harness-guard scripts in the `npm test` chain exit 0.
 * **Nothing here draws a region.** `uncoveredRects` returns holes as rectangles
   precisely so the editor can show them in red, which is the direction of travel
   the 2026-09-14 cut-on-draw ruling chose. No UI consumes it yet.
+
+## Aeon booked both kept limits on their side, and reframed one of them better than we did
+
+*Appended by the overseer 2026-09-16, relayed via the hub. Recorded here because it is the
+other half of this document's own open items, and it lives in another repo.*
+
+Aeon booked **both** limits this parcel kept rather than smoothed, verbatim, in its intent doc
+at aeon **`0dadf3ab`**. Of the two, it names the **three per-row rules we did not restate** as
+the more dangerous for them, and the reason is worth keeping in our words as well as theirs:
+*"it is the one someone would assume in the other direction without ever stating the assumption
+out loud."*
+
+**The sentence to keep: THE EDITOR'S GREEN IS NOT A BUILD PREDICTION.** A regions document that
+passes everything Aurora can check can still be refused by aeon's build, because three of their
+six per-row rules need descriptor constants this repo does not have and inventing them here
+would be a rule the engine does not hold. That is now written on **both** sides of the seam
+instead of neither.
+
+Aeon also took the **`bg` gap as aeon's debt, not a gap in our proof**, which is the better
+framing, and placed it at the front of their step 7 for the failure SHAPE rather than the cost:
+the same golden published late produces a mismatch between two flatteners that both look
+correct in isolation. That is the expensive kind of failure, not the cheap kind.
