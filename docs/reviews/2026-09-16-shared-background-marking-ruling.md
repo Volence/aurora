@@ -200,3 +200,38 @@ lane's call** — the hub said so explicitly.
 
 Everything in §1 through §7 stands unless that verdict says otherwise, and the label's
 **on-condition** is the only thing it can move. Overturnable by one word from him, as before.
+
+### 8.1 RULED: the name is on every label, ALWAYS — and one of the three flagged items is settled here
+
+*Appended by the overseer 2026-09-16. The verdict is at empyrean `d945eb0`,
+`docs/superpowers/notes/2026-09-16-region-background-label-ruling.md`. Read it there; this is a
+pointer and a settlement, not a summary of it. Overturnable by one word from him.*
+
+**It CONFIRMS §7's choice rather than replacing it**, and the hub verified that distinction
+against `4414f8ce` §7 itself rather than against the agent's citation of it — an agent that
+reaches the same answer independently is a confirmation; one whose citation nobody checked
+could be a substitution wearing the same words.
+
+**The argument neither §3 nor §7 had, and it is the strongest one: CONDITIONAL IS THREE STATES,
+NOT TWO.** `bg MISSING <id>` must show on a dangling ref even in a one-background act, so the
+"quieter map" is not quiet — the line is absent, present-as-name, or present-as-error, and the
+absent state carries no information. That collapses the conditional case on its own terms.
+Runner-up, and it is §3's own reasoning turned on §7: **a label that appears only under a
+condition IS a mode**, the exact defect this document cites against colour-by-background.
+
+**Item 2 of the three the ruling flagged unverified is settled, here, by grep, and it splits:**
+
+| symbol | verdict |
+|---|---|
+| `regionBgLabel` | **Does not exist.** It is a proposed resolver, correctly labelled as one. Build it. |
+| `resolveDisplayedBg` | **EXISTS**, `src/renderer/providers/bganim-preview-aeon.ts:98`, and is already the shared answer to "which background is displayed" — `band-coverage.ts:145` calls it *"the same argument `resolveDisplayedBg` is shared for"*. |
+
+**So do not invent a second resolver for the label.** The one this app already uses to decide
+which background is on screen is the one whose answer the label must name, or the label and the
+preview can disagree — which is the defect this whole ruling exists to prevent, in miniature.
+`danglingBgRef` (`src/core/formats/bg-library`, used at `map-status-aeon.ts:55`) is the existing
+path for the `MISSING` case.
+
+**Still unverified and still ours:** the whole-map zoom legibility arithmetic, and *"every act
+has one background today"*, which was taken from §2 and the hub's framing rather than re-derived
+from act data. Neither changes the verdict; both could change the implementation.
