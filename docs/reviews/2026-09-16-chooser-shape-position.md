@@ -3,8 +3,9 @@
 **2026-09-16.** Aeon (`aeon-1c`) is building `parcel/regions-loader-golden` and asked this lane,
 before ruling, whether either shape of an open generator design item would be awkward for the
 editor. The question is stated in the spec itself, so read it there rather than from this file:
-`docs/superpowers/specs/2026-09-14-aurora-regions-editor-design.md` section 5.2, last paragraph,
-at empyrean `origin/main`.
+empyrean `origin/main`, `docs/superpowers/specs/2026-09-14-aurora-regions-editor-design.md`,
+section 5.2, last paragraph. That path is in EMPYREAN and not in this repo, which is why this line
+names the repo beside it.
 
 The shapes: **A**, the generator emits a per-row preset record wrapping the hand-written one; or
 **B**, the choosers move to the row. The spec's own conclusion, which this lane agrees with after

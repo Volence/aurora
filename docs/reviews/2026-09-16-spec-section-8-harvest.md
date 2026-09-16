@@ -1,9 +1,9 @@
 # Section 8 of the regions editor spec supersedes four sections and carries five rulings for THIS lane
 
 **2026-09-16. Read this before building any part of REGIONS-PAINT.** Raised by aeon (`aeon-1c`),
-whose agent hit it implementing the flattener. **Verified here firsthand** at empyrean
-`origin/main`, `docs/superpowers/specs/2026-09-14-aurora-regions-editor-design.md` section 8, not
-taken from their account.
+whose agent hit it implementing the flattener. **Verified here firsthand** at
+empyrean `origin/main`, `docs/superpowers/specs/2026-09-14-aurora-regions-editor-design.md`
+section 8, not taken from their account. That path is in EMPYREAN, not in this repo.
 
 ## The defect, which is the reusable part
 
