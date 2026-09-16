@@ -346,18 +346,73 @@ function runName(run: readonly number[]): string {
 }
 
 /**
- * An id for a key-less row, from the preset it binds.
+ * An id for a key-less row, from the preset it binds: THE WHOLE PRESET SYMBOL,
+ * lowercased, `[^a-z0-9_]` folded to `_`, a leading `_` stripped, truncated to
+ * the contract pattern's 32. `OJZ_Preset_Night` gives `ojz_preset_night`.
  *
- * §8 Q5's recommendation, which the owner left standing ("Doesn't matter too
- * much"): "the preset name when the preset is explicit and `secN` otherwise".
- * A key-less row HAS no section list to be named after, so the preset is the
- * only thing about it an author would recognise. Lowercased and punctuation
- * folded to `_` so it satisfies the contract's id pattern, with the pattern
- * checked afterwards rather than assumed.
+ * ⚠ THE RULE IS RULED, AND IT IS NOT §8 Q5. Empyrean
+ * `docs/AURORA_REGIONS_SCHEMA.md` at `origin/main`, "A KEY-LESS ROW'S ID IS ITS
+ * PRESET SYMBOL, LOWERCASED - AND AEON'S `night` MOVES" (2026-09-16T09:39Z,
+ * OVERTURNABLE BY ONE WORD), with the same rule in the editor spec's §4 item 3.
+ * Q5 governs the `name` FIELD: its text spells ids `sec_N` in BOTH arms and
+ * offers a choice between two NAME schemes, and had it governed ids it would
+ * prove too much, since sec4 binds `OJZ_Preset_Depth` and a preset-derived id
+ * rule renames it `depth` against aeon's golden. The owner has not spoken on
+ * the id question.
+ *
+ * ⚠ AND DO NOT "IMPROVE" IT BY STRIPPING THE `<ACT>_Preset_` PREFIX. That
+ * reproduces the golden for 8 of act 1's 10 rows including this one and then
+ * silently gives `depth` for sec4 and `plain` for sec8; it is also Aurora
+ * reverse-engineering a foreign namespace's internal structure, which the
+ * cited-versus-minted principle forbids, and it collides, since a key-less row
+ * bound to `OJZ_Preset_Sec5` would mint `sec5` on top of a section run's id.
+ * The whole-preset rule has no such seam. The ruling records all three.
+ *
+ * ⚠ THE ID IS MINTED ONCE AND NEVER RE-DERIVED, which is the answer to the
+ * ruling's own strongest objection: a stable identity is being derived from a
+ * MUTABLE cited name. It is derived HERE, at migration, written into the
+ * document, and read back as data ever after. A later preset rename therefore
+ * leaves `ojz_preset_night` bound to some other preset -- ugly, not broken, and
+ * stable, which is what `id` is for. Anything that re-derives an id from a
+ * preset on a later read is a defect, not a repair; `src/core/editing/__tests__/migrate-sections.test.ts`
+ * asserts the property from the other side.
  */
 function idFromPreset(preset: string): string {
   const folded = preset.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+/, '').slice(0, 32);
   return folded;
+}
+
+/**
+ * The readable label for a key-less row's region: the preset symbol with its
+ * namespace marker taken off. `OJZ_Preset_Night` gives `Night`.
+ *
+ * ⚠ THIS IS A CONDITION OF THE ID RULING ABOVE, NOT A GARNISH. The ruling's own
+ * sentence: "the migration writes `id: "ojz_preset_night"` AND `name: "Night"`.
+ * The ugly id is acceptable precisely because nothing legible is lost -- identity
+ * is for machines, the label is what the author sees on the map." A migration
+ * that wrote the minted id and left the label as the raw symbol would take the
+ * ruling's justification with it, so this function is load-bearing.
+ *
+ * WHY STRIPPING IS ALLOWED HERE AND FORBIDDEN FOR THE ID. The schema calls
+ * `name` an "Author-facing label. Never read by the engine or the generator",
+ * so it is not an identity and nothing binds to it: a wrong guess costs a
+ * clumsy word on a panel, where a wrong id costs a failed build. The id's
+ * objection to prefix-stripping was that it made a MINTED IDENTITY depend on a
+ * foreign namespace's internal shape. A label already depends on it.
+ *
+ * AFTER THE LAST `Preset_`, NOT THE LAST `_`. Taking the final underscore
+ * segment would render `OJZ_Preset_Deep_Forest` as "Forest" and lose a word
+ * without saying so. This form either strips exactly the marker or keeps the
+ * whole symbol, so the label is always a verbatim substring of the preset and a
+ * reader can always get back to it. A symbol with no marker keeps its whole
+ * self, which is a plain word more often than not.
+ */
+function labelFromPreset(preset: string): string {
+  const marker = /Preset_/gi;
+  let cut = 0;
+  for (const m of preset.matchAll(marker)) cut = m.index + m[0].length;
+  const tail = preset.slice(cut);
+  return tail.length > 0 ? tail : preset;
 }
 
 /**
@@ -599,8 +654,32 @@ export function planSectionMigration(input: MigrationInput): MigrationPlan {
   }
 
   // ── The key-less rows themselves, appended last (§4 item 3) ──────────────
-  for (const carve of carves) {
-    let id = idFromPreset(carve.row.preset);
+  //
+  // ⚠ TWO KEY-LESS ROWS THAT MINT ONE ID REFUSE THE MIGRATION. THERE IS NO
+  // SUFFIXING SCHEME HERE, and its absence is the ruling rather than an
+  // omission: empyrean `docs/AURORA_REGIONS_SCHEMA.md` at `origin/main`, "A
+  // KEY-LESS ROW'S ID IS ITS PRESET SYMBOL, LOWERCASED", 2026-09-16T09:39Z.
+  // Two key-less rows sharing a preset are two rows Aurora cannot tell apart
+  // from its own input -- `{preset, edges, line, constructorName}` carries no
+  // name and no key -- so a suffix would hand one of them an identity decided by
+  // the order they happen to appear in a descriptor, which is not a stable
+  // identity at all. The author is the one who can say which is which, so the
+  // refusal names BOTH descriptor lines and stops.
+  //
+  // THE SAME REFUSAL COVERS THE TRUNCATION CASE, and that is why the collision
+  // is computed on the MINTED id and not on the preset: two distinct presets
+  // whose lowercased symbols agree in their first 32 characters mint one id
+  // through `slice(0, 32)`, with nothing about the presets themselves to warn
+  // anyone. It is the same defect arriving by a quieter road.
+  const minted = carves.map((carve) => ({ carve, id: idFromPreset(carve.row.preset) }));
+  const byMintedId = new Map<string, typeof minted>();
+  for (const m of minted) {
+    const at = byMintedId.get(m.id);
+    if (at === undefined) byMintedId.set(m.id, [m]);
+    else at.push(m);
+  }
+  for (const m of minted) {
+    const { carve, id } = m;
     if (!ID_PATTERN.test(id)) {
       refusals.push(
         `the ${carve.row.constructorName} row at descriptor line ${carve.row.line} binds `
@@ -609,13 +688,34 @@ export function planSectionMigration(input: MigrationInput): MigrationPlan {
       );
       continue;
     }
+    const sharing = byMintedId.get(id)!;
+    if (sharing.length > 1) {
+      // Said ONCE for the group, by its first row: the sentence already names
+      // every row in the clash, so one per row would be the same paragraph
+      // twice with nothing new in the second copy.
+      if (sharing[0] !== m) continue;
+      refusals.push(
+        `${sharing.length} descriptor rows with no section key would both be called "${id}": `
+        + `${sharing.map((o) => `${o.carve.row.constructorName} at line ${o.carve.row.line} `
+          + `binding ${o.carve.row.preset}`).join(', and ')}. A key-less row is named after the `
+        + 'preset it binds, so two of them binding one preset have one name and nothing to tell '
+        + 'them apart; Aurora will not invent a suffix, because the id it invented would depend on '
+        + 'the order the rows appear in the descriptor. Give one of them a section key, or bind it '
+        + 'to its own preset',
+      );
+      continue;
+    }
     if (usedIds.has(id)) {
-      let n = 1;
-      while (usedIds.has(`${id}${pieceSuffix(n)}`)) n += 1;
-      id = `${id}${pieceSuffix(n)}`;
+      refusals.push(
+        `the ${carve.row.constructorName} row at descriptor line ${carve.row.line} binds `
+        + `"${carve.row.preset}", which is named "${id}" -- and a section run in this act already `
+        + 'has that id. Two regions with one id are one region to aeon, whose loader refuses the '
+        + 'document outright, and Aurora will not invent a suffix to hide the clash',
+      );
+      continue;
     }
     usedIds.add(id);
-    regions.push(regionOf(id, carve.row.preset, carve.row.preset, carve.rect, {
+    regions.push(regionOf(id, labelFromPreset(carve.row.preset), carve.row.preset, carve.rect, {
       sceneRef: null, rasterRef: null, bgLayoutRef: null, paletteRef: null,
     }));
   }

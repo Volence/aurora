@@ -15,10 +15,10 @@
  * outranks a green: do not adjust `flatten.ts` toward the table, and do not
  * adjust the table toward `flatten.ts`.
  *
- * WHAT THE FIXTURE IS FOR, beyond being ten rectangles. Its `night` region
- * straddles the section line at x = 4096 with NEITHER edge on a multiple of the
- * 2048 section size, and `sec1`/`sec2` are off-grid because their spans are its
- * complement. A document whose regions all sat on the section grid could not
+ * WHAT THE FIXTURE IS FOR, beyond being ten rectangles. Its key-less region
+ * (`ojz_preset_night`, aeon's tenth row) straddles the section line at x = 4096
+ * with NEITHER edge on a multiple of the 2048 section size, and `sec1`/`sec2`
+ * are off-grid because their spans are its complement. A document whose regions all sat on the section grid could not
  * tell a correct flattener from one that quietly snapped to sections. The
  * straddle is asserted below as a property OF THE FIXTURE, so a re-vendor that
  * "tidies" it goes red instead of silently ending the coverage.
@@ -439,8 +439,18 @@ describe('the fixture still exercises what it exists for', () => {
     // every other row in this file still passes and the fixture silently stops
     // exercising the thing it exists for. (Aeon asserts the same four facts on
     // its side; the pair is deliberate.)
-    const night = golden.rows.find(r => r.id === 'night');
-    expect(night, 'the golden has no `night` region any more').toBeDefined();
+    //
+    // ⚠ THE ID IS `ojz_preset_night` AND NOT `night` SINCE aeon `a977fa64`. It
+    // is a KEY-LESS row, so its id is minted from the preset symbol it binds
+    // rather than typed: empyrean `docs/AURORA_REGIONS_SCHEMA.md` at
+    // `origin/main`, "A KEY-LESS ROW'S ID IS ITS PRESET SYMBOL, LOWERCASED - AND
+    // AEON'S `night` MOVES". The lookup is an EXACT equality guarded by the line
+    // below, so a further move fails here and says so; aeon reported that one of
+    // ITS four sites used a SUBSTRING match, which `night` still satisfies
+    // inside `ojz_preset_night` and which would have passed a half-landed
+    // rename. Nothing on this side has that shape.
+    const night = golden.rows.find(r => r.id === 'ojz_preset_night');
+    expect(night, 'the golden has no `ojz_preset_night` region any more').toBeDefined();
     expect(night!.x0, 'night no longer starts before the x = 4096 section line').toBeLessThan(2 * SECTION_SIZE);
     expect(night!.x1, 'night no longer reaches past the x = 4096 section line').toBeGreaterThanOrEqual(2 * SECTION_SIZE);
     expect(night!.x0 % SECTION_SIZE, 'night\'s left edge has been snapped to the section grid').not.toBe(0);
@@ -451,10 +461,19 @@ describe('the fixture still exercises what it exists for', () => {
     // sec1 and sec2 exist in this shape BECAUSE night cuts into them. If their
     // widths ever became section multiples the document would be back on the
     // grid even with a straddling night.
-    const doc1 = doc().regions.find(r => r.id === 'sec1')!;
-    const doc2 = doc().regions.find(r => r.id === 'sec2')!;
-    expect(doc1.rect.w % SECTION_SIZE, 'sec1 is back on the section grid').not.toBe(0);
-    expect(doc2.rect.w % SECTION_SIZE, 'sec2 is back on the section grid').not.toBe(0);
+    //
+    // ⚠ THE `toBeDefined` PAIR IS NOT CEREMONY. These two took a bare `!` until
+    // 2026-09-16, so an id that moved out from under them threw a TypeError on
+    // `.rect` — loud, but naming a property access instead of the row that went
+    // missing. The row above was already guarded and read legibly through the
+    // `night` rename; these did not, and the difference was measured at that
+    // landing rather than argued.
+    const doc1 = doc().regions.find(r => r.id === 'sec1');
+    const doc2 = doc().regions.find(r => r.id === 'sec2');
+    expect(doc1, 'the golden document has no `sec1` region any more').toBeDefined();
+    expect(doc2, 'the golden document has no `sec2` region any more').toBeDefined();
+    expect(doc1!.rect.w % SECTION_SIZE, 'sec1 is back on the section grid').not.toBe(0);
+    expect(doc2!.rect.w % SECTION_SIZE, 'sec2 is back on the section grid').not.toBe(0);
   });
 
   it('the document and the rows file agree on their act and their count', () => {

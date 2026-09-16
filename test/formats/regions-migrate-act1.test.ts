@@ -18,15 +18,22 @@
 // rasterRef) run, plus one per key-less row — and the golden is what says the
 // computation matched aeon's own reading of the same act.
 //
-// ⚠ AND THE COMPARISON IS FIELD BY FIELD EXCEPT FOR TWO KEYS, BY DESIGN. §4
+// ⚠ AND THE COMPARISON IS FIELD BY FIELD EXCEPT FOR ONE KEY, BY DESIGN. §4
 // named the migration's ids (`sec_<lowest index>`) and names ("Sections a, b,
 // c"); aeon's table says `sec0` and "Forest, upper left". THE ID HALF OF THAT
 // WAS WRONG and was ruled so on 2026-09-16: an id names an emitted symbol, so it
-// is a cross-tool contract surface and aeon's spelling is canonical. The
-// migration now emits `sec0` and the ids are compared TO AEON'S rather than each
-// to its own literal — see the golden row for why that distinction is the whole
-// lesson. `name` is still a stated difference: nothing has ruled those must
-// agree.
+// is a cross-tool contract surface and aeon's spelling is canonical. `id` IS NOW
+// INSIDE THE FIELD-FOR-FIELD COMPARISON, both halves of it — the section runs'
+// and the key-less row's — because a comparison that omits the field under
+// dispute is green by construction and the omitted field was the identity one.
+// That is this lane's own finding turned on itself: it is what rows 185 and 188
+// paid for.
+//
+// `name` is the ONE stated difference that remains, and only for the section
+// runs: aeon's table carries human labels ("Forest, upper left") where §4
+// carries "Sections a, b, c", and nothing has ruled those must agree. The
+// KEY-LESS row's name is NOT a stated difference — it is asserted against the
+// golden, because the id ruling makes the readable label a CONDITION of itself.
 //
 // ⚠ ONE ROW OF THIS ACT IS LEFT OUT ON PURPOSE, and the last row in this file
 // is about that. aeon's descriptor carries a region row written behind a build
@@ -309,6 +316,14 @@ describe('migrate aeon\'s act 1', () => {
     // ascending lowest-index order, key-less rows appended after), and aeon's
     // table is written in that same order with the night row appended as row 9.
     const strip = (r: typeof mine[number]) => ({
+      // ⚠ `id` IS IN HERE, AND PUTTING IT HERE IS THE POINT OF THE ROW. Until
+      // 2026-09-16 this projection carried preset, rect, sceneRef and rasterRef
+      // and NOT id, while the ids were asserted separately against their own
+      // literals — so the two sides could disagree about identity with every
+      // row green, which is exactly what happened twice (`sec_2` against `sec2`,
+      // then `ojz_preset_night` against `night`). A projection is a list of what
+      // the row can see, and the field left out of it was the one in dispute.
+      id: r.id,
       preset: r.preset,
       rect: r.rect,
       sceneRef: r.sceneRef ?? null,
@@ -343,25 +358,73 @@ describe('migrate aeon\'s act 1', () => {
       'the migration spells a section-run id differently from aeon, whose build `ensure` keys on it')
       .toEqual(theirs.slice(0, runCount).map((r) => r.id));
 
-    // ── AND THE ONE ID THAT STILL DIVERGES, TAGGED RATHER THAN RATIFIED ───
+    // ── THE KEY-LESS ROW'S ID AND LABEL ARE THEIR OWN ROW, BELOW ─────────
     //
-    // ⚠ TAGGED FOR THE CONTROLLER, NOT SETTLED. The ruling covers the section-run
-    // spelling; it says nothing about what a KEY-LESS row's region should be
-    // called, and §4 item 3 does not name one either. Aurora derives it from the
-    // preset (`idFromPreset`), which gives `ojz_preset_night` where aeon's table
-    // says `night` — and `night` is not derivable from `OJZ_Preset_Night` by any
-    // rule Aurora has been given, so inventing one here would be designing
-    // policy rather than applying it. The difference is therefore asserted on
-    // BOTH sides, in one expectation that would go red if either moved, and
-    // reported upward rather than quietly closed.
-    expect([mine.slice(runCount).map((r) => r.id), theirs.slice(runCount).map((r) => r.id)],
-      'the key-less row\'s id: UNRULED, and this row is the disclosure of it')
-      .toEqual([['ojz_preset_night'], ['night']]);
+    // It used to be four more lines here. They moved so that a mutation which
+    // moves the key-less id reds an assertion ABOUT the key-less id rather than
+    // the whole-table projection above, which fires first and names ten rows.
 
-    // `name` is NOT in this: aeon's golden carries human labels and §4 carries
-    // "Sections a, b, c". Nothing has ruled they must agree, so they are stated.
+    // `name` on the SECTION RUNS is NOT in this: aeon's golden carries human
+    // labels and §4 carries "Sections a, b, c". Nothing has ruled they must
+    // agree, so they are stated.
     expect(mine[0].name).toBe('Sections 0');
     expect(theirs[0].name).toBe('Forest, upper left');
+  });
+
+  it('THE KEY-LESS ROW: the RULED id, and the readable label that is its condition', (ctx) => {
+    if (!need(ctx)) return;
+    // ⚠ THIS WAS A DUAL-SPELLING ASSERTION AND IT WAS A HOLDING PATTERN. Row 188
+    // installed `.toEqual([['ojz_preset_night'], ['night']])` — exact on both
+    // arms — to keep an open question open and go red if either side moved
+    // without the other. The question is answered: empyrean
+    // `docs/AURORA_REGIONS_SCHEMA.md` at `origin/main`, "A KEY-LESS ROW'S ID IS
+    // ITS PRESET SYMBOL, LOWERCASED - AND AEON'S `night` MOVES" (2026-09-16T09:39Z,
+    // OVERTURNABLE BY ONE WORD). Aurora's spelling won and aeon's fixture moved
+    // at aeon `a977fa64`, so the two arms are ONE arm now.
+    //
+    // ⚠ AND NOT §8 Q5. Q5 governs the `name` FIELD, spells ids `sec_N` in BOTH
+    // of its arms, and would prove too much if it governed ids: sec4 binds
+    // `OJZ_Preset_Depth`, so a preset-derived id rule renames it `depth` against
+    // this very golden. The owner has not spoken on the id question.
+    const input = act1Input();
+    const plan = planSectionMigration(input);
+    expect(plan.refusals, plan.refusals.join('; ')).toEqual([]);
+    const mine = plan.document!.regions;
+    const theirs = golden().regions;
+    const runCount = mine.length - input.unkeyed.length;
+    expect(runCount, 'every region came from a key-less row, so there is no key-less row to name')
+      .toBeLessThan(mine.length);
+    const mineKeyless = mine.slice(runCount);
+    const theirsKeyless = theirs.slice(runCount);
+
+    // THE SPELLING FIRST, and deliberately before the comparison below. An
+    // assertion that two lists agree is silent about WHICH spelling they agreed
+    // on: both sides moving back to `night` together would pass it, and so would
+    // a migration and a re-vendor that moved in step with nobody's ruling. This
+    // line is the ruling's own answer, quoted.
+    expect(mineKeyless.map((r) => r.id),
+      'the migration no longer mints the RULED id for a key-less row')
+      .toEqual(['ojz_preset_night']);
+    // And then across the seam, which is what makes it a cross-tool check rather
+    // than a restatement of `idFromPreset`.
+    expect(mineKeyless.map((r) => r.id),
+      'the migration spells the key-less row\'s id differently from aeon, whose golden this is')
+      .toEqual(theirsKeyless.map((r) => r.id));
+
+    // ── THE READABLE LABEL, WHICH IS A CONDITION OF THAT RULING ───────────
+    //
+    // "The ugly id is acceptable precisely because nothing legible is lost:
+    // identity is for machines, the label is what the author reads on the map."
+    // A migration that minted the id and left `name` as the raw preset symbol
+    // would satisfy every line above and take the ruling's own justification
+    // with it. Asserted against the GOLDEN's label, which aeon wrote before the
+    // ruling and did not move with the id.
+    expect(theirsKeyless.map((r) => r.name),
+      'the golden carries no label on its key-less row, so this compares nothing')
+      .toEqual(['Night']);
+    expect(mineKeyless.map((r) => r.name),
+      'the key-less region carries no readable label: the id ruling\'s condition is unmet')
+      .toEqual(theirsKeyless.map((r) => r.name));
   });
 
   it('AT THE REVISION CARRYING THE DEBUG DELTA IT IS STILL TEN, and the left-out row is NAMED',
@@ -462,8 +525,12 @@ describe('migrate aeon\'s act 1', () => {
       // this is a like-for-like comparison at ONE revision — which the earlier
       // rows, reading `AEON_PIN`, could not make while the switched row was
       // being migrated.
-      const strip = (r: { preset: string; rect: RegionRect; sceneRef?: string | null;
+      // `id` is in this projection for the same reason it is in the one above:
+      // this is the like-for-like comparison at ONE revision, and leaving the
+      // disputed field out of it is how a divergence stays green.
+      const strip = (r: { id: string; preset: string; rect: RegionRect; sceneRef?: string | null;
         rasterRef?: string | null; }) => ({
+        id: r.id,
         preset: r.preset, rect: r.rect, sceneRef: r.sceneRef ?? null, rasterRef: r.rasterRef ?? null,
       });
       expect(doc.regions.map(strip)).toEqual(golden().regions.map(strip));
