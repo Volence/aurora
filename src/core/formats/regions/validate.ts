@@ -223,7 +223,7 @@ export function regionsValidationNotices(
     notices.push({
       severity: 'warning',
       message:
-        `${label}: ${nameSome(refusedScenes)} — the scene document EXISTS and Aurora could not `
+        `${label}: ${nameSome(refusedScenes)}: the scene document EXISTS and Aurora could not `
         + 'read it, so this binding could not be checked. It is not missing; fix the scene file.',
     });
   }
@@ -241,7 +241,7 @@ export function regionsValidationNotices(
     notices.push({
       severity: 'warning',
       message:
-        `${label}: ${nameSome(refusedRasters)} — the preset document EXISTS and Aurora could not `
+        `${label}: ${nameSome(refusedRasters)}: the preset document EXISTS and Aurora could not `
         + 'read it, so this binding could not be checked. It is not missing; fix the preset file.',
     });
   }
@@ -262,7 +262,7 @@ export function regionsValidationNotices(
     notices.push({
       severity: 'warning',
       message:
-        `${label}: ${nameSome(bodylessLayouts)} — the BG library NAMES this background and this `
+        `${label}: ${nameSome(bodylessLayouts)}: the BG library NAMES this background and this `
         + 'checkout could not open its body, so the binding could not be checked. The reference '
         + 'is not wrong; the files are missing.',
     });

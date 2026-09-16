@@ -1782,7 +1782,7 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
   const keyless = (t: ReturnType<typeof regionRowsByLine>): LineRow[] =>
     t.rows.filter((r) => r.secs.length === 0);
 
-  it('the library declares EVERY preset the region rows bind — rule 3\'s vocabulary', (ctx) => {
+  it('the library declares EVERY preset the region rows bind, which is rule 3\'s vocabulary', (ctx) => {
     if (!need(ctx)) return;
     // WHAT THIS IS FOR. A painted region's `preset` key names an `EffectsPreset`
     // RECORD (editor spec §2.4, ruling Q8), and `regionsValidationNotices`' rule
