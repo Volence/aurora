@@ -164,6 +164,20 @@ export interface SectionRasterWiring {
    * Absent on a wiring built by hand; the load always sets it.
    */
   unkeyedRows?: UnkeyedEffectsRow[];
+  /**
+   * EVERY `EffectsPreset` RECORD THE LIBRARY DECLARES — the vocabulary a painted
+   * region's `preset` key must name (ruling Q8). From the SAME
+   * `<zone>_effects.emp` read as `threadedBy`; see `libraryPresetRecordNames`.
+   *
+   * ⚠ READ IT ONLY WHEN `library.parsed` IS TRUE. Empty while the parse failed
+   * is "I could not look", not "the library declares nothing", and the regions
+   * validator says "could not check" rather than reporting every binding
+   * unresolvable — the rule every predicate in this module already follows.
+   *
+   * Absent on a wiring built by hand; the load always sets it. Same shape and
+   * same reason as `unkeyedRows` above.
+   */
+  presetRecords?: string[];
 }
 
 /** Nothing was read. Every predicate below answers "unknown", never "no". */
@@ -485,6 +499,52 @@ export function libraryRasterChooserCalls(lib: string, chooserFn: string): Recor
     const hit = call.exec(body);
     if (hit) out[marks[i].name] = Number(hit[1]);
   }
+  return out;
+}
+
+/**
+ * EVERY `EffectsPreset` RECORD THE LIBRARY DECLARES, in declaration order.
+ *
+ * ═══ WHAT THIS IS FOR, AND WHY IT IS NOT ONE OF THE MAPS ABOVE ════════════
+ *
+ * A painted region's `preset` key names one of these records (editor spec §2.4,
+ * ruling Q8: the region binds a RECORD NAME, validated against the game's own
+ * effects library, because `Region.rg_effects` is a required pointer and a
+ * preset DOCUMENT cannot express the whole record). So the regions validator's
+ * rule 3 — "every binding resolves" — needs the library's whole VOCABULARY.
+ *
+ * None of the three maps above can supply it, and using one would be a defect
+ * that only shows on a correct document: `bindings` holds the records the
+ * DESCRIPTOR binds, `threadedBy` the records that call one chooser, `patchedArm`
+ * the records that bind an arm. Each is a SUBSET, so a region naming a real
+ * record absent from the subset would be reported "does not exist" — a refusal
+ * Aurora speaks in aeon's name that aeon never made.
+ *
+ * ═══ THE DECLARATION FORM, TRANSCRIBED NOT GUESSED ════════════════════════
+ *
+ * The same `(pub )?(const|data) <Name>:` split `libraryRasterChooserCalls` uses,
+ * narrowed to declarations whose TYPE is `EffectsPreset`. `\s*` around the colon
+ * is load-bearing: aeon's own file aligns its columns
+ * (`pub data OJZ_Preset_Sec0:  EffectsPreset = preset(…)`, two spaces), and a
+ * single-space pattern silently misses seven of its ten records.
+ *
+ * ⚠ AN ARRAY-TYPED DECLARATION IS NOT ONE OF THESE, and that is a real case
+ * rather than a hypothetical: `OJZ_Preset_NightSnap` is
+ * `[EffectsPreset; OJZ_PRESET_NIGHT_SNAP_LEN]`, a DEBUG-gated look fixture. It
+ * is not a record a region can bind, so `EffectsPreset` must be matched with the
+ * colon immediately before it — `: [EffectsPreset;` does not match, by
+ * construction rather than by an exclusion list.
+ *
+ * ⚠ COMMENTS ARE STRIPPED FIRST, on `libraryPatchedArmBindings`' reason: the
+ * library discusses its own records in prose, and a vocabulary built partly from
+ * comments would let a region bind a name that exists only in a sentence.
+ */
+export function libraryPresetRecordNames(lib: string): string[] {
+  const decl = /\b(?:pub\s+)?(?:const|data)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*EffectsPreset\b/g;
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  const body = stripLineComments(lib);
+  while ((m = decl.exec(body)) !== null) out.push(m[1]);
   return out;
 }
 

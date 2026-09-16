@@ -579,9 +579,39 @@ export interface RegionFinding {
  * `x1 + 1 <= CENTRE_X_MAX` on the RIGHT, for the pixel after it. The act's own
  * outer edges are exempt: nothing has to cross into the act from outside it.
  */
-export function validateRect(
+/** Just the act's own extent — everything `validateRectInAct` needs. */
+export interface ActExtentRules {
+  /** The act's width in world pixels, EXCLUSIVE. Aeon: `ACT_W = GRID_W << SECTION_SIZE_SHIFT`. */
+  actW: number;
+  /** The act's height in world pixels, EXCLUSIVE. Aeon: `ACT_H`. */
+  actH: number;
+}
+
+/**
+ * The three per-rect rules that need NOTHING but the act's size: `inverted`
+ * (`w, h >= 1`), `negative-edge` and `outside-act`.
+ *
+ * ═══ WHY THIS IS A SEPARATE ENTRY POINT AND NOT A FLAG ON `validateRect` ═══
+ *
+ * Because of what Aurora does and does not have. `validateRect`'s other four
+ * rules — `min-span` and the reachable-edge family — need
+ * `CENTRE_{X,Y}_{MIN,MAX}` and `REGION_MIN_SPAN`, which live in the act's `.emp`
+ * descriptor. The LOAD does not have them (see the regions seam review,
+ * "three of aeon's six per-row rules are unreachable from here"), so the
+ * load-time notices can report exactly these three and no more. They are
+ * §2.5 rule 2 of the editor spec, whole.
+ *
+ * Calling `validateRect` with invented camera constants and filtering its
+ * findings would be worse in the way this repo keeps paying for: a number with
+ * no source, quietly producing verdicts. Calling it with real constants is what
+ * the FACET will do once it reads the descriptor, and `validateRect` is still
+ * the entry point for that.
+ *
+ * NEVER THROWS AND NEVER CLAMPS; an empty array is the rectangle passing.
+ */
+export function validateRectInAct(
   rect: Rect,
-  rules: RegionRules,
+  act: ActExtentRules,
   context: { regionId?: string | null; pieceIndex?: number | null } = {},
 ): RegionFinding[] {
   const regionId = context.regionId ?? null;
@@ -609,13 +639,36 @@ export function validateRect(
     );
   }
 
-  if (b.x1 >= rules.actW || b.y1 >= rules.actH) {
+  if (b.x1 >= act.actW || b.y1 >= act.actH) {
     add(
       'outside-act',
       `${where} reaches (${b.x1}, ${b.y1}), past the act, whose last pixel is `
-      + `(${rules.actW - 1}, ${rules.actH - 1}). No camera centre can stand there.`,
+      + `(${act.actW - 1}, ${act.actH - 1}). No camera centre can stand there.`,
     );
   }
+
+  return found;
+}
+
+export function validateRect(
+  rect: Rect,
+  rules: RegionRules,
+  context: { regionId?: string | null; pieceIndex?: number | null } = {},
+): RegionFinding[] {
+  const regionId = context.regionId ?? null;
+  const pieceIndex = context.pieceIndex ?? null;
+  const found: RegionFinding[] = [];
+  const add = (code: RegionRuleCode, message: string): void => {
+    found.push({ code, regionId, pieceIndex, rect: { ...rect }, message });
+  };
+  const where = regionId === null ? 'this rectangle' : `region "${regionId}"`;
+
+  // The three ACT-ONLY rules, through their own entry point so there is ONE
+  // transcription of each — see `validateRectInAct` for who else calls it and
+  // why it is separate.
+  found.push(...validateRectInAct(rect, rules, context));
+  const b = toInclusive(rect);
+  if (b === null) return found;
 
   if (rect.w < rules.minSpan || rect.h < rules.minSpan) {
     add(

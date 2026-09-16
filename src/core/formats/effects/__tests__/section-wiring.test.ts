@@ -70,7 +70,7 @@ import {
   libraryPatchedArmBindings, sectionArmExclusivity, sectionArmExclusivityRefusal,
   sectionArmExclusivityUnknownNotice, armBarredSections, sectionBindingControlDisabled,
   extraChannelsAdvisory, EXTRA_SECTION_CHANNELS, type SectionRasterWiring,
-  descriptorEffectsRows, readDescriptorWiring,
+  descriptorEffectsRows, readDescriptorWiring, libraryPresetRecordNames,
 } from '../section-wiring';
 import { siblingPathOrUnresolved, siblingPathSource } from '../../../../../test/support/sibling-root.mjs';
 import { peerRepo, resolveRev, readAtRev } from '../../../../../test/support/peer-repo';
@@ -1781,6 +1781,46 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
     t.rows.filter((r) => r.secs.length === 1);
   const keyless = (t: ReturnType<typeof regionRowsByLine>): LineRow[] =>
     t.rows.filter((r) => r.secs.length === 0);
+
+  it('the library declares EVERY preset the region rows bind — rule 3\'s vocabulary', (ctx) => {
+    if (!need(ctx)) return;
+    // WHAT THIS IS FOR. A painted region's `preset` key names an `EffectsPreset`
+    // RECORD (editor spec §2.4, ruling Q8), and `regionsValidationNotices`' rule
+    // 3 reports a name the library does not declare. That check is only as good
+    // as `libraryPresetRecordNames` is against aeon's REAL declaration forms —
+    // and the file aligns its columns (`OJZ_Preset_Sec0:  EffectsPreset`), which
+    // a single-space pattern misses.
+    //
+    // DERIVED, NOT A LITERAL LIST. The expected vocabulary is read out of the
+    // DESCRIPTOR's own region rows by the second instrument, so a re-pin that
+    // adds, renames or removes a preset needs no edit here — and the row cannot
+    // pass by both sides being empty, because the table is asserted seen first.
+    const t = table();
+    const bound = [...new Set(t.rows.flatMap((r) => r.presets))];
+    expect(bound.length, `no preset names in the region rows of ${where}`).toBeGreaterThan(0);
+
+    const declared = libraryPresetRecordNames(lib);
+    expect(declared.length, `libraryPresetRecordNames found no EffectsPreset record in ${LIB_REL} `
+      + `at ${AEON_REGIONS_PIN}: the declaration form moved`).toBeGreaterThan(0);
+
+    const missing = bound.filter((name) => !declared.includes(name));
+    expect(missing, `${where}: aeon's own act binds these presets and Aurora's vocabulary `
+      + 'extractor does not find them in the library, so rule 3 would report a real record as '
+      + 'unresolvable').toEqual([]);
+
+    // ...and `missing` is not empty for free. MEASURED at this pin: the set of
+    // declared EffectsPreset records and the set the region rows bind are
+    // EXACTLY EQUAL, so "some declared record is unbound" is false here and
+    // cannot be the control. The control is the TYPE FILTER instead: the library
+    // declares far more `const`/`data` records than it declares EffectsPresets
+    // (palettes, raster programs, variants), and a vocabulary that returned
+    // every declaration would make the `missing` assertion above pass whatever
+    // the type pattern did. Both counts are derived from the same text.
+    const allDecls = [...lib.matchAll(/\b(?:pub\s+)?(?:const|data)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:/g)];
+    expect(allDecls.length, `no declarations at all parsed out of ${LIB_REL}`).toBeGreaterThan(0);
+    expect(declared.length, 'the vocabulary is every declaration in the file, so its type filter '
+      + 'asserts nothing').toBeLessThan(allDecls.length);
+  });
 
   it('the run SAID it read aeon at AEON_REGIONS_PIN, out of the object database', (ctx) => {
     if (!need(ctx)) return;

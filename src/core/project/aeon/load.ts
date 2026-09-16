@@ -45,7 +45,7 @@ import { parseSectionMeta } from '../../formats/section-meta';
 import { loadEffectsSceneLibrary } from '../../formats/effects/scene';
 import {
   wiringPaths, unknownWiring, readDescriptorWiring, libraryRasterChooserCalls,
-  libraryChannelCalls, libraryPatchedArmBindings, rasterChooserName,
+  libraryChannelCalls, libraryPatchedArmBindings, libraryPresetRecordNames, rasterChooserName,
   type SectionRasterWiring,
 } from '../../formats/effects/section-wiring';
 import { loadEffectsPresetLibrary } from '../../formats/effects/preset';
@@ -62,8 +62,11 @@ import { parseRegionsDocument } from '../../formats/regions/document';
 import {
   noRegionsLoaded, regionsPathFor, type ActRegionsState,
 } from '../../formats/regions/act-regions';
+import { regionsValidationNotices } from '../../formats/regions/validate';
 import { parseStrips, STRIP_COLS, STRIP_ROWS } from '../../formats/s4-strips';
-import { createSection, SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../model/s4-types';
+import {
+  createSection, SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE,
+} from '../../model/s4-types';
 import { migrateChunkTilesIntoTileset } from '../../art/atlas-migration';
 import type {
   S4Project,
@@ -79,6 +82,21 @@ import type {
   BgLibraryEntry,
   ZonePaletteFile,
 } from '../../model/s4-types';
+
+/**
+ * The DOCUMENT ID a scene or preset path carries: its basename without `.json`.
+ *
+ * The inverse of `effectsScenePath`/`effectsPresetPath`, and it exists for one
+ * narrow job — an `unreadable` entry is a PATH, while a region's `sceneRef` /
+ * `rasterRef` is an ID, and the regions validator has to be able to say "that
+ * document exists and Aurora could not read it" instead of "no such scene". A
+ * refused file is not a missing one, and the two sentences send an author to
+ * different places.
+ */
+function documentIdFromPath(path: string): string {
+  const base = path.slice(path.lastIndexOf('/') + 1);
+  return base.endsWith('.json') ? base.slice(0, -'.json'.length) : base;
+}
 
 /** Derive the legacy chunk-tiles atlas path from the chunk-library JSON path. */
 export function legacyAtlasPath(chunkLibraryPath: string): string {
@@ -873,6 +891,12 @@ async function loadFullProject(
           // disables the per-section select for those sections and only those.
           // See section-wiring.ts's ARM EXCLUSIVITY banner.
           rasterWiring.patchedArm = libraryPatchedArmBindings(libText);
+          // THE LIBRARY'S PRESET VOCABULARY, from this same read — what a
+          // painted region's `preset` key must name (ruling Q8). Rule 3 of
+          // the regions validator is the only reader; it checks
+          // `library.parsed` first, so a failed parse says "could not
+          // check" and never "this record does not exist".
+          rasterWiring.presetRecords = libraryPresetRecordNames(libText);
           // ⚠ AN EMPTY CALL MAP IS A REAL ANSWER HERE, unlike an empty binding
           // map. "No preset threads the chooser" is the state every act starts
           // in and is exactly what the advisory needs to say; only a file that
@@ -1170,6 +1194,50 @@ async function loadFullProject(
   // in the live aeon tree.
   const bgOverride = await loadBgOverride(fa, projectDataRoot(config.raw));
   notices.push(...bgOverride.notices);
+
+  // ═══ REGIONS VALIDATION, §2.5 RULES 2 AND 3 ══════════════════════════════
+  //
+  // LAST, and it has to be: rule 3 resolves a region's bindings against the
+  // scene library, the preset library and the BG library, and two of the three
+  // were loaded four lines ago. Doing it inside the act loop would check the
+  // bindings against libraries that did not exist yet and report every one of
+  // them unresolvable.
+  //
+  // Rule 1 is NOT here — it is a refusal, and the act loop above already pushed
+  // its notice. `regionsValidationNotices`' header carries the rule-by-rule map,
+  // including which rules are deliberately absent.
+  for (const zoneOut of zones) {
+    for (const actOut of zoneOut.acts) {
+      const regionsDoc = actOut.regions.document;
+      if (regionsDoc === null) continue;
+      notices.push(...regionsValidationNotices(
+        regionsDoc,
+        actOut.regions.loadedPath ?? 'regions.json',
+        // THE ACT'S OWN SIZE, from its grid, never from the document being
+        // checked. A bound taken from the thing under test makes the rule true
+        // by construction and therefore unfalsifiable — the reason
+        // `flattenRegionsDocument` takes its bounds as a required argument too.
+        {
+          actW: actOut.gridWidth * SECTION_PIXEL_SIZE,
+          actH: actOut.gridHeight * SECTION_PIXEL_SIZE,
+        },
+        {
+          // NULL, not [], when the library was not parsed: see the vocabulary
+          // type. `presetRecords` is only meaningful under `library.parsed`.
+          presetRecords: actOut.rasterWiring.library.parsed
+            ? actOut.rasterWiring.presetRecords ?? []
+            : null,
+          presetLibraryPath: actOut.rasterWiring.library.path,
+          sceneIds: effectsScenes.scenes.map(s => s.id),
+          sceneUnreadableIds: effectsScenes.unreadable.map(u => documentIdFromPath(u.path)),
+          rasterIds: effectsPresets.presets.map(p => p.id),
+          rasterUnreadableIds: effectsPresets.unreadable.map(u => documentIdFromPath(u.path)),
+          bgLayoutIds: bgLibrary.map(b => b.id),
+          bgUnresolvedIds: bgLibraryUnresolved.map(b => b.id),
+        },
+      ));
+    }
+  }
 
   return {
     project: {
