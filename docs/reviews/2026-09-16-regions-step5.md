@@ -344,3 +344,21 @@ full copy inside the first. 211 entries + 1 nested = the 212 I measured and misr
 success. The agent had no way to see either call and its report is honest about what it
 could observe. The cost was real: 225 failures across 10 renderer files from two
 resolvable copies of React, and the agent spent time proving it was not its own doing.
+
+### Board tidy at the same landing — the 20/20 ceiling, flagged by the hub
+
+`SECTION-3-IS-THE-FREE-ONE` is removed from `docs/lane-status.json`, freeing the
+slot rule 7's ceiling had taken. **Nothing is lost and nothing was decided.** The row
+was a pointer, not a task — its own text said *"DO NOT THREAD — information for you,
+not a task"* — and the fact it pointed at is already recorded durably in two tracked
+places: `docs/lens-findings.jsonl` under that same id, `state: open`, carrying the
+full measurement (`OJZ_Preset_Sec3` at `:1574` hands `raster: Raster_Program_None`,
+the descriptor binds it to section 3 alone, and what threading it would cost), and
+the packet `docs/reviews/2026-09-10-section0-special-case.md`.
+
+The general form, since this board will hit the ceiling again: **a queue row whose
+content is a FACT rather than a task is the right thing to drop first**, because the
+queue is the one place that information does not need to live — a finding ledger is
+greppable by id and a queue is not, and the row was costing a slot a future session
+will need for something that genuinely has to be done. Verify the fact has a tracked
+home before dropping the row, which is what the two citations above are for.
