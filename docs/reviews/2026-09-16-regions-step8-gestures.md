@@ -259,3 +259,24 @@ verdict.** The dirty-tree `git checkout --` contamination is invariant 8(b)'s ex
 failure mode; it was caught by the agent, re-run from a committed baseline, and disclosed
 in the packet and the commit body. The M6 green-under-mutation was a vacuous row found by
 its own proof rather than by a reviewer, which is the instrument working.
+
+### The spec was AMENDED to match, so this section is no longer a departure from it
+
+**empyrean `0449cd8`** (verified here an ancestor of empyrean `origin/main`, and the rows
+read at that revision rather than from the hub's message): §3.2's table now reads *drag
+inside a rect **of the SELECTED region** → move that rect*, and *drag inside any OTHER
+region's rect → **draw and carve**, exactly as on empty space*. That is this parcel's
+resolution adopted unchanged, not a third reading.
+
+**So a later reader should not re-litigate this.** What is recorded above as "the reading I
+rejected" is now also what the spec rejects. The hub verified the premise independently
+before amending — §9's check requires the authored rows to be pairwise disjoint AND to
+cover the act, which is the same refusal `flatten.ts` enforces from the other side.
+
+**And the reason it was booked as a SECOND defect rather than folded under §3.2's existing
+banner is the part worth carrying out of this parcel.** The Q1 supersession was scoped to
+*carve as an opt-in modifier* and correctly retired the Alt gesture. It left a different
+sentence in the same section — move-versus-draw precedence — without a coherent referent,
+changed by implication and named nowhere. **A supersession banner retires the prose it
+describes, not every sentence the ruling invalidates**, and that residue is invisible
+precisely because the section already looks annotated.
