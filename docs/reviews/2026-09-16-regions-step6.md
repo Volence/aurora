@@ -368,6 +368,24 @@ registration. Recorded so nobody reads `[1d]` as the gating row.
 
 ## 5. Two environment findings, neither caused by this branch
 
+> ⚠ **FINDING 1 IS CLOSED, AND IT WAS ALREADY CLOSED WHEN THIS PACKET WAS
+> WRITTEN — added by the overseer at the landing, 2026-09-16.** The agent's
+> measurement was CORRECT AT ITS BASE and stale by the time it reported, because
+> master moved underneath it: repair (b), the EXEMPT row, landed at `058bf11b`
+> while this branch was in flight. The exemption is keyed on the citing document
+> and the token, so it holds whether or not the file is on disk, and
+> `node scripts/check-doc-citations.mjs` on the merged tree exits **0** — measured,
+> not reasoned. **Nothing about the agent's report was wrong**: it reproduced at
+> `9c06b72d` in a clean detached worktree, said so, and refused to route around a
+> decision it judged was not its own. That refusal was right and is the reason this
+> correction is an amendment rather than a criticism.
+>
+> **The general shape, which is the part worth keeping:** a long-running agent's
+> environment findings are measurements of a BASE, and a base is a moving target
+> when the controller is landing work in parallel. **Re-measure an inherited
+> blocker on the MERGED tree before acting on it** — the agent cannot, because the
+> merge has not happened yet from where it sits.
+
 **1. `npm test` CANNOT go green from any linked worktree, and it is inherited.**
 `node scripts/check-doc-citations.mjs` fails on
 `docs/reviews/2026-09-16-regions-step5.md:350`, which cites the board file
