@@ -103,6 +103,12 @@ export const PANEL_COLUMNS = {
     label: 'Effects (aeon)', owner: 'workspace/facets/effects-facet.tsx',
     reach: { kind: 'aeon-facet', facet: 'parallax' },
   },
+  'aeon-regions': {
+    // The call site is the PANEL, not the facet module: `regions-facet.tsx` is
+    // three lines of registration and mounts this component.
+    label: 'Regions (aeon)', owner: 'components/regions/RegionsPanel.tsx',
+    reach: { kind: 'aeon-facet', facet: 'regions' },
+  },
   's1-layout': {
     label: 'Layout (classic)', owner: 'workspace/facets/s1-facets.tsx',
     reach: { kind: 's1-facet', facet: 'layout' },

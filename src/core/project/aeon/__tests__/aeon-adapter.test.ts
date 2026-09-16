@@ -212,8 +212,12 @@ describe('aeonAdapter.open', () => {
     const handle = await aeonAdapter.open(memFa(fixtureFiles()));
     expect(handle.type).toBe('aeon');
     expect(handle.levels).toBeNull();
+    // A VOCABULARY, NOT A FIXTURE — see adapter-contract.test.ts. `regions` is
+    // granted by aeon and by no other profile (editor spec §3.1), so this list
+    // and s1's are the place that difference is visible.
     expect(handle.capabilities.facets)
-      .toEqual(['layout', 'art', 'objects', 'rings', 'collision', 'palette', 'parallax']);
+      .toEqual(['layout', 'art', 'objects', 'rings', 'collision', 'palette', 'parallax',
+        'regions']);
     // Aeon's ladder has no 16px middle tier and its chunk tier is flattened on
     // stamp, so `shared: false` (spec §2.1 / §3.0.2).
     expect(handle.capabilities.artTiers).toEqual([

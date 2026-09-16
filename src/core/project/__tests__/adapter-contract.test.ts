@@ -9,10 +9,16 @@ import {
 } from '../adapter';
 
 describe('adapter contract additions (stage 3)', () => {
+  // ⚠ THIS LIST IS A VOCABULARY, NOT A FIXTURE. It is transcribed here on
+  // purpose so that GROWING the facet vocabulary is a deliberate edit in two
+  // places rather than a silent one — a new key reaches every profile, every
+  // session record and every facet-bar gate, so the transcription is the
+  // review point. `regions` was added 2026-09-16 with the Regions facet
+  // (editor spec §7 row 6).
   it('FACET_CAPABILITIES enumerates the full declared facet vocabulary in order', () => {
     expect(FACET_CAPABILITIES).toEqual([
       'layout', 'art', 'objects', 'rings', 'collision', 'palette',
-      'parallax', 'events', 'preview',
+      'parallax', 'regions', 'events', 'preview',
     ]);
   });
 

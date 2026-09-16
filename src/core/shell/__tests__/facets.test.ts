@@ -7,13 +7,15 @@ describe('facets', () => {
     registerBuiltinFacets();
   });
 
-  it('registers the seven built-in facets', () => {
+  // A VOCABULARY, NOT A FIXTURE — the same rule adapter-contract.test.ts states.
+  // `regions` (the painted-identity lens, editor spec §3.1) joined on 2026-09-16.
+  it('registers the eight built-in facets', () => {
     expect(facetRegistry.list().map((f) => f.id)).toEqual([
-      'layout', 'objects', 'parallax', 'rings', 'collision', 'palette', 'art',
+      'layout', 'objects', 'parallax', 'rings', 'collision', 'regions', 'palette', 'art',
     ]);
   });
 
-  it('puts the canvas-SWAPPING facet last, behind the six that share the map', () => {
+  it('puts the canvas-SWAPPING facet last, behind the seven that share the map', () => {
     // The ordering rule, asserted rather than left to the docblock (see
     // BUILTIN_FACETS). Five facets are lenses over one map viewport and `art`
     // replaces the canvas with a composer, so `art` last is what makes a pill
@@ -22,7 +24,11 @@ describe('facets', () => {
     // change in the middle of the group that isn't one.
     // `parallax` (the Effects lens) joined the map group on 2026-08-22: its
     // right-hand column is the scene editor and its canvas is the same act.
-    const MAP_FACETS = ['layout', 'objects', 'parallax', 'rings', 'collision', 'palette'];
+    // `regions` joined the map group on 2026-09-16 for the same reason
+    // `parallax` did: its right-hand column is the regions editor and its canvas
+    // is the same act.
+    const MAP_FACETS = ['layout', 'objects', 'parallax', 'rings', 'collision', 'regions',
+      'palette'];
     const byOrder = facetRegistry.list()
       .slice()
       .sort((a, b) => a.order - b.order)
@@ -37,7 +43,7 @@ describe('facets', () => {
 
   it('registerBuiltinFacets is idempotent (safe to call from multiple entry points)', () => {
     registerBuiltinFacets();
-    expect(facetRegistry.list()).toHaveLength(7);
+    expect(facetRegistry.list()).toHaveLength(8);
   });
 
   it('facetsFor returns only capability-granted facets, in order', () => {

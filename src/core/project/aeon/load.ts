@@ -63,6 +63,11 @@ import {
   noRegionsLoaded, regionsPathFor, type ActRegionsState,
 } from '../../formats/regions/act-regions';
 import { regionsValidationNotices } from '../../formats/regions/validate';
+// ONE VOCABULARY BUILDER, TWO READERS. `regionBindingVocabulary` is shared
+// with the Regions facet's status line, which shows these same rules live
+// while the author edits (editor spec §3.4). Two mappings of the same four
+// libraries is how a panel and a load come to disagree about one document.
+import { regionBindingVocabulary } from '../../formats/regions/vocabulary';
 import { parseStrips, STRIP_COLS, STRIP_ROWS } from '../../formats/s4-strips';
 import {
   createSection, SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE,
@@ -83,20 +88,6 @@ import type {
   ZonePaletteFile,
 } from '../../model/s4-types';
 
-/**
- * The DOCUMENT ID a scene or preset path carries: its basename without `.json`.
- *
- * The inverse of `effectsScenePath`/`effectsPresetPath`, and it exists for one
- * narrow job — an `unreadable` entry is a PATH, while a region's `sceneRef` /
- * `rasterRef` is an ID, and the regions validator has to be able to say "that
- * document exists and Aurora could not read it" instead of "no such scene". A
- * refused file is not a missing one, and the two sentences send an author to
- * different places.
- */
-function documentIdFromPath(path: string): string {
-  const base = path.slice(path.lastIndexOf('/') + 1);
-  return base.endsWith('.json') ? base.slice(0, -'.json'.length) : base;
-}
 
 /** Derive the legacy chunk-tiles atlas path from the chunk-library JSON path. */
 export function legacyAtlasPath(chunkLibraryPath: string): string {
@@ -1221,20 +1212,16 @@ async function loadFullProject(
           actW: actOut.gridWidth * SECTION_PIXEL_SIZE,
           actH: actOut.gridHeight * SECTION_PIXEL_SIZE,
         },
-        {
-          // NULL, not [], when the library was not parsed: see the vocabulary
-          // type. `presetRecords` is only meaningful under `library.parsed`.
-          presetRecords: actOut.rasterWiring.library.parsed
-            ? actOut.rasterWiring.presetRecords ?? []
-            : null,
-          presetLibraryPath: actOut.rasterWiring.library.path,
-          sceneIds: effectsScenes.scenes.map(s => s.id),
-          sceneUnreadableIds: effectsScenes.unreadable.map(u => documentIdFromPath(u.path)),
-          rasterIds: effectsPresets.presets.map(p => p.id),
-          rasterUnreadableIds: effectsPresets.unreadable.map(u => documentIdFromPath(u.path)),
-          bgLayoutIds: bgLibrary.map(b => b.id),
-          bgUnresolvedIds: bgLibraryUnresolved.map(b => b.id),
-        },
+        // THE SHARED BUILDER, including the null-not-empty rule for an unparsed
+        // preset library. Was inline here until step 6 gave the same question a
+        // second reader; moved rather than copied.
+        regionBindingVocabulary({
+          rasterWiring: actOut.rasterWiring,
+          effectsScenes,
+          effectsPresets,
+          bgLibrary,
+          bgLibraryUnresolved,
+        }),
       ));
     }
   }

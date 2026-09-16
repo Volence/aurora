@@ -149,7 +149,10 @@ export interface ProjectMatch {
  *  home of the facet vocabulary (import from here, not core/shell/facets). */
 export const FACET_CAPABILITIES = [
   'layout', 'art', 'objects', 'rings', 'collision', 'palette',
-  'parallax', 'events', 'preview',
+  // The painted-identity lens (editor spec §3.1). Its canvas is the shared map
+  // viewport, like collision and parallax; aeon-only, because `regions.json`
+  // lives under an aeon act's `dataPath` and classic has no such document.
+  'parallax', 'regions', 'events', 'preview',
 ] as const;
 export type FacetCapability = (typeof FACET_CAPABILITIES)[number];
 

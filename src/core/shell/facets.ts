@@ -54,6 +54,11 @@ const BUILTIN_FACETS: FacetDescriptor[] = [
   { id: 'parallax', label: 'Effects', order: 15 },
   { id: 'rings', label: 'Rings', order: 20 },
   { id: 'collision', label: 'Collision', order: 30 },
+  // The painted-identity lens (editor spec §3.1). ITS CANVAS IS THE MAP, so by
+  // the rule above it belongs inside this group and before `art`; 35 is the gap
+  // between Collision and Palette, taken rather than the next free number for
+  // the reason that docblock gives.
+  { id: 'regions', label: 'Regions', order: 35 },
   { id: 'palette', label: 'Palette', order: 40 },
   // The canvas swap. Last on purpose — see the rule above.
   { id: 'art', label: 'Art', order: 50 },
