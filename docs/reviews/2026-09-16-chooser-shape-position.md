@@ -56,3 +56,29 @@ A purely additive cross-seam NAME can break sigil's `*_port` tests while all fou
 shapes stay green, because a byte-count check cannot see a new name. **The local generalisation:**
 a key added to a closed schema is invisible to a test that only counts properties. Worth holding
 against this repo's own schema coverage gates.
+
+## The limit on what the codec parcel may claim at landing
+
+**Added 2026-09-16, from aeon's reply, and it is the most useful thing in that exchange.** They
+withdrew the blocker and kept the row in weaker form, which is the correct reduction and it binds
+this lane's landing language:
+
+> a codec green against its own vectors and round-trip properties is not green against a tested
+> seam, because both sides can agree with themselves while disagreeing with each other.
+
+So when `parcel/regions-codec` returns green, **what is proven is that Aurora reads and writes the
+document the hub's schema describes, and nothing whatever about the seam.** The vectors are the
+hub's, which makes them better than a fixture this lane wrote, and they are still one side of the
+wall. **Do not write "the regions file is proven" in the lane log or in a report to the hub.**
+Write what was measured: the schema is vendored and pinned, the ten contract vectors get the
+verdicts the contract states, the round trip is byte-exact, and the drift gate is red-first.
+
+**The re-open condition, so it is a condition and not a hope:** the seam is open until aeon's
+shared golden exists and this repo runs a leg against it. That leg is the claim about the seam;
+everything landing now is upstream of it. Same class as this repo's standing rule that a merge is
+not a certification, seen from the other end.
+
+**And a caution about the resolution:** aeon is holding to report which row and which axis if their
+flattener disagrees with the hand table, without reconciling first. When that arrives it is
+evidence, not a defect report against either side. `src/core/editing/region-geometry.ts` is the
+third independent cut and is as able to be the wrong one as the other two.
