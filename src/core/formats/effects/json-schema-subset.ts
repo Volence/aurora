@@ -52,7 +52,7 @@ const ANNOTATION_KEYWORDS = [
 
 /** Keywords this evaluator actually asserts. */
 const ASSERTION_KEYWORDS = [
-  '$ref', 'type', 'const', 'enum', 'pattern', 'minimum', 'maximum', 'multipleOf',
+  '$ref', 'type', 'const', 'enum', 'pattern', 'maxLength', 'minimum', 'maximum', 'multipleOf',
   'properties', 'required', 'unevaluatedProperties',
   'items', 'minItems', 'maxItems', 'uniqueItems', 'oneOf', 'anyOf', 'not',
 ] as const;
@@ -89,10 +89,15 @@ const IN_PLACE_APPLICATORS = [
  * and names no object property as evaluated, so it cannot change what
  * `unevaluatedProperties` sees. Listing it is not a widening of trust — it is
  * the whitelist doing its job on a keyword that provably qualifies.
+ *
+ * `maxLength` joined it with the regions schema (empyrean c3f892f), on the same
+ * terms as `pattern`, which was already here: it asserts a property of a STRING
+ * instance. A string has no properties at all, so it cannot name one as
+ * evaluated and cannot change what `unevaluatedProperties` sees.
  */
 const NON_ANNOTATING_KEYWORDS: ReadonlySet<string> = new Set<string>([
   ...ANNOTATION_KEYWORDS,
-  'type', 'const', 'enum', 'pattern', 'minimum', 'maximum', 'multipleOf',
+  'type', 'const', 'enum', 'pattern', 'maxLength', 'minimum', 'maximum', 'multipleOf',
   'required', 'minItems', 'maxItems', 'uniqueItems',
 ]);
 
@@ -360,6 +365,34 @@ function validateNode(
   if (typeof schema.pattern === 'string' && typeof value === 'string') {
     if (!new RegExp(schema.pattern).test(value)) {
       issues.push({ path, message: `${JSON.stringify(value)} does not match ${schema.pattern}` });
+    }
+  }
+
+  // `maxLength` arrived with the REGIONS schema (empyrean c3f892f), at
+  // `$defs/region/properties/name` -- the first key in either committed contract
+  // schema whose value is FREE AUTHOR PROSE rather than an identifier matched by
+  // a `pattern`. Every string bound before it was spelled as a regex with its
+  // own `{0,31}` repetition count, which carries the length inside the pattern;
+  // a label nobody parses has no pattern to hang a count on, so the length
+  // becomes its own keyword.
+  //
+  // COUNTED IN CODE POINTS, NOT UTF-16 UNITS, and the difference is not
+  // theoretical for a field whose whole purpose is a human-typed label. JSON
+  // Schema 2020-12 defines the length of a string instance as "the number of its
+  // characters" per RFC 8259, i.e. Unicode code points; JavaScript's
+  // `String.prototype.length` counts UTF-16 code units, so every astral
+  // character (an emoji in an author's label) counts TWICE there. Taking
+  // `.length` would refuse a 33-emoji name the contract accepts -- a refusal
+  // Aurora would speak in the contract's name while the contract says nothing of
+  // the kind. `Array.from` iterates code points, which is the same reasoning
+  // canonical-json.ts's `byCodePoint` already applies to key ordering.
+  if (typeof schema.maxLength === 'number' && typeof value === 'string') {
+    const n = Array.from(value).length;
+    if (n > schema.maxLength) {
+      issues.push({
+        path,
+        message: `is ${n} characters long; the maximum is ${schema.maxLength}`,
+      });
     }
   }
 
