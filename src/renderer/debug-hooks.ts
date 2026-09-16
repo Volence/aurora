@@ -646,6 +646,22 @@ interface AeonProbeApi {
     selectedRegionId: string | null;
   };
   /**
+   * The current act's regions document VERBATIM, or null when there is none.
+   *
+   * ⚠ WHY `regions()` ABOVE IS NOT ENOUGH, and it is the whole reason this
+   * exists: that probe reports ids and a count, and the "one gesture is one
+   * undo step" property is about the RECTANGLES. A carve rewrites entries
+   * without necessarily changing the id list at all, and a half-applied undo
+   * can restore the right ids with the wrong geometry -- which is exactly the
+   * state a second command would leave behind. A row comparing id lists would
+   * report PASS for it.
+   *
+   * Deep-cloned on the way out, so a caller cannot mutate the live model
+   * through the probe and so two reads are independent snapshots rather than
+   * one aliased object that appears never to change.
+   */
+  regionsDocument(): unknown | null;
+  /**
    * Load a regions document into the current act, THROUGH THE REAL CODEC AND
    * THE REAL COMMAND.
    *
@@ -1446,6 +1462,14 @@ function installAeonProbe(): AeonProbeApi {
         : act.regions.document === null ? 'none' as const : 'open' as const;
       const ids = act.regions.document?.regions.map((r) => r.id) ?? [];
       return { kind, actId: act.id, count: ids.length, ids, selectedRegionId };
+    },
+    regionsDocument: () => {
+      const act = getCurrentAct(useProjectStore.getState());
+      const doc = act?.regions.document ?? null;
+      // Deep clone: see the declaration. A live reference would make two reads
+      // the same object, and a row asking "did this change?" could never say no
+      // -- or, worse, never say yes.
+      return doc === null ? null : JSON.parse(JSON.stringify(doc));
     },
     setRegions: (json) => {
       const st = useProjectStore.getState();

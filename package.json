@@ -220,6 +220,7 @@
     "harness:restore": "node scratchpad/restore-harness.mjs",
     "harness:refusal-box-fit": "node scratchpad/refusal-box-fit-harness.mjs",
     "harness:regions-facet": "node scratchpad/regions-facet-harness.mjs",
+    "harness:region-gesture": "node scratchpad/region-gesture-harness.mjs",
     "harness:row-remap-control": "node scratchpad/row-remap-control-harness.mjs",
     "harness:rowremap-author": "node scratchpad/rowremap-author-harness.mjs",
     "harness:s1-anim": "node scratchpad/s1-anim-harness.mjs",
