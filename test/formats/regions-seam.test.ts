@@ -183,7 +183,7 @@ describe('THE SEAM: our flattening reproduces aeon\'s hand-typed rows', () => {
     expect(table().rows).toHaveLength(10);
   });
 
-  it('the whole table — act, act_w, act_h and every row — equals the golden', () => {
+  it('the whole table (act, act_w, act_h and every row) equals the golden', () => {
     // The one assertion the parcel is for (spec §5.4). WHOLE ROW OBJECTS, not a
     // projection: an EXTRA key on our side fails this too, which a field-by-field
     // loop over ROW_KEYS could never see.

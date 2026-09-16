@@ -133,7 +133,7 @@ function asRect(r: RegionRect): Rect {
     throw new RegionFlattenError(
       `rect (${r.x}, ${r.y}, ${r.w}, ${r.h}) has a non-positive extent. \`w\` and \`h\` are `
       + 'SIZES in the document\'s exclusive form, so the smallest legal rectangle is w = 1, '
-      + 'h = 1 — never 0, and never a second corner.',
+      + 'h = 1, never 0 and never a second corner.',
     );
   }
   return [r.x, r.y, r.w, r.h];
@@ -291,14 +291,14 @@ export function actExtentFromDocument(doc: RegionsDocument): ActBounds {
 function checkRow(row: RegionRow, bounds: ActBounds, who: string): string[] {
   const out: string[] = [];
   if (row.x0 < 0 || row.y0 < 0) {
-    out.push(`${who}: a negative edge (${row.x0}, ${row.y0}) is outside every act — world px start at 0`);
+    out.push(`${who}: a negative edge (${row.x0}, ${row.y0}) is outside every act: world px start at 0`);
   }
   if (row.x0 > row.x1 || row.y0 > row.y1) {
     out.push(`${who}: inverted rectangle (${row.x0}..${row.x1}, ${row.y0}..${row.y1}) contains no point`);
   }
   if (row.x1 >= bounds.actW || row.y1 >= bounds.actH) {
     out.push(
-      `${who}: reaches past the act — inclusive maximum is (${bounds.actW - 1}, `
+      `${who}: reaches past the act. The inclusive maximum is (${bounds.actW - 1}, `
       + `${bounds.actH - 1}), this row ends at (${row.x1}, ${row.y1})`,
     );
   }
@@ -349,7 +349,7 @@ export function flattenRegionsDocument(
     const [i, j] = pair;
     throw new RegionFlattenError(
       `${where}: regions ${JSON.stringify(rows[i].id)} (row ${i}) and `
-      + `${JSON.stringify(rows[j].id)} (row ${j}) overlap — `
+      + `${JSON.stringify(rows[j].id)} (row ${j}) overlap: `
       + `${rows[i].x0}..${rows[i].x1} x ${rows[i].y0}..${rows[i].y1} against `
       + `${rows[j].x0}..${rows[j].x1} x ${rows[j].y0}..${rows[j].y1}. Identity must be a `
       + 'function of the camera centre alone; with an overlap it depends on scan order, '
@@ -366,7 +366,7 @@ export function flattenRegionsDocument(
     const more = holes.length <= 6 ? '' : ` (and ${holes.length - 6} more)`;
     throw new RegionFlattenError(
       `${where}: ${holes.length} rectangle(s) of the ${bounds.actW}x${bounds.actH} act belong `
-      + `to no region: ${shown}${more}. A hole is a place with no identity — Region_Resolve `
+      + `to no region: ${shown}${more}. A hole is a place with no identity: Region_Resolve `
       + 'would return nothing there and the crossing would keep whatever region the camera '
       + 'came from. Give the area to a region; the generator will not fill it with a default '
       + 'it was not handed.',
