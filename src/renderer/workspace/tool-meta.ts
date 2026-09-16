@@ -26,6 +26,7 @@ export const TOOL_LABELS: Record<ToolId, string> = {
   'place-ring': 'Place Ring',
   'mark-band': 'Mark tile animation',
   'stamp-band': 'Stamp tile animation',
+  region: 'Region',
 };
 
 /**
@@ -50,6 +51,9 @@ export const TOOL_HINTS: Record<ToolId, string> = {
   'place-ring': 'Click to place the selected ring pattern',
   'mark-band': 'Click a background cell to mark a tile animation there; drag to pan · Esc hides the lens',
   'stamp-band': 'Pick a tile animation in the Art panel, then click to lay one pattern or drag a region to tile it',
+  // Every draw carves (the Q1 ruling), so the destructive half is said in the
+  // hint rather than discovered after the undo entry is written.
+  region: 'Drag to give a rectangle to the selected region, carving whatever it covers · drag inside or on the edge of the SELECTED region to move or resize · Ctrl snaps to 8 px',
 };
 
 /**
@@ -79,6 +83,16 @@ export const TOOL_KEYS: Record<ToolId, string> = {
   'place-ring': 'r',
   'mark-band': 'n',
   'stamp-band': 'd',
+  // `g` for the region rectangle (step 8B). CHECKED AGAINST THIS WHOLE TABLE —
+  // letters are unique across the entire vocabulary, not per facet, so a tool
+  // moving between facets can never start shadowing a neighbour — which at this
+  // edit reads v/s/m/t/b/k/c/o/r/n/d. AND AGAINST THE MAP'S OTHER BARE LETTERS,
+  // which TOOL_KEYS does not contain and no test covered until now:
+  // `flipAxisForKey` (components/map-flip.ts) answers to `x` and `y` in the same
+  // window keydown, ahead of `toolForKey`, so either letter would have been a
+  // tool that silently never armed while a marquee was up. The obvious `r` is
+  // place-ring's, so the mnemonic is the second consonant of "reGion".
+  region: 'g',
 };
 
 /** The tool a bare (unmodified) key arms, or null when the key is no tool's. */

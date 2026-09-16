@@ -18,6 +18,11 @@ export const IconLine      = svg(<path d="M3 13L13 3" />);
 export const IconRect      = svg(<rect x="3" y="3" width="10" height="10" />);
 export const IconSelect    = svg(<rect x="3" y="3" width="10" height="10" strokeDasharray="2 2" />);
 export const IconDither    = svg(<path d="M3 3h2v2H3zM7 3h2v2H7zM11 3h2v2h-2zM5 7h2v2H5zM9 7h2v2H9zM3 11h2v2H3zM7 11h2v2H7zM11 11h2v2h-2z" fill="currentColor" stroke="none" />);
+// AN L-SHAPE, NOT A RECTANGLE. `IconRect` (paint-block) and `IconSelect`
+// (marquee) are both plain boxes and both already sit in map docks; a region is
+// the one thing here that is a UNION of rectangles, and a carve is what makes
+// it one. The notch is the whole glyph.
+export const IconRegion    = svg(<path d="M3 3h6v4h4v6H3z" />);
 export const IconView      = svg(<><circle cx="8" cy="8" r="2.5" /><path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" /></>);
 export const IconStamp     = svg(<path d="M5 9h6l1 4H4zM6 9V5a2 2 0 014 0v4" />);
 export const IconCollision = svg(<path d="M2 11l4-6 3 4 2-3 3 5z" />);

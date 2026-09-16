@@ -112,7 +112,7 @@ function RegionRow({ row, selected, onSelect }: {
     <Card selected={selected} onClick={onSelect} domId={`region-row-${row.id}`}
           title={`${row.id}: ${rectCountWord(row.rects.length)}, ${multi ? 'bounds ' : ''}`
             + `${row.rect.w} by ${row.rect.h} at ${row.rect.x}, ${row.rect.y}`
-            + (multi ? ' — the bounds of its pieces, not its shape' : '')}>
+            + (multi ? ' (the bounds of its pieces, not its shape)' : '')}>
       <div data-region-row={row.id} style={{ paddingBottom: T.s2 }}>
         <div style={{ display: 'flex', gap: T.s2, alignItems: 'baseline' }}>
           <span style={{ fontWeight: T.wSemibold }}>{row.label}</span>

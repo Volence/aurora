@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { FACET_TOOLS, toolsForFacet, toolForFacet, switchFacet } from '../facet-tools';
 import { TOOL_LABELS, TOOL_KEYS, dockOrder } from '../tool-meta';
 import { TOOL_IDS } from '../../../core/project/adapter';
+import { flipAxisForKey } from '../../components/map-flip';
 import { useWorkspaceStore } from '../workspaceStore';
 import { useEditorStore, type EditorTool } from '../../state/editorStore';
 import { useProjectStore } from '../../state/projectStore';
@@ -202,6 +203,42 @@ describe('effects facet tools', () => {
 // writes — so it lives beside that tool, in the facet whose Art panel is the
 // picker the band is chosen from. It is a TOOL and not a paint-tile mode so a
 // dock button, a letter and a status-bar hint say it exists (the lesson of §A.3).
+// THE REGION TOOL (step 8B, editor spec §3.1 + build-plan row 8).
+describe('region tool', () => {
+  it('is offered by the regions facet, and `view` still LEADS it', () => {
+    const regions = FACET_TOOLS.regions!;
+    expect(regions).toContain('region');
+    // ⚠ THE ORDER IS THE CLAIM, not the membership: the first entry is the
+    // facet DEFAULT (toolForFacet), so a facet switch must land on a pure pan
+    // and never on an armed tool whose every drag CARVES.
+    expect(regions[0]).toBe('view');
+  });
+  it('a switch INTO the regions facet arms `view`, not `region`', () => {
+    // The property the row above is about, through the real action. Arriving
+    // with a tool this facet does not offer must fall back to the default.
+    useEditorStore.getState().setTool('paint-collision');
+    switchFacet('level:x:1', 'regions');
+    expect(useEditorStore.getState().tool).toBe('view');
+    // The control: the facet DOES accept `region`, so the fallback above is
+    // about `view` leading and not about `region` being rejected outright.
+    useEditorStore.getState().setTool('region');
+    switchFacet('level:x:1', 'regions');
+    expect(useEditorStore.getState().tool).toBe('region');
+  });
+  it('is offered by NO other facet', () => {
+    for (const [facet, tools] of Object.entries(FACET_TOOLS)) {
+      if (facet === 'regions') continue;
+      expect(tools, facet).not.toContain('region');
+    }
+  });
+  it('has a label, a hint and a letter no other tool answers to', () => {
+    expect(TOOL_LABELS.region).toBe('Region');
+    expect(TOOL_KEYS.region).toMatch(/^[a-z]$/);
+    const others = TOOL_IDS.filter((t) => t !== 'region').map((t) => TOOL_KEYS[t]);
+    expect(others).not.toContain(TOOL_KEYS.region);
+  });
+});
+
 describe('band stamp tool', () => {
   it('is offered by the layout facet, after paint-tile', () => {
     const layout = FACET_TOOLS.layout!;
@@ -248,6 +285,21 @@ describe('tool keys', () => {
       expect(new Set(letters).size, facet).toBe(letters.length);
     }
   });
+  // ⚠ TOOL_KEYS IS NOT THE WHOLE BARE-LETTER VOCABULARY, and nothing said so
+  // until step 8B needed a free letter. `MapViewport`'s window keydown calls
+  // `flipAxisForKey` (components/map-flip.ts) BEFORE `toolForKey`, so `x` and
+  // `y` are taken by the marquee/paste flip and a tool bound to either would
+  // silently never arm whenever a flip target was live. Derived from the flip
+  // module itself, never transcribed, so a third letter added there fails here.
+  it('no tool letter collides with the map\'s OTHER bare letters (the flip keys)', () => {
+    const flipLetters = 'abcdefghijklmnopqrstuvwxyz'.split('')
+      .filter((k) => flipAxisForKey(k) !== null);
+    // The control: if `flipAxisForKey` ever stopped answering, this row would
+    // pass over an empty set and prove nothing.
+    expect(flipLetters.length).toBeGreaterThan(0);
+    for (const t of TOOL_IDS) expect(flipLetters, t).not.toContain(TOOL_KEYS[t]);
+  });
+
   it('keeps the letters the viewport has always answered to', () => {
     // The pre-parcel switch, transcribed so a table edit that silently rebinds
     // an old letter has to come through here.

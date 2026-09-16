@@ -176,7 +176,7 @@ describe('a region with several rectangles is ONE row (step 8B item B)', () => {
     expect(rows.flatMap((r) => r.entryIndices).sort()).toEqual([0, 1, 2]);
   });
 
-  it('carries every piece, and its `rect` is the BOUNDS of them — which is not its shape', () => {
+  it('carries every piece, and its `rect` is the BOUNDS of them, which is not its shape', () => {
     const doc = lShapedDoc();
     const [forest] = regionListRows(doc, NO_ACT_SCENE, BG_LIB);
     expect(forest.entryIndices.length).toBeGreaterThanOrEqual(2);
@@ -237,7 +237,7 @@ describe('a region with several rectangles is ONE row (step 8B item B)', () => {
     expect(rows[1].overlaps).toEqual(['forest']);
   });
 
-  it('a region does NOT name ITSELF when two of its own entries overlap — but the status row still does', () => {
+  it('a region does NOT name ITSELF when two of its own entries overlap, but the status row still does', () => {
     const doc = docOf(
       region({ id: 'forest', rect: { x: 0, y: 0, w: HALF, h: HALF } }),
       region({ id: 'forest', rect: { x: 0, y: 0, w: HALF, h: HALF } }),
