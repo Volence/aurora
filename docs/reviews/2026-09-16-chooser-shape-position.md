@@ -28,11 +28,30 @@ Aeon prices and rules this. What this lane put on the record:
   record and **that sentence stops being true with the document shape unchanged**. A description
   that quietly goes false is what nothing reddens, so the hub should amend it deliberately rather
   than discover it.
-- **Weak preference for B, on stated ground rather than as a verdict.** The same schema already
-  describes `sceneRef` as a region fact, the parallax scene "this region uses", resolved through
-  `Region.rg_parallax`. So the contract today describes parallax as belonging to the region and
-  raster as belonging to the record. B makes those consistent and keeps the emitted library equal
-  to the authored one; A leaves the inconsistency and adds a second class of record.
+- ⛔ **WITHDRAWN 2026-09-16, AND IT WAS WRONG WHEN WRITTEN. The weak preference for B rested on a
+  consistency argument that compares two different kinds of fact.** Kept in place rather than
+  deleted, because the way it failed is the lesson. It said: the schema makes `sceneRef` a region
+  fact and `rasterRef` a record fact, so only one can be right, and B makes them consistent.
+  **The binding pair is `preset` and `sceneRef`** - both resolve to per-region engine pointers,
+  `Region.rg_effects` (a required pointer to an EffectsPreset record) and `rg_parallax`. They are
+  symmetric already. **`rasterRef` is provenance and not binding**, so it was never a candidate for
+  the same shape. The contract says so in the sentence next to the one this lane quoted:
+  *"`rasterRef` is not a second home for identity: the record named by `preset` is what the engine
+  binds, and `rasterRef` names a document that produced part of it. One fact, one home."*
+  (`docs/AURORA_REGIONS_SCHEMA.md` section 3 at empyrean `origin/main`, read there after aeon
+  raised it.) **This lane had that sentence in front of it and read past it** - it sits in the same
+  `rasterRef` description that supplied the half-quote the argument was built on, and it was pasted
+  into the codec dispatch brief on the way. Reading far enough to find the support and stopping
+  there is the defect, and it produced the stronger-SOUNDING of the two arguments.
+  **No preference is now stated on the chooser shape.** The costs below stand on their own and
+  aeon rules on engine numbers.
+
+**The half that stands, and it is the one that mattered.** The "B falsifies a landed sentence"
+cost is real, aeon kept it in their ledger, and the hub has changed a rule because of it: their
+CR rule was keyed to KEYS, so a meaning-only change slid under it, and it now runs as a CR landing
+with or before the change it describes. **The argument this lane got wrong was the loud one; the
+argument nothing else in the suite could have made was the quiet one.** Worth remembering in that
+order.
 
 **Whatever aeon takes, this lane holds.** The engine cost is theirs to price and this file records
 an input to their ruling, never the ruling.
@@ -82,3 +101,21 @@ not a certification, seen from the other end.
 flattener disagrees with the hand table, without reconciling first. When that arrives it is
 evidence, not a defect report against either side. `src/core/editing/region-geometry.ts` is the
 third independent cut and is as able to be the wrong one as the other two.
+
+## The nearby gap is a measured consequence, not a design choice, and nothing here may assume it is permanent
+
+**Aeon, 2026-09-16.** No key names the effects record's *document* the way `sceneRef` names the
+scene. That asymmetry is real but it is a consequence rather than a decision: no effects document
+can express a total binding yet, it fails three independent ways (it does not bind, the base
+palette is not in its vocabulary at all, and one key is still reserved-and-refused by name), and
+`effectsRef` is reserved against **all three** closing rather than whichever is fixed first. So it
+dissolves when they close; it is not a shape to build against.
+
+**Why nothing in this parcel is exposed to that, stated as a mechanism rather than an intention.**
+The codec validates against a VENDORED copy of the contract pinned by blob hash in its sidecar,
+with a drift gate that goes red when empyrean's copy moves. The schema is closed, so `effectsRef`
+is refused today, correctly, because the contract refuses it today. The day the hub spends it, the
+pin moves, the drift gate reddens, and the re-vendor is the act that teaches this repo the new key.
+**No code here decides whether that key is coming.** That is the property to preserve when
+reviewing the parcel: any place the report or the types state the gap as settled rather than as
+"what the pinned contract says today" is a place to correct before landing.
