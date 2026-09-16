@@ -1,0 +1,126 @@
+{
+  "$comment": "Document vectors for contract/schema/aurora-regions.schema.json, added 2026-09-16 with regions part 2 step 10. EVERY CASE IS DERIVED FROM A RULE IN docs/AURORA_REGIONS_SCHEMA.md OR FROM THE PART 2 SPEC, none from a generator's behaviour: the contract leads and aeon's effects_gen.py plus aurora's codec implement against it. Each FAIL case perturbs a PASS document in exactly ONE forbidden way, and each was proven to make this gate RED before being declared a fail-case (a FAIL case the schema accepts means the closure is vacuous, which is the anti-vacuity rule G3 and G7 already carry). WHAT IS DELIBERATELY NOT HERE, so a silence is not read as coverage: existence vectors. That `preset` names a real record, that `bg.layoutRef` names a real layout, that `bg.span` equals the referenced layout's height, that rectangles lie inside the act or tile it without gaps, and that the union of referenced layouts fits BG_TILE_CAPACITY are all outside a shape schema; the first is the generator's check, the last is measured per act and is what part 2's E3 measured.",
+  "cases": [
+    {
+      "name": "minimal region: identity by rectangle plus a preset, no background",
+      "expect": "pass",
+      "why": "A region before part 2 binds a preset and nothing else; adding the bg key must not disturb a document that omits it. Regression vector for the addition itself.",
+      "doc": {
+        "schema": 1,
+        "act": "ojz_act1",
+        "regions": [
+          { "id": "forest", "rect": { "x": 0, "y": 0, "w": 3400, "h": 1024 }, "preset": "OJZ_Preset_Sec1" }
+        ]
+      }
+    },
+    {
+      "name": "off-grid region with a background layout and a derived span",
+      "expect": "pass",
+      "why": "The shipped night region straddles a section line by design (x 3400 to 4799), which is the case identity-by-rectangle exists for, and part 2 gives it its own layout and span.",
+      "doc": {
+        "schema": 1,
+        "act": "ojz_act1",
+        "regions": [
+          { "id": "forest", "rect": { "x": 0, "y": 0, "w": 3400, "h": 1024 }, "preset": "OJZ_Preset_Sec1" },
+          {
+            "id": "night",
+            "name": "night stretch",
+            "rect": { "x": 3400, "y": 0, "w": 1400, "h": 1024 },
+            "preset": "OJZ_Preset_Night",
+            "rasterRef": "ojz_night_tint",
+            "sceneRef": "ojz_night_scene",
+            "bg": { "layoutRef": "ojz_forest", "span": 1536 }
+          }
+        ]
+      }
+    },
+    {
+      "name": "the @act sentinel on layoutRef",
+      "expect": "pass",
+      "why": "Inheriting the act's layout must be expressible with the spelling aurora's resolveDisplayedBg already uses, rather than only by omitting the key.",
+      "doc": {
+        "schema": 1,
+        "act": "ojz_act1",
+        "regions": [
+          { "id": "forest", "rect": { "x": 0, "y": 0, "w": 3400, "h": 1024 }, "preset": "OJZ_Preset_Sec1", "bg": { "layoutRef": "@act" } }
+        ]
+      }
+    },
+    {
+      "name": "effectsRef on a region row",
+      "expect": "fail",
+      "why": "RULING Q8: the key stays RESERVED and unspent because a preset document is not total (three measured reasons). A document carrying it must be refused, or the ruling is decorative.",
+      "doc": {
+        "schema": 1,
+        "act": "ojz_act1",
+        "regions": [
+          { "id": "forest", "rect": { "x": 0, "y": 0, "w": 3400, "h": 1024 }, "preset": "OJZ_Preset_Sec1", "effectsRef": "ojz_sec1_tint" }
+        ]
+      }
+    },
+    {
+      "name": "a region with no preset",
+      "expect": "fail",
+      "why": "Region.rg_effects is a REQUIRED pointer in the engine, so a region with no identity binding cannot be represented. Sections carry no identity to fall back on since part 1 deleted sec_effects.",
+      "doc": {
+        "schema": 1,
+        "act": "ojz_act1",
+        "regions": [ { "id": "forest", "rect": { "x": 0, "y": 0, "w": 3400, "h": 1024 } } ]
+      }
+    },
+    {
+      "name": "a per-section binding key",
+      "expect": "fail",
+      "why": "Option B of Q8 is refused on its own terms: an off-grid region has no single section to inherit from, so no binding in this document may be expressed per-section.",
+      "doc": {
+        "schema": 1,
+        "act": "ojz_act1",
+        "regions": [
+          { "id": "forest", "rect": { "x": 0, "y": 0, "w": 3400, "h": 1024 }, "preset": "OJZ_Preset_Sec1", "section": 1 }
+        ]
+      }
+    },
+    {
+      "name": "the anchor triple authored on the region",
+      "expect": "fail",
+      "why": "v_center_y, v_offset and v_factor_bg are parallax_config fields and Region.rg_parallax already names a config, so the anchor is a region fact through one indirection. A second home for it is the failure the one-source ruling names.",
+      "doc": {
+        "schema": 1,
+        "act": "ojz_act1",
+        "regions": [
+          { "id": "forest", "rect": { "x": 0, "y": 0, "w": 3400, "h": 1024 }, "preset": "OJZ_Preset_Sec1", "v_offset": 64 }
+        ]
+      }
+    },
+    {
+      "name": "a zero-width rectangle",
+      "expect": "fail",
+      "why": "A region with no extent is not a region; w and h are at least 1. The generator converts to inclusive bounds, so a zero here would emit a reversed range.",
+      "doc": {
+        "schema": 1,
+        "act": "ojz_act1",
+        "regions": [
+          { "id": "forest", "rect": { "x": 0, "y": 0, "w": 0, "h": 1024 }, "preset": "OJZ_Preset_Sec1" }
+        ]
+      }
+    },
+    {
+      "name": "an empty regions array",
+      "expect": "fail",
+      "why": "An act with no regions has no identity anywhere, since sections carry none. Distinct from an absent key: this is a document that looks authored and binds nothing.",
+      "doc": { "schema": 1, "act": "ojz_act1", "regions": [] }
+    },
+    {
+      "name": "an unknown key inside bg",
+      "expect": "fail",
+      "why": "The document is closed at every level, not only at the top. A nested open object is how a key nobody agreed to reaches a consumer.",
+      "doc": {
+        "schema": 1,
+        "act": "ojz_act1",
+        "regions": [
+          { "id": "forest", "rect": { "x": 0, "y": 0, "w": 3400, "h": 1024 }, "preset": "OJZ_Preset_Sec1", "bg": { "layoutRef": "ojz_forest", "anchorY": 64 } }
+        ]
+      }
+    }
+  ]
+}

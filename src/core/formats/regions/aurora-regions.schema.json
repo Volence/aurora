@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://empyrean/contract/aurora-regions.schema.json",
+  "title": "Aurora Regions Document (regions part 2: identity by rectangle, with the region's background placement)",
+  "description": "Wire shape for one act's regions document, the editor-owned tree in the aeon repo. A REGION IS THE UNIT OF IDENTITY AND A SECTION IS NOT: part 1 deleted Sec.sec_effects, so a section carries no identity at all, and part 2 deletes Sec.sec_bg_layout so it carries no background either. A region is a RECTANGLE in world pixels whose edges need not fall on the section grid (the owner's 2026-09-13 selection of aeon's Regions v1 design; the shipped night region straddles a section line by design), which is why no binding here may be expressed per-section. NORMATIVE for SHAPE only: which keys exist, their JSON types, and which are required. NUMERIC BOUNDS ARE DELIBERATELY NOT RESTATED: the engine's own ensures fire at build time with the measurement behind each rule and aeon's generator forwards values verbatim, the same split docs/AURORA_EFFECTS_SCHEMA.md section 7.1 makes for presets. Closed: any key not listed is refused, and adding one is a contract change. RULING Q8 (2026-09-16, the hub with aurora, from aurora's firsthand measurement at aeon origin/master fa5b317f): a region binds `preset`, a RECORD NAME the generator validates against the game's own effects library, plus an optional `rasterRef`, a preset DOCUMENT id. `effectsRef` is NOT spent and stays reserved in docs/AURORA_EFFECTS_SCHEMA.md, because a preset DOCUMENT IS NOT TOTAL and fails to be in three independent ways, all measured rather than assumed: (1) it does not BIND - tools/effects_gen.py emits the program under a stable name and does not say which section or region installs it; (2) the base palette is not in its vocabulary AT ALL - PRESET_KEYS carries no palette key and base_swap is a mid-frame swap, not the preset's palette channel, while band-ownership section 16.1 counts the palette as an EffectsPreset channel; (3) one key is still reserved-and-refused by name, `fires`. So the day a document could carry a total binding is gated on all three, not one. Option B (inheriting through the section under the camera) is refused on its own terms and not merely as the weaker choice: an off-grid region has no single section to inherit from. KNOWN LIMITS WITH NO ENFORCING ASSERTION, stated so a silence here is not read as coverage: nothing in this schema checks that `preset` names a record that EXISTS (that is the generator's check, the way section_preset_symbols validates today), that a `bg.layoutRef` names a layout in the library, that a region's rectangle is inside the act, that regions tile the act without gaps, or that the union of layouts a document references fits BG_TILE_CAPACITY - the last is measured per act and was the whole subject of part 2's E3 (forest 320 + cave 448 = 768 against 376, so two authored pictures do not coexist until tile paging lands).",
+  "type": "object",
+  "required": [
+    "schema",
+    "act",
+    "regions"
+  ],
+  "unevaluatedProperties": false,
+  "properties": {
+    "schema": {
+      "const": 1,
+      "description": "Document format version. Absent: refused."
+    },
+    "act": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,31}$",
+      "description": "The act this document describes, e.g. \"ojz_act1\". Shape only; that the act exists is the generator's check."
+    },
+    "regions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/region" },
+      "description": "Regions in author order. The ENGINE's resolution order and the sliver rule are not expressed here: the generator converts {x,y,w,h} to the inclusive bounds the engine reads (regions v1 section 1.3(b)), so a reader of this document must not assume the engine sees these numbers unchanged."
+    }
+  },
+  "$defs": {
+    "region": {
+      "type": "object",
+      "required": ["id", "rect", "preset"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,31}$",
+          "description": "Stable identity for this region within the act. Used by the editor and by the generator's emitted symbol names."
+        },
+        "rect": { "$ref": "#/$defs/rect" },
+        "preset": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "RULING Q8: the record name of the EffectsPreset this region installs, validated by the generator against the game's own effects library. This is the region's total identity binding, because Region.rg_effects is a REQUIRED pointer to an EffectsPreset in the engine and a preset DOCUMENT cannot express the whole record (see the three measured reasons in this schema's description)."
+        },
+        "rasterRef": {
+          "type": ["string", "null"],
+          "pattern": "^[a-z][a-z0-9_]{0,31}$",
+          "description": "Optional id of a raster preset DOCUMENT (aurora-effects-preset.schema.json) whose program is a channel of the record `preset` names. Null or absent: this region installs no raster program. NOT a second home for identity: the record named by `preset` is what the engine binds, and this points at the document that generated one of its channels."
+        },
+        "sceneRef": {
+          "type": ["string", "null"],
+          "pattern": "^[a-z][a-z0-9_]{0,31}$",
+          "description": "Optional id of the parallax scene (a parallax_config) this region uses. THE BACKGROUND'S VERTICAL ANCHOR TRIPLE LIVES HERE AND NOT ON THE REGION: v_center_y, v_offset and v_factor_bg are parallax_config fields at $04, $06 and $01, and Region.rg_parallax already names a config, so the anchor is a region fact through one indirection and part 2 adds no new field for it."
+        },
+        "bg": { "$ref": "#/$defs/bg" },
+        "name": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Author-facing label. Never read by the engine or the generator."
+        }
+      }
+    },
+    "rect": {
+      "type": "object",
+      "required": ["x", "y", "w", "h"],
+      "unevaluatedProperties": false,
+      "description": "World pixels. Edges need not fall on the section grid: that is the whole point of identity by rectangle. The generator converts to inclusive bounds.",
+      "properties": {
+        "x": { "type": "integer", "minimum": 0 },
+        "y": { "type": "integer", "minimum": 0 },
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "bg": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "The region's background placement, which is what part 2 adds. Absent: the region inherits the act's background, which is every region's behaviour before part 2 and stays the default.",
+      "properties": {
+        "layoutRef": {
+          "type": ["string", "null"],
+          "description": "A background layout library id, or the sentinel \"@act\" meaning inherit the act's layout (the spelling aurora's resolveDisplayedBg already uses), or null meaning the same. The engine reads this as Region.rg_bg_layout.",
+          "pattern": "^(@act|[a-z][a-z0-9_]{0,31})$"
+        },
+        "span": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The layout's height in pixels, read by the engine as Region.rg_bg_span and used to clamp the background's scroll in MAP space rather than plane space. DERIVED FROM THE REFERENCED LAYOUT AND NEVER TYPED BY HAND (part 2 section 6.2 item 1): the editor computes it from the layout it resolves, so a hand-edited value that disagrees with the layout is a defect this schema cannot catch and the generator must."
+        }
+      }
+    }
+  }
+}
