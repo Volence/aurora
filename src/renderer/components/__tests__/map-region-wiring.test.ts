@@ -129,4 +129,28 @@ describe('the region tool reaches the map (a SOURCE scan, not a running app)', (
     // transform the commit will run, so what the author sees is what lands.
     expect(src).toContain('regionDragPreview(');
   });
+
+  it('the wash is gated on the toggle, and an in-flight drag overrides the gate', () => {
+    // Owner, 2026-09-16: "Can we have it just toggleable if we want to see it
+    // exactly?" -- "it" being the ART under the wash. The `rd !== null` half is
+    // an OVERSEER'S CALL, not his ask: with the wash hidden, a region drag
+    // would otherwise be drawing blind.
+    //
+    // ⚠ A SOURCE SCAN, like every row above, and with their bound: it proves the
+    // component ASKS the two questions on one line. That a hidden wash actually
+    // stops painting on a real canvas, and that a drag still previews while it
+    // is hidden, needs the running app and is TAGGED for the foreground pass in
+    // `docs/reviews/2026-09-16-regions-step8b-wiring.md`'s sense.
+    const src = mapViewport();
+    const gate = src.split('\n').find((l) => l.includes('overlayOpts.showRegions'));
+    expect(gate, 'MapViewport does not read the regions toggle at all').toBeDefined();
+    // ONE conjunction rather than two branches a later edit could separate: the
+    // override has to sit beside the toggle it overrides, and both upstream of
+    // the work, so a hidden wash costs no derivation either.
+    expect(gate).toContain('rd !== null');
+    expect(gate).toContain('regionsDoc');
+    // Anti-vacuous: there is still exactly ONE draw call, so the line found
+    // above is the gate on the real one and not on a dead second copy.
+    expect(src.split('drawRegionOverlay(').length - 1).toBe(1);
+  });
 });

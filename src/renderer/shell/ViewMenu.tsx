@@ -23,6 +23,13 @@ const LABELS: Record<string, string> = {
   // Row G: the size the label states is core/model/screen.ts's, which mirrors
   // aeon's SCREEN_WIDTH/HEIGHT — not typed here.
   showScreenFrame: `Screen frame (${SCREEN_WIDTH}x${SCREEN_HEIGHT})`,
+  // Says what it DOES to the map, because this is the one row here an author
+  // reaches for in order to turn something OFF. `pretty()`'s fallback would
+  // derive "Regions", which names the facet he is already standing in and tells
+  // him nothing about what unticking the box will do; "Tint the ground by
+  // region" says what comes off, so seeing the art exactly is a readable
+  // consequence of clearing it.
+  showRegions: 'Tint the ground by region',
 };
 
 /**

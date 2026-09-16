@@ -140,6 +140,9 @@ const BOTH_PLANES: OverlayOptions = {
   occludeSprites: false, playAnimatedArt: false,
   showSolidBothPlanes: false, showCrossover: false,
   showScreenFrame: false,
+  // OFF here, unlike the store default: nothing in this file is the Regions
+  // facet, and a wash would be chrome over the subject under test.
+  showRegions: false,
 };
 
 /** A viewport that covers one whole section at 1:1 — every cell is in range. */
