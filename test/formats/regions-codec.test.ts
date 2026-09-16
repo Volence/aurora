@@ -4,7 +4,7 @@ import {
   parseRegionsDocument, serializeRegionsDocument, RegionsDocumentError,
   type RegionsDocument,
 } from '../../src/core/formats/regions/document';
-import { validateAgainstSchema } from '../../src/core/formats/effects/json-schema-subset';
+import { validateAgainstSchema, canonicalizeBySchema } from '../../src/core/formats/effects/json-schema-subset';
 
 /**
  * Aurora's OWN rows for the regions codec, beside the contract's vectors.
@@ -116,6 +116,22 @@ describe('regions codec: it REFUSES what it does not understand, it never drops 
         .not.toBeNull();
       // ...and it refused rather than returning a document with the key gone.
       expect(String((thrown as Error).message)).not.toBe('');
+    });
+
+    /**
+     * ⚠ AND THE ROW ABOVE IS MET BY THE VALIDATION ALONE, WHICH IS NOT WHAT IT
+     * LOOKS LIKE IT PROVES. `serializeRegionsDocument` validates before it
+     * canonicalizes, and the closed schema refuses the unknown key at the
+     * validation, so `canonicalizeBySchema` never gets to speak. MEASURED
+     * rather than reasoned about: deleting `canonicalizeBySchema` from the
+     * writer leaves every row above GREEN, which is why this row exists and why
+     * it calls the second guard DIRECTLY. Two refusals that are both real is
+     * the design; one refusal and one unobservable line that everybody believes
+     * is a refusal is not.
+     */
+    it(`the writer's SECOND guard refuses the same key at ${where} on its own`, () => {
+      expect(() => canonicalizeBySchema(doc, REGIONS_SCHEMA))
+        .toThrow(/refusing to drop /);
     });
   }
 

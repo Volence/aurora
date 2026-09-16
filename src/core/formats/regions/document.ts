@@ -30,17 +30,28 @@
 //
 // REFUSES, NEVER ERASES. The schema is closed at EVERY level
 // (`unevaluatedProperties: false` on the document, on a region and on `bg`), so
-// an unknown key is a refusal and never a silent drop. Both directions are
-// guarded, and the two guards are different instruments on purpose:
+// an unknown key is a refusal and never a silent drop.
 //
 //   - READING, `validateAgainstSchema` refuses the document and names the
 //     JSON Pointer of the offending value. The object handed back is the one
 //     `JSON.parse` produced, never a rebuild from a field list, so nothing can
 //     be lost between the check and the caller.
-//   - WRITING, `canonicalizeBySchema` THROWS on any key the schema does not
-//     declare. Its ordering no longer reaches disk (section 5's alphabetical
-//     sort runs after it), but its refusal does, and that refusal is the only
-//     thing standing between a serialize and a silent erasure.
+//   - WRITING runs TWO refusals, and it is worth being exact about which one
+//     does the work, because the obvious sentence is wrong and this file said
+//     it first. The same `validateAgainstSchema` runs FIRST on the way out, and
+//     the closed schema already refuses an unknown key there, so it is the
+//     VALIDATION and not `canonicalizeBySchema` that speaks on every document
+//     the writer meets today. MEASURED, not reasoned about: deleting
+//     `canonicalizeBySchema` from `serializeRegionsDocument` leaves every
+//     writer row in test/formats/regions-codec.test.ts green.
+//
+//     It stays anyway, as the SECOND and independent refusal: it throws on any
+//     key the schema does not declare, so an amendment that loosens the closure,
+//     or an evaluator change that stops reporting an unevaluated property,
+//     still cannot turn a serialize into a silent erasure. Its ORDERING does not
+//     reach disk, because section 5's alphabetical sort runs after it. Because
+//     it is unobservable THROUGH the writer, its refusal is asserted on its own
+//     instead, which is the only way a row about it can go red.
 //
 // THE SPAN HOLE, stated plainly because no keyword can carry it. `bg.span` is
 // DERIVED FROM THE REFERENCED LAYOUT AND NEVER TYPED BY HAND (part 2 section 6.2
