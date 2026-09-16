@@ -95,7 +95,7 @@ function RegionRow({ row, selected, onSelect }: {
           title={`${row.id}: ${row.rect.w} by ${row.rect.h} at ${row.rect.x}, ${row.rect.y}`}>
       <div data-region-row={row.id} style={{ paddingBottom: T.s2 }}>
         <div style={{ display: 'flex', gap: T.s2, alignItems: 'baseline' }}>
-          <span style={{ fontWeight: 600 }}>{row.label}</span>
+          <span style={{ fontWeight: T.wSemibold }}>{row.label}</span>
           <span style={{ ...NOTE, marginBottom: 0 }}>{row.id}</span>
           <span style={{ ...NOTE, marginBottom: 0, marginLeft: 'auto' }}>
             {row.rect.w}x{row.rect.h}
@@ -136,7 +136,7 @@ function ActRow({ state }: { state: Extract<RegionsPanelState, { kind: 'open' }>
     <Card title="The act's own values. A region binding left null inherits these.">
       <div data-region-row="act" style={{ paddingBottom: T.s2 }}>
         <div style={{ display: 'flex', gap: T.s2, alignItems: 'baseline' }}>
-          <span style={{ fontWeight: 600 }}>act</span>
+          <span style={{ fontWeight: T.wSemibold }}>act</span>
           <span style={{ ...NOTE, marginBottom: 0 }}>{actRow.actId}</span>
         </div>
         <div data-region-bg="act" style={{ ...NOTE, marginBottom: 0 }}>bg {actRow.bg.text}</div>
@@ -342,7 +342,7 @@ function SelectedRegion({ state }: { state: Extract<RegionsPanelState, { kind: '
   const rows = regionBindingRows(region, state.defaults);
   return (
     <div data-region-detail={region.id}>
-      <Row><span style={{ fontWeight: 600 }}>{region.name ?? region.id}</span></Row>
+      <Row><span style={{ fontWeight: T.wSemibold }}>{region.name ?? region.id}</span></Row>
       <RectFields state={state} regionId={region.id} rect={region.rect} />
       {rows.map((r) => (
         <BindingRow key={r.key} state={state} regionId={region.id} row={r} />
@@ -372,7 +372,7 @@ function StatusRows({ rows }: { rows: RegionStatusRow[] }) {
                marginBottom: T.s2,
                ...(r.tone === 'unmeasurable' ? { fontStyle: 'italic' } : {}),
              }}>
-          {r.tone === 'unmeasurable' ? 'NOT CHECKED — ' : ''}{r.text}
+          {r.tone === 'unmeasurable' ? 'NOT CHECKED: ' : ''}{r.text}
         </div>
       ))}
     </div>
@@ -412,7 +412,7 @@ export default function RegionsPanel(): React.ReactElement {
           {state.kind === 'refused' && (
             <Hint tone="warning" style={{ marginBottom: 0 }}>
               {state.actId} HAS a regions document and Aurora refused it:{' '}
-              {state.path} — {state.reason}. Nothing here is editable and the
+              {state.path} ({state.reason}). Nothing here is editable and the
               save will neither overwrite nor remove that file. Fix the file.
             </Hint>
           )}

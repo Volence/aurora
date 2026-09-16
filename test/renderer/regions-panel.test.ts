@@ -119,7 +119,7 @@ describe('the list is in DOCUMENT order (the painter\'s-order sentence is supers
       .toEqual(['anon', 'Forest, upper mid']);
   });
 
-  it('an EMPTY document produces an empty list — and the fixture that is not empty proves the call works', () => {
+  it('an EMPTY document produces an empty list, and the fixture that is not empty proves the call works', () => {
     expect(regionListRows(docOf(), NO_ACT_SCENE, BG_LIB)).toEqual([]);
     expect(regionListRows(tiledDoc(), NO_ACT_SCENE, BG_LIB)).toHaveLength(2);
   });
@@ -130,7 +130,7 @@ describe('the list is in DOCUMENT order (the painter\'s-order sentence is supers
 // ---------------------------------------------------------------------------
 
 describe('the overlap mark (the successor to §3.4\'s "hidden", which the ruling made impossible)', () => {
-  it('a DISJOINT set marks nothing — and an overlapping one names the other region, both ways', () => {
+  it('a DISJOINT set marks nothing, and an overlapping one names the other region, both ways', () => {
     // The clean control first, so "no marks" is known to be the disjoint answer
     // and not the answer of an instrument that never looks.
     expect(regionListRows(tiledDoc(), NO_ACT_SCENE, BG_LIB).map((r) => r.overlaps))
@@ -163,7 +163,7 @@ describe('the overlap mark (the successor to §3.4\'s "hidden", which the ruling
 // ---------------------------------------------------------------------------
 
 describe('the background is named in words on EVERY row, unconditionally', () => {
-  it('the all-shared launch state — every region inherits — still says `act` on every row', () => {
+  it('the all-shared launch state (every region inherits) still says `act` on every row', () => {
     // THIS IS THE ROW THE RULING IS ABOUT. Under the rejected CONDITIONAL design
     // every one of these labels would be absent, which is why the assertion is
     // on presence and content, never on a difference between rows.
@@ -188,7 +188,7 @@ describe('the background is named in words on EVERY row, unconditionally', () =>
     expect(regionBgLabel(undefined, NO_ACT_SCENE, BG_LIB)).toEqual({ text: 'act', missing: false });
   });
 
-  it('a DANGLING ref reads `MISSING <id>` in the warning arm — the third state the ruling names', () => {
+  it('a DANGLING ref reads `MISSING <id>` in the warning arm: the third state the ruling names', () => {
     expect(regionBgLabel('gone_bg', NO_ACT_SCENE, BG_LIB))
       .toEqual({ text: 'MISSING gone_bg', missing: true });
     // The control: the same call on an id the library DOES hold is not a warning.
@@ -214,7 +214,7 @@ describe('the four bindings rows and their badges (§3.4, gated by §7 row 6)', 
     expect(rows.map((r) => r.label)).toEqual(['preset', 'scene', 'raster', 'bg layout']);
   });
 
-  it('BADGE TEXT DIFFERS PER ROW on a wholly-inherited region — the §7 row 6 gate, non-vacuously', () => {
+  it('BADGE TEXT DIFFERS PER ROW on a wholly-inherited region: the §7 row 6 gate, non-vacuously', () => {
     const rows = regionBindingRows(region({ id: 'forest' }), NO_ACT_SCENE);
     const badges = rows.map((r) => r.badge);
     // The gate itself.
@@ -231,7 +231,7 @@ describe('the four bindings rows and their badges (§3.4, gated by §7 row 6)', 
     ]);
   });
 
-  it('the act\'s OWN scene appears in the scene badge — the badge reads the act, not a constant', () => {
+  it('the act\'s OWN scene appears in the scene badge: the badge reads the act, not a constant', () => {
     const rows = regionBindingRows(region({ id: 'forest' }), actBindingDefaults('ojz_act1_start'));
     expect(rows[1].badge).toBe('inherited (act: ojz_act1_start)');
     // The control: with no act scene the same row says `default`, so the badge
@@ -309,7 +309,7 @@ describe('detach on edit and revert to inherited', () => {
       .toBe('inherited (act: default)');
   });
 
-  it('`preset` REFUSES a revert — the schema makes it required and there is nothing to inherit', () => {
+  it('`preset` REFUSES a revert: the schema makes it required and there is nothing to inherit', () => {
     expect(setRegionBinding(tiledDoc(), 'forest', 'preset', null)).toBeNull();
     // The control: the SAME call with a value succeeds, so the null refusal is
     // about the null and not about the key being unwritable.
@@ -395,7 +395,7 @@ describe('the status line: §2.5 live, where the author is looking at the thing 
     expect(rows.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('an UNASSIGNED area is a warning naming its size and position — the state the ruling made first-class', () => {
+  it('an UNASSIGNED area is a warning naming its size and position: the state the ruling made first-class', () => {
     const hole = docOf(region({ id: 'forest', rect: { x: 0, y: 0, w: HALF, h: ACT.actH } }));
     const row = rowById(hole, 'unassigned')!;
     expect(row.tone).toBe('warning');
@@ -460,7 +460,7 @@ describe('the status line: §2.5 live, where the author is looking at the thing 
       .toContain('1 sidecar still carries refs: migrate');
   });
 
-  it('RULE 4 is UNMEASURABLE on EVERY document, clean or broken — never ok, never a warning', () => {
+  it('RULE 4 is UNMEASURABLE on EVERY document, clean or broken: never ok, never a warning', () => {
     // The rule this repository cannot answer must not render as a pass. It
     // names the constants and where they live, so the reader knows what is
     // missing rather than that something is.
