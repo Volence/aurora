@@ -54,6 +54,8 @@ import {
   areaOfRows,
   toInclusive,
   type RegionRow,
+  type RegionTable,
+  type ActBounds,
 } from '../../src/core/formats/regions/flatten';
 import { gitBlobSha } from '../support/peer-repo';
 
@@ -122,19 +124,33 @@ describe("AURORA'S OWN CODEC ACCEPTS AEON'S GOLDEN DOCUMENT", () => {
    * the schema past.
    */
   it('parses unchanged, with no key massaged and nothing dropped', () => {
-    const doc = parseRegionsDocument(docBytes, 'ojz_act1.regions.json');
+    const parsed = parseRegionsDocument(docBytes, 'ojz_act1.regions.json');
     // Not a rebuild from a field list: `parseRegionsDocument` hands back the
     // object `JSON.parse` produced. So deep-equality against a bare parse is the
     // statement that the codec neither repaired nor erased anything.
-    expect(doc).toEqual(JSON.parse(docBytes));
-    expect(doc.act).toBe('ojz_act1');
-    expect(doc.schema).toBe(1);
-    expect(doc.regions).toHaveLength(golden.rows.length);
+    expect(parsed).toEqual(JSON.parse(docBytes));
+    expect(parsed.act).toBe('ojz_act1');
+    expect(parsed.schema).toBe(1);
+    expect(parsed.regions).toHaveLength(golden.rows.length);
   });
 });
 
-/** The parsed golden document, for every row below. */
-const doc: RegionsDocument = parseRegionsDocument(docBytes, 'ojz_act1.regions.json');
+/**
+ * The parsed golden document and the flattened table, LAZY AND MEMOISED — not
+ * module-level constants, and the difference is not style.
+ *
+ * Both of these can throw: `parseRegionsDocument` throws if Aurora's closed
+ * schema ever refuses aeon's golden, and `flattenRegionsDocument` throws if the
+ * document stops covering the act. Evaluated at module scope, either throw
+ * happens during COLLECTION and vitest reports `Tests: no tests` — every row in
+ * this file vanishes, including the ones whose whole job is to name what went
+ * wrong. Measured, not reasoned about: breaking the inclusive conversion to
+ * `x + w` on 2026-09-16 took all 29 rows out in one line and printed no row name
+ * at all. Behind a function the same break fails the rows that USE the table and
+ * leaves the fixture-property rows reporting.
+ */
+let docCache: RegionsDocument | null = null;
+const doc = (): RegionsDocument => (docCache ??= parseRegionsDocument(docBytes, 'ojz_act1.regions.json'));
 
 /**
  * THE ACT'S SIZE IS DERIVED HERE, NOT COPIED OUT OF THE ROWS FILE.
@@ -151,26 +167,27 @@ const doc: RegionsDocument = parseRegionsDocument(docBytes, 'ojz_act1.regions.js
  * the coverage check either: a document with a hole in the middle has the same
  * extent and `uncoveredRects` still finds the hole.
  */
-const derived = actExtentFromDocument(doc);
+const derived = (): ActBounds => actExtentFromDocument(doc());
+let tableCache: RegionTable | null = null;
+const table = (): RegionTable => (tableCache ??= flattenRegionsDocument(doc(), derived(), 'ojz_act1.regions.json'));
 
 describe('THE SEAM: our flattening reproduces aeon\'s hand-typed rows', () => {
   it("the act's size derived from the document equals the golden's act_w/act_h", () => {
-    expect(derived.actW).toBe(golden.act_w);
-    expect(derived.actH).toBe(golden.act_h);
+    expect(derived().actW).toBe(golden.act_w);
+    expect(derived().actH).toBe(golden.act_h);
   });
 
-  const table = flattenRegionsDocument(doc, derived, 'ojz_act1.regions.json');
 
   it('ten regions in, ten rows out', () => {
     expect(golden.rows).toHaveLength(10);
-    expect(table.rows).toHaveLength(10);
+    expect(table().rows).toHaveLength(10);
   });
 
   it('the whole table — act, act_w, act_h and every row — equals the golden', () => {
     // The one assertion the parcel is for (spec §5.4). WHOLE ROW OBJECTS, not a
     // projection: an EXTRA key on our side fails this too, which a field-by-field
     // loop over ROW_KEYS could never see.
-    expect(table).toEqual({
+    expect(table()).toEqual({
       act: golden.act,
       act_w: golden.act_w,
       act_h: golden.act_h,
@@ -181,10 +198,10 @@ describe('THE SEAM: our flattening reproduces aeon\'s hand-typed rows', () => {
   // …and again per row, per field, because the message a single deep-equal over
   // ten rows prints on failure names the whole table and not the field that
   // moved. Same claim, legible failure.
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < golden.rows.length; i++) {
     it(`row ${i} matches the golden on every field`, () => {
       const want = golden.rows[i];
-      const got = table.rows[i];
+      const got = table().rows[i];
       expect(got, `no row ${i} in our table`).toBeDefined();
       for (const k of ROW_KEYS) {
         expect(got[k], `row ${i} (${want.id}): field ${k}`).toBe(want[k]);
@@ -202,10 +219,10 @@ describe('THE SEAM: our flattening reproduces aeon\'s hand-typed rows', () => {
     // tell the two apart in JS either — `undefined` fails it, but so would a key
     // that is simply absent from an object built another way. This is the row
     // that separates them.
-    const absent = table.rows.filter(r => r.sceneRef === null);
+    const absent = table().rows.filter(r => r.sceneRef === null);
     // Anti-vacuous: if the golden had no null bindings this would measure nothing.
     expect(absent.length, 'no row has a null sceneRef: this row measured nothing').toBeGreaterThan(0);
-    for (const r of table.rows) {
+    for (const r of table().rows) {
       expect(Object.prototype.hasOwnProperty.call(r, 'sceneRef'), `row ${r.index} (${r.id})`).toBe(true);
       expect(Object.prototype.hasOwnProperty.call(r, 'rasterRef'), `row ${r.index} (${r.id})`).toBe(true);
     }
@@ -220,16 +237,16 @@ describe('THE SEAM: our flattening reproduces aeon\'s hand-typed rows', () => {
     expect(scenes.length, 'the golden has no non-null sceneRef to check').toBeGreaterThan(0);
     expect(rasters.length, 'the golden has no non-null rasterRef to check').toBeGreaterThan(0);
     for (const want of scenes) {
-      expect(table.rows[want.index].sceneRef, `row ${want.index} (${want.id}) sceneRef`).toBe(want.sceneRef);
+      expect(table().rows[want.index].sceneRef, `row ${want.index} (${want.id}) sceneRef`).toBe(want.sceneRef);
     }
     for (const want of rasters) {
-      expect(table.rows[want.index].rasterRef, `row ${want.index} (${want.id}) rasterRef`).toBe(want.rasterRef);
+      expect(table().rows[want.index].rasterRef, `row ${want.index} (${want.id}) rasterRef`).toBe(want.rasterRef);
     }
   });
 
   it('area and disjointness are the engine\'s own two numbers', () => {
-    expect(areaOfRows(table.rows)).toBe(golden.act_w * golden.act_h);
-    const rects = table.rows.map(r => [r.x0, r.y0, r.x1 - r.x0 + 1, r.y1 - r.y0 + 1] as const);
+    expect(areaOfRows(table().rows)).toBe(golden.act_w * golden.act_h);
+    const rects = table().rows.map(r => [r.x0, r.y0, r.x1 - r.x0 + 1, r.y1 - r.y0 + 1] as const);
     expect(firstOverlap(rects)).toBeNull();
     expect(uncoveredRects(rects, golden.act_w, golden.act_h)).toEqual([]);
   });
@@ -254,15 +271,15 @@ describe('the fixture still exercises what it exists for', () => {
     // sec1 and sec2 exist in this shape BECAUSE night cuts into them. If their
     // widths ever became section multiples the document would be back on the
     // grid even with a straddling night.
-    const doc1 = doc.regions.find(r => r.id === 'sec1')!;
-    const doc2 = doc.regions.find(r => r.id === 'sec2')!;
+    const doc1 = doc().regions.find(r => r.id === 'sec1')!;
+    const doc2 = doc().regions.find(r => r.id === 'sec2')!;
     expect(doc1.rect.w % SECTION_SIZE, 'sec1 is back on the section grid').not.toBe(0);
     expect(doc2.rect.w % SECTION_SIZE, 'sec2 is back on the section grid').not.toBe(0);
   });
 
   it('the document and the rows file agree on their act and their count', () => {
-    expect(golden.act).toBe(doc.act);
-    expect(golden.rows).toHaveLength(doc.regions.length);
+    expect(golden.act).toBe(doc().act);
+    expect(golden.rows).toHaveLength(doc().regions.length);
   });
 });
 
@@ -275,33 +292,33 @@ describe('the instruments can actually produce a failing answer', () => {
    * exists for the same reason and says so in the same words.)
    */
   it('uncoveredRects finds a hole punched on purpose, and names where', () => {
-    const holed = doc.regions
+    const holed = doc().regions
       .filter(r => r.id !== 'sec4')
       .map(r => [r.rect.x, r.rect.y, r.rect.w, r.rect.h] as const);
     const holes = uncoveredRects(holed, golden.act_w, golden.act_h);
-    const sec4 = doc.regions.find(r => r.id === 'sec4')!.rect;
+    const sec4 = doc().regions.find(r => r.id === 'sec4')!.rect;
     expect(holes).toEqual([[sec4.x, sec4.y, sec4.w, sec4.h]]);
   });
 
   it('firstOverlap finds an overlap made on purpose, and names the pair', () => {
     // Same shape: `null` over the golden is what a correct document produces and
     // what `return null` produces.
-    const rects = doc.regions.map(r => [r.rect.x, r.rect.y, r.rect.w, r.rect.h] as const);
+    const rects = doc().regions.map(r => [r.rect.x, r.rect.y, r.rect.w, r.rect.h] as const);
     const clash = [...rects, rects[0]];
     expect(firstOverlap(clash)).toEqual([0, clash.length - 1]);
   });
 
   it('flattening refuses a document with a hole, rather than repairing it', () => {
     const wounded: RegionsDocument = {
-      ...doc,
-      regions: doc.regions.filter(r => r.id !== 'sec4'),
+      ...doc(),
+      regions: doc().regions.filter(r => r.id !== 'sec4'),
     };
-    expect(() => flattenRegionsDocument(wounded, derived)).toThrow(/belong to no region/);
+    expect(() => flattenRegionsDocument(wounded, derived())).toThrow(/belong to no region/);
   });
 
   it('flattening refuses a document whose regions overlap', () => {
-    const wounded: RegionsDocument = { ...doc, regions: [...doc.regions, doc.regions[0]] };
-    expect(() => flattenRegionsDocument(wounded, derived)).toThrow(/overlap/);
+    const wounded: RegionsDocument = { ...doc(), regions: [...doc().regions, doc().regions[0]] };
+    expect(() => flattenRegionsDocument(wounded, derived())).toThrow(/overlap/);
   });
 });
 
