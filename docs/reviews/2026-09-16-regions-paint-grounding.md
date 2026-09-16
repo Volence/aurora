@@ -37,7 +37,17 @@ matches anywhere in aeon's tree and therefore **"the shared golden does not exis
 now: aeon landed it at `e3b21e7267fa0590fdf43fbede068a98fc681c16`
 (*"merge(REGIONS SEAM): the loader, the flattener and the shared golden"*), verified here an
 ancestor of aeon `origin/master`, carrying `tools/fixtures/regions/ojz_act1.regions.json` and
-`ojz_act1.rows.json`. **Editor-spec step 2 is done.** Do not read that paragraph as current;
+`ojz_act1.rows.json`. **Editor-spec step 2 is done.**
+
+⚠ **AND `e3b21e72` IS A LANDING, NOT A PIN — DO NOT REUSE IT AS ONE.** Corrected 2026-09-16 by
+the seam-leg agent against this file's own author. `git log origin/master -- <path>` over both
+golden files names **`97723264e3ec975e46b1c2569ad9aadb00f5074a`** as the *only* commit that has
+ever touched either; `e3b21e72` is the merge eight commits later and resolves the same blobs
+only because it does not touch them. Identical bytes, weaker citation. The vendored sidecars
+pin `9772326`. **The rule is this repo's own** (`docs/reviews/2026-09-16-regions-codec.md`, "The
+pin, re-derived here": the pin is the last-touching commit, never the tip) — it was quoted in
+the dispatch brief that then broke it, which is the ordinary way a rule fails: not disputed,
+just not applied to the sentence being written. Do not read that paragraph as current;
 it is a dated measurement, which is the class this repo keeps paying for.
 
 ## The precedent the hub cited for region colours is REAL — checked, not assumed
