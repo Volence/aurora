@@ -63,7 +63,9 @@
 // files: represent a state, never represent it by absence.
 
 import type { Region, RegionRect, RegionsDocument } from '../../core/formats/regions/document';
-import type { BgLibraryEntry } from '../../core/model/s4-types';
+import type { Act, BgLibraryEntry, S4Project, Section } from '../../core/model/s4-types';
+import { SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
+import { regionBindingVocabulary } from '../../core/formats/regions/vocabulary';
 import type { Notice } from '../../core/project/notice';
 import type { SetRegionsCommand } from '../../core/editing/commands';
 import { cloneRegionsDocument } from '../../core/formats/regions/act-regions';
@@ -594,4 +596,119 @@ function toneOf(n: Notice): RegionStatusTone {
  */
 export function regionRectFindings(region: Region, act: ActExtent): string[] {
   return validateRectInAct(region.rect, act, { regionId: region.id }).map((f) => f.message);
+}
+
+// ---------------------------------------------------------------------------
+// The store side — everything above this line is pure and is what the node
+// suite tests. Below it the same derivations are fed from the open project.
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything the Regions panel renders for the current act, or a reason it
+ * renders nothing.
+ *
+ * ⚠ THE THREE STATES OF `ActRegionsState` SURVIVE INTO THE PANEL. `kind` is
+ * `none` / `open` / `refused`, never a bare "no regions", because a
+ * `regions.json` Aurora REFUSED is not an act without regions: the save neither
+ * overwrites nor removes it, and a panel that said "no regions yet" over a file
+ * on disk would invite the author to build a second one. `act-regions.ts`'s
+ * header carries the long version.
+ */
+export type RegionsPanelState =
+  | { kind: 'no-project' }
+  | { kind: 'none'; actId: string }
+  | { kind: 'refused'; actId: string; path: string; reason: string }
+  | {
+    kind: 'open';
+    actId: string;
+    doc: RegionsDocument;
+    defaults: ActBindingDefaults;
+    act: ActExtent;
+    rows: RegionListRow[];
+    actRow: ActListRow;
+    status: RegionStatusRow[];
+    /** The selected region, resolved BY ID (see `editorStore.selectedRegionId`). */
+    selected: Region | null;
+    /** The `EffectsPreset` record names the picker offers, or null: unreadable. */
+    presetRecords: string[] | null;
+  };
+
+/**
+ * How many of this act's section sidecars still carry a `sceneRef` or a
+ * `rasterRef` — §2.5 rule 5's count.
+ *
+ * ⚠ IT COUNTS SECTIONS, NOT FILES, and the two agree because one section is one
+ * `section_N.meta.json`. An EMPTY section slot is skipped rather than counted as
+ * clean: it has no sidecar to carry anything, and counting it would make the
+ * number an act-grid size rather than a migration debt.
+ */
+export function sidecarsCarryingRefs(sections: readonly (Section | null)[]): number {
+  let n = 0;
+  for (const s of sections) {
+    if (s === null) continue;
+    if (s.sceneRef !== null || s.rasterRef !== null) n += 1;
+  }
+  return n;
+}
+
+/**
+ * Build the whole panel state from an act and its project's libraries.
+ *
+ * SPLIT FROM THE HOOK ON PURPOSE: this takes plain arguments, so the node suite
+ * can drive the three `kind`s without a store, and the hook below is the thin
+ * part that reads one.
+ */
+export function regionsPanelState(
+  act: Act | null,
+  project: S4Project | null,
+  selectedRegionId: string | null,
+): RegionsPanelState {
+  if (!act || !project) return { kind: 'no-project' };
+  const st = act.regions;
+  // ⚠ `unreadable` IS READ BEFORE `document`. A refused file leaves `document`
+  // null, so testing the document first would report the refusal as "no
+  // regions" — the collapse `ActRegionsState` exists to prevent, arriving from
+  // the surface instead of from the save.
+  if (st.unreadable !== null) {
+    return {
+      kind: 'refused', actId: act.id,
+      path: st.unreadable.path, reason: st.unreadable.reason,
+    };
+  }
+  if (st.document === null) return { kind: 'none', actId: act.id };
+
+  const doc = st.document;
+  const defaults = actBindingDefaults(act.sceneRef);
+  const extent: ActExtent = {
+    // THE ACT'S OWN SIZE, FROM ITS GRID, never from the document under test —
+    // the load's own rule at the same call: a bound taken from the thing being
+    // checked makes the rule true by construction.
+    actW: act.gridWidth * SECTION_PIXEL_SIZE,
+    actH: act.gridHeight * SECTION_PIXEL_SIZE,
+  };
+  const vocab = regionBindingVocabulary({
+    rasterWiring: act.rasterWiring,
+    effectsScenes: project.effectsScenes,
+    effectsPresets: project.effectsPresets,
+    bgLibrary: project.bgLibrary,
+    bgLibraryUnresolved: project.bgLibraryUnresolved,
+  });
+
+  return {
+    kind: 'open',
+    actId: act.id,
+    doc,
+    defaults,
+    act: extent,
+    rows: regionListRows(doc, defaults, project.bgLibrary),
+    actRow: actListRow(doc, defaults, project.bgLibrary),
+    status: regionStatusRows({
+      doc, act: extent, vocab,
+      sidecarsWithRefs: sidecarsCarryingRefs(act.sections),
+    }),
+    // BY ID: an id that no longer names a region resolves to null, which is a
+    // visible "nothing selected" rather than a silent jump to a neighbour.
+    selected: doc.regions.find((r) => r.id === selectedRegionId) ?? null,
+    presetRecords: vocab.presetRecords,
+  };
 }

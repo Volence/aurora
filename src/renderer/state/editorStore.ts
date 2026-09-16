@@ -343,6 +343,28 @@ interface EditorState {
   effectsSubTab: EffectsSubTabId;
 
   /**
+   * WHICH REGION THE REGIONS FACET IS EDITING, by id, or null for none.
+   *
+   * ═══ BY ID, NOT BY LIST INDEX ═══
+   *
+   * An index survives nothing: step 7's migration rewrites `regions[]` whole,
+   * step 8's carve can delete the region under the cursor, and an undo restores
+   * a document whose positions moved. An index would then silently select a
+   * DIFFERENT region — the panel would show one region's bindings under another
+   * region's name, and an edit would land on the wrong row. An id that no longer
+   * exists resolves to "nothing selected", which is a visible state.
+   *
+   * IN THE STORE, NOT `React.useState` IN THE PANEL, on exactly the reasoning
+   * `selectedEffectsSceneId` gives: a sibling has to be able to write it. §3.4
+   * says selecting a list entry selects it ON THE MAP, and the map overlay is
+   * step 8 — so the canvas is the sibling this exists for, and the state is put
+   * in the right place now rather than moved out of a component later.
+   *
+   * NOT PERSISTED. Which region you last looked at is not a preference.
+   */
+  selectedRegionId: string | null;
+
+  /**
    * Which RASTER PRESET the band panel is editing, by id.
    *
    * The id and not the document, on `selectedEffectsSceneId`'s own reasoning:
@@ -562,6 +584,8 @@ interface EditorState {
    * nothing changed on screen" the reveal exists to end.
    */
   setEffectsSubTab: (tab: EffectsSubTabId) => void;
+  /** Select a region by id, or clear the selection with null. */
+  setSelectedRegionId: (id: string | null) => void;
   /**
    * Move the promotion candidate, and point the lens AT it.
    *
@@ -773,6 +797,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedEffectsPresetId: null,
   // The job a scene needs, and the one the mockup draws first.
   effectsSubTab: 'parallax',
+  selectedRegionId: null,
   // 1x1 at slot 0: the smallest legal band, and a base the panel re-seeds to
   // `firstPromotableSlot` as soon as a document is open. `bandLensTarget: null`
   // is what keeps this from lighting anything before the author marks.
@@ -873,6 +898,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectedEffectsSceneId: (id) => set({ selectedEffectsSceneId: id }),
   setSelectedEffectsPresetId: (id) => set({ selectedEffectsPresetId: id }),
   setEffectsSubTab: (effectsSubTab) => set({ effectsSubTab }),
+  setSelectedRegionId: (selectedRegionId) => set({ selectedRegionId }),
   setBandCandidate: (patch) => set((s) => ({
     bandCandidate: { ...s.bandCandidate, ...patch },
     bandLensTarget: { kind: 'candidate' },
