@@ -3,6 +3,7 @@ import type { EffectsScene, EffectsSceneLibrary } from '../formats/effects/scene
 import type { EffectsPreset, EffectsPresetLibrary } from '../formats/effects/preset';
 import type { BgOverrideBand, BgOverrideDocument } from '../formats/bg-override/bg-override';
 import type { BandSlotPlan } from '../formats/bg-override/bg-anim-band';
+import type { RegionsDocument } from '../formats/regions/document';
 
 export interface S4Level {
   sections: (Section | null)[];
@@ -458,6 +459,53 @@ export interface SetSectionsCommand extends EditCommand {
 }
 
 /**
+ * Replace this act's WHOLE regions document — `{dataPath}regions.json`.
+ *
+ * ═══ ONE COMMAND PER GESTURE, AND WHY IT IS THE WHOLE DOCUMENT ═════════════
+ *
+ * The editor spec's §3.3 asks for exactly this shape, and the reason is the
+ * owner's Q1 ruling (2026-09-14T14:54:34Z, "cut right away"): drawing a region
+ * over another TRIMS the other at once, so a single drag can split three
+ * neighbouring regions into nine rectangles, and "Migrate sections" rewrites
+ * every region in the act. A per-rect delta would make one gesture N undo
+ * steps, and Ctrl+Z would walk backwards through the middle of a carve, leaving
+ * the act in a state no author ever drew. A whole-document swap makes "one
+ * gesture is one undo step" true BY CONSTRUCTION rather than by discipline at
+ * every call site.
+ *
+ * The document is small — tens of rectangles, not the hundreds of thousands of
+ * cells a tile plane carries — so the memory argument that forces deltas on
+ * `set-tiles` does not arise here. It is the same trade `set-effects-scene`
+ * made, for the same reason, and this is deliberately its shape.
+ *
+ * ═══ BOTH HALVES ARE DEEP COPIES THE CALLER OWNS ══════════════════════════
+ *
+ * `cloneRegionsDocument` (core/formats/regions/act-regions.ts), never an alias
+ * of the object on the act: a command holding the very object it is meant to
+ * restore restores nothing. That defect is recorded on `set-effects-scene` and
+ * is not re-learned here.
+ *
+ * ═══ NULL MEANS "NO REGIONS DOCUMENT", ON PURPOSE ═════════════════════════
+ *
+ * `oldDocument` null = the act had none (creating the first region); `newDocument`
+ * null = the author deleted the last one. The contract's `regions` array is
+ * `minItems: 1`, so "a document with no regions" is not a value that exists —
+ * absent is how the file says it, and null is how the model says it.
+ *
+ * `sectionIndex` is -1: ACT-AMBIENT, like `set-effects-scene` and
+ * `set-section-scene`. The regions of an act are not the property of any one
+ * section — the shipped night region straddles a section line, which is the
+ * whole point of identity by rectangle — so there is no section to record on.
+ * `commandDocId` (renderer/state/editorStore.ts) routes it to the current act's
+ * document, which is where act-scoped history lives.
+ */
+export interface SetRegionsCommand extends EditCommand {
+  type: 'set-regions';
+  oldDocument: RegionsDocument | null;
+  newDocument: RegionsDocument | null;
+}
+
+/**
  * Groups several commands into one undo step. Children apply in order and undo
  * in reverse. Used for multi-tile pixel edits (a stroke/shape crossing several
  * chunk tiles edits each tileset tile, but undoes as a single action).
@@ -499,4 +547,5 @@ export type AnyCommand =
   | SetBgOverrideTilesCommand
   | SetBgOverridePhasesCommand
   | SetBgOverrideDefaultOffCommand
+  | SetRegionsCommand
   | SetSectionsCommand;
