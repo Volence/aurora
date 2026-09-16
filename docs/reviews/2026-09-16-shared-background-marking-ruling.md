@@ -178,3 +178,25 @@ to notice an absence, and because on day one every act has one background and he
 see the line he asked for. If he prefers the quiet map, the caption alone carries the launch
 state and the label line switches on at the second background; every other part of this ruling
 stands unchanged.
+
+---
+
+## 8. The one open question went to a Fable agent, not to his card — and its verdict lands in EMPYREAN
+
+*Appended by the overseer 2026-09-16, after the hub took it up. Recorded here because a
+successor reading this ruling is the one who needs it, and it arrived in a message, which is
+the one artifact a `/clear` destroys.*
+
+§7's question — **name on every label always, or only once an act has more than one
+background** — was **not** filed to the owner. His 2026-09-16T05:2xZ instruction routes a
+regions-phase-2 call to a Fable agent rather than to his card, and this is one, inside the lift.
+The hub dispatched an agent against **`4414f8ce`**, read at that revision, with this document's
+framing rather than the hub's, and with a third option open to it if it has one.
+
+**Its verdict is written into empyrean, not into this repo.** Go and look for it there rather
+than waiting for it to arrive; a ruling nobody fetches reads identically to one never made. If
+it moves §3.4's badge text beyond what §4 already specifies, that is **view, and it stays this
+lane's call** — the hub said so explicitly.
+
+Everything in §1 through §7 stands unless that verdict says otherwise, and the label's
+**on-condition** is the only thing it can move. Overturnable by one word from him, as before.
