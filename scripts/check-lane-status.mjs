@@ -20,10 +20,14 @@ import { readFileSync } from 'node:fs';
 // still unchecked on `focus`. Found here by measuring rather than by reading:
 // `grep -n focus scripts/check-lane-status.mjs` returned nothing while this
 // lane's own focus had measured EXACTLY 120 on 2026-09-11, inside by nothing,
-// with nothing watching. The hub's `scripts/hub_check.py` had been printing all
-// four under the label "rule 7" for weeks — right figures, wrong source, which
-// is the one defect that would have stopped anyone re-deriving where the fourth
-// bound lives. Both halves fixed at empyrean `b86aa93` (verified here an ancestor
+// with nothing watching. The hub's `empyrean/scripts/hub_check.py` had been
+// printing all four under the label "rule 7" for weeks — right figures, wrong
+// source, which is the one defect that would have stopped anyone re-deriving
+// where the fourth bound lives. (It is named WITH its repo because this suite's
+// own check-cited-paths gate caught the repo-less spelling on the first landing
+// attempt: in-repo by shape, absent in fact. A peer's file is cited with the
+// peer's name or it reads as a promise about this tree.)
+// Both halves fixed at empyrean `b86aa93` (verified here an ancestor
 // of `origin/main`): rule 7 now names the fourth and its snippet measures it, and
 // the field table cell names rule 7 for the other three. MEASURE THE COUNT, never
 // quote it — including from this comment.
