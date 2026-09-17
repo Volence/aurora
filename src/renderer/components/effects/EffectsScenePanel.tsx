@@ -512,8 +512,10 @@ export default function EffectsScenePanel(): React.ReactElement {
   // WHAT THE SELECTED SCENE HAS TO DO WITH THE ACTIVE SECTION. `text` is null
   // in the state this panel arrives in and stays in — see the provider for why
   // agreement is deliberately silent rather than a fifth restatement of it.
+  // The act goes in so that on a region-mode act (ruling b1's predicate, asked
+  // in the provider) the sentence names the region rows, not the sections.
   const relation = sceneSelectionRelation(
-    act?.sections ?? [], activeSectionIndex, selected?.id ?? null);
+    act?.sections ?? [], activeSectionIndex, selected?.id ?? null, act ?? undefined);
 
   // HOW FAR THE CAMERA TRAVELS ACROSS THIS ACT, which is the only thing that
   // turns a parallax factor into "the background starts over HERE" (ROADMAP
