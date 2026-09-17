@@ -1963,6 +1963,22 @@ export function presetIdFromFileName(fileName: string): string | null {
   return fileName.slice(0, -'.json'.length);
 }
 
+/**
+ * The preset id a library PATH names, or null when the path is not a preset
+ * document of the library under `dataRoot`. The inverse of `effectsPresetPath`,
+ * built on the same terms as `sceneIdFromPath` (scene.ts): the directory is
+ * `effectsPresetDir`, the file name is read by `presetIdFromFileName`, and a
+ * path with a further `/` below the directory is refused because the loader
+ * never lists one.
+ */
+export function presetIdFromPath(dataRoot: string, path: string): string | null {
+  const dir = effectsPresetDir(dataRoot);
+  if (!path.startsWith(dir)) return null;
+  const fileName = path.slice(dir.length);
+  if (fileName.includes('/')) return null;
+  return presetIdFromFileName(fileName);
+}
+
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
@@ -2273,7 +2289,9 @@ export async function loadEffectsPresetLibrary(
   for (const entry of entries) {
     const stem = presetIdFromFileName(entry);
     if (stem === null) continue;
-    const path = `${dir}${entry}`;
+    // THE BUILDER, as in the scene loader: the reported path is one
+    // `presetIdFromPath` is tested as the inverse of.
+    const path = effectsPresetPath(dataRoot, stem);
     try {
       presets.push(parseEffectsPreset(new TextDecoder().decode(await fa.read(path)), stem));
       loadedPaths.push(path);

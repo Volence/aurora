@@ -26,12 +26,12 @@
 
 import type { RegionBindingVocabulary } from './validate';
 import type { SectionRasterWiring } from '../effects/section-wiring';
-import type { EffectsSceneLibrary } from '../effects/scene';
-import type { EffectsPresetLibrary } from '../effects/preset';
+import { sceneIdFromPath, type EffectsSceneLibrary } from '../effects/scene';
+import { presetIdFromPath, type EffectsPresetLibrary } from '../effects/preset';
 import type { BgLibraryEntry } from '../../model/s4-types';
 
 /**
- * A loaded document's id from the path it was read from.
+ * The ids of a library's REFUSED documents, from the paths it reports them by.
  *
  * ⚠ NARROW JOB, AND THE REASON IT EXISTS. An `unreadable` entry is a PATH,
  * while a region's `sceneRef` / `rasterRef` is an ID, and the validator has to
@@ -39,19 +39,35 @@ import type { BgLibraryEntry } from '../../model/s4-types';
  * "no such scene". A refused file is not a missing one and the two sentences
  * send an author to different places.
  *
- * ⚠ IT IS THE INVERSE OF `effectsScenePath` / `effectsPresetPath` BY
- * TRANSCRIPTION, NOT BY CONSTRUCTION — booked at the step-5 landing. It takes
- * the basename without `.json`, which is what those two build; if either ever
- * nests an id under a directory, rule 3's "exists but was refused" half silently
- * degrades into its "missing" half. A wrong notice, not a crash.
+ * THE PARSE IS THE LIBRARY'S, not this module's: `sceneIdFromPath` and
+ * `presetIdFromPath` live beside the builders they invert and share their
+ * directory functions (was a basename transcription here until
+ * REGIONS-DOCID-TRANSCRIBED-INVERSE).
+ *
+ * A PATH THAT IS NOT A DOCUMENT OF THE LIBRARY IS DROPPED, never guessed. It
+ * names no id, so no ref can be "refused" by it; a guessed basename could only
+ * turn a genuinely missing document into a falsely "refused" one. The path is
+ * not lost: the library's own notice already names every unreadable path.
  */
-export function documentIdFromPath(path: string): string {
-  const base = path.slice(path.lastIndexOf('/') + 1);
-  return base.endsWith('.json') ? base.slice(0, -'.json'.length) : base;
+function refusedIds(
+  unreadable: readonly { path: string }[],
+  idFromPath: (path: string) => string | null,
+): string[] {
+  const ids: string[] = [];
+  for (const u of unreadable) {
+    const id = idFromPath(u.path);
+    if (id !== null) ids.push(id);
+  }
+  return ids;
 }
 
 /** The four libraries rule 3 resolves a region's bindings against. */
 export interface RegionVocabularySources {
+  /**
+   * The data root the two effects libraries were LOADED from — the parse of a
+   * refused document's path is relative to it (`projectDataRoot(config.raw)`).
+   */
+  dataRoot: string;
   /** THIS ACT's wiring — the preset vocabulary is per act, not per project. */
   rasterWiring: SectionRasterWiring;
   effectsScenes: EffectsSceneLibrary;
@@ -72,9 +88,11 @@ export function regionBindingVocabulary(
       : null,
     presetLibraryPath: src.rasterWiring.library.path,
     sceneIds: src.effectsScenes.scenes.map((s) => s.id),
-    sceneUnreadableIds: src.effectsScenes.unreadable.map((u) => documentIdFromPath(u.path)),
+    sceneUnreadableIds: refusedIds(
+      src.effectsScenes.unreadable, (p) => sceneIdFromPath(src.dataRoot, p)),
     rasterIds: src.effectsPresets.presets.map((p) => p.id),
-    rasterUnreadableIds: src.effectsPresets.unreadable.map((u) => documentIdFromPath(u.path)),
+    rasterUnreadableIds: refusedIds(
+      src.effectsPresets.unreadable, (p) => presetIdFromPath(src.dataRoot, p)),
     bgLayoutIds: src.bgLibrary.map((b) => b.id),
     bgUnresolvedIds: src.bgLibraryUnresolved.map((b) => b.id),
   };

@@ -362,3 +362,5 @@ queue is the one place that information does not need to live — a finding ledg
 greppable by id and a queue is not, and the row was costing a slot a future session
 will need for something that genuinely has to be done. Verify the fact has a tracked
 home before dropping the row, which is what the two citations above are for.
+
+**2026-09-17, CLOSED (REGIONS-DOCID-TRANSCRIBED-INVERSE):** the booked `documentIdFromPath` limit is closed at `6860f694` (tests `d04f0583`, branch `regions-docid-inverse`). The parse now lives beside the builders as `sceneIdFromPath` / `presetIdFromPath`, sharing `effectsSceneDir` / `effectsPresetDir`; both loaders build their `unreadable` paths with the builders; a path that is not a document of the library yields null and is dropped from the vocabulary. Pinned by `test/formats/effects-docid-inverse.test.ts`.
