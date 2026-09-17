@@ -746,7 +746,30 @@
  */
 
 export const RASTER_SECTION_BINDING_LIMIT =
-  'Saving a preset does not install it, and binding one no longer stops at the sidecar, but it '
+  // ⚠ THE REGION-MODE CLAUSE LEADS, AND IT IS ADDITIVE ON PURPOSE (2026-09-17).
+  // Ruling B asked for this sentence to be cut back to what is true at aeon
+  // origin/master. The cut is STOPPED, not skipped: its gate,
+  // `__tests__/raster-binding-threaded-set.test.ts`, derives the wired and bound
+  // sets with the SECTION-KEYED parser and requires both to be non-empty, which
+  // no true sentence can satisfy at aeon bcd844aa or later. Re-aiming that gate
+  // is the hub's call (docs/reviews/2026-09-17-region-mode-raster-false-output.md).
+  // Until then this clause says which of the clauses after it are stale, so the
+  // published sentence stops asserting them as current.
+  'REGION MODE FIRST, AND WHAT IT MAKES STALE BELOW. An act whose regions.json exists is in '
+  + 'region mode (aeon tools/effects_gen.py has_act_regions): its raster bindings are rasterRef '
+  + 'keys on the region rows, aeon\'s check_mode_conflict refuses the build when a '
+  + 'section_N.meta.json of that act carries a rasterRef or a sceneRef, so on such an act a '
+  + 'raster preset is bound on a region, in the Regions panel. OJZ act 1 has been in region mode '
+  + 'since aeon e2af59ea (2026-09-16), which nulled every one of its sidecar refs, and aeon '
+  + 'bcd844aa (2026-09-16) '
+  + 're-keyed the raster chooser from the section index to the preset record: '
+  + 'ojz_act1_sec_raster(sec: N) became ojz_act1_preset_raster(preset: <Record>_KEY), and at aeon '
+  + 'bb62eb9c (2026-09-17) a grep for sec_raster over ojz_effects.emp finds only comments. SO THE '
+  + 'SECTION-KEYED CLAUSES THAT FOLLOW (the rule naming ojz_act1_sec_raster, the wired and bound '
+  + 'readings of sections 5 and 6, the sidecar rasterRefs, and the aeon test names quoted for '
+  + 'them) were read at aeon a6aaf581 or earlier and are NOT current for OJZ act 1. They stand '
+  + 'unrevised pending a ruling on the gate that checks them. '
+  + 'Saving a preset does not install it, and binding one no longer stops at the sidecar, but it '
   + 'still does not finish. The per-section key is rasterRef: assign_section_preset writes it into '
   + 'that section\'s .meta.json sidecar, and aeon\'s build NOW READS IT. Verified at aeon e6405428 '
   + '(2026-08-30): tools/effects_gen.py resolves rasterRef against the preset documents and emits '

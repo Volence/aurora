@@ -27,7 +27,7 @@ import {
   sectionRasterOptions, presetRefOptions,
 } from '../../../providers/effects-preset';
 import {
-  REGION_MODE_RASTER_NOTICE, regionModeSectionRasterRefusal,
+  REGION_MODE_RASTER_NOTICE, regionModeSectionRasterRefusal, RASTER_SECTION_BINDING_LIMIT,
 } from '../../../../core/formats/raster-binding';
 import { noRegionsLoaded, type ActRegionsState } from '../../../../core/formats/regions/act-regions';
 import type { EffectsPresetLibrary } from '../../../../core/formats/effects/preset';
@@ -176,5 +176,33 @@ describe('the surfaces are wired to the gate (source)', () => {
       expect(code, `${name} calls actHasRegionsFile directly instead of through the provider gate`)
         .not.toMatch(/actHasRegionsFile\(/);
     }
+  });
+});
+
+describe('the shipped limit sentence carries the region-mode clause, FIRST', () => {
+  /**
+   * `RASTER_SECTION_BINDING_LIMIT` is published in the panel's limit block, the
+   * `assign_section_preset` reply and two tool descriptions. Its cut-back to
+   * aeon origin/master is STOPPED (see raster-binding.ts), so what it must do in
+   * the meantime is say region mode exists and which of its own clauses that
+   * makes stale, BEFORE a reader reaches them.
+   */
+  it('names the predicate, the refusal, the Regions panel, and the two aeon commits', () => {
+    for (const phrase of [
+      'has_act_regions', 'check_mode_conflict', 'Regions panel', 'e2af59ea', 'bcd844aa',
+      'ojz_act1_preset_raster(preset: <Record>_KEY)', 'are NOT current for OJZ act 1',
+    ]) {
+      expect(RASTER_SECTION_BINDING_LIMIT, `missing: ${phrase}`).toContain(phrase);
+    }
+  });
+
+  it('comes before the first section-keyed clause it declares stale', () => {
+    const clause = RASTER_SECTION_BINDING_LIMIT.indexOf('REGION MODE FIRST');
+    const rule = RASTER_SECTION_BINDING_LIMIT.indexOf('a section is wired exactly when');
+    const reading = RASTER_SECTION_BINDING_LIMIT.indexOf('the wired set is {');
+    expect(clause).toBe(0);
+    expect(rule, 'the section-keyed rule clause is gone: re-read this row with the sentence')
+      .toBeGreaterThan(clause);
+    expect(reading).toBeGreaterThan(clause);
   });
 });
