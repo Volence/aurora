@@ -45,6 +45,7 @@ import {
 import { cloneRegionsDocument } from '../../../core/formats/regions/act-regions';
 import { planActMigration } from '../../providers/regions-migrate';
 import { BG_ACT_SENTINEL } from '../../../core/formats/regions/validate';
+import { projectDataRoot } from '../../../core/config/s4-config';
 
 /**
  * The list body's scroller.
@@ -564,9 +565,10 @@ export default function RegionsPanel(): React.ReactElement {
   useHistoryVersion();
   const act = useProjectStore((s) => getCurrentAct(s));
   const project = useProjectStore((s) => s.project);
+  const dataRoot = useProjectStore((s) => (s.config ? projectDataRoot(s.config.raw) : null));
   const selectedRegionId = useEditorStore((s) => s.selectedRegionId);
   const setSelectedRegionId = useEditorStore((s) => s.setSelectedRegionId);
-  const state = regionsPanelState(act, project, selectedRegionId);
+  const state = regionsPanelState(act, project, selectedRegionId, dataRoot);
   // THE RECEIPT OUTLIVES THE DOOR — see `MigrateSections`. Held here because
   // this component renders in every `state.kind`, and dropped the moment the
   // panel is looking at a different act, so a receipt never describes an act it

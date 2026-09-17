@@ -110,9 +110,9 @@ const ALLOWANCES = [
   },
   {
     file: 'src/core/formats/raster-binding.ts',
-    text: 'no sidecar carries a rasterRef',
+    text: 'nothing binds a rasterRef',
     why: 'RASTER_SECTION_BINDING_LIMIT quotes three of aeon\'s pytest failure messages by name',
-    read_from: 'aeon tools/test_effects_seam_gate.py:758',
+    read_from: 'aeon tools/test_effects_seam_gate.py:1176 at c7ebe7a1',
   },
 ];
 

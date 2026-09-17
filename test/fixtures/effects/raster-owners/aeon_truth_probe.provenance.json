@@ -1,0 +1,30 @@
+{
+  "$what": "Provenance of the two raster-ownership truth records in this directory and of the SECTION-MODE CONSTRUCTION they describe. Ruling REGION-MODE-RASTER-FALSE-OUTPUT-b1, condition 2: section-mode verdicts are shown TRUE against aeon today on a section-mode act AND a region-mode act. aeon's tree at c7ebe7a1 has no section-mode act that threads rasters (regions.json exists only for games/sonic4/data/editor/ojz/act1/, and only OJZ has an effects library), so the section-mode act is a MINIMAL, LABELLED CONSTRUCTION from aeon bytes.",
+  "aeon": {
+    "repo": "git@github.com:Volence/aeon.git",
+    "branch_that_answers_currency": "origin/master",
+    "revision_of_the_generator_and_library": "c7ebe7a1a781cae8a036eb3e7185fc0de069b168",
+    "revision_of_the_section_mode_act_files": "bcd844aaeced9a7130481f0c77c088d7d8837409"
+  },
+  "construction": {
+    "is": "aeon c7ebe7a1 (tools/, project.json, engine/, games/sonic4/) with aeon e2af59ea's act-1 region flip REVERTED and nothing else changed: games/sonic4/data/levels/ojz/act1/act_descriptor.emp and act_assets.emp and games/sonic4/data/editor/ojz/act1/section_{0,4,5,6,7,8}.meta.json replaced by their bytes at bcd844aa, and games/sonic4/data/editor/ojz/act1/regions.json deleted.",
+    "why_bcd844aa": "bcd844aa (regions-emit-bindings 2/3) is the commit that re-keyed the choosers on the record while OJZ act 1 was still in SECTION mode; e2af59ea (3/3), its child on this path, is the flip. `git diff --stat bcd844aa c7ebe7a1 -- games/sonic4/data/editor/ojz/act1/ games/sonic4/data/levels/ojz/act1/` lists exactly regions.json, section_{0,4,5,6,7,8}.meta.json, act_assets.emp and act_descriptor.emp, so the reversion above is that whole diff and no more. bcd844aa is an ancestor of c7ebe7a1 (`git merge-base --is-ancestor`, exit 0).",
+    "built_where": "a scratch directory from `git archive c7ebe7a1 tools project.json games/sonic4/data engine` and `git archive c7ebe7a1 games/sonic4`, with the replaced files written by `git show bcd844aa:<path>`. aeon's checkout was never checked out, built, edited or fetched.",
+    "aeon_accepts_it": "`python3 tools/effects_seam_gate.py --source-only` run by aeon's own c7ebe7a1 code inside the construction printed `effects_seam_gate: OK (--source-only) ... [raster OJZ_Preset_Sec5(preset: OJZ_Preset_Sec5_KEY), raster OJZ_Preset_Sec6(preset: OJZ_Preset_Sec6_KEY)]; 9 section call site(s), 2 sidecar rasterRef(s) (0 on the patched arm); non-arm channel threadings required and found: sec 5 patch motion, sec 5 patch world-Y.` and exited 0. The control, the unmodified c7ebe7a1 tree, printed `... 4 region scene binding(s), 2 region rasterRef(s) (0 on the patched arm); non-arm channel threadings required and found: region sec5 patch motion, region sec5 patch world-Y.` and exited 0."
+  },
+  "files": {
+    "section-mode/act_descriptor.emp": "aeon bcd844aa:games/sonic4/data/levels/ojz/act1/act_descriptor.emp, sha256 7cb3b68d282059554665c7efd1868c7a97ab22372abcd0f085ba3183fbb5a9a8",
+    "section-mode/section_0.meta.json": "aeon bcd844aa:games/sonic4/data/editor/ojz/act1/section_0.meta.json, sha256 3b375c4e884e2ea97a0392f26fa5a5833deab2606c98040ecf08b373ee8227b9",
+    "section-mode/section_4.meta.json": "aeon bcd844aa:games/sonic4/data/editor/ojz/act1/section_4.meta.json, sha256 f16ce9cb5d895cd8a89ef453034730b2bdedc7566010a8eebdc5c85d72522bdd",
+    "section-mode/section_5.meta.json": "aeon bcd844aa:games/sonic4/data/editor/ojz/act1/section_5.meta.json, sha256 b599f780cedc8896547d919e60b50b56259d6bba99c86f31c1d054578b560045",
+    "section-mode/section_6.meta.json": "aeon bcd844aa:games/sonic4/data/editor/ojz/act1/section_6.meta.json, sha256 cfa192b08eea54286c93b701c7bb45571029288b63898440226bc2d8bd5de4af",
+    "section-mode/section_7.meta.json": "aeon bcd844aa:games/sonic4/data/editor/ojz/act1/section_7.meta.json, sha256 e19f56dfdfb59afa283b3c38bdb3c25ff205008e3cf29e983bfd108c456313b9",
+    "section-mode/section_8.meta.json": "aeon bcd844aa:games/sonic4/data/editor/ojz/act1/section_8.meta.json, sha256 97b0adf56e499c537891df4de324add19ba21a67505231e3660f09f95ddcc8b2",
+    "../ojz_effects.emp": "aeon c7ebe7a1:games/sonic4/data/effects/ojz_effects.emp, verbatim, with its own provenance sidecar (ojz_effects.provenance.json)",
+    "../ojz_act1.regions.json": "aeon c7ebe7a1:games/sonic4/data/editor/ojz/act1/regions.json is blob d7f45399, the SAME blob this existing fixture vendors at e2af59ea (see ojz_act1.regions.provenance.json)",
+    "section-mode.aeon-truth.json": "the stdout of `python3 aeon_truth_probe.py <construction>`, exit 0",
+    "region-mode.aeon-truth.json": "the stdout of `python3 aeon_truth_probe.py <unmodified c7ebe7a1 tree>`, exit 0",
+    "aeon_truth_probe.py": "the probe. It imports aeon's own tools/effects_gen.py and tools/effects_seam_gate.py from the tree it is pointed at and calls owner_maps, raster_call_sites, channel_call_sites and _rekey_bound_to_record. It computes nothing of its own except the home list, which is the owners whose record's raster_call_sites entry names that record, and the sha256 of each input file."
+  },
+  "what_the_truth_records_are_not": "They are not a pin of Aurora's output. Nothing in them was produced by Aurora code. The test that reads them first checks that each record's sha256_of_inputs equals the vendored bytes it is compared over, so a re-vendored fixture with a stale truth record fails before any comparison."
+}

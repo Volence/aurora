@@ -78,6 +78,7 @@ import {
   threadedSections, ownPresetSections, boundSections, sectionExtraChannelsCondition,
   extraChannelsAdvisory, type WiringCondition,
 } from '../../../core/formats/effects/section-wiring';
+import { regionModeRasterNotice } from '../../providers/effects-preset';
 
 /**
  * WHAT AN UNMET CONDITION MEANS RIGHT NOW, which decides how it may be drawn.
@@ -235,7 +236,8 @@ export default function SectionPicker({ children }: {
   // — because which choosers a section owes is a function of that document's
   // KEYS (aeon `effects_gen.document_channels`). The cold read's D-A: section 5
   // showed ✓✓ and the build still refused, because the preset it bound carried
-  // `cycles` and nothing threads `ojz_act1_sec_cycle(sec: 5)`.
+  // `cycles` and nothing threaded the cycle chooser for it (then
+  // `ojz_act1_sec_cycle(sec: 5)`; record-keyed since aeon `bcd844aa`).
   const boundPreset = section?.rasterRef ?? null;
   const boundDoc = boundPreset === null ? null
     : (useProjectStore.getState().project?.effectsPresets.presets
@@ -266,6 +268,19 @@ export default function SectionPicker({ children }: {
   // `boundSections`' docblock for that, and for why it is a set on this line
   // rather than a fourth condition row.
   const bound = boundSections(act.sections);
+
+  // ═══ REGION MODE (ruling B, 2026-09-17) ═══
+  //
+  // Non-null exactly when this act's regions.json exists (`actHasRegionsFile`,
+  // aeon's `has_act_regions`, asked through the provider). Every raster reading
+  // on this strip is SECTION-KEYED: the three conditions and the act sets read
+  // the section-keyed chooser and the section sidecars, and the raster half of
+  // the bindings line reads a sidecar `rasterRef`. On a region-mode act the
+  // binding is on the region rows, so none of those is painted and this ONE
+  // notice is, pointing at the Regions panel. A section-mode act renders exactly
+  // what it rendered before: every block below is gated on `regionNotice === null`
+  // and nothing inside those blocks changed.
+  const regionNotice = regionModeRasterNotice(act);
 
   return (
     <>
@@ -313,6 +328,16 @@ export default function SectionPicker({ children }: {
           data-effects-section-bindings="">
           {section === null ? (
             <>This section is empty: nothing is bound to it.</>
+          ) : regionNotice !== null ? (
+            // REGION MODE (ruling b1, condition 5): BOTH halves read a sidecar,
+            // and on this act neither sidecar ref is the binding. The scene half
+            // used to stay and printed `act default` for every section of OJZ
+            // act 1 while its region rows bind scenes (sec0 binds
+            // ojz_act1_start at aeon c7ebe7a1), which is false. So neither half
+            // is printed from the sidecar: the line says where both live.
+            <>
+              scene and raster are bound on this act's region rows, in the Regions panel
+            </>
           ) : (
             <>
               scene <code style={{ color: T.textHi }}>{section.sceneRef ?? 'act default'}</code>
@@ -332,17 +357,26 @@ export default function SectionPicker({ children }: {
             read's D-A. Three rows is more surface on a panel already called
             confusing, and that cost was weighed: a verdict that is wrong is
             worse than a verdict that is long. */}
+        {regionNotice !== null && (
+          <div data-effects-region-mode-notice=""
+            style={{ fontSize: T.tXs, color: T.textBase, lineHeight: 1.45 }}>
+            {regionNotice}
+          </div>
+        )}
+        {regionNotice === null && (<>
         <ConditionRow n={1} label="own preset" cond={cond.ownPreset} unmet={unmet}
           title={`CONDITION 1 of 3: a section can carry an editor-authored raster band only if it `
-            + `binds a preset record NO OTHER SECTION binds. Threading a section-keyed band into a `
-            + `shared record would give every section that shares it the same band, and aeon's `
-            + `build refuses that by name. Read from the act descriptor on every load.`
+            + `binds a preset record. aeon's raster chooser is keyed on that RECORD, so when other `
+            + `sections bind the same record they install the same band, and aeon's build refuses `
+            + `sections of one record that name different preset documents. Read from the act `
+            + `descriptor on every load.`
             + (advisory ? `\n\n${advisory}` : '')} />
         <ConditionRow n={2} label="threaded" cond={cond.threaded} unmet={unmet}
-          title={`CONDITION 2 of 3: some preset() in the game's effects library must actually pass `
-            + `${chooser}(sec: N) to its raster: channel. Without it the generator emits the binding `
-            + `row and nothing reads it, which presents to the author as an assignment that did `
-            + `nothing. That is one line in aeon. Read from the effects library on every load.`
+          title={`CONDITION 2 of 3: the preset() of the record this section binds must pass `
+            + `${chooser}(preset: <that record>_KEY) to its raster: channel, with its own key. `
+            + `Without it the generator emits the binding and nothing reads it, which presents to `
+            + `the author as an assignment that did nothing. That is one line in aeon. Read from the `
+            + `effects library on every load.`
             + (advisory ? `\n\n${advisory}` : '')} />
         <ConditionRow n={3} label="its channels" cond={extra} unmet={unmet}
           title={`CONDITION 3 of 3: one rasterRef binds the WHOLE preset document (aeon ruling Q1), `
@@ -352,6 +386,7 @@ export default function SectionPicker({ children }: {
             + `Conditions 1 and 2 can both be ✓ and this one ✗, which is exactly the case that `
             + `reached a build error after Aurora had said yes.`
             + (extraAdvisory ? `\n\n${extraAdvisory}` : '')} />
+        </>)}
 
         {/* THE SETS, NOT A SENTENCE ABOUT THE SETS. Which sections can carry a
             raster band is a property of the LEVEL DATA and is re-derived on
@@ -376,13 +411,13 @@ export default function SectionPicker({ children }: {
             false impression to correct, and `bound` alone under an `act:` label
             would read as a statement about wiring. Nothing is lost — the
             rebind notice reads no aeon file and is unaffected. */}
-        {act.rasterWiring.descriptor.parsed && (
+        {regionNotice === null && act.rasterWiring.descriptor.parsed && (
           <div style={{ fontSize: T.t2xs, color: T.textFaint, fontFamily: T.fontMono }}
             data-effects-act-sets=""
             title={'Three act-wide sets, each derived from its own question.\n\n'
-              + 'own preset: the sections whose aeon preset RECORD no other section shares '
-              + '(condition 1).\n'
-              + `threaded: the sections some preset() passes ${chooser}(sec: N) to (condition 2).\n`
+              + 'own preset: the sections that bind an aeon preset RECORD (condition 1).\n'
+              + `threaded: the sections whose record passes ${chooser}(preset: <record>_KEY) with `
+              + 'its own key (condition 2).\n'
               // ⚠ THIS LINE MUST NOT BEGIN WITH THE WORD `bound`, and the
               // reason is a gate that went green on a mutation. `bound` is a
               // RENDERED row in scripts/check-guide-text.mjs with `prefix:
@@ -434,7 +469,7 @@ export default function SectionPicker({ children }: {
           — the cold read credits this text with resolving C1 — only the tier
           it is drawn in, which now tracks whether a build is actually refused.
           Its `warning` tone is unchanged the moment a rasterRef is bound. */}
-      {advisory !== null && (
+      {regionNotice === null && advisory !== null && (
         <div data-effects-section-advisory=""
           data-effects-advisory-tone={state !== 'unknown' && unmet === 'refused' ? 'warning' : 'note'}
           style={{ padding: `${T.s2} ${T.s3} 0` }}>
@@ -453,7 +488,7 @@ export default function SectionPicker({ children }: {
           is that a gate must never prescribe a spelling nobody can write.
           `whiteSpace: pre-wrap` because the remedy is a bulleted list and a
           collapsed one runs the chooser calls together. */}
-      {extraAdvisory !== null && (
+      {regionNotice === null && extraAdvisory !== null && (
         <div data-effects-section-channel-advisory=""
           style={{ padding: `${T.s2} ${T.s3} 0` }}>
           <Hint tone="warning" style={{ marginBottom: T.s2, whiteSpace: 'pre-wrap' }}>

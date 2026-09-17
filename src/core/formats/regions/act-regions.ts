@@ -91,6 +91,70 @@ export function regionsPathFor(dataPath: string): string {
 }
 
 /**
+ * Is this act in REGION MODE: does its `{dataPath}regions.json` exist?
+ *
+ * ═══ AEON'S PREDICATE, AND THIS IS THE ONLY COPY OF IT IN AURORA ═══
+ *
+ * aeon `tools/effects_gen.py` at `c7ebe7a1` (re-read 2026-09-17; first read at
+ * `e20863ad`), unchanged between them on these lines:
+ *
+ *     def has_act_regions(repo, zone, act) -> bool:
+ *         """True when this act is in REGION mode. The whole of the mode decision."""
+ *         return os.path.isfile(regions_path(repo, zone, act))
+ *
+ * where `regions_path` is `os.path.join(repo, entry["dataPath"], "regions.json")`,
+ * the same file `regionsPathFor(dataPath)` above names. `check_mode_conflict`
+ * gates on exactly that and refuses a region-mode act whose section sidecar
+ * still carries a `sceneRef` or a `rasterRef`.
+ *
+ * ⚠ FILE PRESENCE AND NOTHING ELSE. Not "every sidecar ref is null", not a
+ * chooser name in aeon's library, not a document with rows in it. Every
+ * consumer that has to know the mode calls THIS, so there is one answer.
+ *
+ * ═══ WHICH FILE: THE ONE THE SAVE LEAVES ON DISK ═══
+ *
+ * Aurora cannot stat the file at every render, and the load already probed that
+ * exact path. `ActRegionsState` records what it found, and the save acts on it
+ * (save.ts, the regions branch), so the file on disk after a save is:
+ *
+ *   | state                                   | the save            | file exists |
+ *   |-----------------------------------------|---------------------|-------------|
+ *   | `document` set (loaded, or migrated now)| writes it           | yes         |
+ *   | `unreadable` set (present, refused)     | leaves it untouched | yes         |
+ *   | `document` null, `loadedPath` set       | removes it          | no          |
+ *   | all null (absent, or a bare fixture)    | writes nothing      | no          |
+ *
+ * So the predicate is `document !== null || unreadable !== null`. That is the
+ * file aeon's build will read the moment the author saves, which is the build
+ * any write made now has to survive: a sidecar `rasterRef` written just after
+ * `Migrate sections` (document set, nothing saved yet) is refused by
+ * `check_mode_conflict` at the next save and build, so it is region mode now.
+ *
+ * ═══ THE ONE WINDOW WHERE THIS AND aeon DISAGREE, AND IT IS NOT DRIFT ═══
+ *
+ * RATIFIED by ruling REGION-MODE-RASTER-FALSE-OUTPUT-b1 (condition 1). aeon asks
+ * the DISK (`os.path.isfile`); this asks the LOADED DOCUMENT. They answer
+ * differently in exactly one window: AFTER "Migrate sections" and BEFORE the
+ * save. In that window the migration has set `document` (so this says region
+ * mode) while regions.json is not yet on disk (so aeon, and an unsaved build,
+ * still say section mode). It is deliberate: the migration already cleared the
+ * sidecar refs in the model, and the save it is waiting for writes regions.json,
+ * so refusing a new sidecar ref now forbids nothing the save would keep. The
+ * mirror window, every region deleted and not yet saved, says section mode while
+ * the file is still on disk until the save removes it. Anyone comparing this
+ * predicate with aeon's across those two windows is looking at the save, not at
+ * a divergence.
+ *
+ * `undefined` is a hand-built `Act` that never carried the field, which is
+ * `noRegionsLoaded()`'s state by that function's own rule: nothing was looked
+ * at, so there is no file.
+ */
+export function actHasRegionsFile(regions: ActRegionsState | undefined): boolean {
+  if (regions === undefined) return false;
+  return regions.document !== null || regions.unreadable !== null;
+}
+
+/**
  * A deep copy of a regions document, for the old/new halves of a
  * `set-regions` command.
  *

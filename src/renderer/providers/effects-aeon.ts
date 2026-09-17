@@ -89,6 +89,11 @@ import {
 } from '../../core/formats/effects/curve-rate';
 import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
+// REGION MODE IS DECIDED IN ONE PLACE (ruling b1, condition 5): the scene half of
+// the sidecar refusal asks the same predicate and says the same sentence as the
+// raster half in effects-preset.ts.
+import { actHasRegionsFile, type ActRegionsState } from '../../core/formats/regions/act-regions';
+import { regionModeSectionRefRefusal } from '../../core/formats/raster-binding';
 
 // ---------------------------------------------------------------------------
 // Factor picker
@@ -3748,6 +3753,53 @@ export function unassignableSceneRef(
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
+
+/**
+ * Why this section cannot take ANY scene binding right now, or null.
+ *
+ * ═══ THE SCENE HALF OF THE REGION-MODE REFUSAL (ruling b1, condition 5) ═══
+ *
+ * aeon's `check_mode_conflict` (tools/effects_gen.py, read at aeon `c7ebe7a1`)
+ * loops over BOTH `ACT_SCENE_REF_KEY` and `ACT_RASTER_REF_KEY`, so on an act whose
+ * regions.json exists a sidecar `sceneRef` is refused exactly as a `rasterRef` is.
+ * This is `sectionRasterBindRefusal`'s mirror and says the same sentence with the
+ * scene words. On a section-mode act it is always null.
+ */
+export function sectionSceneBindRefusal(
+  act: { regions?: ActRegionsState }, sectionIndex: number, currentRef: string | null,
+): string | null {
+  if (!actHasRegionsFile(act.regions)) return null;
+  return regionModeSectionRefRefusal('sceneRef', sectionIndex, currentRef);
+}
+
+/**
+ * Why writing `value` into this section's sidecar `sceneRef` is refused, or null.
+ * BOTH DOORS ASK THIS before `sectionSceneCommand`: the scene panel's Section
+ * assignment select and `assign_section_scene`. Clearing (`''` or null) is never
+ * refused: a sidecar `sceneRef` beside regions.json is what `check_mode_conflict`
+ * refuses, so clearing it is the repair (RATIFIED in ruling b1).
+ */
+export function sectionSceneWriteRefusal(
+  act: { regions?: ActRegionsState }, sectionIndex: number,
+  currentRef: string | null, value: string | null,
+): string | null {
+  if (value === null || value === '') return null;
+  return sectionSceneBindRefusal(act, sectionIndex, currentRef);
+}
+
+/**
+ * The Section assignment select's options: `sceneRefOptions`, less every value
+ * `sectionSceneWriteRefusal` refuses, keeping the value already there so a
+ * controlled `<select>` can show it. On a section-mode act this IS
+ * `sceneRefOptions(library)`.
+ */
+export function sectionSceneOptions(
+  act: { regions?: ActRegionsState }, library: EffectsSceneLibrary,
+  sectionIndex: number, currentRef: string | null,
+): FactorOption[] {
+  return sceneRefOptions(library).filter((o) => o.value === (currentRef ?? '')
+    || sectionSceneWriteRefusal(act, sectionIndex, currentRef, o.value) === null);
+}
 
 /** Assign (or clear) one section's `sceneRef`. `''` from a select = act default. */
 export function sectionSceneCommand(

@@ -60,7 +60,8 @@
 // COMMITTED revision instead of the pin, because a pin could never answer it.
 
 import { describe, it, expect } from 'vitest';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   descriptorEffectsBindings, libraryRasterChooserCalls, rasterChooserName, wiringPaths,
   unknownWiring, sectionRasterState, sectionRasterAdvisory, sectionSharers,
@@ -262,6 +263,18 @@ const regionsLib = regions.ok ? readAeon(regions, LIB_REL) : '';
 const RDESC = `aeon:${DESC_REL}@${AEON_REGIONS_PIN.slice(0, 8)}`;
 const RLIB = `aeon:${LIB_REL}@${AEON_REGIONS_PIN.slice(0, 8)}`;
 
+/**
+ * THE VENDORED SECTION-MODE CONSTRUCTION (ruling b1, 2026-09-17): aeon `c7ebe7a1`'s
+ * effects library and aeon `bcd844aa`'s act-1 descriptor, the last section-mode
+ * tree after the chooser re-key. See
+ * test/fixtures/effects/raster-owners/aeon_truth_probe.provenance.json. Read from this
+ * repository, so the rows that use it never skip.
+ */
+const FIXTURES = join(__dirname, '..', '..', '..', '..', '..', 'test', 'fixtures', 'effects');
+const CURRENT_LIB = readFileSync(join(FIXTURES, 'ojz_effects.emp'), 'utf8');
+const SECTION_MODE_DESC = readFileSync(
+  join(FIXTURES, 'raster-owners', 'section-mode', 'act_descriptor.emp'), 'utf8');
+
 // ---------------------------------------------------------------------------
 // Synthetic fixtures — the shapes the real tree cannot produce
 // ---------------------------------------------------------------------------
@@ -290,9 +303,9 @@ pub const ZZZ_Act1: Act = act(sections: [
  */
 const SYNTHETIC_LIB = `
 pub data ZZZ_Preset_Sec0: EffectsPreset = preset(pal: P,
-    raster: zzz_act1_sec_raster(sec: 0, hand: Raster_Program_None),
-    cycle: zzz_act1_sec_cycle(sec: 0, hand: Pal_Cycle_None),
-    variants: [ zzz_act1_sec_variant(sec: 0, slot: 0, hand: Variant_X), 0 ])
+    raster: zzz_act1_preset_raster(preset: ZZZ_Preset_Sec0_KEY, hand: Raster_Program_None),
+    cycle: zzz_act1_preset_cycle(preset: ZZZ_Preset_Sec0_KEY, hand: Pal_Cycle_None),
+    variants: [ zzz_act1_preset_variant(preset: ZZZ_Preset_Sec0_KEY, slot: 0, hand: Variant_X), 0 ])
 pub data ZZZ_Preset_Shared: EffectsPreset = preset(pal: P, raster: Raster_Program_None)
 `;
 
@@ -324,10 +337,12 @@ describe('the parse has no window: the defect that produced a wrong answer', () 
   });
 
   it('the zone key stops the chooser call being read as a section record', () => {
-    // `zzz_act1_sec_raster(sec: 5)` also matches `..._sec\(\s*sec:` if the zone
-    // is not part of the pattern. It must not become a binding.
+    // `zzz_act1_sec_scene(sec: 5)` also matches `..._sec\(\s*sec:` if the zone
+    // is not part of the pattern. It must not become a binding. (This row used
+    // the raster chooser until aeon `bcd844aa` renamed it `_preset_raster`; the
+    // scene chooser still carries `sec:`, so it is the call that keeps the trap.)
     const b = descriptorEffectsBindings(
-      `${SYNTHETIC_DESC}\nraster: zzz_act1_sec_raster(sec: 7, hand: X) effects: Ghost`, 'zzz');
+      `${SYNTHETIC_DESC}\nparallax: zzz_act1_sec_scene(sec: 7, hand: X) effects: Ghost`, 'zzz');
     expect(b[7]).toBeUndefined();
   });
 });
@@ -502,33 +517,54 @@ describe('the region-row reader: each `effects:` with the `sec:` inside its OWN 
   });
 });
 
-describe('the four author-facing states', () => {
+// ⚠ FOUR STATES BECAME THREE on 2026-09-17 (ruling b1). `shared` meant "aeon
+// refuses a band on a record several sections bind", and since aeon `bcd844aa`
+// keyed the chooser on the record that is false: read at aeon `c7ebe7a1`,
+// `effects_seam_gate.chooser_call_faults` says the section-keyed invariant "is
+// GONE because the hazard it guarded is gone: two rows sharing a record now
+// share its channels". The row below asserts the sharing sentence instead.
+describe('the three author-facing states, and what sharing a record does', () => {
   const w = synthetic();
+  const CH = rasterChooserName('zzz', 'act1');
 
   it('own preset AND threaded → wired, and says nothing', () => {
     expect(sectionRasterState(w, 0)).toBe('wired');
-    expect(sectionRasterAdvisory(w, 0, 'zzz_act1_sec_raster')).toBeNull();
+    expect(sectionRasterAdvisory(w, 0, CH)).toBeNull();
   });
 
-  it('a SHARED preset names the sharers and what would happen', () => {
-    expect(sectionRasterState(w, 1)).toBe('shared');
+  it('a SHARED record is not a state: it is unthreaded here, and the advisory says the sharers install the same band', () => {
+    expect(sectionRasterState(w, 1)).toBe('unthreaded');
     expect(sectionSharers(w, 1)).toEqual([1, 2]);
-    const say = sectionRasterAdvisory(w, 1, 'zzz_act1_sec_raster')!;
-    // A FACT ABOUT THE LEVEL, not a prohibition by Aurora — the distinction the
-    // whole module is shaped around.
-    expect(say).toMatch(/Sections 1 and 2 all share the preset record ZZZ_Preset_Shared/);
-    expect(say).toMatch(/would give section 2 the same band/);
-    expect(say).toMatch(/split/);
-    expect(say).not.toMatch(/Aurora|you cannot|not allowed/i);
+    const say = sectionRasterAdvisory(w, 1, CH)!;
+    expect(say).toContain('Section 2 also binds ZZZ_Preset_Shared');
+    expect(say).toContain('a band bound here is installed there too');
+    expect(say).toContain('refuses sections of one record naming different preset documents');
+    // The retired claim: aeon no longer asks for a split.
+    expect(say).not.toMatch(/split/);
+    expect(say).not.toMatch(/you cannot|not allowed/i);
+    // ...and once that shared record threads itself, sharing does not stop it being wired.
+    const threadedShared: SectionRasterWiring = {
+      ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Shared: 'ZZZ_Preset_Shared' },
+    };
+    expect(sectionRasterState(threadedShared, 1)).toBe('wired');
+    expect(sectionRasterState(threadedShared, 2)).toBe('wired');
   });
 
-  it('own preset but NOT threaded → one aeon line, and the message says so', () => {
+  it('own preset but NOT threaded → the advisory quotes aeon\'s record-keyed refusal', () => {
     const w2 = { ...w, threadedBy: {} };
     expect(sectionRasterState(w2, 0)).toBe('unthreaded');
-    const say = sectionRasterAdvisory(w2, 0, 'zzz_act1_sec_raster')!;
+    const say = sectionRasterAdvisory(w2, 0, CH)!;
     expect(say).toMatch(/nothing threads the raster chooser into it yet/);
-    expect(say).toMatch(/no preset threads zzz_act1_sec_raster\(sec: 0\)/);
+    expect(say).toContain('no preset threads zzz_act1_preset_raster(preset: ZZZ_Preset_Sec0_KEY)');
     expect(say).toMatch(/one line in aeon/);
+  });
+
+  it('a record threading ANOTHER record\'s key is unthreaded, and the advisory names both keys', () => {
+    const w2: SectionRasterWiring = { ...w, threadedBy: { ZZZ_Preset_Sec0: 'ZZZ_Preset_Shared' } };
+    expect(sectionRasterState(w2, 0)).toBe('unthreaded');
+    const say = sectionRasterAdvisory(w2, 0, CH)!;
+    expect(say).toContain('ANOTHER record\'s key, ZZZ_Preset_Shared_KEY');
+    expect(say).toContain('the call has to pass ZZZ_Preset_Sec0_KEY');
   });
 
   /**
@@ -542,7 +578,7 @@ describe('the four author-facing states', () => {
    */
   it('a section binding no preset at all is named as such (SYNTHETIC: no real one exists)', () => {
     expect(sectionRasterState(w, 3)).toBe('unbound');
-    expect(sectionRasterAdvisory(w, 3, 'zzz_act1_sec_raster'))
+    expect(sectionRasterAdvisory(w, 3, CH))
       .toMatch(/binds no preset record in the act descriptor/);
   });
 
@@ -563,8 +599,9 @@ describe('the four author-facing states', () => {
 
   it('the two derived sets, from the same wiring', () => {
     expect(wiredSections(w, 4)).toEqual([0]);
-    expect(eligibleSections(w, 4)).toEqual([0]);
-    expect(eligibleSections({ ...w, threadedBy: {} }, 4)).toEqual([0]);
+    // Every section binding a record is eligible since the re-key: 1 and 2 share one.
+    expect(eligibleSections(w, 4)).toEqual([0, 1, 2]);
+    expect(eligibleSections({ ...w, threadedBy: {} }, 4)).toEqual([0, 1, 2]);
     expect(wiredSections({ ...w, threadedBy: {} }, 4)).toEqual([]);
   });
 });
@@ -582,42 +619,44 @@ describe('the two wiring conditions, stated apart', () => {
   const w = synthetic();
   const CH = rasterChooserName('zzz', 'act1');
 
-  it('both hold → two ✓, and the detail names the record and the call', () => {
+  it('both hold → two ✓, and the detail names the record and the record-keyed call', () => {
     const c = sectionWiringConditions(w, 0, CH);
     expect(c.ownPreset.verdict).toBe('yes');
     expect(c.ownPreset.record).toBe('ZZZ_Preset_Sec0');
     expect(c.threaded.verdict).toBe('yes');
-    expect(c.threaded.detail).toContain('zzz_act1_sec_raster(sec: 0)');
+    expect(c.threaded.detail).toBe(
+      'ZZZ_Preset_Sec0 threads zzz_act1_preset_raster(preset: ZZZ_Preset_Sec0_KEY)');
   });
 
-  it('condition 1 fails and condition 2 IS STILL ASKED: no short-circuit', () => {
-    // Section 1 shares its record with 2, and nothing threads sec 1. An author
-    // whose strip stopped at the first failure could not tell whether fixing
-    // the share would be enough.
+  it('a SHARED record passes condition 1 and names its sharers; condition 2 asks that record', () => {
+    // Section 1 shares ZZZ_Preset_Shared with 2, which threads nothing. Sharing
+    // is `yes` since aeon bcd844aa; the threading question is asked of the record.
     const c = sectionWiringConditions(w, 1, CH);
-    expect(c.ownPreset.verdict).toBe('no');
-    expect(c.ownPreset.detail).toContain('shared with section 2');
+    expect(c.ownPreset.verdict).toBe('yes');
+    expect(c.ownPreset.detail).toBe('ZZZ_Preset_Shared, shared with section 2');
     expect(c.threaded.verdict).toBe('no');
-    expect(c.threaded.detail).toBe('nothing threads zzz_act1_sec_raster(sec: 1)');
+    expect(c.threaded.record).toBe('ZZZ_Preset_Shared');
+    expect(c.threaded.detail)
+      .toBe('nothing threads zzz_act1_preset_raster(preset: ZZZ_Preset_Shared_KEY)');
   });
 
-  it('a section binding nothing fails condition 1 with its own reason', () => {
+  it('a section binding nothing fails condition 1 with its own reason, and condition 2 says there is no key', () => {
     const c = sectionWiringConditions(w, 3, CH);
     expect(c.ownPreset.verdict).toBe('no');
     expect(c.ownPreset.record).toBeNull();
     expect(c.ownPreset.detail).toBe('binds no preset record');
+    expect(c.threaded.verdict).toBe('no');
+    expect(c.threaded.detail).toBe('binds no preset record, so no key to thread');
   });
 
-  it('the THIRD fact (threaded by a record the section does not bind) is in the detail', () => {
-    // SYNTHETIC, and unreachable in ojz/act1 today. A preset that threads sec 2
-    // while section 2 binds a different record satisfies condition 2 as aeon's
-    // gate words it ("no preset threads …") and still would not reach the
-    // screen, so the verdict stays `yes` and the discrepancy is NAMED.
-    const w2: SectionRasterWiring = { ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Other: 2 } };
+  it('a record threading another record\'s key fails condition 2, naming the key it passes', () => {
+    // aeon's seam gate refuses this call by name (`chooser_call_faults`, read at
+    // aeon c7ebe7a1: "it threads ANOTHER RECORD'S key"), so it is `no`.
+    const w2: SectionRasterWiring = { ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Shared: 'ZZZ_Preset_Sec0' } };
     const c = sectionWiringConditions(w2, 2, CH);
-    expect(c.threaded.verdict).toBe('yes');
-    expect(c.threaded.detail).toContain('but section 2 binds ZZZ_Preset_Shared');
-    // …and the collapsed word still refuses it, which is the seam below.
+    expect(c.threaded.verdict).toBe('no');
+    expect(c.threaded.detail).toBe(
+      'ZZZ_Preset_Shared threads zzz_act1_preset_raster(preset: ZZZ_Preset_Sec0_KEY), another record\'s key');
     expect(sectionRasterState(w2, 2)).not.toBe('wired');
   });
 
@@ -627,6 +666,14 @@ describe('the two wiring conditions, stated apart', () => {
     expect(c1.ownPreset.verdict).toBe('unknown');
     expect(c1.ownPreset.detail).toBe('could not read act_descriptor.emp');
     expect(c1.threaded.verdict).toBe('unknown');
+
+    // Library read, descriptor not: the record is unknown, so threading is too.
+    const noDescOnly: SectionRasterWiring = {
+      ...w, descriptor: { path: 'a/act_descriptor.emp', parsed: false, reason: 'ENOENT' },
+    };
+    const c3 = sectionWiringConditions(noDescOnly, 0, CH);
+    expect(c3.threaded.verdict).toBe('unknown');
+    expect(c3.threaded.detail).toBe('no record to check: could not read act_descriptor.emp');
 
     // ONE file readable, the other not: the readable condition still answers.
     const halfRead: SectionRasterWiring = {
@@ -641,7 +688,7 @@ describe('the two wiring conditions, stated apart', () => {
   it('THE SEAM: `wired` means both conditions on the SAME record, for every section', () => {
     // Two derivations of one fact that nothing compares is how they come apart.
     for (let i = 0; i < 4; i++) expect(sectionConditionsAgreeWithState(w, i, CH)).toBe(true);
-    const w2: SectionRasterWiring = { ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Other: 2 } };
+    const w2: SectionRasterWiring = { ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Shared: 'ZZZ_Preset_Sec0' } };
     for (let i = 0; i < 4; i++) expect(sectionConditionsAgreeWithState(w2, i, CH)).toBe(true);
     const noLib: SectionRasterWiring = {
       ...w, library: { path: 'b', parsed: false, reason: 'ENOENT' },
@@ -659,8 +706,8 @@ describe('the two wiring conditions, stated apart', () => {
     const noLib: SectionRasterWiring = {
       ...w, library: { path: 'b/zzz_effects.emp', parsed: false, reason: 'ENOENT' },
     };
-    expect(eligibleSections(noLib, 4)).toEqual([]);          // the trap
-    expect(ownPresetSections(noLib, 4, CH)).toEqual([0]);     // the fix
+    expect(eligibleSections(noLib, 4)).toEqual([]);             // the trap
+    expect(ownPresetSections(noLib, 4, CH)).toEqual([0, 1, 2]); // the fix
     // And the invariant, over both worlds: the act-wide set is exactly the
     // sections whose own-preset condition says yes.
     for (const world of [w, noLib]) {
@@ -670,11 +717,18 @@ describe('the two wiring conditions, stated apart', () => {
     }
   });
 
-  it('`threadedSections` is EXISTENCE, and is not the same set as wired', () => {
+  it('`threadedSections` is the sections whose record threads its OWN key', () => {
     expect(threadedSections(w, 4)).toEqual([0]);
-    const w2: SectionRasterWiring = { ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Other: 2 } };
-    expect(threadedSections(w2, 4)).toEqual([0, 2]);
-    expect(wiredSections(w2, 4)).toEqual([0]);
+    // A record passing another record's key threads nothing for its sections.
+    const w2: SectionRasterWiring = { ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Shared: 'ZZZ_Preset_Sec0' } };
+    expect(threadedSections(w2, 4)).toEqual([0]);
+    // A shared record that threads itself threads every section binding it.
+    const w3: SectionRasterWiring = { ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Shared: 'ZZZ_Preset_Shared' } };
+    expect(threadedSections(w3, 4)).toEqual([0, 1, 2]);
+    expect(wiredSections(w3, 4)).toEqual([0, 1, 2]);
+    // A record nothing binds threads no section.
+    const w4: SectionRasterWiring = { ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Other: 'ZZZ_Preset_Other' } };
+    expect(threadedSections(w4, 4)).toEqual([0]);
   });
 
   it('`boundSections` is OCCUPANCY, and it is not in aeon\'s files at all', () => {
@@ -725,21 +779,22 @@ describe('condition 3: every OTHER chooser a bound document owes', () => {
     // A parameter-anchored regex sees one; aeon matches by chooser NAME for
     // exactly this reason, and so does this.
     const lib = `pub data A: EffectsPreset = preset(
-      variants: [ zzz_act1_sec_variant(sec: 4, slot: 0, hand: X),
-                  zzz_act1_sec_variant(sec: 4, slot: 1) ])`;
-    expect(libraryChannelChooserCalls(lib, 'zzz_act1_sec_variant', 'slot'))
-      .toEqual({ A: { 4: [0, 1] } });
+      variants: [ zzz_act1_preset_variant(preset: A_KEY, slot: 0, hand: X),
+                  zzz_act1_preset_variant(preset: A_KEY, slot: 1) ])`;
+    expect(libraryChannelChooserCalls(lib, 'zzz_act1_preset_variant', 'slot'))
+      .toEqual({ A: { A: [0, 1] } });
   });
 
   it('an UNINDEXED chooser records the sentinel index 0, so all six read alike', () => {
-    expect(libraryChannelChooserCalls(SYNTHETIC_LIB, 'zzz_act1_sec_cycle', null))
-      .toEqual({ ZZZ_Preset_Sec0: { 0: [0] } });
+    expect(libraryChannelChooserCalls(SYNTHETIC_LIB, 'zzz_act1_preset_cycle', null))
+      .toEqual({ ZZZ_Preset_Sec0: { ZZZ_Preset_Sec0: [0] } });
   });
 
   it('the chooser names are DERIVED from the ids, aeon ActNames\' own stem', () => {
-    expect(channelChooserName('ojz', 'act1', 'cycle')).toBe('ojz_act1_sec_cycle');
+    // aeon ActNames at c7ebe7a1: `fn_preset_cycle = f"{stem}_preset_cycle"`.
+    expect(channelChooserName('ojz', 'act1', 'cycle')).toBe('ojz_act1_preset_cycle');
     expect(channelChooserName('ojz', 'act1', 'patch_world_y'))
-      .toBe('ojz_act1_sec_patch_world_y');
+      .toBe('ojz_act1_preset_patch_world_y');
     // …and `rasterChooserName` is the same function with 'raster'. If these two
     // ever disagreed, condition 2 and condition 3 would be reading different
     // acts out of one file.
@@ -750,7 +805,7 @@ describe('condition 3: every OTHER chooser a bound document owes', () => {
     // Section 1 binds ZZZ_Preset_Shared, which threads nothing at all.
     const c = sectionExtraChannelsCondition(w, 1, { cycles: [{ line: 2 }] }, 'zzz', 'act1', 'mine');
     expect(c.verdict).toBe('no');
-    expect(c.detail).toBe('nothing threads zzz_act1_sec_cycle(sec: 1)');
+    expect(c.detail).toBe('nothing threads zzz_act1_preset_cycle(preset: ZZZ_Preset_Shared_KEY)');
     expect(c.gaps).toHaveLength(1);
     expect(c.gaps[0].channel.key).toBe('cycles');
     // …and conditions 1 and 2 are NOT what caught it on a section that has both.
@@ -819,16 +874,33 @@ describe('condition 3: every OTHER chooser a bound document owes', () => {
     expect(c1.detail).toBe('nothing bound; no extra chooser threaded here');
   });
 
-  it('a chooser threaded in a DIFFERENT record does not count for this section', () => {
-    // aeon's `channel_faults` looks the call up at `bindings.get(sec)` and
-    // nowhere else: a row emitted for sec N is read only by sec N's `preset()`.
-    // ZZZ_Preset_Sec0 threads `cycle(sec: 0)`; section 2 binds ZZZ_Preset_Shared.
+  it('a chooser call keyed on this record but made in a DIFFERENT record does not count', () => {
+    // aeon's `channel_faults` reads `channel_calls[ch][owner][owner]`: the call
+    // must be IN the record the section binds AND pass that record's own key.
+    // Here ZZZ_Preset_Sec0 passes ZZZ_Preset_Shared_KEY; section 2 binds ZZZ_Preset_Shared.
     const shifted: SectionRasterWiring = {
       ...w,
-      channelThreadedBy: { ...w.channelThreadedBy, cycle: { ZZZ_Preset_Sec0: { 2: [0] } } },
+      channelThreadedBy: { ...w.channelThreadedBy, cycle: { ZZZ_Preset_Sec0: { ZZZ_Preset_Shared: [0] } } },
     };
     expect(sectionExtraChannelsCondition(shifted, 2, { cycles: null }, 'zzz', 'act1').verdict)
       .toBe('no');
+    // ...nor does a call made INSIDE the bound record that passes ANOTHER record's
+    // key. Found by red-first proof S20 (2026-09-17): with the lookup mutated to
+    // "any key inside the owner's record" the row above stayed green, because its
+    // plant sits in the wrong record and never reaches the key comparison.
+    const otherKey: SectionRasterWiring = {
+      ...w,
+      channelThreadedBy: { ...w.channelThreadedBy, cycle: { ZZZ_Preset_Shared: { ZZZ_Preset_Sec0: [0] } } },
+    };
+    expect(sectionExtraChannelsCondition(otherKey, 2, { cycles: null }, 'zzz', 'act1').verdict)
+      .toBe('no');
+    // ...and the same call made inside ZZZ_Preset_Shared with its own key does.
+    const own: SectionRasterWiring = {
+      ...w,
+      channelThreadedBy: { ...w.channelThreadedBy, cycle: { ZZZ_Preset_Shared: { ZZZ_Preset_Shared: [0] } } },
+    };
+    expect(sectionExtraChannelsCondition(own, 2, { cycles: null }, 'zzz', 'act1').verdict)
+      .toBe('yes');
   });
 
   it('the advisory SPELLS THE REMEDY and never a prohibition', () => {
@@ -836,7 +908,7 @@ describe('condition 3: every OTHER chooser a bound document owes', () => {
     const say = extraChannelsAdvisory(c.gaps, 1, 'mine', w.bindings[1])!;
     expect(say).toContain('ZZZ_Preset_Shared, the preset record section 1 binds');
     // The exact `preset()` argument, in aeon's own `prescription` spelling.
-    expect(say).toContain('cycle: zzz_act1_sec_cycle(sec: 1, hand: Pal_Cycle_None)');
+    expect(say).toContain('cycle: zzz_act1_preset_cycle(preset: ZZZ_Preset_Shared_KEY, hand: Pal_Cycle_None)');
     expect(say).toContain('one line in aeon');
     expect(say).not.toMatch(/you cannot|not allowed|may not|is forbidden/i);
     // No gaps, nothing to say.
@@ -949,17 +1021,21 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
     // wiring with a genuinely shared record. What is gone is the confirmation
     // that aeon still SHIPS one — so this row asserts the emptiness explicitly
     // and goes red the day a section is pointed at another's record again.
+    //
+    // ⚠ 2026-09-17 (ruling b1): there is no `shared` STATE any more (aeon bcd844aa
+    // keyed the chooser on the record, so sharing is not a refusal). The emptiness
+    // is still asserted, from `sectionSharers`, which is what the state was read from.
     expect(eligibleSections(w, 9)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
     const shared: number[] = [];
     for (let s = 0; s < 9; s++) {
-      if (sectionRasterState(w, s) === 'shared') shared.push(s);
+      if (sectionSharers(w, s).length > 1) shared.push(s);
       // Every section is its own only sharer — the data form of "nothing is
       // shared", checked per section rather than inferred from the list above.
       expect(sectionSharers(w, s), `section ${s}`).toEqual([s]);
     }
     expect(shared,
       'aeon ships a SHARED preset record again: re-pin this row and the one above, and note '
-      + 'which sections share it; the shared state is reachable against the real tree once more')
+      + 'which sections share it')
       .toEqual([]);
     // Anti-vacuous: nine sections really were examined, and they really do bind
     // nine DISTINCT records — an empty or single-record binding map would
@@ -968,8 +1044,17 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
     expect(new Set(Object.values(w.bindings)).size).toBe(9);
   });
 
-  it('exactly TWO sections are threaded today, and it is not the same fact as eligible', (ctx) => {
-    if (!need(ctx)) return;
+  // ⚠ RE-POINTED 2026-09-17 (ruling b1): THIS ROW AND THE NEXT READ THE VENDORED
+  // SECTION-MODE CONSTRUCTION, NOT `AEON_PIN`. At `AEON_PIN` the library spells the
+  // pre-`bcd844aa` chooser `ojz_act1_sec_raster(sec: N)`, which aeon's generator no
+  // longer emits and this module no longer parses, so "threaded today" cannot be
+  // asked of that revision. The construction is aeon `c7ebe7a1`'s library with the
+  // act-1 files of `bcd844aa`, the last section-mode tree (see
+  // test/fixtures/effects/raster-owners/aeon_truth_probe.provenance.json); aeon's own
+  // functions' reading of it is held in raster-owners-truth.test.ts.
+  it('exactly TWO sections are threaded today, and it is not the same fact as eligible', () => {
+    const desc = SECTION_MODE_DESC;
+    const lib = CURRENT_LIB;
     // ⚠ THE TWO FACTS ARE DIFFERENT AND BOTH MATTER. "Section 0 may have a
     // band" (its preset is its own) and "section 0 has one wired" (a preset
     // threads the chooser on index 0) are different claims, and conflating them
@@ -982,9 +1067,9 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
     // still are not the same fact — eligible is 0-6, threaded is {5,6} — which
     // is precisely why the row keeps asserting both. CONFIRMED INTENDED.
     const calls = libraryRasterChooserCalls(lib, rasterChooserName('ojz', 'act1'));
-    expect(calls).toEqual({ OJZ_Preset_Sec5: 5, OJZ_Preset_Sec6: 6 });
+    expect(calls).toEqual({ OJZ_Preset_Sec5: 'OJZ_Preset_Sec5', OJZ_Preset_Sec6: 'OJZ_Preset_Sec6' });
     const w: SectionRasterWiring = {
-      bindings: descriptorEffectsBindings(desc, 'ojz'),
+      ...readDescriptorWiring(DESC, desc, 'ojz'),
       threadedBy: calls,
       channelThreadedBy: libraryChannelCalls(lib, 'ojz', 'act1'),
       patchedArm: libraryPatchedArmBindings(lib),
@@ -995,8 +1080,9 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
     expect(eligibleSections(w, 9)).not.toEqual(wiredSections(w, 9));
   });
 
-  it('THE COLD READ REPRODUCED: section 5 is ✓ ✓ ✗ against aeon\'s real tree', (ctx) => {
-    if (!need(ctx)) return;
+  it('THE COLD READ REPRODUCED: section 5 is ✓ ✓ ✗ against aeon\'s real tree', () => {
+    const desc = SECTION_MODE_DESC;
+    const lib = CURRENT_LIB;
     // ⚠ THIS IS THE ROW THE WHOLE PARCEL IS FOR. The cold reader bound a preset
     // carrying `cycles` to section 5 — the ONE section Aurora's own strip marked
     // ✓ own preset AND ✓ threaded — and aeon refused the build:
@@ -1009,7 +1095,7 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
     // RED and the correct response is to read the new fact off the file.
     const chooser = rasterChooserName('ojz', 'act1');
     const w: SectionRasterWiring = {
-      bindings: descriptorEffectsBindings(desc, 'ojz'),
+      ...readDescriptorWiring(DESC, desc, 'ojz'),
       threadedBy: libraryRasterChooserCalls(lib, chooser),
       channelThreadedBy: libraryChannelCalls(lib, 'ojz', 'act1'),
       patchedArm: libraryPatchedArmBindings(lib),
@@ -1024,9 +1110,9 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
       w, 5, { cycles: [{ line: 2, first: 8, count: 4, period: 8 }] },
       'ojz', 'act1', 'coldread_water_tint');
     expect(withCycles.verdict, 'the third condition catches what the first two missed').toBe('no');
-    expect(withCycles.detail).toBe('nothing threads ojz_act1_sec_cycle(sec: 5)');
+    expect(withCycles.detail).toBe('nothing threads ojz_act1_preset_cycle(preset: OJZ_Preset_Sec5_KEY)');
     expect(extraChannelsAdvisory(withCycles.gaps, 5, 'coldread_water_tint', w.bindings[5]))
-      .toContain('cycle: ojz_act1_sec_cycle(sec: 5, hand: Pal_Cycle_None)');
+      .toContain('cycle: ojz_act1_preset_cycle(preset: OJZ_Preset_Sec5_KEY, hand: Pal_Cycle_None)');
 
     // ANTI-VACUOUS, both ways. The same section PASSES for a document with no
     // extra keys (so the row is not simply always `no`), and the patch channels
@@ -1180,27 +1266,18 @@ describe('GUARD-SEAT-RESIDUE: the plants the rows above survived', () => {
       .toBe('ZZZ_Own');
   });
 
-  it('the collapsed word asks OWNERSHIP, not existence: a record threading sec 0 is not sec 0\'s', () => {
-    // PLANT SW07, SURVIVED: `Object.values(w.threadedBy).includes(sectionIndex)`.
-    // The row that exists for this ("the THIRD fact") points at section 2 —
-    // which is SHARED, so `sectionRasterState` returns 'shared' two branches
-    // earlier and its `.not.toBe('wired')` is answered by a guard that is not
-    // the one under test. Section 0 owns its preset, so the threaded branch is
-    // actually reached.
+  it('a record threading ITSELF wires only the sections that bind it, and a section binding another record stays unthreaded', () => {
+    // PLANT SW07's successor (the chooser is record-keyed since aeon bcd844aa):
+    // the state must ask whether THIS section's record threads itself, not
+    // whether any record threads anything. Section 0 binds ZZZ_Preset_Sec0;
+    // only ZZZ_Preset_Shared threads.
     const w = named();
-    const elsewhere: SectionRasterWiring = { ...w, threadedBy: { ZZZ_Preset_Shared: 0 } };
+    const elsewhere: SectionRasterWiring = { ...w, threadedBy: { ZZZ_Preset_Shared: 'ZZZ_Preset_Shared' } };
     expect(elsewhere.bindings[0], 'section 0 owns ZZZ_Preset_Sec0').toBe('ZZZ_Preset_Sec0');
     expect(sectionRasterState(elsewhere, 0),
-      'ZZZ_Preset_Shared threads sec 0, but section 0 does not bind it').toBe('unthreaded');
-    expect(wiredSections(elsewhere, 4)).toEqual([]);
-
-    // PLANT SW09, SURVIVED: the seam's `c.threaded.record === c.ownPreset.record`
-    // clause. Condition 2 is EXISTENCE by design and says 'yes' here, so
-    // without that clause the seam calls `unthreaded` a disagreement. The
-    // existing seam rows never reach it for the same reason: their off-record
-    // threading lands on a shared section.
-    expect(sectionWiringConditions(elsewhere, 0, CH).threaded.verdict,
-      'condition 2 is existence and answers yes: that is not the defect').toBe('yes');
+      'ZZZ_Preset_Shared threads itself, but section 0 does not bind it').toBe('unthreaded');
+    expect(wiredSections(elsewhere, 4)).toEqual([1, 2]);
+    expect(sectionWiringConditions(elsewhere, 0, CH).threaded.verdict).toBe('no');
     expect(sectionConditionsAgreeWithState(elsewhere, 0, CH)).toBe(true);
   });
 
@@ -1228,13 +1305,13 @@ describe('GUARD-SEAT-RESIDUE: the plants the rows above survived', () => {
     // hand can repeat a call.
     const lib = `
 pub data R_Out_Of_Order: EffectsPreset = preset(
-    variants: [ zzz_act1_sec_variant(sec: 3, slot: 2, hand: A),
-                zzz_act1_sec_variant(sec: 3, slot: 0, hand: B),
-                zzz_act1_sec_variant(sec: 3, slot: 2, hand: C) ])
+    variants: [ zzz_act1_preset_variant(preset: R_Out_Of_Order_KEY, slot: 2, hand: A),
+                zzz_act1_preset_variant(preset: R_Out_Of_Order_KEY, slot: 0, hand: B),
+                zzz_act1_preset_variant(preset: R_Out_Of_Order_KEY, slot: 2, hand: C) ])
 `;
     const calls = libraryChannelChooserCalls(
       lib, channelChooserName('zzz', 'act1', 'variant'), 'slot');
-    expect(calls.R_Out_Of_Order[3], 'sorted, and slot 2 recorded once').toEqual([0, 2]);
+    expect(calls.R_Out_Of_Order.R_Out_Of_Order, 'sorted, and slot 2 recorded once').toEqual([0, 2]);
   });
 
   it('the index parameter is matched BY NAME: a misspelled one is not threading', () => {
@@ -1245,13 +1322,13 @@ pub data R_Out_Of_Order: EffectsPreset = preset(
     // will refuse, which is the one outcome condition 3 was added to stop.
     const fn = channelChooserName('zzz', 'act1', 'patch_world_y');
     const wrong = 'pub data R_Wrong: EffectsPreset = preset(patch_world_ys: [ '
-      + `${fn}(sec: 4, slot: 0, hand: PATCH_ANCHOR_NONE) ])`;
+      + `${fn}(preset: R_Wrong_KEY, slot: 0, hand: PATCH_ANCHOR_NONE) ])`;
     expect(libraryChannelChooserCalls(wrong, fn, 'ch'),
       '`slot:` is not this chooser\'s index parameter').toEqual({});
     // The control: the same record spelled correctly IS found, so the row is
     // not merely asserting that the parse found nothing.
     const right = wrong.replace('slot: 0', 'ch: 0');
-    expect(libraryChannelChooserCalls(right, fn, 'ch')).toEqual({ R_Wrong: { 4: [0] } });
+    expect(libraryChannelChooserCalls(right, fn, 'ch')).toEqual({ R_Wrong: { R_Wrong: [0] } });
   });
 });
 
@@ -1332,13 +1409,13 @@ describe('arm exclusivity: the three verdicts, and none of them is the others', 
     expect(arm.verdict).toBe('barred');
     expect(arm.record).toBe('ZZZ_Preset_Sec0');
     expect(arm.patched).toBe('ZZZ_TwoChannel');
-    const say = sectionArmExclusivityRefusal(w, 0, 'zzz_act1_sec_raster');
+    const say = sectionArmExclusivityRefusal(w, 0, rasterChooserName('zzz', 'act1'));
     // THE SENTENCE IS THE INSTRUMENT, so it is asserted like one: it must carry
     // the record, the program, the chooser call the seam gate names, and the
     // mechanism — not "you cannot bind this section".
     expect(say).toContain('ZZZ_Preset_Sec0');
     expect(say).toContain('patched: ZZZ_TwoChannel');
-    expect(say).toContain('zzz_act1_sec_raster(sec: 0)');
+    expect(say).toContain('zzz_act1_preset_raster(preset: ZZZ_Preset_Sec0_KEY)');
     expect(say).toContain('mutually exclusive');
     expect(say, 'a refusal must not be phrased as a prohibition by Aurora')
       .not.toMatch(/you (can ?not|may not)/i);
@@ -1346,13 +1423,15 @@ describe('arm exclusivity: the three verdicts, and none of them is the others', 
 
   it('a section whose record binds no arm is OPEN, and says nothing at all', () => {
     // Sections 1 and 2 of the synthetic descriptor bind `ZZZ_Preset_Shared`,
-    // which hands `raster:` a literal. They fail condition 1 loudly — and this
+    // which hands `raster:` a literal. They fail condition 2 loudly — and this
     // predicate is silent about them, which is the whole three-way point: an
-    // occupied or unthreaded section is not a barred one.
+    // occupied or unthreaded section is not a barred one. (Until aeon bcd844aa
+    // it was condition 1, for sharing; sharing is no longer a failure.)
     const w = barred();
+    const ch = rasterChooserName('zzz', 'act1');
     expect(sectionArmExclusivity(w, 1).verdict).toBe('open');
-    expect(sectionArmExclusivityRefusal(w, 1, 'zzz_act1_sec_raster')).toBeNull();
-    expect(sectionWiringConditions(w, 1, 'zzz_act1_sec_raster').ownPreset.verdict,
+    expect(sectionArmExclusivityRefusal(w, 1, ch)).toBeNull();
+    expect(sectionWiringConditions(w, 1, ch).threaded.verdict,
       'and the OTHER conditions still speak about it').toBe('no');
   });
 
@@ -1936,8 +2015,17 @@ describe('against aeon\'s CURRENT act 1, after regions: the reader reads the reg
     // prints these sets. Every row names its own distinct preset (measured
     // above), so every section owns its preset.
     expect(ownPresetSections(w, n, CH), where).toEqual([...Array(n).keys()]);
-    expect(wiredSections(w, n), `${where}: the library half, which regions did not touch`)
-      .toEqual([5, 6]);
+    // ⚠ THE WIRED SET IS NO LONGER ASKED OF THIS REVISION (ruling b1, 2026-09-17).
+    // It read [5, 6] here until this module followed aeon bcd844aa's re-key; this
+    // pin predates bcd844aa and spells the retired section-keyed chooser, which the
+    // record-keyed parse does not read. So the row now asserts exactly that, both
+    // halves, so an empty parse cannot pass for a broken read: the old spelling is
+    // in the bytes, and the record-keyed parse finds no call in them. The wired set
+    // against aeon-current bytes is raster-owners-truth.test.ts's subject.
+    expect(lib, `${where}: the pre-bcd844aa chooser spelling is not in this revision's library`)
+      .toMatch(/raster\s*:\s*ojz_act1_sec_raster\s*\(\s*sec\s*:\s*5/);
+    expect(libraryRasterChooserCalls(lib, CH), `${where}: a record-keyed call in a pre-bcd844aa library`)
+      .toEqual({});
   });
 
   it('SECTIONS 0 AND 7 COME BACK BARRED, and the barred set is DERIVED from the patched: declarations', (ctx) => {

@@ -22,6 +22,39 @@
 // cannot be stale.
 //
 // ═══════════════════════════════════════════════════════════════════════════
+// ⚠ RE-KEYED 2026-09-17 (ruling REGION-MODE-RASTER-FALSE-OUTPUT-b1): THE
+// CHOOSERS ARE KEYED ON THE PRESET RECORD, NOT ON THE SECTION INDEX
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// aeon `bcd844aa` (2026-09-16, "B′") renamed every generated preset-channel
+// chooser for EVERY act, in either mode: `<act>_sec_raster(sec: N, …)` became
+// `<act>_preset_raster(preset: <Record>_KEY, …)`, and the four others
+// (`cycle`, `variant`, `patch_world_y`, `patch_motion`) the same way. Read at
+// aeon `c7ebe7a1` in `tools/effects_gen.py`: `ActNames.fn_preset_raster`
+// (`f"{stem}_preset_raster"`), `render_module`'s `_rekey_bound_to_record`, and
+// in `tools/effects_seam_gate.py`: `raster_call_sites`, `chooser_call_faults`,
+// `channel_call_sites`, `channel_faults`. What that changed, and so what this
+// module now says:
+//
+//   THREADED is a property of a RECORD: its `preset()` passes
+//     `<act>_preset_raster(preset: <ITS OWN NAME>_KEY, …)`. A record passing
+//     ANOTHER record's key is refused by name ("it threads ANOTHER RECORD'S
+//     key"), so it does not count as threaded here either.
+//   SHARING IS NO LONGER A FAULT. Two owners (sections, or region rows) that
+//     bind one record install the same band, "which is what sharing a record
+//     means". aeon refuses only two owners of one record naming DIFFERENT
+//     preset documents. So "own preset" no longer requires that no other
+//     section binds the record; it requires a record.
+//   THE OWNER of a binding is a SECTION when the act has no `regions.json`
+//     (its sidecar `rasterRef`, and the record from the descriptor's row), and
+//     a REGION ROW when it has one (both from `regions.json`). Aeon's
+//     `owner_maps`. `rasterOwners` below is that function.
+//
+// The section-keyed text further down this header is the history of how the
+// rules were found; where it names `sec_raster(sec: N)` it describes a chooser
+// aeon no longer emits.
+//
+// ═══════════════════════════════════════════════════════════════════════════
 // THE RULE, AND WHY IT IS A PROPERTY OF THE LEVEL DATA AND NOT OF AURORA
 // ═══════════════════════════════════════════════════════════════════════════
 //
@@ -126,18 +159,23 @@ export interface WiringSource {
 export interface SectionRasterWiring {
   /** section index → the `effects:` record name its `<zone>_sec(...)` binds. */
   bindings: Record<number, string>;
-  /** Preset record name → the section index its `raster:` chooser is keyed on. */
-  threadedBy: Record<string, number>;
+  /**
+   * Preset record name → the RECORD whose `_KEY` its `raster:` chooser call
+   * passes (aeon `raster_call_sites`, record-keyed since `bcd844aa`). A record
+   * is threaded exactly when this maps it to ITSELF.
+   */
+  threadedBy: Record<string, string>;
   /**
    * THE OTHER FOUR CHOOSERS' CALL SITES — condition 3's evidence, from the SAME
    * `<zone>_effects.emp` read that produces `threadedBy`.
    *
-   * `channel name → preset record → section index → the INDEX ARGUMENTS threaded`.
-   * An indexed chooser (`slot:`, `ch:`) records the indices it was called with;
-   * an unindexed one records `[0]`. Absent when the library was not parsed —
-   * which is the `unknown` verdict and never a `no`.
+   * `channel name → preset record → the record whose _KEY it passes → the INDEX
+   * ARGUMENTS threaded` (aeon `channel_call_sites`). An indexed chooser (`slot:`,
+   * `ch:`) records the indices it was called with; an unindexed one records
+   * `[0]`. Absent when the library was not parsed — which is the `unknown`
+   * verdict and never a `no`.
    */
-  channelThreadedBy: Record<string, Record<string, Record<number, number[]>>>;
+  channelThreadedBy: Record<string, Record<string, Record<string, number[]>>>;
   /**
    * THE OTHER ARM — preset record name → the non-zero `patched:` program it binds.
    *
@@ -753,30 +791,57 @@ export function readDescriptorWiring(path: string, desc: string, zoneId: string)
 }
 
 /**
- * `{preset record name: the section index its `raster:` chooser is keyed on}`.
+ * `{preset record name: the record whose _KEY its `raster:` chooser call passes}`.
  *
  * Only presets whose `raster:` channel is a CALL to the generated chooser
  * appear. A preset that hands `raster:` a literal program is not a fault — most
- * of them do, and that is what an unwired section looks like.
+ * of them do, and that is what an unwired record looks like.
+ *
+ * ⚠ RECORD-KEYED SINCE aeon `bcd844aa`, and this is aeon's own reading: read at
+ * aeon `c7ebe7a1`, `tools/effects_seam_gate.py` `raster_call_sites` matches
+ * `raster\s*:\s*<fn>\s*\(\s*preset\s*:\s*(\w+)_KEY` inside each record and returns
+ * the captured record. The value is that captured record, NOT a boolean, because
+ * a record passing another record's key is a fault aeon names
+ * (`chooser_call_faults`: "it threads ANOTHER RECORD'S key") and the caller has
+ * to be able to say which.
+ *
+ * ⚠ LINE COMMENTS ARE STRIPPED FIRST, on `libraryPatchedArmBindings`' reason:
+ * aeon's library discusses the chooser in prose. This was the parse the
+ * `preset-rebind-orphan` test carried locally while this function still read
+ * `sec: N`; that test now calls this one (ruling b1, "reuse that parse").
  */
-export function libraryRasterChooserCalls(lib: string, chooserFn: string): Record<string, number> {
-  const out: Record<string, number> = {};
+export function libraryRasterChooserCalls(lib: string, chooserFn: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const code = stripLineComments(lib);
   // A `preset()` record: `pub const <Name>: EffectsPreset = preset(...)` — split
   // on the declaration and search each body for the chooser call, which is the
   // same shape aeon's `preset_records` + `raster_call_sites` pair uses.
   const decl = /\b(?:pub\s+)?(?:const|data)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:/g;
   const marks: { name: string; at: number }[] = [];
   let m: RegExpExecArray | null;
-  while ((m = decl.exec(lib)) !== null) marks.push({ name: m[1], at: m.index });
+  while ((m = decl.exec(code)) !== null) marks.push({ name: m[1], at: m.index });
   const call = new RegExp(
-    `raster\\s*:\\s*${chooserFn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\(\\s*sec\\s*:\\s*(\\d+)`,
+    `raster\\s*:\\s*${escapeRegExp(chooserFn)}\\s*\\(\\s*preset\\s*:\\s*([A-Za-z_][A-Za-z0-9_]*)_KEY\\b`,
   );
   for (let i = 0; i < marks.length; i++) {
-    const body = lib.slice(marks[i].at, marks[i + 1]?.at ?? lib.length);
+    const body = code.slice(marks[i].at, marks[i + 1]?.at ?? code.length);
     const hit = call.exec(body);
-    if (hit) out[marks[i].name] = Number(hit[1]);
+    if (hit) out[marks[i].name] = hit[1];
   }
   return out;
+}
+
+/** `s` with every regular-expression metacharacter escaped. */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * The comptime key constant a record names itself with at a chooser call:
+ * aeon `ActNames.preset_key`, `f"{record}_KEY"` (read at aeon `c7ebe7a1`).
+ */
+export function presetKeyName(record: string): string {
+  return `${record}_KEY`;
 }
 
 /**
@@ -887,9 +952,90 @@ function stripLineComments(s: string): string {
   return s.replace(/\/\/[^\n]*/g, '');
 }
 
-/** The generated chooser's name for an act — aeon's `effects_gen` spelling. */
+/**
+ * The generated raster chooser's name for an act — aeon's `effects_gen`
+ * spelling, `ActNames.fn_preset_raster = f"{stem}_preset_raster"` with
+ * `stem = f"{zone_id}_{act_id}"` (read at aeon `c7ebe7a1`). It was
+ * `<stem>_sec_raster` until aeon `bcd844aa`, which renamed it for every act.
+ */
 export function rasterChooserName(zoneId: string, actId: string): string {
-  return `${zoneId}_${actId}_sec_raster`;
+  return `${zoneId}_${actId}_preset_raster`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WHO OWNS A RASTER BINDING — aeon's `owner_maps`, in both modes
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Read at aeon `c7ebe7a1`, `tools/effects_seam_gate.py` `owner_maps`:
+//
+//   region mode (`has_act_regions`: the act's regions.json exists)
+//     owner  = a region row's `id`
+//     ref    = that row's `rasterRef`
+//     record = that row's `preset`
+//   section mode (no regions.json)
+//     owner  = a section index
+//     ref    = `section_N.meta.json`'s `rasterRef` (`load_section_raster_refs`)
+//     record = the descriptor row's `effects:` beside `sec: N`
+//              (`descriptor_effects_bindings`)
+//
+// and `render_module` re-keys `{owner: document}` to `{record: document}` with
+// `_rekey_bound_to_record`, whose one refusal is two owners of one record
+// naming different documents. The emitted chooser then has one arm per bound
+// record, and that arm is reached only from a record that threads its own key.
+//
+// So a HOME for an editor-authored raster band is an owner whose record
+// threads itself, and it is BOUND when its ref is set. That is what
+// `rasterHomes` returns, and it is the pair the shipped limit sentence's
+// reading is checked against (`raster-binding-threaded-set.test.ts`).
+
+/** One owner of a raster binding, in whichever mode the act is in. */
+export interface RasterOwner {
+  /** A region row's `id` in region mode; a section index in section mode. */
+  owner: string | number;
+  /** The `EffectsPreset` record the owner installs, or null when none is known. */
+  record: string | null;
+  /** The preset document id its `rasterRef` names, or null. */
+  rasterRef: string | null;
+}
+
+/**
+ * The owners of an act's raster bindings, the way aeon's `owner_maps` reads them.
+ *
+ * `regionRows` non-null IS region mode, and the caller decides that by the act's
+ * `regions.json` existing, never by inference. With it null the owners are the
+ * sections the descriptor binds or a sidecar names, in index order.
+ */
+export function rasterOwners(input: {
+  regionRows: readonly { id: string; preset: string; rasterRef?: string | null }[] | null;
+  bindings: Record<number, string>;
+  sidecarRasterRefs: Record<number, string | null>;
+}): RasterOwner[] {
+  if (input.regionRows !== null) {
+    return input.regionRows.map((r) => ({
+      owner: r.id, record: r.preset, rasterRef: r.rasterRef ?? null,
+    }));
+  }
+  const indices = new Set<number>([
+    ...Object.keys(input.bindings).map(Number),
+    ...Object.keys(input.sidecarRasterRefs).map(Number),
+  ]);
+  return [...indices].sort((a, b) => a - b).map((i) => ({
+    owner: i, record: input.bindings[i] ?? null, rasterRef: input.sidecarRasterRefs[i] ?? null,
+  }));
+}
+
+/**
+ * The HOMES (owners whose record threads its own key) and the BOUND owners
+ * (owners carrying a `rasterRef`), in owner order.
+ */
+export function rasterHomes(owners: readonly RasterOwner[], threadedBy: Record<string, string>)
+: { wired: (string | number)[]; bound: (string | number)[] } {
+  return {
+    wired: owners
+      .filter((o) => o.record !== null && threadedBy[o.record] === o.record)
+      .map((o) => o.owner),
+    bound: owners.filter((o) => o.rasterRef !== null && o.rasterRef !== '').map((o) => o.owner),
+  };
 }
 
 /**
@@ -921,13 +1067,19 @@ export function wiringPaths(dataPath: string, zoneId: string)
 // The author-facing answer
 // ---------------------------------------------------------------------------
 
+/**
+ * ⚠ THERE IS NO `shared` STATE ANY MORE (ruling b1, 2026-09-17). It meant "its
+ * record is bound by more than one section, so aeon refuses a band here", and
+ * since aeon `bcd844aa` that is false: the chooser is keyed on the record, so
+ * every section sharing a record installs the same band and aeon builds it.
+ * `sectionSharers` still answers who shares, and the advisory says what sharing
+ * does.
+ */
 export type SectionRasterState =
-  /** Its preset is unshared AND threaded — a binding here reaches the screen. */
+  /** Its record threads the raster chooser with its own key — a binding here reaches the screen. */
   | 'wired'
-  /** Its preset is unshared but no preset threads the chooser on this index. */
+  /** It binds a record, but that record does not thread the chooser with its own key. */
   | 'unthreaded'
-  /** Its preset is bound by more than one section. */
-  | 'shared'
   /** It binds no preset at all. */
   | 'unbound'
   /** aeon's files could not be read or parsed — NOT a refusal. */
@@ -937,13 +1089,8 @@ export function sectionRasterState(w: SectionRasterWiring, sectionIndex: number)
   if (!w.descriptor.parsed) return 'unknown';
   const record = w.bindings[sectionIndex];
   if (record === undefined) return 'unbound';
-  const sharers = Object.keys(w.bindings)
-    .map(Number)
-    .filter((s) => w.bindings[s] === record)
-    .sort((a, b) => a - b);
-  if (sharers.length > 1) return 'shared';
   if (!w.library.parsed) return 'unknown';
-  return w.threadedBy[record] === sectionIndex ? 'wired' : 'unthreaded';
+  return w.threadedBy[record] === record ? 'wired' : 'unthreaded';
 }
 
 /** The sections sharing this section's preset record, including it. */
@@ -994,23 +1141,42 @@ export function sectionRasterAdvisory(
       + `can carry a raster band${which.reason ? ` (${which.reason})` : ''}. The binding is still `
       + 'written; aeon\'s build is the authority.';
   }
-  if (state === 'shared') {
-    const sharers = sectionSharers(w, sectionIndex).filter((s) => s !== sectionIndex);
-    return `Sections ${listOf(sectionSharers(w, sectionIndex))} all share the preset record `
-      + `${w.bindings[sectionIndex]}, so giving section ${sectionIndex} a band would give `
-      + `section${sharers.length === 1 ? '' : 's'} ${listOf(sharers)} the same band. aeon's build `
-      + 'refuses that and asks for the record to be split first: one preset per section that '
-      + 'needs its own raster channel.';
-  }
   if (state === 'unbound') {
     return `Section ${sectionIndex} binds no preset record in the act descriptor, so there is `
       + 'nothing for a raster program to hang off. A programmer gives it one.';
   }
+  const record = w.bindings[sectionIndex];
+  const sharing = sharingSentence(w, sectionIndex);
   // 'unthreaded'
-  return `Section ${sectionIndex}'s preset record ${w.bindings[sectionIndex]} is its own (nothing `
-    + 'else shares it) but nothing threads the raster chooser into it yet, so aeon\'s canonical '
-    + `build refuses a binding here ("no preset threads ${chooserFn}(sec: ${sectionIndex})"). `
-    + 'That is one line in aeon, not a redesign. The binding is written either way.';
+  const keyed = w.threadedBy[record];
+  const why = keyed === undefined
+    ? `nothing threads the raster chooser into it yet, so aeon's build refuses a binding here `
+      + `("no preset threads ${chooserFn}(preset: ${presetKeyName(record)})")`
+    : `it threads the raster chooser with ANOTHER record's key, ${presetKeyName(keyed)}, which aeon's `
+      + `seam gate refuses by name ("it threads ANOTHER RECORD'S key"); the call has to pass `
+      + `${presetKeyName(record)}`;
+  return `Section ${sectionIndex}'s preset record ${record} is not wired: ${why}. `
+    + 'That is one line in aeon, not a redesign. The binding is written either way.'
+    + (sharing === null ? '' : ` ${sharing}`);
+}
+
+/**
+ * What sharing a record means for a binding, or null when nothing shares it.
+ *
+ * Read at aeon `c7ebe7a1`: the chooser is keyed on the record, so "two rows
+ * sharing a record share its channels, which is what sharing a record means"
+ * (`chooser_call_faults`), and `_rekey_bound_to_record` refuses only two owners
+ * of one record naming DIFFERENT documents.
+ */
+function sharingSentence(w: SectionRasterWiring, sectionIndex: number): string | null {
+  const record = w.bindings[sectionIndex];
+  if (record === undefined) return null;
+  const others = sectionSharers(w, sectionIndex).filter((s) => s !== sectionIndex);
+  if (others.length === 0) return null;
+  const plural = others.length === 1 ? '' : 's';
+  return `Section${plural} ${listOf(others)} also bind${others.length === 1 ? 's' : ''} ${record}, `
+    + `and aeon's raster chooser is keyed on the record, so a band bound here is installed there `
+    + `too. aeon's build refuses sections of one record naming different preset documents.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1051,9 +1217,14 @@ export interface WiringCondition {
 }
 
 export interface SectionWiringConditions {
-  /** Binds a preset record no other section binds. */
+  /**
+   * Binds a preset record. ⚠ The field keeps its name and the strip keeps its
+   * label `own preset` (the in-app guide quotes it), but since aeon `bcd844aa`
+   * the condition is only that a record is bound: a SHARED record is `yes`, and
+   * the detail names who shares it.
+   */
   ownPreset: WiringCondition;
-  /** Some `preset()` threads `<chooser>(sec: N)`. */
+  /** The section's record threads `<chooser>(preset: <Record>_KEY)` with its own key. */
   threaded: WiringCondition;
 }
 
@@ -1080,26 +1251,41 @@ export function sectionWiringConditions(
     if (record === undefined) {
       return { verdict: 'no', record: null, detail: 'binds no preset record' };
     }
+    // SHARED IS `yes` SINCE aeon `bcd844aa`: the chooser is keyed on the record,
+    // so the sharers install the same band and aeon builds it. Said in the detail.
     const sharers = sectionSharers(w, sectionIndex).filter((s) => s !== sectionIndex);
     if (sharers.length > 0) {
-      return { verdict: 'no', record, detail: `${record}, shared with section${sharers.length === 1 ? '' : 's'} ${listOf(sharers)}` };
+      return { verdict: 'yes', record, detail: `${record}, shared with section${sharers.length === 1 ? '' : 's'} ${listOf(sharers)}` };
     }
     return { verdict: 'yes', record, detail: record };
   })();
 
+  // ⚠ RECORD-KEYED SINCE aeon `bcd844aa`, SO THIS CONDITION NEEDS THE RECORD.
+  // Until then it was asked of the section index alone and answered even when
+  // condition 1 failed; aeon's chooser no longer takes an index, so "is section
+  // N threaded" has no meaning apart from "does N's record thread its own key".
   const threaded: WiringCondition = (() => {
-    const call = `${chooserFn}(sec: ${sectionIndex})`;
     if (!w.library.parsed) {
       return { verdict: 'unknown', record: null, detail: `could not read ${basename(w.library.path)}` };
     }
-    const by = Object.keys(w.threadedBy).filter((r) => w.threadedBy[r] === sectionIndex);
-    if (by.length === 0) return { verdict: 'no', record: null, detail: `nothing threads ${call}` };
-    const record = by[0];
-    // THE THIRD FACT, in the detail and not in the verdict — see the block above.
-    if (ownPreset.record !== null && record !== ownPreset.record) {
+    if (ownPreset.verdict === 'unknown') {
       return {
-        verdict: 'yes', record,
-        detail: `${record} threads ${call}, but section ${sectionIndex} binds ${ownPreset.record}`,
+        verdict: 'unknown', record: null,
+        detail: `no record to check: ${ownPreset.detail}`,
+      };
+    }
+    const record = ownPreset.record;
+    if (record === null) {
+      return { verdict: 'no', record: null, detail: 'binds no preset record, so no key to thread' };
+    }
+    const call = `${chooserFn}(preset: ${presetKeyName(record)})`;
+    const keyed = w.threadedBy[record];
+    if (keyed === undefined) return { verdict: 'no', record, detail: `nothing threads ${call}` };
+    if (keyed !== record) {
+      // aeon's seam gate refuses this by name (`chooser_call_faults`), so it is `no`.
+      return {
+        verdict: 'no', record,
+        detail: `${record} threads ${chooserFn}(preset: ${presetKeyName(keyed)}), another record's key`,
       };
     }
     return { verdict: 'yes', record, detail: `${record} threads ${call}` };
@@ -1288,9 +1474,9 @@ export function sectionArmExclusivityRefusal(
     // clause below is still the wrong sentence for one — that is condition 2's
     // recorded defect (the CONDITION 2 note further down), not this wording's.
     + 'carries one program; a band list, a ramp or a base swap lowers to a raster program, and '
-    + `effects_seam_gate.py requires it be threaded through ${chooserFn}(sec: ${sectionIndex}). `
-    + 'So binding one here would have to take '
-    + `${arm.patched} out of section ${sectionIndex} first. That is a property of the `
+    + `effects_seam_gate.py requires it be threaded through ${chooserFn}(preset: `
+    + `${presetKeyName(arm.record ?? '<record>')}). So binding one here would have to take `
+    + `${arm.patched} out of ${arm.record} first. That is a property of the `
     + 'mechanism and not a choice about this section (aeon, 2026-09-10: "THAT IS A STRUCTURAL GAP '
     + 'AND NOT A CHOICE"), and it is the only kind of thing that greys this control out: a section '
     + 'nothing threads yet, or one whose raster channel is already occupied, is refused nothing '
@@ -1376,7 +1562,8 @@ export function armBarredSections(w: SectionRasterWiring, sectionCount: number):
 }
 
 /**
- * The sections whose preset record is theirs alone — CONDITION 1 ONLY.
+ * The sections whose condition 1 says `yes` — since aeon `bcd844aa`, the
+ * sections that bind a preset record at all (a shared one included).
  *
  * ⚠ NOT `eligibleSections`, and the difference is a self-contradiction the strip
  * shipped for one harness run: `eligibleSections` goes through
@@ -1396,11 +1583,16 @@ export function ownPresetSections(w: SectionRasterWiring, sectionCount: number, 
   return out;
 }
 
-/** The sections some preset threads the chooser on, in order. Derived. */
+/**
+ * The sections whose preset record threads the raster chooser with its own key,
+ * in order. Derived. Record-keyed since aeon `bcd844aa`: a section is in this set
+ * exactly when `w.threadedBy[its record]` is that record.
+ */
 export function threadedSections(w: SectionRasterWiring, sectionCount: number): number[] {
   const out: number[] = [];
   for (let i = 0; i < sectionCount; i++) {
-    if (Object.values(w.threadedBy).includes(i)) out.push(i);
+    const record = w.bindings[i];
+    if (record !== undefined && w.threadedBy[record] === record) out.push(i);
   }
   return out;
 }
@@ -1414,7 +1606,7 @@ export function wiredSections(w: SectionRasterWiring, sectionCount: number): num
   return out;
 }
 
-/** The sections whose preset record is theirs alone — one aeon line from wired. */
+/** The sections that bind a preset record while both files are readable — one aeon line from wired. */
 export function eligibleSections(w: SectionRasterWiring, sectionCount: number): number[] {
   const out: number[] = [];
   for (let i = 0; i < sectionCount; i++) {
@@ -1670,11 +1862,13 @@ export const EXTRA_SECTION_CHANNELS: readonly SectionChannelSpec[] = Object.free
  * a dozen call sites name it.
  */
 export function channelChooserName(zoneId: string, actId: string, suffix: string): string {
-  return `${zoneId}_${actId}_sec_${suffix}`;
+  // aeon `ActNames.fn_preset_<suffix>` (read at aeon `c7ebe7a1`); `_sec_` until `bcd844aa`.
+  return `${zoneId}_${actId}_preset_${suffix}`;
 }
 
 /**
- * `{preset record: {sec index: the index arguments threaded}}` for ONE chooser.
+ * `{preset record: {the record whose _KEY it passes: the index arguments threaded}}`
+ * for ONE chooser — aeon `channel_call_sites`, record-keyed since `bcd844aa`.
  *
  * ⚠ MATCHED BY THE CHOOSER'S NAME AND NOT BY ITS `preset()` PARAMETER, which is
  * aeon's `channel_call_sites` and is deliberate there: "The other four choosers
@@ -1689,38 +1883,40 @@ export function channelChooserName(zoneId: string, actId: string, suffix: string
  */
 export function libraryChannelChooserCalls(
   lib: string, chooserFn: string, indexParam: string | null,
-): Record<string, Record<number, number[]>> {
-  const out: Record<string, Record<number, number[]>> = {};
+): Record<string, Record<string, number[]>> {
+  const out: Record<string, Record<string, number[]>> = {};
+  const code = stripLineComments(lib);
   const decl = /\b(?:pub\s+)?(?:const|data)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:/g;
   const marks: { name: string; at: number }[] = [];
   let m: RegExpExecArray | null;
-  while ((m = decl.exec(lib)) !== null) marks.push({ name: m[1], at: m.index });
-  const fn = chooserFn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  while ((m = decl.exec(code)) !== null) marks.push({ name: m[1], at: m.index });
+  const fn = escapeRegExp(chooserFn);
+  const key = '([A-Za-z_][A-Za-z0-9_]*)_KEY\\b';
   const pattern = indexParam === null
-    ? `${fn}\\s*\\(\\s*sec\\s*:\\s*(\\d+)`
-    : `${fn}\\s*\\(\\s*sec\\s*:\\s*(\\d+)\\s*,\\s*${indexParam}\\s*:\\s*(\\d+)`;
+    ? `${fn}\\s*\\(\\s*preset\\s*:\\s*${key}`
+    : `${fn}\\s*\\(\\s*preset\\s*:\\s*${key}\\s*,\\s*${indexParam}\\s*:\\s*(\\d+)`;
   for (let i = 0; i < marks.length; i++) {
-    const body = lib.slice(marks[i].at, marks[i + 1]?.at ?? lib.length);
+    const body = code.slice(marks[i].at, marks[i + 1]?.at ?? code.length);
     const call = new RegExp(pattern, 'g');
     let hit: RegExpExecArray | null;
     while ((hit = call.exec(body)) !== null) {
-      const sec = Number(hit[1]);
+      const keyed = hit[1];
       const idx = indexParam === null ? 0 : Number(hit[2]);
       const perPreset = (out[marks[i].name] ??= {});
-      const list = (perPreset[sec] ??= []);
+      const list = (perPreset[keyed] ??= []);
       if (!list.includes(idx)) list.push(idx);
     }
   }
   for (const preset of Object.values(out)) {
-    for (const sec of Object.keys(preset)) preset[Number(sec)].sort((a, b) => a - b);
+    for (const keyed of Object.keys(preset)) preset[keyed].sort((a, b) => a - b);
   }
   return out;
 }
 
 /** Every non-arm chooser's call sites, from ONE read of the effects library. */
 export function libraryChannelCalls(lib: string, zoneId: string, actId: string)
-: Record<string, Record<string, Record<number, number[]>>> {
-  const out: Record<string, Record<string, Record<number, number[]>>> = {};
+: Record<string, Record<string, Record<string, number[]>>> {
+  const out: Record<string, Record<string, Record<string, number[]>>> = {};
   for (const ch of EXTRA_SECTION_CHANNELS) {
     out[ch.channel] = libraryChannelChooserCalls(
       lib, channelChooserName(zoneId, actId, ch.chooserSuffix), ch.indexParam);
@@ -1728,11 +1924,15 @@ export function libraryChannelCalls(lib: string, zoneId: string, actId: string)
   return out;
 }
 
-/** The `preset()` argument to WRITE for one owed channel — aeon's `prescription`. */
-export function channelPrescription(ch: SectionChannelSpec, fn: string, sec: number): string {
-  if (ch.indexParam === null) return `${ch.param}: ${fn}(sec: ${sec}, hand: ${ch.hand})`;
+/**
+ * The `preset()` argument to WRITE for one owed channel — aeon's `prescription`,
+ * self-keyed since `bcd844aa`: `<param>: <fn>(preset: <Record>_KEY, hand: …)`.
+ */
+export function channelPrescription(ch: SectionChannelSpec, fn: string, record: string): string {
+  const key = presetKeyName(record);
+  if (ch.indexParam === null) return `${ch.param}: ${fn}(preset: ${key}, hand: ${ch.hand})`;
   const hand = ch.hand === null ? '' : `, hand: ${ch.hand}`;
-  return `${ch.param}: [${fn}(sec: ${sec}, ${ch.indexParam}: 0${hand}), … one per index]`;
+  return `${ch.param}: [${fn}(preset: ${key}, ${ch.indexParam}: 0${hand}), … one per index]`;
 }
 
 /** One owed-but-missing channel, named so the caller can spell the remedy. */
@@ -1780,12 +1980,13 @@ export function sectionExtraChannelsCondition(
 ): ExtraChannelsCondition {
   const owner = w.bindings[sectionIndex];
   const threadedHere = (ch: SectionChannelSpec): number[] => {
-    // The chooser must be threaded IN THE RECORD THIS SECTION BINDS — aeon's
-    // `channel_faults` looks the call up at `bindings.get(sec)` and nowhere
-    // else, because a row emitted for sec N is only read by sec N's `preset()`.
+    // The chooser must be threaded IN THE RECORD THIS SECTION BINDS, WITH THAT
+    // RECORD'S OWN KEY — aeon's `channel_faults` reads
+    // `channel_calls[ch][owner][owner]` (read at aeon `c7ebe7a1`), so a record
+    // threading someone else's key does not satisfy it.
     if (owner === undefined) return [];
     const perPreset = w.channelThreadedBy[ch.channel] ?? {};
-    return (perPreset[owner] ?? {})[sectionIndex] ?? [];
+    return (perPreset[owner] ?? {})[owner] ?? [];
   };
 
   if (!w.library.parsed) {
@@ -1836,10 +2037,12 @@ export function sectionExtraChannelsCondition(
   }
   const first = gaps[0];
   const rest = gaps.length > 1 ? ` (+${gaps.length - 1} more)` : '';
-  const detail = first.got.length === 0
-    ? `nothing threads ${first.chooserFn}(sec: ${sectionIndex})${rest}`
-    : `${first.chooserFn}(sec: ${sectionIndex}) threaded only at `
-      + `${first.channel.indexParam} ${first.got.join(',')}${rest}`;
+  const call = `${first.chooserFn}(preset: ${presetKeyName(owner ?? '<record>')})`;
+  const detail = owner === undefined
+    ? `binds no preset record, so nothing threads ${first.chooserFn}${rest}`
+    : first.got.length === 0
+      ? `nothing threads ${call}${rest}`
+      : `${call} threaded only at ${first.channel.indexParam} ${first.got.join(',')}${rest}`;
   return { verdict: 'no', record: name, gaps, detail };
 }
 
@@ -1858,17 +2061,22 @@ export function extraChannelsAdvisory(
   gaps: ChannelGap[], sectionIndex: number, docId: string | null, owner: string | undefined,
 ): string | null {
   if (gaps.length === 0) return null;
-  const where = owner === undefined
-    ? `section ${sectionIndex} binds no preset record in the act descriptor, so nothing`
-    : `${owner}, the preset record section ${sectionIndex} binds,`;
+  if (owner === undefined) {
+    return `${docId ?? 'The bound preset'} carries keys beyond its raster program, but section `
+      + `${sectionIndex} binds no preset record in the act descriptor, so there is no record for `
+      + 'their choosers to be threaded into, and aeon\'s build refuses the binding. A programmer '
+      + 'gives the section a record first. The binding is written either way.';
+  }
+  const where = `${owner}, the preset record section ${sectionIndex} binds,`;
+  const key = presetKeyName(owner);
   const lines = gaps.map((g) => {
     const what = g.got.length === 0
-      ? `${where} threads ${g.chooserFn} for sec ${sectionIndex} nowhere`
-      : `${where} threads ${g.chooserFn} for sec ${sectionIndex} only at `
+      ? `${where} threads ${g.chooserFn}(preset: ${key}) nowhere`
+      : `${where} threads ${g.chooserFn}(preset: ${key}) only at `
         + `${g.channel.indexParam} ${g.got.join(', ')}, and the document reaches `
         + `${g.want.join(', ')}`;
     return `• ${g.channel.key}: ${what}. Write, inside that preset(): `
-      + `${channelPrescription(g.channel, g.chooserFn, sectionIndex)}`;
+      + `${channelPrescription(g.channel, g.chooserFn, owner)}`;
   });
   return `${docId ?? 'The bound preset'} carries `
     + `${gaps.length === 1 ? 'a key' : 'keys'} beyond its raster program, and one rasterRef `

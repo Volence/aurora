@@ -697,8 +697,14 @@
  * owns; the values are `section-wiring.ts`'s, re-derived per act on every load,
  * and `section-wiring.test.ts`'s real-tree rows are what pin them against aeon.
  * If you want today's numbers at a terminal rather than in the app:
- * `grep -n sec_raster` over aeon's `games/sonic4/data/effects/ojz_effects.emp`
+ * `grep -n preset_raster` over aeon's `games/sonic4/data/effects/ojz_effects.emp`
  * at a committed revision.
+ * ⚠ AND (1) AND (2) ARE THE SECTION-KEYED RULE, RETIRED 2026-09-17. aeon
+ * `bcd844aa` keyed the chooser on the RECORD for every act: sharing a record is
+ * no longer a failure (the sharers install the same band), and (2) is now "the
+ * record the owner installs passes `<act>_preset_raster(preset: <its own>_KEY)`".
+ * `section-wiring.ts`'s header says what changed; the published sentence below
+ * carries the current rule.
  * A section that satisfies (1) and fails (2) dies in aeon's canonical build.
  * Both were published as "the" answer on 2026-09-02 — aurora's own prose said
  * "only 5" (right about (2)), aeon said "1-5" and then "0-5" (right about (1)) —
@@ -746,103 +752,189 @@
  */
 
 export const RASTER_SECTION_BINDING_LIMIT =
-  'Saving a preset does not install it, and binding one no longer stops at the sidecar, but it '
-  + 'still does not finish. The per-section key is rasterRef: assign_section_preset writes it into '
-  + 'that section\'s .meta.json sidecar, and aeon\'s build NOW READS IT. Verified at aeon e6405428 '
-  + '(2026-08-30): tools/effects_gen.py resolves rasterRef against the preset documents and emits '
-  + 'that section\'s raster program together with the chooser that selects it, refusing an id that '
-  + 'names no preset document BY NAME with the known ids listed, and refusing a numeric rasterRef, '
-  + 'which matters because this editor\'s own sidecar parser nulls a non-string silently, so the '
-  + 'build is the last reader that can still see that mistake. WHICH SECTION YOU BIND DECIDES WHAT '
-  + 'HAPPENS, AND THE WIRED SET IS DERIVED, NEVER FIXED. THE RULE, which is the only durable '
-  + 'sentence here: a section is wired exactly when some preset() in aeon\'s '
-  + 'games/sonic4/data/effects/ojz_effects.emp passes ojz_act1_sec_raster(sec: N, hand: ...) to its '
-  + 'raster: channel. THE INSTRUMENT: this editor re-derives that set from aeon\'s own file on every '
-  + 'project load (core/formats/effects/section-wiring.ts) and the band-preset panel\'s per-section '
-  + 'strip renders whatever the derivation returned, so nothing in the app quotes the reading below. '
-  + 'THE COMMAND that answers it at a terminal: grep -n sec_raster over that file in an aeon '
+  // ⚠ REWRITTEN 2026-09-17 TO aeon's CURRENT RULE (ruling REGION-MODE-RASTER-FALSE-OUTPUT-b1).
+  // Every claim below was read at aeon c7ebe7a1, whose generator and effects data are
+  // unchanged at cc314a18. The section-keyed sentence it replaces named
+  // ojz_act1_sec_raster(sec: N), sidecar-only bindings and two aeon content tests that
+  // have since been renamed and re-aimed; aeon bcd844aa re-keyed the chooser on the
+  // record for every act and aeon e2af59ea put OJZ act 1 in region mode. The reading
+  // clause's spelling ("at aeon <sha> (<date>) the wired homes are {..}") is the contract
+  // with core/formats/__tests__/raster-binding-threaded-set.test.ts, which re-derives it.
+  'Saving a preset does not install it; a BINDING does, and where the binding lives depends on '
+  + 'the act. THE KEY IS rasterRef, and aeon\'s build reads it. Verified at aeon c7ebe7a1 '
+  + '(2026-09-17): tools/effects_gen.py resolves rasterRef against the preset documents, refusing '
+  + 'an id that names no preset document BY NAME with the known ids listed, and refusing a numeric '
+  + 'rasterRef, which matters because this editor\'s own sidecar parser nulls a non-string silently, '
+  + 'so the build is the last reader that can still see that mistake. WHERE IT LIVES IS THE ACT\'S '
+  + 'MODE, AND THE MODE IS ONE FILE. An act whose regions.json exists is in region mode (aeon '
+  + 'has_act_regions): its bindings are rasterRef keys on the region rows, set in the Regions panel '
+  + 'under Bindings, and aeon\'s check_mode_conflict, which effects_gen.py generate runs, refuses the '
+  + 'build while any section_N.meta.json of that act carries a rasterRef or a sceneRef. So on such an '
+  + 'act assign_section_preset and the Section select refuse a sidecar binding, and clearing one is '
+  + 'still allowed, since that is the repair. An act with no regions.json is in section mode: '
+  + 'assign_section_preset or the band-preset panel\'s Section select writes rasterRef into that '
+  + 'section\'s .meta.json sidecar, and the record it installs is the one the act descriptor\'s row '
+  + 'for that section names. WHICH OWNER YOU BIND DECIDES WHAT HAPPENS, AND THE WIRED SET IS '
+  + 'DERIVED, NEVER FIXED. THE RULE, which is the only durable sentence here: an owner (a region row, '
+  + 'or a section) is wired exactly when the preset() of the EffectsPreset record it installs, in '
+  + 'aeon\'s games/sonic4/data/effects/ojz_effects.emp, passes ojz_act1_preset_raster(preset: <that '
+  + 'record>_KEY, hand: ...) to its raster: channel. The chooser is keyed on the RECORD (aeon '
+  + 'bcd844aa renamed it from ojz_act1_sec_raster(sec: N) for every act), so every owner that '
+  + 'installs one record installs the same band, and aeon refuses two owners of one record that '
+  + 'name different preset documents. THE INSTRUMENT: this editor re-derives that rule from aeon\'s '
+  + 'own files on every project load (core/formats/effects/section-wiring.ts); on a section-mode act '
+  + 'the band-preset panel\'s per-section strip renders whatever the derivation returned, and on a '
+  + 'region-mode act it shows one notice instead, so nothing in the app quotes the reading below. '
+  + 'THE COMMAND that answers it at a terminal: grep -n preset_raster over that file in an aeon '
   + 'checkout, at a committed revision. THE READING, which is a reading and not a rule: at aeon '
-  + 'a6aaf581 (2026-09-10) the wired set is {5, 6}: OJZ_Preset_Sec5 with sec: 5 at :1665, and '
-  + 'OJZ_Preset_Sec6 with sec: 6 at :1723. That grep is what refutes it. BOTH ARE ALSO BOUND: '
-  + 'section_5.meta.json carries rasterRef ojz_sec5_showcase (aeon c9a462be, authored here through '
-  + 'this writer, the first choice made in this editor that aeon\'s build carried to a raster '
-  + 'channel) and section_6.meta.json carries ojz_sec6_baseswap, so EditorRaster_OJZ_Act1_Bindings '
-  + 'is 2 and the chooser resolves both. Leaving a wired section unbound resolves to that hand: '
-  + 'label and changes nothing. BINDING A SECTION OUTSIDE THE WIRED SET STILL REACHES NOTHING: '
-  + 'those presets hand raster: a literal, so the key is written, aeon\'s witness counts it, and no '
-  + 'program follows it. That case is not SILENT: aeon\'s tools/effects_seam_gate.py refuses the '
-  + 'build for it and names the section and the id. The refusal is aeon\'s alone (nothing here '
-  + 'warns), but it is no longer skippable by FAST: since their 2026-09-02 walkthrough finding b4, '
-  + 'build.sh runs tools/effects_seam_gate.py --source-only as an unconditional pre-build check '
-  + 'under FAST == 1 && GAME == sonic4, and that arm reaches the raster binding step. What FAST '
-  + 'still skips is the pytest lane and the post-build listing step. AND THE BOUND SET ITSELF IS '
-  + 'PINNED BY AEON\'S FULL BUILD, WHICH THIS EDITOR CAN MOVE: read at aeon a6aaf581 (2026-09-10), '
-  + 'three content tests in build.sh\'s pytest lane accept the bound set {5: ojz_sec5_showcase, 6: '
-  + 'ojz_sec6_baseswap} and refuse other trees: '
+  + 'c7ebe7a1 (2026-09-17) the wired homes are {sec5, sec6}: OJZ act 1 is in region mode, and its '
+  + 'region rows sec5 and sec6 install OJZ_Preset_Sec5 (its raster: at :1739) and OJZ_Preset_Sec6 '
+  + '(:1797), each passing its own key. That grep and the act\'s regions.json are what refute it. '
+  + 'BOTH ARE ALSO BOUND: the sec5 row of regions.json carries rasterRef ojz_sec5_showcase and the '
+  + 'sec6 row carries ojz_sec6_baseswap. Both bindings moved there from section_5.meta.json and '
+  + 'section_6.meta.json at aeon e2af59ea, and ojz_sec5_showcase was first bound through this '
+  + 'editor\'s writer (aeon c9a462be). So EditorRaster_OJZ_Act1_Bindings is 2 '
+  + '(games/sonic4/data/generated/ojz/act1/effects_scenes.emp:315) and the chooser resolves both. '
+  + 'Leaving a wired owner unbound resolves to that hand: label '
+  + 'and changes nothing. BINDING AN OWNER WHOSE RECORD IS NOT THREADED STILL REACHES NOTHING: that '
+  + 'record hands raster: a literal, so the key is written and no program follows it. That case is '
+  + 'not SILENT: aeon\'s tools/effects_seam_gate.py refuses the build for it and names the region or '
+  + 'section and the id ("no preset threads ojz_act1_preset_raster(preset: <record>_KEY)"). The refusal is '
+  + 'aeon\'s, and it is not skippable by FAST: build.sh runs tools/effects_seam_gate.py --source-only '
+  + 'as an unconditional pre-build check under FAST == 1 && GAME == sonic4, and that arm reaches the '
+  + 'raster binding step. What FAST still skips is the pytest lane and the post-build listing step. '
+  + 'AND AEON\'S FULL BUILD CHECKS THE BOUND OWNERS, WHICH THIS EDITOR CAN MOVE: read at aeon '
+  + 'c7ebe7a1, build.sh\'s pytest lane runs '
   + 'tools/test_effects_seam_gate.py::TestRasterSeamAgainstTheRealTree'
-  + '::test_the_bound_sections_are_exactly_the_threaded_ones, its sibling '
-  + 'test_section_5_and_6_are_the_bound_ones_and_their_ids_are_the_shipped_documents, and '
+  + '::test_the_bound_owners_are_exactly_the_threaded_ones, its sibling '
+  + 'test_the_bound_owners_are_the_regions_the_DOCUMENT_gives_a_rasterRef, and '
   + 'tools/test_raster_cycle_table_lint.py::test_every_preset_document_is_REACHABLE. UNBINDING A '
-  + 'BOUND SECTION (null from this tool, or the select\'s Hand-authored raster option) shrinks the '
-  + 'bound set and orphans that section\'s document, and those tests refuse it by name: "the bound '
-  + 'sections are ..., not [5, 6]" and "reachable by NOTHING: [...]". Unbinding BOTH also trips '
+  + 'BOUND OWNER orphans its document unless another owner or a DEBUG raster-table row still names '
+  + 'it, and that lint refuses an orphan by name ("reachable by NOTHING"). Unbinding every one also '
   // ⚠ THE QUOTATION AND ITS DASH STAY ON ONE SOURCE LINE. It is a verbatim aeon
-  // pytest message, allowed by name in `scripts/check-src-dashes.mjs`, and that
-  // allowance matches on the OFFENDING LINE: rewrap it so the leading "no" sits
-  // on the line above and the allowance stops matching while the dash remains.
-  + '"no sidecar carries a rasterRef — step 6\'s band is gone". Delete the orphaned document too '
-  + 'and the lint passes while the content test still refuses. BINDING A SECTION OUTSIDE THE BOUND SET '
-  + 'fails the same exact-set assertion (sorted(bound) must equal the pinned list) and, if it is '
-  + 'also outside the WIRED set, the threaded-set one and the seam gate above; re-pointing a bound '
-  + 'section at another document orphans the one it left. That pytest refusal runs only in the '
-  + 'canonical FAST=0 build: FAST=1 sets NO_LINT=1, the pytest lane sits under NO_LINT, and FAST=1 '
-  + 'builds the tree, which is how aeon built its own control ROM '
-  + '(docs/research/reference_captures/2026-08-30-sec5-band/README.md, '
-  + '"The canonical build REFUSES the control tree, by design"). NOTHING HERE PREVENTS THE WRITE: '
-  + 'the sidecar takes whichever state you choose, and you meet the refusal at aeon\'s next FAST=0 '
-  + 'build or not at all. THAT CLAUSE IS A SNAPSHOT OF ANOTHER REPO\'S TESTS and it expires when '
-  + 'their pinned list changes, when those tests are renamed or the pytest lane leaves the NO_LINT '
-  + 'block that FAST=1 switches off, or when test_every_preset_document_is_REACHABLE drops its '
-  + 'sidecar arm (owner: aeon\'s lane); before quoting it, re-read tools/test_effects_seam_gate.py, '
-  + 'tools/test_raster_cycle_table_lint.py and build.sh at a committed revision. '
-  + 'Wiring a further section is hand work in aeon, not authoring the effect: at most one '
-  + 'call-site line if that section already owns its preset record, and a record SPLIT first if it '
-  + 'shares one, because a section-keyed chooser threaded into a record two sections point at is '
-  + 'itself a seam-gate refusal. Which sections share a record is derived here too '
-  + '(eligibleSections in core/formats/effects/section-wiring.ts) and the panel strip shows it; at '
-  + 'aeon a6aaf581 every section 0-8 owns its own record, so no split is outstanding. Nor is there '
-  + 'anything to look at '
-  + 'here, for section 5 as much as for any other: the band-preset panel now carries a per-section '
-  + 'raster select, but binding one draws nothing: the viewport does not composite a rasterRef, so '
-  + 'unlike assign_section_bg (whose ref the viewport does composite) this assignment changes '
-  + 'nothing on screen. A preset document costs ROM whether or not any section binds it, since aeon '
-  + 'emits one program per document. Unlike assign_section_scene, which is baked. At a6aaf581 two '
-  + 'sidecars carry the key (sections 5 and 6), so the seam gate\'s section arm is not vacuous: it '
-  + 'counts the sidecar rasterRefs and checks them against the threaded set. To count them '
-  + 'yourself, grep rasterRef over games/sonic4/data/editor/ojz/act1/ in an aeon checkout. Section '
-  + '5 has been exercised from this editor\'s writer to aeon\'s generator and build, and once past '
-  + 'them in aeon\'s tree: aeon\'s 4a4d3474 (2026-08-30, docs/research/reference_captures/'
-  + '2026-08-30-sec5-band/) records the section-5 band MEASURED on screen in aeon\'s emulator '
-  + 'capture: its README reads CRAM line 2 entry 8 as $0EA4 at screen lines 40, 56 and 72 and '
-  + '$0000 at lines 8, 20, 96 and 150, all in one frame, on two bound runs that agree byte for '
-  + 'byte, and as $0000 on every one of those lines on the control ROM built with the sidecar\'s '
-  + 'rasterRef null; taken on their headless oracle-aether instance, not hardware. That is aeon\'s '
-  + 'measurement of aeon\'s build: no CRAM was sampled here, and nothing of that frame is visible '
-  + 'in this editor. EXPIRES, and note first that the wired-set clause above no longer relies on '
-  + 'this list, because the reading it carries is checked on every test run against aeon\'s real file by '
-  + 'core/formats/__tests__/raster-binding-threaded-set.test.ts, which is why "a second section is '
-  + 'threaded" is no longer a clause here: from 2026-09-03 to 2026-09-10 that clause was true, '
-  + 'named the right file, and was read by nothing. What is left in this list still has no reader, '
-  + 'so treat it as a re-read instruction and not as an alarm. EXPIRES when section 5\'s sidecar '
-  + 'stops naming ojz_sec5_showcase, when '
-  + 'tools/effects_seam_gate.py stops refusing the unthreaded case or build.sh stops running its '
-  + 'source-only arm under FAST=1, when docs/research/reference_captures/2026-08-30-sec5-band/ '
-  + 'leaves aeon\'s tree or its '
-  + 'README stops saying what is quoted here, when a later aeon measurement of section 5 records '
-  + 'something else, or when this viewport learns to composite a rasterRef (owner: aeon\'s lane '
-  + 'for all but the last, which is Aurora\'s). Before quoting this, re-read '
-  + 'games/sonic4/data/effects/ojz_effects.emp for which sec: indices its raster: arguments pass, '
-  + 're-read games/sonic4/data/editor/ojz/act1/ for which sidecars carry rasterRef, re-read '
-  + 'tools/effects_seam_gate.py and tools/effects_gen.py, and re-read '
-  + 'docs/research/reference_captures/2026-08-30-sec5-band/README.md for what was measured and '
-  + 'what it says was not.';
+  // pytest message (tools/test_effects_seam_gate.py:1176 at c7ebe7a1), allowed by
+  // name in `scripts/check-src-dashes.mjs`, and that allowance matches on the
+  // OFFENDING LINE: rewrap it and the allowance stops matching while the dash remains.
+  + 'trips "nothing binds a rasterRef — step 6\'s band is gone". BINDING AN OWNER WHOSE RECORD '
+  + 'THREADS NO CHOOSER fails test_the_bound_owners_are_exactly_the_threaded_ones as well as the '
+  + 'seam gate. That pytest lane runs only in the canonical FAST=0 build: FAST=1 sets NO_LINT=1, the '
+  + 'pytest lane sits under NO_LINT, and FAST=1 builds the tree, which is how aeon built its own '
+  + 'control ROM (docs/research/reference_captures/2026-08-30-sec5-band/README.md, "The canonical '
+  + 'build REFUSES the control tree, by design"). On a section-mode act NOTHING HERE '
+  + 'PREVENTS THE WRITE beyond the one structural refusal the Section select states (a record that '
+  + 'binds patched:): the sidecar takes whichever state you choose, and you meet aeon\'s refusal at '
+  + 'its next build or not at all. THAT CLAUSE IS A SNAPSHOT OF ANOTHER REPO\'S TESTS and it expires '
+  + 'when those tests are renamed or change what they assert, or when the pytest lane leaves the '
+  + 'NO_LINT block that FAST=1 switches off (owner: aeon\'s lane); before quoting it, re-read '
+  + 'tools/test_effects_seam_gate.py, tools/test_raster_cycle_table_lint.py and build.sh at a '
+  + 'committed revision. Wiring a further record is hand work in aeon, not authoring the effect: one '
+  + 'call-site line in that record\'s preset(), and no split, since owners sharing a record share '
+  + 'its band. Nor is there anything to look at here, for section 5 as much as for any other: the '
+  + 'band-preset panel carries a per-section raster select, but binding one draws nothing: the '
+  + 'viewport does not composite a rasterRef, so unlike assign_section_bg (whose ref the viewport '
+  + 'does composite) this assignment changes nothing on screen. A preset document costs ROM whether '
+  + 'or not anything binds it, since aeon emits one program per document. Unlike '
+  + 'assign_section_scene, which is baked. At c7ebe7a1 two region rows carry the key (sec5 and sec6), '
+  + 'so the seam gate\'s owner arm is not vacuous: it counts the bound rasterRefs and checks their '
+  + 'records against the threaded ones. To count them yourself, grep rasterRef over '
+  + 'games/sonic4/data/editor/ojz/act1/ in an aeon checkout and read which are not null. The '
+  + 'section-5 band has been '
+  + 'exercised from this editor\'s writer to aeon\'s generator and build, and once past them in aeon\'s '
+  + 'tree: aeon\'s 4a4d3474 (2026-08-30, docs/research/reference_captures/2026-08-30-sec5-band/) '
+  + 'records the section-5 band MEASURED on screen in aeon\'s emulator capture: its README reads CRAM '
+  + 'line 2 entry 8 as $0EA4 at screen lines 40, 56 and 72 and $0000 at lines 8, 20, 96 and 150, all '
+  + 'in one frame, on two bound runs that agree byte for byte, and as $0000 on every one of those '
+  + 'lines on the control ROM built with the sidecar\'s rasterRef null; taken on their headless '
+  + 'oracle-aether instance, not hardware, and before the act moved to region mode. That is aeon\'s '
+  + 'measurement of aeon\'s build: no CRAM was sampled here, and nothing of that frame is visible in '
+  + 'this editor. EXPIRES: the reading above is checked on every test run against aeon\'s published '
+  + 'files by core/formats/__tests__/raster-binding-threaded-set.test.ts. The rest has no reader, so '
+  + 'treat it as a re-read instruction and not as an alarm. It expires when the sec5 row of the act\'s '
+  + 'regions.json stops naming ojz_sec5_showcase, when tools/effects_seam_gate.py stops refusing the '
+  + 'unthreaded case or build.sh stops running its source-only arm under FAST=1, when '
+  + 'check_mode_conflict stops refusing a sidecar ref beside regions.json, when '
+  + 'docs/research/reference_captures/2026-08-30-sec5-band/ leaves aeon\'s tree or its README stops '
+  + 'saying what is quoted here, when a later aeon measurement of section 5 records something else, '
+  + 'or when this viewport learns to composite a rasterRef (owner: aeon\'s '
+  + 'lane for all but the last, which is Aurora\'s). Before quoting this, re-read '
+  + 'games/sonic4/data/effects/ojz_effects.emp for which records pass their own key to the raster '
+  + 'chooser, re-read games/sonic4/data/editor/ojz/act1/ for which regions.json rows and sidecars '
+  + 'carry rasterRef, re-read tools/effects_seam_gate.py and tools/effects_gen.py, and re-read '
+  + 'docs/research/reference_captures/2026-08-30-sec5-band/README.md for what was measured and what '
+  + 'it says was not.';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REGION MODE (2026-09-17, ruling B, revised as B1 on REGION-MODE-RASTER-FALSE-OUTPUT)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// aeon `e2af59ea` put OJZ act 1 in REGION MODE: `regions.json` owns the scene
+// and raster bindings and every `section_N.meta.json` ref is nulled. The mode is
+// FILE PRESENCE (`has_act_regions`), which Aurora reads through exactly one
+// predicate, `actHasRegionsFile` in core/formats/regions/act-regions.ts.
+//
+// On such an act every per-section raster verdict this editor derives (own
+// preset, threaded, its channels, the act sets, the rebind note) asks about a
+// SECTION as the owner of a binding, and the owners are region rows, so they are
+// not shown. These sentences are what is shown instead.
+// `docs/reviews/2026-09-17-region-mode-raster-false-output.md` is the finding.
+//
+// ⚠ NO "Migrate sections" POINTER IN EITHER, AND THAT IS MEASURED, NOT FORGOTTEN.
+// The ruling asks for one "where the act has not migrated". In region mode the
+// document already exists, and Aurora's `planActMigration`
+// (renderer/providers/regions-migrate.ts) refuses an act that has a document OR
+// a refused one, and the Regions panel only renders the Migrate sections button
+// when there is no document. So on every act these sentences are shown for,
+// that action is refused or absent; pointing at it would send the author to a
+// wall. The review file records this as a stopped item.
+
+/**
+ * Shown ONCE, in place of the section-keyed raster verdicts, on a region-mode
+ * act. Read by the effects strip and the band-preset panel.
+ */
+export const REGION_MODE_RASTER_NOTICE =
+  'This act is in region mode: its regions.json exists, so aeon\'s build takes raster bindings '
+  + '(rasterRef) from the region rows, not from the section sidecars. The raster checks on this '
+  + 'tab ask about a section as the owner of a binding, so they are not shown for this act. To '
+  + 'see or change which preset a region binds, use the Regions panel, under Bindings.';
+
+/** Which sidecar key a region-mode refusal is about, and the words for its clear option. */
+const SIDECAR_REF_WORDS = {
+  rasterRef: { what: 'a raster binding', clear: 'Hand-authored raster, or null from assign_section_preset' },
+  sceneRef: { what: 'a scene binding', clear: 'act default, or null from assign_section_scene' },
+} as const;
+
+/**
+ * Why a section sidecar may not take a `rasterRef` or a `sceneRef` on a
+ * region-mode act. aeon's `check_mode_conflict` (read at aeon `c7ebe7a1`) loops
+ * over BOTH keys, so both doors of both kinds ask this one sentence.
+ */
+export function regionModeSectionRefRefusal(
+  key: 'rasterRef' | 'sceneRef', sectionIndex: number, currentRef: string | null,
+): string {
+  const words = SIDECAR_REF_WORDS[key];
+  const base = `Section ${sectionIndex} cannot take ${words.what}: this act is in region mode `
+    + '(its regions.json exists), and aeon\'s tools/effects_gen.py check_mode_conflict refuses '
+    + 'the build when a section_N.meta.json carries a rasterRef or a sceneRef beside that file. '
+    + 'The binding lives on a region: set it in the Regions panel, under Bindings.';
+  if (currentRef === null) return base;
+  return `${base} This section's sidecar still carries ${key} "${currentRef}", which that `
+    + `check refuses now. Clearing it (${words.clear}) is still allowed.`;
+}
+
+/**
+ * Why a section sidecar may not take a raster binding on a region-mode act.
+ *
+ * ONE SENTENCE FOR BOTH DOORS: the band-preset panel's Section select and the
+ * agent's `assign_section_preset`. It names aeon's refusal by its function and
+ * file, because that is what an author meets if the write is made by hand, and
+ * it says where the binding lives instead.
+ *
+ * `currentRef` non-null adds the one thing still allowed: clearing that ref.
+ * A sidecar still carrying a `rasterRef` beside `regions.json` is the very tree
+ * `check_mode_conflict` refuses, so clearing it is the repair, not a binding.
+ */
+export function regionModeSectionRasterRefusal(
+  sectionIndex: number, currentRef: string | null,
+): string {
+  return regionModeSectionRefRefusal('rasterRef', sectionIndex, currentRef);
+}

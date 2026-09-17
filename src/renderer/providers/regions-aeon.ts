@@ -850,8 +850,14 @@ export function regionsPanelState(
   act: Act | null,
   project: S4Project | null,
   selectedRegionId: string | null,
+  /**
+   * `projectDataRoot(config.raw)`: the root the effects libraries were loaded
+   * from, which rule 3 needs to read a refused document's path back as its id.
+   * Null only without a config, which `openLoaded` never leaves beside a project.
+   */
+  dataRoot: string | null,
 ): RegionsPanelState {
-  if (!act || !project) return { kind: 'no-project' };
+  if (!act || !project || dataRoot === null) return { kind: 'no-project' };
   const st = act.regions;
   // ⚠ `unreadable` IS READ BEFORE `document`. A refused file leaves `document`
   // null, so testing the document first would report the refusal as "no
@@ -875,6 +881,7 @@ export function regionsPanelState(
     actH: act.gridHeight * SECTION_PIXEL_SIZE,
   };
   const vocab = regionBindingVocabulary({
+    dataRoot,
     rasterWiring: act.rasterWiring,
     effectsScenes: project.effectsScenes,
     effectsPresets: project.effectsPresets,

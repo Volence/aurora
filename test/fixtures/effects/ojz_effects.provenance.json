@@ -1,0 +1,25 @@
+{
+  "$what": "Provenance of ojz_effects.emp, aeon's SHIPPED effects library for OJZ (`games/sonic4/data/effects/ojz_effects.emp`), VENDORED into Aurora at a named aeon revision. It is the file whose `preset()` records thread the generated preset-channel choosers, record-keyed since aeon bcd844aa: `raster: ojz_act1_preset_raster(preset: OJZ_Preset_Sec5_KEY, hand: Raster_Program_None)` and the same for OJZ_Preset_Sec6. Aurora's raster-binding derivation (src/core/formats/effects/section-wiring.ts) is held to it, in both modes, by src/core/formats/effects/__tests__/raster-owners-truth.test.ts.",
+  "aeon": {
+    "repo": "git@github.com:Volence/aeon.git",
+    "path": "games/sonic4/data/effects/ojz_effects.emp",
+    "branch_that_answers_currency": "origin/master",
+    "revision": "c7ebe7a1a781cae8a036eb3e7185fc0de069b168",
+    "revision_is": "aeon origin/master at this parcel's dispatch (2026-09-17). `git log -1 c7ebe7a1 -- games/sonic4/data/effects/ojz_effects.emp` names 80fd217e as the last commit to touch the path. `git diff --stat c7ebe7a1 cc314a18 -- tools/effects_gen.py tools/effects_seam_gate.py games/sonic4/data/` printed nothing at a later origin/master (cc314a18), with the control `git diff --stat c7ebe7a1 cc314a18` printing five changed paths outside it (docs/DEFERRED_WORK.md, docs/lane-log.jsonl, docs/lane-status.json, engine/effects/preset.emp, engine/structs.emp).",
+    "blob": "b89a77ff6648d6d07a57d0aab4dc4ee7825107d8",
+    "last_changed_by": "80fd217e93d95587d03623515ddb82934699152f (2026-09-16) ojz_effects: record the measured release effect of the two DEBUG-only showcase names",
+    "resolved_by": "`git -C <aeon> show c7ebe7a1:games/sonic4/data/effects/ojz_effects.emp`, re-hashed on this side with `git hash-object` (b89a77ff...) and compared to `git rev-parse c7ebe7a1:games/sonic4/data/effects/ojz_effects.emp`. Never the sibling working tree."
+  },
+  "fixture": {
+    "path": "test/fixtures/effects/ojz_effects.emp",
+    "bytes": 229985,
+    "sha256": "00159e098ecf71ede4ae1010d280cc961e32c68365c44e2f0ae0a7d527fdfe9b",
+    "git_blob": "b89a77ff6648d6d07a57d0aab4dc4ee7825107d8",
+    "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
+  },
+  "what_the_two_checks_measure": {
+    "truth": "src/core/formats/effects/__tests__/raster-owners-truth.test.ts compares Aurora's derivation over these bytes with what aeon's own functions returned over the same bytes (raster-owners/*.aeon-truth.json).",
+    "currency": "test/formats/aeon-fixture-currency.test.ts, against aeon's origin/master."
+  },
+  "re_vendor": "node scripts/revendor.mjs test/fixtures/effects/ojz_effects.emp test/fixtures/effects/ojz_effects.provenance.json <AEON_DIR> games/sonic4/data/effects/ojz_effects.emp <revision>, then re-run test/fixtures/effects/raster-owners/aeon_truth_probe.py over both trees described in raster-owners/aeon_truth_probe.provenance.json and re-vendor both .aeon-truth.json files: their sha256_of_inputs.library must equal fixture.sha256 here."
+}

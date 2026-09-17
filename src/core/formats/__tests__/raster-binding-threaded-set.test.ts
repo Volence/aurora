@@ -1,5 +1,20 @@
 // THE SENTENCE THAT SHIPS AND THE FILE IT IS ABOUT, CHECKED AGAINST EACH OTHER.
 //
+// ═══ RE-AIMED 2026-09-17 (ruling REGION-MODE-RASTER-FALSE-OUTPUT-b1, condition 4) ═══
+//
+// aeon bcd844aa re-keyed the raster chooser on the RECORD for every act
+// (`ojz_act1_preset_raster(preset: <Record>_KEY)`), and aeon e2af59ea moved OJZ
+// act 1's bindings onto `regions.json`'s rows. Both rows below then failed BEFORE
+// comparing anything with the sentence: one derived with the section-keyed
+// chooser, the other read sidecars, and both were empty by construction. They now
+// re-derive by aeon's current rule, in whichever mode aeon's tree has the act
+// (`rasterOwners` / `rasterHomes` in section-wiring.ts, the mode read off the tree
+// listing), and compare against the sentence's `the wired homes are {..}` reading.
+// Each was proven red against the old sentence restored and against the
+// derivation mutated back to `_sec_raster`
+// (docs/reviews/2026-09-17-region-mode-b1.md). The history below is the file's
+// reason to exist and still holds; where it says "section" read "owner".
+//
 // ═══ WHY THIS FILE EXISTS — the 2026-09-10 finding, in one paragraph ═══
 //
 // `RASTER_SECTION_BINDING_LIMIT` is not a comment. It is published to a person
@@ -96,7 +111,9 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync } from 'node:fs';
 import { RASTER_SECTION_BINDING_LIMIT } from '../raster-binding';
-import { libraryRasterChooserCalls, rasterChooserName } from '../effects/section-wiring';
+import {
+  libraryRasterChooserCalls, rasterChooserName, rasterOwners, rasterHomes, readDescriptorWiring,
+} from '../effects/section-wiring';
 import { siblingPathOrUnresolved, siblingPathSource } from '../../../../test/support/sibling-root.mjs';
 import { peerRepo, resolveRev, readAtRev } from '../../../../test/support/peer-repo';
 import { announceFixture, READ_MODES } from '../../../../scratchpad/lib/fixture-provenance.mjs';
@@ -113,6 +130,7 @@ const AEON_TIP = 'origin/master';
 /** aeon-repo-relative, because these go to `git show <rev>:<path>` and nothing else. */
 const LIB_REL = 'games/sonic4/data/effects/ojz_effects.emp';
 const SIDECARS_REL = 'games/sonic4/data/editor/ojz/act1';
+const DESC_REL = 'games/sonic4/data/levels/ojz/act1/act_descriptor.emp';
 
 /**
  * WHICH AEON THIS RUN READ, printed before the rows that read it.
@@ -176,22 +194,24 @@ if (!existsSync(AEON)) {
 }
 
 /**
- * The sentence's canonical, machine-findable reading of the wired set.
+ * The sentence's canonical, machine-findable reading of the wired HOMES.
  *
  * ⚠ THE SPELLING IS THE CONTRACT between the prose and this file, so it is
- * parsed here and nowhere else. `at aeon <sha> (<date>) the wired set is {a, b}`.
- * A rewrite that keeps the fact and drops this shape fails the FIRST row below,
- * with a message saying so — never silently, which is what a regex returning
- * `null` into a comparison would do.
+ * parsed here and nowhere else. `at aeon <sha> (<date>) the wired homes are {a, b}`,
+ * where each member is an OWNER id: a region row's `id` on a region-mode act, a
+ * section index on a section-mode act (ruling REGION-MODE-RASTER-FALSE-OUTPUT-b1;
+ * until 2026-09-17 it was `the wired set is {5, 6}`, section indices only).
+ * A rewrite that keeps the fact and drops this shape fails the row that parses
+ * it, with a message saying so, never silently.
  */
-const READING = /at aeon ([0-9a-f]{7,40}) \((\d{4}-\d{2}-\d{2})\) the wired set is \{([0-9,\s]*)\}/;
+const READING = /at aeon ([0-9a-f]{7,40}) \((\d{4}-\d{2}-\d{2})\) the wired homes are \{([A-Za-z0-9_,\s]*)\}/;
 
-/** The set the sentence claims, or `null` if the sentence has no such clause. */
-function claimedWiredSet(): { sha: string; date: string; sections: number[] } | null {
+/** The homes the sentence claims, sorted, or `null` if the sentence has no such clause. */
+function claimedHomes(): { sha: string; date: string; homes: string[] } | null {
   const m = READING.exec(RASTER_SECTION_BINDING_LIMIT);
   if (m === null) return null;
-  const sections = m[3].split(',').map((s) => s.trim()).filter((s) => s !== '').map(Number);
-  return { sha: m[1], date: m[2], sections: sections.sort((a, b) => a - b) };
+  const homes = m[3].split(',').map((s) => s.trim()).filter((s) => s !== '');
+  return { sha: m[1], date: m[2], homes: homes.sort() };
 }
 
 /** Where a red should send the reader: peer, path, branch and the SHA it resolved to. */
@@ -217,26 +237,16 @@ function readPublished(rel: string): string {
   return r.text;
 }
 
-/** Memoised so the rows below do not re-spawn git for the same blob. */
-let libText: string | null = null;
-
-/** The set aeon's PUBLISHED file actually threads, by this repo's own parser. */
-function derivedWiredSet(): number[] {
-  libText ??= readPublished(LIB_REL);
-  const calls = libraryRasterChooserCalls(libText, rasterChooserName('ojz', 'act1'));
-  return [...new Set(Object.values(calls))].sort((a, b) => a - b);
-}
-
 type Listing = { ok: true; names: string[] } | { ok: false; why: string };
 
 /**
- * The names in aeon's published sidecar directory.
+ * The names in aeon's published act-1 editor directory.
  *
  * `git show <rev>:<dir>` prints `tree <rev>:<dir>`, a blank line, then one entry
  * per line. The header is checked rather than assumed: a directory REPLACED by a
  * file is a third state, and it must not read as an empty directory.
  */
-function sidecarListing(): Listing {
+function editorListing(): Listing {
   const r = readAtRev(aeonDir!, aeonSha!, SIDECARS_REL);
   if (!r.ok) return { ok: false, why: `${at(SIDECARS_REL)}: ${r.why}` };
   const lines = r.text.split('\n');
@@ -251,44 +261,73 @@ function sidecarListing(): Listing {
   return { ok: true, names: lines.slice(1).map((l) => l.trim()).filter((l) => l.length > 0) };
 }
 
-/** The sections whose PUBLISHED sidecar carries a `rasterRef`. */
-function derivedBoundSet(names: string[]): number[] {
-  const out: number[] = [];
-  for (let s = 0; s < 32; s++) {
-    const name = `section_${s}.meta.json`;
-    if (!names.includes(name)) continue;
-    let doc: unknown;
-    try {
-      doc = JSON.parse(readPublished(`${SIDECARS_REL}/${name}`));
-    } catch (e) {
-      // A sidecar this repo cannot parse is UNMEASURABLE, not absent. Surfaced
-      // as a throw so the row goes red rather than quietly counting one fewer.
-      throw new Error(`${at(`${SIDECARS_REL}/${name}`)} is not readable JSON `
-        + `(${e instanceof Error ? e.message : String(e)}): this row cannot derive the bound set `
-        + 'and must not report a smaller one');
-    }
-    const ref = (doc as Record<string, unknown> | null)?.rasterRef;
-    if (typeof ref === 'string' && ref !== '') out.push(s);
+/** A sidecar this repo cannot parse is UNMEASURABLE, not absent, so it throws. */
+function publishedJson(rel: string): unknown {
+  try {
+    return JSON.parse(readPublished(rel));
+  } catch (e) {
+    throw new Error(`${at(rel)} is not readable JSON (${e instanceof Error ? e.message : String(e)}): `
+      + 'this row cannot derive the owners and must not report fewer');
   }
-  return out;
+}
+
+/**
+ * THE OWNERS OF ACT 1'S RASTER BINDINGS AS aeon HAS PUBLISHED THEM, by aeon's
+ * current rule and this repo's own derivation (`rasterOwners`, `rasterHomes`, the
+ * record-keyed `libraryRasterChooserCalls` under `rasterChooserName`).
+ *
+ * THE MODE IS THE FILE, READ OFF THE TREE LISTING: `regions.json` among the
+ * directory's entries is region mode (aeon `has_act_regions`), and its absence
+ * from a listing that WAS read is section mode. Never inferred from what the
+ * sidecars carry: a region-mode act and an unbound section-mode act have
+ * identical nulled sidecars.
+ */
+function derivedOwners(names: string[]): { mode: 'region' | 'section'; wired: string[]; bound: string[] } {
+  const lib = readPublished(LIB_REL);
+  const threadedBy = libraryRasterChooserCalls(lib, rasterChooserName('ojz', 'act1'));
+  if (names.includes('regions.json')) {
+    const doc = publishedJson(`${SIDECARS_REL}/regions.json`) as {
+      regions?: { id: string; preset: string; rasterRef?: string | null }[];
+    };
+    if (!Array.isArray(doc.regions)) {
+      throw new Error(`${at(`${SIDECARS_REL}/regions.json`)} has no regions array: unmeasurable`);
+    }
+    const h = rasterHomes(rasterOwners({ regionRows: doc.regions, bindings: {}, sidecarRasterRefs: {} }),
+      threadedBy);
+    return { mode: 'region', wired: h.wired.map(String).sort(), bound: h.bound.map(String).sort() };
+  }
+  const wiring = readDescriptorWiring(DESC_REL, readPublished(DESC_REL), 'ojz');
+  if (!wiring.descriptor.parsed) {
+    throw new Error(`${at(DESC_REL)}: a section-mode act whose descriptor this repo's reader refused `
+      + `(${wiring.descriptor.reason}). The owners' records are unmeasurable, not absent.`);
+  }
+  const sidecarRasterRefs: Record<number, string | null> = {};
+  for (const n of names) {
+    const m = /^section_(\d+)\.meta\.json$/.exec(n);
+    if (m === null) continue;
+    const ref = (publishedJson(`${SIDECARS_REL}/${n}`) as Record<string, unknown> | null)?.rasterRef;
+    sidecarRasterRefs[Number(m[1])] = typeof ref === 'string' && ref !== '' ? ref : null;
+  }
+  const h = rasterHomes(rasterOwners({ regionRows: null, bindings: wiring.bindings, sidecarRasterRefs }),
+    threadedBy);
+  return { mode: 'section', wired: h.wired.map(String).sort(), bound: h.bound.map(String).sort() };
 }
 
 const needAeon = (ctx: { skip: (reason: string) => void }): boolean => {
   if (aeonDir !== null && aeonSha !== null) return true;
-  ctx.skip(`SKIPPED, NOT PASSED: ${cannotMeasure}. This row re-derives the wired set from `
-    + `aeon's real ${LIB_REL} as aeon has PUBLISHED it at ${AEON_TIP}, and compares it to what `
-    + 'the shipped limit sentence claims. Nothing was measured: the sentence may be right or may '
-    + 'be as wrong as it was for the seven days this row exists to prevent.');
+  ctx.skip(`SKIPPED, NOT PASSED: ${cannotMeasure}. This row re-derives the wired homes from `
+    + `aeon's real ${LIB_REL} and act-1 editor files as aeon has PUBLISHED them at ${AEON_TIP}, and `
+    + 'compares them to what the shipped limit sentence claims. Nothing was measured: the sentence '
+    + 'may be right or may be as wrong as it was for the seven days this row exists to prevent.');
   return false;
 };
 
-const needSidecars = (
-  ctx: { skip: (reason: string) => void },
-): string[] | null => {
-  const listing = sidecarListing();
+const needListing = (ctx: { skip: (reason: string) => void }): string[] | null => {
+  const listing = editorListing();
   if (listing.ok) return listing.names;
-  ctx.skip(`SKIPPED, NOT PASSED: ${listing.why}. This row re-derives which sections carry a `
-    + 'rasterRef and could not list the directory that holds them. Nothing was measured.');
+  ctx.skip(`SKIPPED, NOT PASSED: ${listing.why}. This row re-derives who owns the act's raster `
+    + 'bindings and could not list the directory that says which mode the act is in. Nothing was '
+    + 'measured.');
   return null;
 };
 
@@ -328,92 +367,117 @@ describe('the shipped raster-binding limit agrees with aeon\'s real file', () =>
   });
 
   it('the sentence carries a DATED, machine-findable reading at all', () => {
-    const claim = claimedWiredSet();
+    const claim = claimedHomes();
     expect(claim,
       'RASTER_SECTION_BINDING_LIMIT no longer contains a clause of the form "at aeon <sha> '
-      + '(<date>) the wired set is {..}". That clause is the contract between the published '
+      + '(<date>) the wired homes are {..}". That clause is the contract between the published '
       + 'sentence and this gate: without it the sentence is unreadable by any instrument, which '
       + 'is precisely the state that let "ONLY SECTION 5 IS WIRED" ship for seven days after aeon '
       + 'threaded section 6. Restore the spelling, do not delete this row.').not.toBeNull();
-    // A reading with no sections is not a reading. Guards the degenerate `{}`
+    // A reading with no homes is not a reading. Guards the degenerate `{}`
     // that would otherwise satisfy the comparison row against an empty derive.
-    expect(claim!.sections.length,
+    expect(claim!.homes.length,
       'the sentence claims an EMPTY wired set, which no aeon tree this editor supports has ever '
       + 'had; a reading of nothing cannot be compared with anything').toBeGreaterThan(0);
   });
 
-  it('THE ROW THIS FILE IS FOR: the claimed wired set equals the derived one', (ctx) => {
+  it('the wired homes the sentence claims equal the homes derived from aeon\'s published files by aeon\'s current rule', (ctx) => {
     if (!needAeon(ctx)) return;
-    const claim = claimedWiredSet();
+    const names = needListing(ctx);
+    if (names === null) return;
+    const claim = claimedHomes();
     expect(claim, 'no reading clause: see the row above').not.toBeNull();
-    const derived = derivedWiredSet();
+    const derived = derivedOwners(names);
     // ANTI-VACUOUS. A parse that found nothing would make the comparison a
     // contest between two empty lists and pass forever. aeon has threaded at
-    // least one section since `9cdf32d8`; zero here means the PARSER broke, not
-    // that the world did, and the two must not look alike.
-    expect(derived.length,
-      `this repo's own libraryRasterChooserCalls found NO chooser call in ${at(LIB_REL)}. That is `
-      + 'a parser or a path failure, not a fact about aeon: at least one section has been threaded '
-      + 'continuously since aeon 9cdf32d8. Do not "fix" the sentence to match this.')
+    // least one raster home continuously since 9cdf32d8; zero here means the
+    // PARSER or the OWNER JOIN broke, not that the world did.
+    expect(derived.wired.length,
+      `this repo's own derivation found NO home whose record threads `
+      + `${rasterChooserName('ojz', 'act1')} with its own key, reading ${at(LIB_REL)} and the act's `
+      + `${derived.mode}-mode owners. That is a parser, join or path failure, not a fact about aeon. `
+      + 'Do not "fix" the sentence to match this.')
       .toBeGreaterThan(0);
-    expect(derived,
-      `the published limit says the wired set is {${claim!.sections.join(', ')}} as read at aeon `
-      + `${claim!.sha} (${claim!.date}), and ${at(LIB_REL)} threads {${derived.join(', ')}}. `
-      + 'THIS IS THE EXPIRY FIRING, not a regression: aeon changed which sections thread '
-      + `ojz_act1_sec_raster, and the sentence four surfaces publish is now false. Check it out `
-      + `with: git -C <aeon> show ${aeonSha ?? AEON_TIP}:${LIB_REL} | grep -n sec_raster. Update `
-      + 'the reading AND its sha and date, and check the clauses that hang off it (the bound set, '
-      + 'EditorRaster_<ACT>_Bindings, and aeon\'s pinned content tests, which carry the same '
-      + 'list). Do NOT simply widen this matcher.')
-      .toEqual(claim!.sections);
+    expect(derived.wired,
+      `the published limit says the wired homes are {${claim!.homes.join(', ')}} as read at aeon `
+      + `${claim!.sha} (${claim!.date}), and aeon at ${AEON_TIP} (${aeonSha}) has a ${derived.mode}-mode `
+      + `act 1 whose homes are {${derived.wired.join(', ')}}. THIS IS THE EXPIRY FIRING, not a `
+      + 'regression: aeon changed which records thread the raster chooser, or which owners install '
+      + `them, and the sentence four surfaces publish is now false. Check it with: git -C <aeon> show `
+      + `${aeonSha ?? AEON_TIP}:${LIB_REL} | grep -n preset_raster, and the act's regions.json or `
+      + 'sidecars. Update the reading AND its sha and date, and check the clauses that hang off it '
+      + '(the bound owners, and aeon\'s content tests quoted in the sentence). Do NOT simply widen '
+      + 'this matcher.')
+      .toEqual(claim!.homes);
   });
 
-  it('every wired section the sentence names is also bound in aeon\'s sidecars', (ctx) => {
+  it('every wired home the sentence names is bound, in the file that owns the act\'s bindings', (ctx) => {
     if (!needAeon(ctx)) return;
     // ⚠ THE SECOND SET OF AEON FILES GETS THE SAME TREATMENT AS THE FIRST: read
     // at `AEON_TIP` through git objects, never off that lane's disk. An author
     // mid-edit in aeon's own tree must not be able to redden or green this row.
-    const names = needSidecars(ctx);
+    const names = needListing(ctx);
     if (names === null) return;
     // The sentence says BOTH ARE ALSO BOUND. That is a second claim about a
-    // second set of aeon files and it can expire on its own — an author
-    // unbinding a section in this very editor is enough.
-    const bound = derivedBoundSet(names);
-    expect(bound.length,
-      `no sidecar under ${at(SIDECARS_REL)} carries a rasterRef. Either aeon's band bindings are `
-      + 'gone (a real and reportable event) or this row is reading the wrong directory; the '
-      + 'sentence claims at least one, so investigate before editing prose.').toBeGreaterThan(0);
-    const derived = derivedWiredSet();
-    expect(bound.filter((s) => !derived.includes(s)),
-      'a section binds a rasterRef that no preset threads. That tree is one aeon\'s seam gate '
-      + 'refuses by name, and the shipped sentence says it is refused, so this is a real finding '
-      + 'about aeon\'s tree, not a wording problem here.').toEqual([]);
+    // second set of aeon files and it can expire on its own: an author
+    // unbinding an owner in this very editor is enough.
+    const derived = derivedOwners(names);
+    expect(derived.bound.length,
+      `no ${derived.mode === 'region' ? 'region row of regions.json' : 'sidecar'} under `
+      + `${at(SIDECARS_REL)} carries a rasterRef. Either aeon's band bindings are gone (a real and `
+      + 'reportable event) or this row is reading the wrong owners; the sentence claims at least '
+      + 'one, so investigate before editing prose.').toBeGreaterThan(0);
+    expect(derived.bound.filter((o) => !derived.wired.includes(o)),
+      'an owner binds a rasterRef whose record does not thread the raster chooser with its own key. '
+      + 'That tree is one aeon\'s seam gate refuses by name, and the shipped sentence says it is '
+      + 'refused, so this is a real finding about aeon\'s tree, not a wording problem here.')
+      .toEqual([]);
     expect(RASTER_SECTION_BINDING_LIMIT,
-      'the sentence no longer claims the wired sections are bound; if that clause was rewritten '
+      'the sentence no longer claims the wired homes are bound; if that clause was rewritten '
       + 'deliberately, rewrite this row with it rather than deleting the check')
       .toMatch(/BOTH ARE ALSO BOUND/);
-    // ⚠ THIS IS NOT AN INVARIANT ABOUT AEON — a wired section left UNBOUND is a
-    // legal, documented state (the sentence's own case 2: it resolves to the
-    // `hand:` label and changes nothing). It is a check on OUR CLAIM: while the
-    // sentence says BOTH ARE ALSO BOUND, the two sets must coincide. Wired
-    // {5,6,7} with bound {5,6} is a fine aeon tree and a false Aurora sentence.
-    expect(bound,
-      `the sentence says BOTH ARE ALSO BOUND, but aeon threads {${derived.join(', ')}} and only `
-      + `{${bound.join(', ')}} carry a rasterRef. A wired section left unbound is legal (it is `
-      + 'the sentence\'s own case 2), so the fix is to REWORD the clause to say which sections are '
-      + 'bound, not to bind anything in aeon\'s tree.')
-      .toEqual(derived);
+    // ⚠ AGAINST THE SENTENCE, NOT ONLY AGAINST THE DERIVATION. The first draft of
+    // this row compared aeon's bound owners with aeon's wired homes and checked
+    // the phrase was present, and it stayed GREEN with the pre-b1 sentence
+    // restored on disk: it never read which owners the sentence claims. "BOTH ARE
+    // ALSO BOUND" is a claim about the homes the reading names, so the bound
+    // owners are compared with those.
+    const claim = claimedHomes();
+    expect(claim, 'no reading clause, so the sentence names no homes to be bound: see the row above')
+      .not.toBeNull();
+    expect(derived.bound,
+      `the sentence says the homes {${claim!.homes.join(', ')}} are BOTH ALSO BOUND, and aeon at `
+      + `${AEON_TIP} (${aeonSha}) binds a rasterRef on {${derived.bound.join(', ')}}.`)
+      .toEqual(claim!.homes);
+    // ⚠ THIS IS NOT AN INVARIANT ABOUT AEON: a wired home left UNBOUND is a
+    // legal, documented state (it resolves to the `hand:` label and changes
+    // nothing). It is a check on OUR CLAIM: while the sentence says BOTH ARE
+    // ALSO BOUND, the two sets must coincide.
+    expect(derived.bound,
+      `the sentence says BOTH ARE ALSO BOUND, but aeon's homes are {${derived.wired.join(', ')}} and `
+      + `only {${derived.bound.join(', ')}} carry a rasterRef. A wired home left unbound is legal, so `
+      + 'the fix is to REWORD the clause to say which owners are bound, not to bind anything in '
+      + 'aeon\'s tree.')
+      .toEqual(derived.wired);
   });
 
-  it('the retired absolutes cannot come back by revert or by re-typing a number', () => {
+  it('the retired absolutes and the retired chooser spelling are absent, and the current rule and command are present', () => {
     // The two shapes that were false on 2026-09-10, asserted absent. A revert of
     // the constant, or a well-meant "just update the number", reintroduces one
     // of these and fails HERE with the reason rather than shipping again.
     expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/ONLY SECTION \d+ IS WIRED/);
     expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/exactly one preset\(\)/);
+    // The section-keyed rule and its command, retired by aeon bcd844aa, and the
+    // first build's staleness preface, removed by ruling b1.
+    expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/a section is wired exactly when some preset\(\)/);
+    expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/grep -n sec_raster/);
+    expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/WHAT IT MAKES STALE|NOT current for OJZ act 1/);
     // ...and the rule and the command, which are what make the sentence
     // answerable without this gate being available.
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/a section is wired exactly when some preset\(\)/);
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/grep -n sec_raster/);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(
+      /an owner \(a region row, or a section\) is wired exactly when the preset\(\) of the EffectsPreset record it installs/);
+    expect(RASTER_SECTION_BINDING_LIMIT).toContain(
+      `passes ${rasterChooserName('ojz', 'act1')}(preset: <that record>_KEY, hand: ...)`);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/grep -n preset_raster/);
   });
 });

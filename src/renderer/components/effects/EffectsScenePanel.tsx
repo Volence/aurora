@@ -84,7 +84,7 @@ import {
   layerCountLine, vFactorHint,
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
   sceneSelectionRelation,
-  sectionSceneCommand, createSceneCommand,
+  sectionSceneCommand, createSceneCommand, sectionSceneBindRefusal, sectionSceneOptions,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   layerExtrasLine,
   SCENE_FORM_CHOICES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
@@ -479,6 +479,10 @@ export default function EffectsScenePanel(): React.ReactElement {
     ? getActiveLevel(state)?.act ?? null
     : null;
   const section = act?.sections[activeSectionIndex] ?? null;
+  // The region-mode refusal for this section's sceneRef, or null (section mode,
+  // or no section). Asked through the provider, never by reading act.regions here.
+  const sceneModeRefusal = act === null || section === null ? null
+    : sectionSceneBindRefusal(act, activeSectionIndex, section.sceneRef);
 
   // ═══ THE SELECTION FOLLOWS THE SECTION (cold read 2026-09-05 C2) ═══
   //
@@ -1997,12 +2001,27 @@ export default function EffectsScenePanel(): React.ReactElement {
           </Hint>
         ) : (
           <>
+            {/* ═══ REGION MODE (ruling b1, condition 5) ═══
+                On an act whose regions.json exists, aeon's check_mode_conflict
+                refuses a sidecar sceneRef, so the select refuses a binding the
+                way the raster Section select does: the sentence above the
+                control, only unrefused options, and disabled while nothing is
+                bound. A leftover sceneRef can still be cleared, which is the
+                repair. On a section-mode act `sceneModeRefusal` is null and the
+                control is what it was. */}
+            {sceneModeRefusal !== null && (
+              <div data-effects-scene-region-mode-refusal="">
+                <Hint tone="warning" style={{ marginBottom: 0 }}>{sceneModeRefusal}</Hint>
+              </div>
+            )}
             <Field label={`Section ${activeSectionIndex}`}>
-              <Select title={'Which effects scene this section uses (sceneRef). '
-                + "Act default means the act's own scene."}
+              <Select title={sceneModeRefusal ?? ('Which effects scene this section uses (sceneRef). '
+                + "Act default means the act's own scene.")}
+                disabled={sceneModeRefusal !== null && section.sceneRef === null}
                 value={section.sceneRef ?? ''} style={{ flex: 1, minWidth: 0 }}
                 onChange={(v) => run(sectionSceneCommand(activeSectionIndex, section.sceneRef, v))}>
-                {sceneRefOptions(library).map((o) => (
+                {(act === null ? sceneRefOptions(library) : sectionSceneOptions(
+                  act, library, activeSectionIndex, section.sceneRef)).map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </Select>
@@ -2018,10 +2037,12 @@ export default function EffectsScenePanel(): React.ReactElement {
                 reader asking "what does this option mean" already looks; what
                 stays on screen is the thing no control can tell you, which is
                 WHERE THE VALUE IS WRITTEN. */}
-            <Hint under style={{ marginBottom: 0 }}>
-              Saved to <code>section_{activeSectionIndex}.meta.json</code> as
-              {' '}<code>sceneRef</code>.
-            </Hint>
+            {sceneModeRefusal === null && (
+              <Hint under style={{ marginBottom: 0 }}>
+                Saved to <code>section_{activeSectionIndex}.meta.json</code> as
+                {' '}<code>sceneRef</code>.
+              </Hint>
+            )}
           </>
         )}
        </SectionBody>
