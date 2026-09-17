@@ -1,0 +1,11 @@
+open threw {"code":-32000,"message":"Promise was collected"}
+region: open=true sections=9 regions={"kind":"open","actId":"act1","count":10,"ids":["sec0","sec1","sec2","sec3","sec
+facet: {"facet":"effects","tool":"view"} click=ok
+facet result: {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+buttons: ["Run a commandCtrl+K","Project Setup","Open project…","Open","Layout","Objects","Effects","Rings","Collision","Regions","Palette","Art","FG","BG","View","Undo","Redo","Save","? Guide","Promote from tile 0","Parallax preview","Parallax","Colour","Tile anim","New","Add","Remove","Remove","Remove","Remove","Remove","Delete","−","+","Aether ◇ offline"]
+parallax tab: ok
+region section 3 scene ojz_act1_depth: ["This act is in region mode: scenes are bound on its region rows, not on sections. Edits below change ojz_act1_depth, which region sec4 binds. To change which scene a region binds, use the Regions panel, under Bindings."]
+region section 3 scene ojz_act1_start: ["This act is in region mode: scenes are bound on its region rows, not on sections. Edits below change ojz_act1_start, which region sec0 binds. To change which scene a region binds, use the Regions panel, under Bindings."]
+region section 0 scene ojz_act1_depth: ["This act is in region mode: scenes are bound on its region rows, not on sections. Edits below change ojz_act1_depth, which region sec4 binds. To change which scene a region binds, use the Regions panel, under Bindings."]
+region section 0 scene ojz_act1_start: ["This act is in region mode: scenes are bound on its region rows, not on sections. Edits below change ojz_act1_start, which region sec0 binds. To change which scene a region binds, use the Regions panel, under Bindings."]
+region section 7 scene ojz_act1_floor: ["This act is in region mode: scenes are bound on its region rows, not on sections. Edits below change ojz_act1_floor, which region sec8 binds. To change which scene a region binds, use the Regions panel, under Bindings."]

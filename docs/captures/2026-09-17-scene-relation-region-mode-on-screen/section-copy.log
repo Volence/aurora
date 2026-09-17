@@ -1,0 +1,11 @@
+open threw {"code":-32000,"message":"Promise was collected"}
+section: open=true sections=9 regions={"kind":"none","actId":"act1","count":0,"ids":[],"selectedRegionId":null}
+facet: {"facet":"effects","tool":"view"} click=ok
+facet result: {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+buttons: ["Run a commandCtrl+K","Project Setup","Open project…","Open","Layout","Objects","Effects","Rings","Collision","Regions","Palette","Art","FG","BG","View","Undo","Redo","Save","? Guide","Promote from tile 0","Parallax preview","Parallax","Colour","Tile anim","New","Add","Remove","Remove","Remove","Remove","Remove","Delete","−","+","Aether ◇ offline"]
+parallax tab: ok
+section section 3 scene ojz_act1_depth: ["Section 3 uses the act default scene. Edits below change ojz_act1_depth, which no section uses yet: bind it under SECTION ASSIGNMENT."]
+section section 3 scene ojz_act1_start: ["Section 3 uses the act default scene. Edits below change ojz_act1_start, which no section uses yet: bind it under SECTION ASSIGNMENT."]
+section section 0 scene ojz_act1_depth: ["Section 0 uses the act default scene. Edits below change ojz_act1_depth, which no section uses yet: bind it under SECTION ASSIGNMENT."]
+section section 0 scene ojz_act1_start: ["Section 0 uses the act default scene. Edits below change ojz_act1_start, which no section uses yet: bind it under SECTION ASSIGNMENT."]
+section section 7 scene ojz_act1_floor: ["Section 7 uses the act default scene. Edits below change ojz_act1_floor, which no section uses yet: bind it under SECTION ASSIGNMENT."]
