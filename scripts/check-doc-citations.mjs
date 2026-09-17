@@ -994,6 +994,18 @@ const EXEMPT = [
        + 'carried is recorded in two TRACKED places and cites both, so the unopenable path is '
        + 'not doing any evidential work. Untracked by contract (empyrean '
        + 'contract/LANE_STATUS.md), so it cannot be made openable.' },
+
+  // Added 2026-09-17. FOURTH entry on this token, and a different third reason: not
+  // provenance but an INSTRUCTION naming the file a booting session reads. The rotation
+  // rule tells a session where its `next` row lives, and that place is the board file,
+  // by contract local to each machine. The sentence offers nothing as evidence. Same
+  // landing lesson as the row above, repeated: 92443d5b added the sentence, was pushed,
+  // and the suite was not re-run, so master sat red until the next parcel's run found it.
+  { file: 'docs/OVERSEER.md', token: 'docs/lane-status.json',
+    why: 'the sentence is an INSTRUCTION to a booting session naming the file its next queue '
+       + 'row is read from; it offers nothing as evidence. The file is the boot-time source by '
+       + 'design and untracked by contract (empyrean contract/LANE_STATUS.md), so it cannot be '
+       + 'made openable and no repair is wanted.' },
 ];
 
 // ---------------------------------------------------------------------------
