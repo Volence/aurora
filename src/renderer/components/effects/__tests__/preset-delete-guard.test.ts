@@ -301,10 +301,26 @@ describe('the panel is wired to the guard, from one derivation', () => {
     // owner of a binding on a region-mode act. The delete guard is the one
     // reading that must run in BOTH modes: it asks whether anything still names
     // the document, and on a region-mode act the answer lives on the region
-    // rows. Gating it on `regionNotice` would restore the defect exactly.
+    // rows. Suppressing it would restore the defect exactly.
+    //
+    // ⚠ THIS ROW'S FIRST DRAFT ASSERTED `not.toMatch(/regionNotice/)` AND WAS
+    // VACUOUS AGAINST THE DEFECT IT NAMES. Applied on disk, a suppressor
+    // spelled with any other local (`const deleteRefusalGate = act === null ?
+    // null : regionModeRasterNotice(act)`, then `|| deleteRefusalGate !== null`)
+    // left this file 20/20 green. So the claim is made structurally instead: the
+    // CONDITION that can zero this derivation mentions nothing but the nullity
+    // of `act` and `selected`. Any added suppressor, whatever it is called,
+    // puts a fourth identifier in that set.
     const derivation = /const deleteRefusal = [\s\S]*?;\n/.exec(code)![0];
     expect(derivation).toMatch(/deletePresetRefusal\(act\.sections, selected\.id, act\)/);
-    expect(derivation).not.toMatch(/regionNotice/);
+    const cond = /const deleteRefusal = \(([^)]*)\)/.exec(derivation)![1];
+    const idents = [...new Set(cond.match(/[A-Za-z_$][\w$]*/g) ?? [])].sort();
+    expect(idents).toEqual(['act', 'null', 'selected']);
+    // THE INSTRUMENT IS CHECKED BEFORE IT IS TRUSTED: the same extraction over a
+    // sibling verdict on this surface DOES find the suppressor, so an empty or
+    // blind reader cannot read as "no suppressor here".
+    const sibling = /const wiringAdvisory = [\s\S]*?;\n/.exec(code)![0];
+    expect(sibling).toMatch(/regionNotice !== null/);
     // The act is what carries `regions`, so the guard cannot be handed sections
     // alone and still see the region rows.
     expect(code).toMatch(/const regionNotice = act === null \? null : regionModeRasterNotice\(act\)/);
