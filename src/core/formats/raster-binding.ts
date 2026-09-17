@@ -846,3 +846,62 @@ export const RASTER_SECTION_BINDING_LIMIT =
   + 'tools/effects_seam_gate.py and tools/effects_gen.py, and re-read '
   + 'docs/research/reference_captures/2026-08-30-sec5-band/README.md for what was measured and '
   + 'what it says was not.';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REGION MODE (2026-09-17, ruling B on REGION-MODE-RASTER-FALSE-OUTPUT)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// aeon `e2af59ea` put OJZ act 1 in REGION MODE: `regions.json` owns the scene
+// and raster bindings and every `section_N.meta.json` ref is nulled. The mode is
+// FILE PRESENCE (`has_act_regions`), which Aurora reads through exactly one
+// predicate, `actHasRegionsFile` in core/formats/regions/act-regions.ts.
+//
+// On such an act every section-keyed raster verdict this editor derives (own
+// preset, threaded, its channels, the act sets, the rebind note) is about files
+// that no longer carry the binding, so they are not shown. These two sentences
+// are what is shown instead. `docs/reviews/2026-09-17-region-mode-raster-false-output.md`
+// is the finding.
+//
+// ⚠ NO "Migrate sections" POINTER IN EITHER, AND THAT IS MEASURED, NOT FORGOTTEN.
+// The ruling asks for one "where the act has not migrated". In region mode the
+// document already exists, and Aurora's `planActMigration`
+// (renderer/providers/regions-migrate.ts) refuses an act that has a document OR
+// a refused one, and the Regions panel only renders the Migrate sections button
+// when there is no document. So on every act these sentences are shown for,
+// that action is refused or absent; pointing at it would send the author to a
+// wall. The review file records this as a stopped item.
+
+/**
+ * Shown ONCE, in place of the section-keyed raster verdicts, on a region-mode
+ * act. Read by the effects strip and the band-preset panel.
+ */
+export const REGION_MODE_RASTER_NOTICE =
+  'This act is in region mode: its regions.json exists, so aeon\'s build takes raster bindings '
+  + '(rasterRef) from the region rows, not from the section sidecars. The per-section raster '
+  + 'checks on this tab read the sidecars, so they are not shown for this act. To see or change '
+  + 'which preset a region binds, use the Regions panel.';
+
+/**
+ * Why a section sidecar may not take a raster binding on a region-mode act.
+ *
+ * ONE SENTENCE FOR BOTH DOORS: the band-preset panel's Section select and the
+ * agent's `assign_section_preset`. It names aeon's refusal by its function and
+ * file, because that is what an author meets if the write is made by hand, and
+ * it says where the binding lives instead.
+ *
+ * `currentRef` non-null adds the one thing still allowed: clearing that ref.
+ * A sidecar still carrying a `rasterRef` beside `regions.json` is the very tree
+ * `check_mode_conflict` refuses, so clearing it is the repair, not a binding.
+ */
+export function regionModeSectionRasterRefusal(
+  sectionIndex: number, currentRef: string | null,
+): string {
+  const base = `Section ${sectionIndex} cannot take a raster binding: this act is in region mode `
+    + '(its regions.json exists), and aeon\'s tools/effects_gen.py check_mode_conflict refuses '
+    + 'the build when a section_N.meta.json carries a rasterRef or a sceneRef beside that file. '
+    + 'The binding lives on a region: set it in the Regions panel, under Bindings.';
+  if (currentRef === null) return base;
+  return `${base} This section's sidecar still carries rasterRef "${currentRef}", which that `
+    + 'check refuses now. Clearing it (Hand-authored raster, or null from assign_section_preset) '
+    + 'is still allowed.';
+}

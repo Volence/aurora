@@ -176,6 +176,7 @@ import {
   programArmEditorGap, programArmRowTitle,
   bandControlsRefusal,
   RASTER_REF_ROW, presetRefOptions, unassignablePresetRef, sectionPresetCommand,
+  regionModeRasterNotice, sectionRasterOptions, sectionRasterBindRefusal,
   createPresetCommand,
   addBandCommand, removeBandCommand, lastBandRefusal, deletePresetRefusal, rebindOrphanNotice,
   setBandFieldCommand, setBandArmCommand, setArmFieldCommand,
@@ -312,7 +313,17 @@ export default function BandPresetPanel(): React.ReactElement | null {
   const deleteRefusal = (act === null || selected === null)
     ? null
     : deletePresetRefusal(act.sections, selected.id);
-  const wiringAdvisory = act === null ? null : sectionRasterAdvisory(
+  // ═══ REGION MODE (ruling B, 2026-09-17) ═══
+  //
+  // Non-null exactly when this act's regions.json exists (`actHasRegionsFile`,
+  // aeon's `has_act_regions`). Every section-keyed raster verdict below reads
+  // the section sidecars or the section-keyed chooser, and on such an act the
+  // binding lives on the region rows, so each of them is computed ONLY while
+  // this is null. A section-mode act takes exactly the path it took before.
+  // The notice itself is painted once, by the strip; this panel paints the
+  // refusal at the control that would write the sidecar.
+  const regionNotice = act === null ? null : regionModeRasterNotice(act);
+  const wiringAdvisory = act === null || regionNotice !== null ? null : sectionRasterAdvisory(
     act.rasterWiring, activeSectionIndex, rasterChooserName(zoneId, act.id));
   // ═══ THE ONE STRUCTURAL REFUSAL, AND THE ONLY THING ON THIS SURFACE THAT
   //     DISABLES A CONTROL (SECTION0-SPECIAL-CASE, aeon `92d744fc`) ═══
@@ -329,19 +340,24 @@ export default function BandPresetPanel(): React.ReactElement | null {
   // for why it is derived from the mechanism rather than from `sec === 0`, and
   // for the three-way shape that made a single verdict for "0-4" wrong either
   // way round.
-  const armRefusal = act === null ? null : sectionArmExclusivityRefusal(
+  const armRefusal = act === null || regionNotice !== null ? null : sectionArmExclusivityRefusal(
     act.rasterWiring, activeSectionIndex, rasterChooserName(zoneId, act.id));
   // ⚠ `unknown` IS NEITHER OF THE OTHER TWO. With the effects library unread,
   // the control stays ENABLED and says what could not be checked — never
   // silently enabled, and never disabled for a mechanism nobody measured.
-  const armUnknown = act === null ? null
+  const armUnknown = act === null || regionNotice !== null ? null
     : sectionArmExclusivityUnknownNotice(act.rasterWiring, activeSectionIndex);
   // ⚠ NO aeon FILE IN THIS ONE. The two sentences above degrade with
   // act_descriptor.emp and <zone>_effects.emp; this reads only the sidecars
   // Aurora itself writes, so it survives an unreadable aeon tree and it is the
   // half of the cold read's D-B that is always available. See its docblock.
-  const rebindNotice = act === null ? null
+  const rebindNotice = act === null || regionNotice !== null ? null
     : rebindOrphanNotice(act.sections, activeSectionIndex);
+  // What this section's select refuses, said BEFORE the author picks. On a
+  // region-mode act any binding is refused (clearing is not); on a section-mode
+  // act this is always null.
+  const modeRefusal = act === null || section === null ? null
+    : sectionRasterBindRefusal(act, activeSectionIndex, section.rasterRef);
   // ⚠ THE SUBJECT IS THE WHOLE ACT, NOT `activeSectionIndex`. Every other
   // per-section reading on this surface is about the section the author is
   // looking at; this one is about every section that BINDS the document they are
@@ -532,6 +548,16 @@ export default function BandPresetPanel(): React.ReactElement | null {
                   trigger `ConditionRow`'s `refused` tier uses, one mechanism
                   further out — there the refusal needs a `rasterRef` to exist
                   before it fires, and here it fires on the section itself. */}
+              {/* ═══ REGION MODE: THE WRITE aeon WOULD REFUSE, ABOVE THE CONTROL ═══
+
+                  `armRefusal`'s placement and tier, for its reasons: a refusal
+                  the author meets after the grey box has already done its damage.
+                  On a section-mode act `modeRefusal` is null and nothing renders. */}
+              {modeRefusal !== null && (
+                <div data-effects-region-mode-refusal="" style={{ marginTop: T.s3 }}>
+                  <Hint tone="warning" style={{ marginBottom: 0 }}>{modeRefusal}</Hint>
+                </div>
+              )}
               {armRefusal !== null && (
                 <div data-effects-arm-refusal="" style={{ marginTop: T.s3 }}>
                   <Hint tone="warning" style={{ marginBottom: 0 }}>{armRefusal}</Hint>
@@ -571,13 +597,24 @@ export default function BandPresetPanel(): React.ReactElement | null {
                     defect than the one it prevents, so the refusal above stays
                     on screen, in the warning tier, and the control stays live
                     until the binding is gone. Then it greys. */}
-                <Select title={armRefusal ?? RASTER_REF_ROW.title}
-                  disabled={act !== null && sectionBindingControlDisabled(
-                    act.rasterWiring, activeSectionIndex, section.rasterRef)}
+                {/* ⚠ REGION MODE DISABLES ON THE SAME TERMS: only while nothing is
+                    bound, so a sidecar ref left beside regions.json (the tree
+                    aeon's check_mode_conflict refuses) can still be cleared here.
+                    A live control cannot bind either: `sectionRasterOptions`
+                    offers only the values `sectionRasterWriteRefusal` (the
+                    function `assign_section_preset` asks) does not refuse, plus
+                    the value already there. On a section-mode act that is every
+                    option `presetRefOptions` returns, unchanged. */}
+                <Select title={modeRefusal ?? armRefusal ?? RASTER_REF_ROW.title}
+                  disabled={act !== null && (
+                    (modeRefusal !== null && section.rasterRef === null)
+                    || (regionNotice === null && sectionBindingControlDisabled(
+                      act.rasterWiring, activeSectionIndex, section.rasterRef)))}
                   value={section.rasterRef ?? ''} style={{ flex: 1, minWidth: 0 }}
                   onChange={(v) => run(sectionPresetCommand(
                     activeSectionIndex, section.rasterRef, v))}>
-                  {presetRefOptions(library).map((o) => (
+                  {(act === null ? presetRefOptions(library) : sectionRasterOptions(
+                    act, library, activeSectionIndex, section.rasterRef)).map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
                   ))}
                 </Select>

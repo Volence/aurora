@@ -34,7 +34,7 @@ import {
 import { parseEffectsPreset, presetProgramArm } from '../../core/formats/effects/preset';
 import {
   deletePresetCommand, presetIdRefusal, replacePresetCommand, sectionPresetCommand,
-  PRESET_LIMITS,
+  sectionRasterWriteRefusal, PRESET_LIMITS,
 } from '../providers/effects-preset';
 import {
   addBandCommand, bandBudget, bandRows, demoteBandCommand,
@@ -1146,6 +1146,14 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       }
       const section = ctx.act.sections[req.section];
       if (!section) throw new Error(`section ${req.section} is empty`);
+      // ⚠ REGION MODE REFUSES FIRST (ruling B, 2026-09-17). On an act whose
+      // regions.json exists, aeon's `check_mode_conflict` refuses a sidecar that
+      // carries a rasterRef, so this write would hand the caller a tree aeon will
+      // not build. The SAME function the panel's Section select asks; clearing
+      // (null) is still allowed, and on a section-mode act it is always null.
+      const modeRefusal = sectionRasterWriteRefusal(
+        ctx.act, req.section, section.rasterRef, req.presetId);
+      if (modeRefusal !== null) throw new Error(`assign_section_preset refused: ${modeRefusal}`);
       const library = useProjectStore.getState().project!.effectsPresets;
       if (req.presetId !== null && !library.presets.some(p => p.id === req.presetId)) {
         // Deliberately refuses an UNREADABLE id too — it is not in `presets`.

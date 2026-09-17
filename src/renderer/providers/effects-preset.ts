@@ -153,7 +153,13 @@ import type { SetEffectsPresetCommand, SetSectionRasterCommand } from '../../cor
 // AUTHOR-FACING copy of a sentence the agent replies and the published tool
 // descriptions also carry, and main/ cannot import renderer/ — so the words live
 // in core/ and every audience quotes them. See raster-binding.ts's own header.
-import { RASTER_SECTION_BINDING_LIMIT } from '../../core/formats/raster-binding';
+import {
+  RASTER_SECTION_BINDING_LIMIT, REGION_MODE_RASTER_NOTICE, regionModeSectionRasterRefusal,
+} from '../../core/formats/raster-binding';
+// REGION MODE IS DECIDED IN ONE PLACE. Every surface that has to know whether an
+// act binds rasters on regions asks `actHasRegionsFile`, aeon's `has_act_regions`
+// (file presence) and nothing else. See its docblock.
+import { actHasRegionsFile, type ActRegionsState } from '../../core/formats/regions/act-regions';
 // THE FIRE BOUND IS NOT RE-TYPED HERE. A band's two edges and a vsplit's fire
 // are the same engine `ensure` — see the timeline block at the foot of this
 // file — so the constant is imported from the one place that declares it.
@@ -1036,6 +1042,66 @@ export function unassignablePresetRef(
     return `${where} is assigned to "${rasterRef}", whose file exists but could not be read.`;
   }
   return `${where} is assigned to "${rasterRef}", which is not a raster preset in this project.`;
+}
+
+/**
+ * The one notice a REGION-MODE act shows in place of the section-keyed raster
+ * verdicts, or null on a section-mode act (which keeps every verdict as before).
+ *
+ * THE GATE THE STRIP AND THE PANEL READ. Each suppressed verdict in
+ * `SectionPicker` and `BandPresetPanel` is computed only while this is null, so
+ * "which mode" is asked once per render, through the one predicate.
+ */
+export function regionModeRasterNotice(act: { regions?: ActRegionsState }): string | null {
+  return actHasRegionsFile(act.regions) ? REGION_MODE_RASTER_NOTICE : null;
+}
+
+/**
+ * Why writing `value` into this section's sidecar `rasterRef` is refused, or
+ * null when it is not. BOTH DOORS ASK THIS before `sectionPresetCommand`: the
+ * band-preset panel's Section select and `assign_section_preset`.
+ *
+ * On a section-mode act it is always null, so nothing there changes. On a
+ * region-mode act any non-empty value is refused (aeon's `check_mode_conflict`
+ * refuses the tree it would make) and CLEARING is allowed, because a sidecar
+ * still carrying a ref beside `regions.json` is the tree that check refuses and
+ * clearing it is the way out. `''` and null are the same unbind, as in
+ * `sectionPresetCommand`.
+ */
+export function sectionRasterWriteRefusal(
+  act: { regions?: ActRegionsState }, sectionIndex: number,
+  currentRef: string | null, value: string | null,
+): string | null {
+  if (value === null || value === '') return null;
+  return sectionRasterBindRefusal(act, sectionIndex, currentRef);
+}
+
+/**
+ * The Section select's options: `presetRefOptions`, less every value
+ * `sectionRasterWriteRefusal` refuses, keeping the value already bound so a
+ * controlled `<select>` can still show it. On a section-mode act nothing is
+ * refused, so this IS `presetRefOptions(library)`; on a region-mode act it is
+ * the unbind option and the current ref, so the control can clear and cannot
+ * bind.
+ */
+export function sectionRasterOptions(
+  act: { regions?: ActRegionsState }, library: EffectsPresetLibrary,
+  sectionIndex: number, currentRef: string | null,
+): FactorOption[] {
+  return presetRefOptions(library).filter((o) => o.value === (currentRef ?? '')
+    || sectionRasterWriteRefusal(act, sectionIndex, currentRef, o.value) === null);
+}
+
+/**
+ * Why this section cannot take ANY raster binding right now, or null. The
+ * sentence the panel paints above its Section select before anything is picked;
+ * `sectionRasterWriteRefusal` is the same answer for one concrete value.
+ */
+export function sectionRasterBindRefusal(
+  act: { regions?: ActRegionsState }, sectionIndex: number, currentRef: string | null,
+): string | null {
+  if (!actHasRegionsFile(act.regions)) return null;
+  return regionModeSectionRasterRefusal(sectionIndex, currentRef);
 }
 
 /**
