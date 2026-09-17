@@ -1,0 +1,27 @@
+{
+  "$what": "Provenance of ojz_act1.regions.json — aeon's SHIPPED regions document for OJZ act 1 (`games/sonic4/data/editor/ojz/act1/regions.json`), VENDORED into Aurora at a named aeon revision. Since aeon e2af59ea (2026-09-16, regions-emit-bindings 3/3) OJZ act 1 is in REGION MODE and THIS document owns the act's scene and raster bindings: its `sec6` row carries `rasterRef: \"ojz_sec6_baseswap\"`, which is the binding that makes ojz_sec6_baseswap.json a document the editor must be able to open. Until that commit the binding sat in section_6.meta.json, vendored beside this file and now null.",
+  "$why_a_second_copy_of_a_blob_already_vendored": "test/fixtures/regions/ojz_act1.regions.json holds the SAME BYTES today (blob d7f45399 at both paths at aeon 83ec56d2), and it is not reused on purpose. That file vendors aeon's SHARED GOLDEN, `tools/fixtures/regions/ojz_act1.regions.json`, a test fixture aeon publishes for the seam; its currency row tracks the golden, not the file aeon's build reads. The binding claim is about what aeon SHIPS, so it needs a currency row on the shipped path. The two copies are free to diverge the day aeon edits one and not the other, and each currency row will then say which.",
+  "aeon": {
+    "repo": "git@github.com:Volence/aeon.git",
+    "path": "games/sonic4/data/editor/ojz/act1/regions.json",
+    "branch_that_answers_currency": "origin/master",
+    "revision": "e2af59ea6de7aa066550fb7fa8eb470dae94c580",
+    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log --oneline 83ec56d2 -- games/sonic4/data/editor/ojz/act1/regions.json` names exactly one commit, e2af59ea, which created the file (one parent, not a merge). Measured 2026-09-17 with aeon origin/master = 83ec56d2d190a97a4d40eb5bc1a78b56b634b0bb (local ref, no fetch run).",
+    "blob": "d7f45399fa9a95b08ca307930faab65ca2343d36",
+    "last_changed_by": "e2af59ea6de7aa066550fb7fa8eb470dae94c580 (2026-09-16) regions-emit-bindings 3/3: act 1 reads its regions from the editor's file, and the flip moved ZERO bytes",
+    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> <AEON_DIR> <path> e2af59ea — bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
+    "revision_published": "e2af59ea is an ancestor of aeon origin/master (83ec56d2), checked with `git merge-base --is-ancestor` (exit 0); the sidecar sweep in test/formats/aeon-fixture-currency.test.ts re-asserts reachability on every run"
+  },
+  "fixture": {
+    "path": "test/fixtures/effects/ojz_act1.regions.json",
+    "bytes": 1949,
+    "sha256": "7a8c2ed27a4a39ba43eb19140fcb4eda66f575590baddbc98849864ea287fa85",
+    "git_blob": "d7f45399fa9a95b08ca307930faab65ca2343d36",
+    "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
+  },
+  "what_the_two_checks_measure": {
+    "binding": "test/formats/effects-preset-base-swap.test.ts asserts that exactly one region row of this document carries `rasterRef` equal to the id the codec parsed out of ojz_sec6_baseswap.json, and that ojz_act1_section_6.meta.json's `rasterRef` is null.",
+    "currency": "test/formats/aeon-fixture-currency.test.ts, against aeon's origin/master."
+  },
+  "re_vendor": "node scripts/revendor.mjs test/fixtures/effects/ojz_act1.regions.json test/fixtures/effects/ojz_act1.regions.provenance.json <AEON_DIR> games/sonic4/data/editor/ojz/act1/regions.json <the commit that last touched the path, from `git log origin/master -- <path>`> — then update `last_changed_by` and `revision_is` here, and re-vendor ojz_act1_section_6.meta.json at a revision that agrees."
+}

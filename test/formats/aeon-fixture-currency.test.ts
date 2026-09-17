@@ -62,6 +62,12 @@ const VENDORED: Vendored[] = [
   'effects/ojz_act1_depth.json',
   'effects/ojz_sec6_baseswap.json',
   'effects/ojz_act1_section_6.meta.json',
+  // aeon's SHIPPED regions document for OJZ act 1, vendored 2026-09-17 at aeon
+  // e2af59ea, the commit that put the act in REGION MODE and moved section 6's
+  // raster binding off its sidecar and onto this document's `sec6` row. It has
+  // the same bytes as the shared golden below today and is tracked separately
+  // because it is a different aeon path; see its provenance sidecar.
+  'effects/ojz_act1.regions.json',
   // The SHARED GOLDEN, both halves, vendored 2026-09-16 at aeon 9772326; see
   // docs/reviews/2026-09-16-regions-seam-leg.md. The pair is pinned at ONE
   // revision on purpose — a document from one aeon commit compared against rows

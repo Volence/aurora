@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { referenceFile, skipUnlessPresent } from '../support/fixture-tree';
+import { peerRepo, resolveRev, readAtRev } from '../support/peer-repo';
 
 import type { FileAccess } from '../../src/core/project/adapter';
 import { loadAeonProject } from '../../src/core/project/aeon/load';
@@ -233,76 +233,140 @@ describe('every JSON writer aimed at aeon\'s tree ends in exactly one newline', 
 
 // ── (3) F2 itself: a no-edit save of aeon's real sidecar is a no-op ──────────
 
-describe('F2: parse → serialize of aeon\'s on-disk files', () => {
+describe('F2: parse → serialize of aeon\'s committed files', () => {
   // DERIVED, not a fixed hop. Until 2026-08-29 this read
-  // `resolve(__dirname, '../../../../../../aeon')`, which is six levels up —
+  // `resolve(__dirname, '../../../../../../aeon')`, which is six levels up,
   // correct from a linked worktree under `.claude/worktrees/<id>/`, and
   // `/aeon` from the main checkout. So on the checkout these tests are
   // normally run from, both rows below took the absent branch and reported
   // PASSED while measuring nothing. Nothing could have made them red.
-  const META = referenceFile('aeon', 'games/sonic4/data/editor/ojz/act1/section_4.meta.json');
-  const OVERRIDE = referenceFile('aeon', 'games/sonic4/data/editor_bg_override.json');
+  //
+  // ⚠ 2026-09-17: AEON'S BYTES, AT A NAMED REVISION, NEVER ITS WORKING TREE.
+  // Until today these rows opened aeon's live checkout by path, so their colour
+  // was decided by whatever that lane had on disk. They now read `origin/master`
+  // in aeon's checkout through git objects (`test/support/peer-repo.ts`), never
+  // fetch, name the resolved SHA in every message, and skip LOUDLY when that
+  // ref cannot be resolved. It is still a LIVE reading: it moves when aeon
+  // pushes, which is what went red on 2026-09-17 (below).
+  //
+  // ⚠ AND THE SIDECAR ROW SPLIT IN TWO, BECAUSE aeon e2af59ea MOVED ITS SUBJECT.
+  // That commit put OJZ act 1 in REGION MODE and nulled every scene/raster ref
+  // in every `section_N.meta.json`. `section_4.meta.json`, the file F2 was
+  // found on, now carries NO ref at all, so `serializeSectionMeta` returns null
+  // for it and the old row threw `Cannot convert undefined or null to object`.
+  // An all-null sidecar that exists on disk is not skipped by the save: it goes
+  // through `buildAeonSavePlan`'s explicit-null CLEAR branch, a DIFFERENT writer.
+  // So F2's property is now held on both writers, each against a real aeon file
+  // that exercises it:
+  //   • section_4.meta.json, all refs null   -> the CLEAR branch, via the plan;
+  //   • section_0.meta.json, carries a ref   -> serializeSectionMeta, as before.
+  // Each row asserts its file is still the SHAPE that reaches its writer, so a
+  // later aeon edit that moves either file onto the other writer reddens the row
+  // with a sentence saying so rather than quietly testing the other path.
+  // Nothing was dropped: the old row's three assertions are in both rows.
+  const AEON_TIP = 'origin/master';
+  const SEC4 = 'games/sonic4/data/editor/ojz/act1/section_4.meta.json';
+  const SEC0 = 'games/sonic4/data/editor/ojz/act1/section_0.meta.json';
+  const OVERRIDE = 'games/sonic4/data/editor_bg_override.json';
+
+  /** aeon's committed bytes for `rel`, or null after a loud skip saying what was not measured. */
+  const committed = (ctx: { skip: (reason: string) => void }, rel: string, what: string)
+  : { text: string; at: string } | null => {
+    const aeon = peerRepo('aeon');
+    if (aeon === null) {
+      ctx.skip(`SKIPPED, NOT PASSED: no aeon git checkout beside this repo (set AEON_DIR), so ${what} `
+        + `(${rel} at ${AEON_TIP}) was not measured`);
+      return null;
+    }
+    const sha = resolveRev(aeon, AEON_TIP);
+    if (sha === null) {
+      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon}; this row reads that ref `
+        + `and never the working tree, so ${what} was not measured`);
+      return null;
+    }
+    const r = readAtRev(aeon, sha, rel);
+    // Not a skip: the revision resolved, so an absent path IS a measurement.
+    if (!r.ok) throw new Error(`aeon:${rel} at ${AEON_TIP} (${sha}): ${r.why}`);
+    return { text: r.text, at: `aeon:${rel} at ${AEON_TIP} (${sha})` };
+  };
 
   /**
-   * F2's property is that a no-edit save does not flip a byte GRATUITOUSLY —
+   * F2's property is that a no-edit save does not flip a byte GRATUITOUSLY:
    * it was written when the last byte was the newline. It is NOT a promise that
    * the sidecar's key set can never grow: a contracted ref landing legitimately
-   * adds an explicit `null` to every sidecar written before it, and this is the
-   * SECOND time it has happened (`sceneRef`, 2026-08-22; `rasterRef`, schema
-   * §3.1 at empyrean `da91abce`, 2026-08-30). So the row asserts the property
-   * F2 owns and DERIVES the permitted delta rather than pinning bytes:
+   * adds an explicit `null` to every sidecar written before it, and this has
+   * happened twice (`sceneRef`, 2026-08-22; `rasterRef`, schema §3.1 at empyrean
+   * `da91abce`, 2026-08-30). So each row asserts the property F2 owns and
+   * DERIVES the permitted delta rather than pinning bytes:
    *
-   *   • every key already on disk survives with its value UNCHANGED — that is
-   *     the erasure hazard, and it is the half that must never soften;
-   *   • any key added is one the parser contributes, and it is `null` — a
-   *     non-null addition would be Aurora inventing an assignment;
-   *   • removing exactly those added keys returns the file byte-for-byte,
-   *     newline included, which is F2 itself.
+   *   • every key already on disk survives with its value UNCHANGED (that is
+   *     the erasure hazard, and it is the half that must never soften);
+   *   • any key added is one the writer contributes, and it is `null` (a
+   *     non-null addition would be Aurora inventing an assignment);
+   *   • for the key set the file actually has, the §5 chokepoint reproduces the
+   *     file byte-for-byte, newline included, which is F2 itself.
    *
-   * The delta is REPORTED, not repaired — the same shape as the override row
-   * below, and for the same reason: the discrepancy is aeon's tree to update on
-   * its own next save, not this test's to hide.
+   * The delta is REPORTED, not repaired: the discrepancy is aeon's tree to
+   * update on its own next save, not this test's to hide.
    */
-  it('section_4.meta.json round-trips with no byte lost: only contracted nulls added', (ctx) => {
-    if (skipUnlessPresent(ctx, META, "aeon's on-disk section_4.meta.json")) return;
-    const text = readFileSync(META!, 'utf8');
-    expect(text.endsWith('\n'), 'the ruling was made on this file carrying the byte').toBe(true);
-
-    const out = serializeSectionMeta(parseSectionMeta(text))!;
+  const assertF2 = (text: string, out: string, at: string) => {
+    expect(text.endsWith('\n'), `${at}: the ruling was made on this file carrying the byte`).toBe(true);
     const onDisk = JSON.parse(text) as Record<string, unknown>;
     const written = JSON.parse(out) as Record<string, unknown>;
-    // Anti-vacuous: the on-disk file really carries refs to lose.
-    expect(Object.keys(onDisk).length).toBeGreaterThan(0);
-
-    // Nothing on disk is dropped or altered.
+    // Anti-vacuous: there are keys whose survival is being checked.
+    expect(Object.keys(onDisk).length, `${at} parsed with no keys`).toBeGreaterThan(0);
     for (const k of Object.keys(onDisk)) {
       expect(written, `${k} must survive the round trip`).toHaveProperty(k);
       expect(written[k], `${k} must survive UNCHANGED`).toEqual(onDisk[k]);
     }
-    // Anything added is a contracted ref, explicitly null.
     const added = Object.keys(written).filter((k) => !(k in onDisk));
     for (const k of added) expect(written[k], `${k} was added, so it must be null`).toBeNull();
     if (added.length > 0) {
       console.warn(
-        `DISCREPANCY: ${META} predates ${added.join(', ')}; Aurora's next write adds `
+        `DISCREPANCY: ${at} predates ${added.join(', ')}; Aurora's next write adds `
         + `exactly ${added.length} explicit null(s) and changes nothing else`);
     }
-    // ...and F2 proper: for the key set the file actually has, Aurora's own §5
-    // chokepoint reproduces those bytes exactly — trailing newline, key order
-    // and indent included. Derived through `canonicalJsonPretty`, the writer's
-    // own path, rather than compared against a typed string.
+    expect(endsInExactlyOneNewline(out), `the writer's bytes for ${at} must end in one newline`).toBe(true);
     expect(canonicalJsonPretty(onDisk)).toBe(text);
+  };
+
+  it('section_4.meta.json (every ref null in region mode) round-trips through the CLEAR branch: only contracted nulls added', async (ctx) => {
+    const got = committed(ctx, SEC4, "aeon's committed section_4.meta.json");
+    if (got === null) return;
+    const meta = parseSectionMeta(got.text);
+    // THE SHAPE THAT REACHES THIS WRITER. If aeon gives section 4 a ref again,
+    // this row's subject has moved to the serializeSectionMeta row below.
+    expect(serializeSectionMeta(meta), `${got.at} carries a non-null ref, so a save no longer `
+      + 'takes the explicit-null CLEAR branch this row is about: re-point the row, do not loosen it')
+      .toBeNull();
+    const plan = await planFor(fixtureFiles({ metaOnDisk: got.text }));
+    const file = plan.files.find((f) => f.path === 'games/sonic4/data/editor/ojz/act1/section_0.meta.json');
+    expect(file, 'an all-null sidecar on disk must be overwritten by the CLEAR branch, not skipped')
+      .toBeDefined();
+    assertF2(got.text, dec(file!.bytes), got.at);
   });
 
-  it('editor_bg_override.json round-trips up to the ruled trailer, and reports the on-disk state', (ctx) => {
-    if (skipUnlessPresent(ctx, OVERRIDE, "aeon's on-disk editor_bg_override.json")) return;
-    const text = readFileSync(OVERRIDE!, 'utf8');
+  it('section_0.meta.json (carries a ref) round-trips through serializeSectionMeta: only contracted nulls added', (ctx) => {
+    const got = committed(ctx, SEC0, "aeon's committed section_0.meta.json");
+    if (got === null) return;
+    const out = serializeSectionMeta(parseSectionMeta(got.text));
+    // THE SHAPE THAT REACHES THIS WRITER, and the anti-vacuity the old row had:
+    // the file really carries a ref to lose.
+    expect(out, `${got.at} carries no non-null ref, so serializeSectionMeta returns null and this `
+      + 'row has nothing to round-trip: find a sidecar that still carries one').not.toBeNull();
+    assertF2(got.text, out!, got.at);
+  });
+
+  it('editor_bg_override.json round-trips up to the ruled trailer, and reports the committed state', (ctx) => {
+    const got = committed(ctx, OVERRIDE, "aeon's committed editor_bg_override.json");
+    if (got === null) return;
+    const text = got.text;
     const out = serializeBgOverride(parseBgOverride(text).doc);
     // The ruling says aeon changes nothing. If the shipped file does not yet
     // carry the newline, the first Aurora save adds exactly that one byte and
-    // nothing else — that is the discrepancy, reported here, not repaired here.
+    // nothing else: that is the discrepancy, reported here, not repaired here.
     if (!text.endsWith('\n')) {
-      console.warn(`DISCREPANCY: ${OVERRIDE} does not end in "\\n"; Aurora's next write adds exactly that byte`);
+      console.warn(`DISCREPANCY: ${got.at} does not end in "\\n"; Aurora's next write adds exactly that byte`);
     }
     expect(out).toBe(jsonFileText(text));
     expect(out.slice(0, -1)).toBe(text.replace(/\n+$/, ''));
