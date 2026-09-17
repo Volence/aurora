@@ -131,3 +131,54 @@ fresh checkout, not a transitional one. **So the empty state should name the com
 telling an author `python3 tools/s2_zone_convert.py convert --all-six` in aeon is the whole
 difference between a dead page and a one-line fix, and it is the cheapest useful thing this
 page can do before any marquee exists.
+
+## ADDENDUM 2026-09-17: THE PASTE HALF IS SETTLED TOO — THIS DOCUMENT'S TITLE IS NOW HALF WRONG
+
+Aeon landed the clip-manifest format. **Verified here at a committed revision, not taken from
+the relay** (`git -C ../aeon merge-base --is-ancestor`, `git -C ../aeon cat-file -e`, both
+against a freshly fetched `origin/master`):
+
+- `72d8c764` and parcel tip `72cd8b7d` are both ancestors of aeon `origin/master`.
+- Present at that revision: aeon `docs/research/s2-compressed-act/2026-09-17-clip-manifest.md`
+  (the spec and the reasoning), aeon `tools/clip_manifest.py` (the format),
+  aeon `games/sonic4/data/clips/s2_two_clip/clips.json` (a working fixture).
+
+**Shape**, one file per act: `{schema, units: "world_px", id, name, act: {grid_w, grid_h}, clips: []}`.
+Each clip carries `id`, `donor`, `zone`, `src_rect`, `dst_rect` (both `{x,y,w,h}`) and `region_id`.
+All geometry is integer world pixels **with the unit declared in the file**, so nothing rounds
+inside the interface.
+
+### Four things a page built on this must not assume
+
+1. **`region_id` is OPTIONAL and is AURORA'S WRITE-BACK**, not a naming handed to us. The
+   shipped fixture happens to pre-fill it on both clips (`ehz_s2`, `cpz_s2`, each equal to its
+   own clip `id`), **so the fixture cannot show you the absent case.** Read it as absent-capable.
+2. **There is NO palette or preset field, and a manifest carrying one is REFUSED, not ignored.**
+   A clip supplies the donor's 96 palette bytes; the preset that installs them is named by
+   Aurora at paste time. A page that expects to read a palette name out of the manifest is
+   built against a field that was deliberately removed.
+3. **Clip ids are held to the regions schema's own region-id pattern** (`^[a-z][a-z0-9_]{0,31}$`,
+   confirmed in `tools/clip_manifest.py` and matching the pattern verified in
+   `contract/schema/aurora-regions.schema.json`), so one rectangle keeps one name in both
+   documents. That is the property the page should rely on.
+4. **COLLISION IS NOT IN THE MANIFEST.** Aeon's next parcel. **Nothing built against this format
+   may assume a pasted clip already carries collision** — and this is the assumption most likely
+   to be made silently, because a pasted rectangle looks complete on screen.
+
+### Two engine facts that change what the page should show
+
+- **The 2048 px placement snap stayed, but its REASON changed under aeon's measurement.** Window
+  cost is identical whether a section holds one zone or two (9 of 12 either way, adjacency fixed).
+  What the snap protects is the **per-section tile lookup table**: 394+224 split against 617
+  merged, hard limit 2047. So the bake **refuses** an unsnapped placement (with an in-file
+  opt-out), while two zones in one section is a **warning, not a refusal**. The hard rule nobody
+  had written down is **8 px**.
+- **A tile index is 11 bits**, so one act-wide tileset caps at 2048 tiles while six clipped zones
+  need 2,965. **Multiple tilesets are forced, not chosen** — a budget view that assumes one
+  tileset per act is wrong by construction.
+
+*(Aurora's four constraints all landed, two of them changing aeon's design rather than being
+accommodated: the palette field removed, and clip ids bound to the region-id pattern. Provenance
+sits in the manifest and the bake output, never in the regions document and never in `name` —
+on the ground that a field whose own contract says it is decorative must not carry anything
+load-bearing.)*
