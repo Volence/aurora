@@ -519,6 +519,102 @@ describe('sceneSelectionRelation: which document do my keystrokes land in', () =
   });
 });
 
+// ═══ REGION MODE (SCENE-RELATION-REGION-MODE, 2026-09-17) ═══
+//
+// On an act whose regions.json exists (ruling b1: file presence, asked through
+// `actHasRegionsFile`), sections bind no scene: every sidecar `sceneRef` is null
+// and SECTION ASSIGNMENT refuses one. The overseer measured the old sentence on
+// OJZ act 1 saying "Section 3 uses the act default scene. Edits below change
+// ojz_act1_depth, which no section uses yet: bind it under SECTION ASSIGNMENT."
+// while region `sec4` bound that scene and the control it named was disabled.
+describe('sceneSelectionRelation in region mode: the bindings live on region rows', () => {
+  const sec = (sceneRef: string | null) => ({ sceneRef });
+  const LEAD = 'This act is in region mode: scenes are bound on its region rows, not on sections.';
+  const rect = { x: 0, y: 0, w: 2048, h: 2048 };
+  const loaded = (regions: Array<{ id: string; sceneRef?: string | null }>) => ({
+    regions: {
+      document: {
+        schema: 1, act: 'zz_act1',
+        regions: regions.map((r) => ({ ...r, rect, preset: 'ZZ_Preset' })),
+      },
+      loadedPath: 'data/regions.json',
+      unreadable: null,
+    },
+  });
+
+  // The committed copy of aeon's OJZ act 1 regions.json (provenance beside it).
+  // The binding ids are DERIVED from the file, not typed here.
+  const OJZ_ACT1 = resolve(__dirname, '../../../../test/fixtures/regions/ojz_act1.regions.json');
+  const ojzAct = () => {
+    const document = JSON.parse(readFileSync(OJZ_ACT1, 'utf8'));
+    return { regions: { document, loadedPath: 'x/regions.json', unreadable: null } };
+  };
+
+  it('names the region row that binds the selected scene, on OJZ act 1 as measured', () => {
+    const act = ojzAct();
+    const binders = (act.regions.document.regions as Array<{ id: string; sceneRef?: string | null }>)
+      .filter((r) => r.sceneRef === 'ojz_act1_depth').map((r) => r.id);
+    expect(binders.length).toBe(1);
+    const sections = Array.from({ length: 9 }, () => sec(null));
+    const r = sceneSelectionRelation(sections, 3, 'ojz_act1_depth', act);
+    expect(r.text).toBe(`${LEAD} Edits below change ojz_act1_depth, which region ${binders[0]} binds. `
+      + 'To change which scene a region binds, use the Regions panel, under Bindings.');
+  });
+
+  it('says no region binds a scene none binds, and points at the Regions panel', () => {
+    const act = loaded([{ id: 'a', sceneRef: 'canopy' }, { id: 'b' }]);
+    const r = sceneSelectionRelation([sec(null), sec(null)], 0, 'fresh_scene', act);
+    expect(r.text).toBe(`${LEAD} Edits below change fresh_scene, which no region binds yet: `
+      + 'bind it in the Regions panel, under Bindings.');
+  });
+
+  it('lists every binding region id once, in author order, with the plural verb', () => {
+    // `b` is carved: two entries, one id. The Regions panel lists one row per id.
+    const act = loaded([
+      { id: 'b', sceneRef: 'canyon' }, { id: 'a', sceneRef: 'canopy' },
+      { id: 'b', sceneRef: 'canyon' }, { id: 'c', sceneRef: 'canyon' }, { id: 'd', sceneRef: null },
+    ]);
+    const r = sceneSelectionRelation([sec(null)], 0, 'canyon', act);
+    expect(r.text).toBe(`${LEAD} Edits below change canyon, which regions b, c bind. `
+      + 'To change which scene a region binds, use the Regions panel, under Bindings.');
+  });
+
+  it('is not silenced by a leftover sidecar sceneRef naming the selected scene', () => {
+    // A sidecar ref beside regions.json is what check_mode_conflict refuses; it
+    // decides nothing the build uses, so it cannot be the agreement that silences.
+    const act = loaded([{ id: 'a', sceneRef: 'canyon' }]);
+    const r = sceneSelectionRelation([sec('canyon')], 0, 'canyon', act);
+    expect(r.text).toBe(`${LEAD} Edits below change canyon, which region a binds. `
+      + 'To change which scene a region binds, use the Regions panel, under Bindings.');
+  });
+
+  it('says which regions bind it cannot be told when regions.json was refused', () => {
+    const act = { regions: { document: null, loadedPath: null, unreadable: { path: 'r.json', reason: 'bad' } } };
+    const r = sceneSelectionRelation([sec(null)], 0, 'canyon', act);
+    expect(r.text).toBe(`${LEAD} Edits below change canyon. This act's regions.json could not be `
+      + 'read, so Aurora cannot tell which regions bind it. The Regions panel says why.');
+  });
+
+  it('keeps the section-mode sentence when the act has no regions file', () => {
+    const act = { regions: { document: null, loadedPath: null, unreadable: null } };
+    const r = sceneSelectionRelation([sec(null), sec('canyon')], 0, 'canyon', act);
+    expect(r.text)
+      .toBe('Section 0 uses the act default scene. Edits below change canyon, which section 1 uses.');
+  });
+
+  it('carries no en dash or em dash in any region-mode sentence', () => {
+    const texts = [
+      sceneSelectionRelation([sec(null)], 0, 'canyon', loaded([{ id: 'a', sceneRef: 'canyon' }])).text,
+      sceneSelectionRelation([sec(null)], 0, 'canyon', loaded([{ id: 'a' }])).text,
+      sceneSelectionRelation([sec(null)], 0, 'canyon',
+        { regions: { document: null, loadedPath: null, unreadable: { path: 'r', reason: 'x' } } }).text,
+    ];
+    const codes = texts.flatMap((t) => [...String(t)].map((ch) => ch.codePointAt(0)));
+    expect(codes).not.toContain(0x2013);
+    expect(codes).not.toContain(0x2014);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // layerExtras — parcel E. The layer card used to show only world_y/fa/fb, so a
 // scene whose curve WAS set ("how are we doing the curved scroll? I don't see
