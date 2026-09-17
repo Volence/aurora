@@ -15,7 +15,7 @@ both directions.
 
 **Published: aeon `6180a1af` is an ancestor of aeon `origin/master`** (verified with
 `git -C ../aeon merge-base --is-ancestor 6180a1af origin/master`), and its report is present
-at `origin/master:docs/research/s2-compressed-act/2026-09-17-whole-zone-converter.md`
+at aeon `origin/master:docs/research/s2-compressed-act/2026-09-17-whole-zone-converter.md`
 (verified with `git -C ../aeon cat-file -e`). Read it there, not from this summary.
 
 A converted donor zone lands at `games/sonic4/data/donors/<donor>/<ZONE>/` carrying
