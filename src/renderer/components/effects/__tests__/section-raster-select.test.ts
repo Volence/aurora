@@ -253,10 +253,13 @@ describe('the control adds no second wording of the limit', () => {
     // 6-8 share one record" was a snapshot that expired at aeon `6ae88363`. The
     // replacement phrase states the RULE (split first only if the record is
     // shared), so it does not carry a section list that can move.
+    // ⚠ AND A THIRD TIME ON 2026-09-17 (ruling b1): aeon bcd844aa keyed the
+    // chooser on the record, so owners sharing a record share its band and no
+    // split is needed; the constant says so, and names both writers.
     const phrases = [
-      'does not install it', 'assign_section_preset writes it',
+      'does not install it', 'Section select writes rasterRef into that',
       'changes nothing on screen', 'costs ROM',
-      'a record SPLIT first if it shares one',
+      'and no split, since owners sharing a record share its band',
     ];
     // ANTI-VACUOUS: these really are the constant's phrases, so a green here is
     // about the panel and not about five strings nobody wrote.

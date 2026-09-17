@@ -1,9 +1,9 @@
 // A REGION-MODE ACT GETS ONE NOTICE AND A REFUSAL; A SECTION-MODE ACT GETS WHAT IT HAD.
 //
-// Ruling B (2026-09-17, docs/reviews/2026-09-17-region-mode-raster-false-output.md).
-// On an act whose regions.json exists, every section-keyed raster verdict the
-// effects strip and the band-preset panel paint is about files that no longer
-// carry the binding. So:
+// Ruling B, revised as b1 (2026-09-17, docs/reviews/2026-09-17-region-mode-raster-false-output.md).
+// On an act whose regions.json exists, every per-section raster verdict the
+// effects strip and the band-preset panel paint asks about a section as the owner
+// of a binding, and the owners are region rows. So:
 //
 //   the gate      `regionModeRasterNotice(act)`, non-null exactly in region mode,
 //                 through the one predicate `actHasRegionsFile`;
@@ -11,9 +11,11 @@
 //                 the Section select and `assign_section_preset` both ask;
 //   the options   `sectionRasterOptions`, so a live select cannot bind either.
 //
-// EVERY ROW RUNS ON BOTH ACTS. The section-mode act must come out identical to
-// the functions the surfaces called before the ruling; the golden next door
-// (`region-mode-section-golden.test.ts`) pins those functions' bytes.
+// EVERY ROW RUNS ON BOTH ACTS. On the section-mode act the gate and the refusal
+// are null and the options are unfiltered. ⚠ REVISED 2026-09-17 (ruling b1): the
+// SHA golden that pinned the section-mode verdict functions' bytes is deleted;
+// whether those verdicts are TRUE is held against aeon's own functions in
+// core/formats/effects/__tests__/raster-owners-truth.test.ts.
 //
 // ⚠ THE SOURCE ROWS ARE ABOUT WIRING, NOT PAINT. Whether the notice really
 // appears in the running app, and the verdicts really do not, is a CDP
@@ -29,6 +31,7 @@ import {
 import {
   REGION_MODE_RASTER_NOTICE, regionModeSectionRasterRefusal, RASTER_SECTION_BINDING_LIMIT,
 } from '../../../../core/formats/raster-binding';
+import { rasterChooserName } from '../../../../core/formats/effects/section-wiring';
 import { noRegionsLoaded, type ActRegionsState } from '../../../../core/formats/regions/act-regions';
 import type { EffectsPresetLibrary } from '../../../../core/formats/effects/preset';
 
@@ -179,30 +182,36 @@ describe('the surfaces are wired to the gate (source)', () => {
   });
 });
 
-describe('the shipped limit sentence carries the region-mode clause, FIRST', () => {
+describe('the shipped limit sentence states the mode rule and the record-keyed rule, with no staleness preface', () => {
   /**
    * `RASTER_SECTION_BINDING_LIMIT` is published in the panel's limit block, the
-   * `assign_section_preset` reply and two tool descriptions. Its cut-back to
-   * aeon origin/master is STOPPED (see raster-binding.ts), so what it must do in
-   * the meantime is say region mode exists and which of its own clauses that
-   * makes stale, BEFORE a reader reaches them.
+   * `assign_section_preset` reply and two tool descriptions. Ruling B's first
+   * build led it with "REGION MODE FIRST, AND WHAT IT MAKES STALE BELOW" and left
+   * the section-keyed clauses in place; ruling b1 (2026-09-17) rewrote it to aeon's
+   * current rule and removed that preface. These rows hold the mode half of it.
    */
-  it('names the predicate, the refusal, the Regions panel, and the two aeon commits', () => {
+  it('names the mode predicate, the refusal, where a region binds, and the two aeon commits', () => {
     for (const phrase of [
-      'has_act_regions', 'check_mode_conflict', 'Regions panel', 'e2af59ea', 'bcd844aa',
-      'ojz_act1_preset_raster(preset: <Record>_KEY)', 'are NOT current for OJZ act 1',
+      'has_act_regions', 'check_mode_conflict', 'Regions panel', 'under Bindings', 'e2af59ea',
+      'bcd844aa', `${rasterChooserName('ojz', 'act1')}(preset: <that record>_KEY, hand: ...)`,
     ]) {
       expect(RASTER_SECTION_BINDING_LIMIT, `missing: ${phrase}`).toContain(phrase);
     }
   });
 
-  it('comes before the first section-keyed clause it declares stale', () => {
-    const clause = RASTER_SECTION_BINDING_LIMIT.indexOf('REGION MODE FIRST');
-    const rule = RASTER_SECTION_BINDING_LIMIT.indexOf('a section is wired exactly when');
-    const reading = RASTER_SECTION_BINDING_LIMIT.indexOf('the wired set is {');
-    expect(clause).toBe(0);
-    expect(rule, 'the section-keyed rule clause is gone: re-read this row with the sentence')
-      .toBeGreaterThan(clause);
-    expect(reading).toBeGreaterThan(clause);
+  it('carries no staleness preface and no section-keyed rule', () => {
+    expect(RASTER_SECTION_BINDING_LIMIT).not.toContain('REGION MODE FIRST');
+    expect(RASTER_SECTION_BINDING_LIMIT).not.toContain('NOT current for OJZ act 1');
+    expect(RASTER_SECTION_BINDING_LIMIT).not.toContain('a section is wired exactly when');
+    expect(RASTER_SECTION_BINDING_LIMIT).not.toContain('the wired set is {');
+  });
+
+  it('states where a binding lives before it states the rule and the reading', () => {
+    const mode = RASTER_SECTION_BINDING_LIMIT.indexOf('WHERE IT LIVES IS THE ACT\'S MODE');
+    const rule = RASTER_SECTION_BINDING_LIMIT.indexOf('is wired exactly when');
+    const reading = RASTER_SECTION_BINDING_LIMIT.indexOf('the wired homes are {');
+    expect(mode, 'the mode clause is gone').toBeGreaterThan(0);
+    expect(rule).toBeGreaterThan(mode);
+    expect(reading).toBeGreaterThan(rule);
   });
 });

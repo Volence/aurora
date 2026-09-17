@@ -267,7 +267,7 @@ const RLIB = `aeon:${LIB_REL}@${AEON_REGIONS_PIN.slice(0, 8)}`;
  * THE VENDORED SECTION-MODE CONSTRUCTION (ruling b1, 2026-09-17): aeon `c7ebe7a1`'s
  * effects library and aeon `bcd844aa`'s act-1 descriptor, the last section-mode
  * tree after the chooser re-key. See
- * test/fixtures/effects/raster-owners/construction.provenance.json. Read from this
+ * test/fixtures/effects/raster-owners/aeon_truth_probe.provenance.json. Read from this
  * repository, so the rows that use it never skip.
  */
 const FIXTURES = join(__dirname, '..', '..', '..', '..', '..', 'test', 'fixtures', 'effects');
@@ -1040,7 +1040,7 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
   // longer emits and this module no longer parses, so "threaded today" cannot be
   // asked of that revision. The construction is aeon `c7ebe7a1`'s library with the
   // act-1 files of `bcd844aa`, the last section-mode tree (see
-  // test/fixtures/effects/raster-owners/construction.provenance.json); aeon's own
+  // test/fixtures/effects/raster-owners/aeon_truth_probe.provenance.json); aeon's own
   // functions' reading of it is held in raster-owners-truth.test.ts.
   it('exactly TWO sections are threaded today, and it is not the same fact as eligible', () => {
     const desc = SECTION_MODE_DESC;

@@ -21,5 +21,5 @@
     "truth": "src/core/formats/effects/__tests__/raster-owners-truth.test.ts compares Aurora's derivation over these bytes with what aeon's own functions returned over the same bytes (raster-owners/*.aeon-truth.json).",
     "currency": "test/formats/aeon-fixture-currency.test.ts, against aeon's origin/master."
   },
-  "re_vendor": "node scripts/revendor.mjs test/fixtures/effects/ojz_effects.emp test/fixtures/effects/ojz_effects.provenance.json <AEON_DIR> games/sonic4/data/effects/ojz_effects.emp <revision>, then re-run test/fixtures/effects/raster-owners/aeon_truth_probe.py over both trees described in raster-owners/construction.provenance.json and re-vendor both .aeon-truth.json files: their sha256_of_inputs.library must equal fixture.sha256 here."
+  "re_vendor": "node scripts/revendor.mjs test/fixtures/effects/ojz_effects.emp test/fixtures/effects/ojz_effects.provenance.json <AEON_DIR> games/sonic4/data/effects/ojz_effects.emp <revision>, then re-run test/fixtures/effects/raster-owners/aeon_truth_probe.py over both trees described in raster-owners/aeon_truth_probe.provenance.json and re-vendor both .aeon-truth.json files: their sha256_of_inputs.library must equal fixture.sha256 here."
 }

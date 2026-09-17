@@ -14,7 +14,7 @@
 // `raster_call_sites`, `channel_call_sites` and `_rekey_bound_to_record` over
 // two trees. No Aurora code produced either record. The trees, and why the
 // section-mode one is a CONSTRUCTION (aeon's tree has no section-mode act that
-// threads rasters), are in `raster-owners/construction.provenance.json`.
+// threads rasters), are in `raster-owners/aeon_truth_probe.provenance.json`.
 //
 // ⚠ THE RECORDS NAME THEIR INPUTS BY sha256, and the first rows here check those
 // against the vendored bytes these rows read. A re-vendored library beside a

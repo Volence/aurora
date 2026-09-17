@@ -184,19 +184,19 @@ const CODE_EXT = /\.(ts|tsx|mts|cts|mjs|cjs|js|jsx)$/;
 const ALLOWANCES = [
   {
     file: 'src/renderer/agent/__tests__/agent-handler.assign-section-preset.test.ts',
-    text: 'no sidecar carries a rasterRef',
+    text: 'nothing binds a rasterRef',
     why: 'a regex matching RASTER_SECTION_BINDING_LIMIT, which quotes aeon\'s own pytest '
       + 'failure message verbatim so an author can match a build log. Rewriting the pattern '
       + 'would make the test assert a message aeon does not emit.',
     produced_by: 'src/core/formats/raster-binding.ts, itself an allowed quotation in '
-      + 'scripts/check-src-dashes.mjs, read from aeon tools/test_effects_seam_gate.py:758',
+      + 'scripts/check-src-dashes.mjs, read from aeon tools/test_effects_seam_gate.py:1176 at c7ebe7a1',
   },
   {
     file: 'src/renderer/components/effects/__tests__/band-preset-wording.test.ts',
-    text: 'no sidecar carries a rasterRef',
+    text: 'nothing binds a rasterRef',
     why: 'the same quotation, asserted here against the disclosure body the panel renders',
     produced_by: 'src/core/formats/raster-binding.ts, itself an allowed quotation in '
-      + 'scripts/check-src-dashes.mjs, read from aeon tools/test_effects_seam_gate.py:758',
+      + 'scripts/check-src-dashes.mjs, read from aeon tools/test_effects_seam_gate.py:1176 at c7ebe7a1',
   },
   // DELETED 2026-09-05 by the scripts/ sweep (EW-DASHES-SCRIPTS). The entry here
   // was a deferral marker for `todo <dash> declared unwritten`, the one line
