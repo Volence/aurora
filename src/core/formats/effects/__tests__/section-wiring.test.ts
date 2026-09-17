@@ -884,6 +884,16 @@ describe('condition 3: every OTHER chooser a bound document owes', () => {
     };
     expect(sectionExtraChannelsCondition(shifted, 2, { cycles: null }, 'zzz', 'act1').verdict)
       .toBe('no');
+    // ...nor does a call made INSIDE the bound record that passes ANOTHER record's
+    // key. Found by red-first proof S20 (2026-09-17): with the lookup mutated to
+    // "any key inside the owner's record" the row above stayed green, because its
+    // plant sits in the wrong record and never reaches the key comparison.
+    const otherKey: SectionRasterWiring = {
+      ...w,
+      channelThreadedBy: { ...w.channelThreadedBy, cycle: { ZZZ_Preset_Shared: { ZZZ_Preset_Sec0: [0] } } },
+    };
+    expect(sectionExtraChannelsCondition(otherKey, 2, { cycles: null }, 'zzz', 'act1').verdict)
+      .toBe('no');
     // ...and the same call made inside ZZZ_Preset_Shared with its own key does.
     const own: SectionRasterWiring = {
       ...w,
