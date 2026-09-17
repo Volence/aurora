@@ -83,7 +83,7 @@ import {
   vsplitLockAdvisoryParts, sceneVsplitLockAdvisoryParts,
   layerCountLine, vFactorHint,
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
-  sceneSelectionRelation,
+  sceneSelectionRelation, deleteSceneRefusal,
   sectionSceneCommand, createSceneCommand, sectionSceneBindRefusal, sectionSceneOptions,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   layerExtrasLine,
@@ -483,6 +483,26 @@ export default function EffectsScenePanel(): React.ReactElement {
   // or no section). Asked through the provider, never by reading act.regions here.
   const sceneModeRefusal = act === null || section === null ? null
     : sectionSceneBindRefusal(act, activeSectionIndex, section.sceneRef);
+
+  // ═══ WHY THE SELECTED SCENE CANNOT BE DELETED RIGHT NOW (DELETE-SCENE-NO-GUARD) ═══
+  //
+  // There was no guard here at all: Delete removed the document and left every
+  // `sceneRef` that named it DANGLING, which aeon's generator then refuses by
+  // name. The confirm on the button below is a different question (am I
+  // destroying a FILE) and both are wanted; this one disables, so a bound scene
+  // never reaches that confirm.
+  //
+  // ⚠ THE WHOLE `act` GOES IN BESIDE `act.sections`, and it is not redundant:
+  // `act.regions` is what tells the guard whether this act binds scenes on
+  // REGION rows, and on OJZ act 1 it does (four of them). The same shape
+  // `sceneSelectionRelation` above takes.
+  //
+  // ⚠ AND IT IS NOT GATED ON `sceneModeRefusal`. That verdict is about a SECTION
+  // as the owner of a binding, which a region-mode act has none of; this asks
+  // whether anything at all still names the document, which both modes answer.
+  const deleteRefusal = (act === null || selected === null)
+    ? null
+    : deleteSceneRefusal(act.sections, selected.id, act);
 
   // ═══ THE SELECTION FOLLOWS THE SECTION (cold read 2026-09-05 C2) ═══
   //
@@ -1385,6 +1405,11 @@ export default function EffectsScenePanel(): React.ReactElement {
         <CollapsibleSection id="aeon.effects.scene" title={`Scene: ${selected.id}`}
           defaultCollapsed
           right={<IconButton icon={<span>Delete</span>} label={`Delete scene ${selected.id}`}
+            // DISABLED WITH THE REASON UNDER IT (DELETE-SCENE-NO-GUARD). The
+            // same idiom the preset Delete uses: `deleteSceneRefusal` is the ONE
+            // derivation the disabled state and the sentence both read, so they
+            // cannot describe different conditions.
+            disabled={deleteRefusal !== null}
             // d-27, AND THIS IS THE STRONGEST INSTANCE OF IT IN THE APP. Both
             // earlier passes excluded this button as self-unmounting; clicking
             // it (`docs/reviews/2026-09-03-d27-disputed-six.md`, `[esd-a..c]`)
@@ -1402,6 +1427,7 @@ export default function EffectsScenePanel(): React.ReactElement {
             // inside `act()` — so d-27's subject is untouched.
             onClick={(e) => actAndDropFocus(e, () => { void deleteSceneGuarded(library, selected.id, run); })} />}>
          <SectionBody>
+          {deleteRefusal !== null && <Hint tone="warning">{deleteRefusal}</Hint>}
           <Field label="Name">
             <input value={typeof selected.name === 'string' ? selected.name : ''}
               onChange={(e) => run(setSceneFieldCommand(
