@@ -96,6 +96,30 @@ same item — but that is a fact discovered by checking, not a reason to skip th
 
 So when a session boots from a Dominion rotation (or any boot with no owner at the console) and the `next` row in `docs/lane-status.json` has no `blockedBy`, waits on no other lane and needs no owner call, **take that row after boot**: report, then start. **Keep the `/overseer` skill's stop for rows that really wait on him** (look/taste calls, open decision cards) and for when he is at the console choosing. The skill's "propose and stop" is his file and lives in dominion's tree; this is his own standing sentence applied, not a patch to it. **Re-check the grep before relying on it**: a standing instruction can be superseded, and the committed hub doc is where that shows.
 
+## ⚠ RUN THE GATES AT BOOT — A RED MASTER IS INVISIBLE ON THIS LANE'S CARD
+
+*(Added 2026-09-17, after the SECOND red master in one day, both found by accident.)*
+
+`npm run land` refuses a red suite. `docs/lane-status.json` carries **no gate state at all** —
+the console's `ok` means the FILE parsed, never that the tree is green. So a lane whose master
+is red is **healthy and stalled at once**, and the card shows only the healthy half.
+
+Both of this lane's instances were found by an **agent running a baseline for an unrelated
+row**: aeon's `ojz_preset_night` rename in the morning, and my own `check:doc-citations` wrap
+that evening. Neither was found by looking, and nothing would ever have surfaced either. **That
+is luck twice, not method** — and it is the whole argument for spending one command at boot:
+
+```sh
+npm test   # or, when that is too slow to boot behind, the check:* scripts alone
+```
+
+**The moment you know master is red, say so in `awaiting`** — that is the field his console
+quotes when a lane goes quiet. Not `blockedOnOwner` (he is owed nothing) and not a queue row.
+
+**Deliberately NOT a contract field.** The hub declined to propose one on two instances in one
+lane: that is a pattern, not a suite population. If a third lane hits it, that is the argument,
+and this lane owes the report.
+
 ## The queue
 
 **`docs/ROADMAP.md` is the plan of record — read §2.6 then §5.1 and stop.** §2.6 records
