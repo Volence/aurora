@@ -816,6 +816,58 @@ export function sectionsBindingPreset(
 }
 
 /**
+ * Which REGION ROWS name this preset document, by id, once each, in author
+ * order. Empty when none do. `sectionsBindingPreset`'s twin for the other
+ * installer (DELETE-PRESET-REGION-BOUND, 2026-09-17).
+ *
+ * ⚠ IT READS `rasterRef` AND NOT `preset`, AND THAT IS THE WHOLE CARE OF THIS
+ * FUNCTION. A `Region` carries two fields that both read like "a preset":
+ * `preset` is the RECORD NAME of an EffectsPreset in the GAME's own effects
+ * library, required and non-null and validated by aeon's generator against a
+ * source Aurora does not open; `rasterRef` is the id of a raster preset
+ * DOCUMENT, the same namespace `Section.rasterRef` and this library name, and
+ * the only one a document delete can dangle. A scan over `preset` would refuse
+ * deletions for ids that are not in this library at all and still miss the
+ * binding that breaks the build.
+ *
+ * ⚠ ONE MENTION PER ID, because a carved region is several `regions[]` entries
+ * sharing one id and ONE Regions panel row (`setRegionBinding`'s docblock: every
+ * entry of one id carries identical bindings). The sentence points at that row,
+ * so naming it three times would point three times at one control. This is
+ * `regionModeSceneRelationText`'s rule, for the same reason.
+ *
+ * Absent and null are the same "no binding" here, as they are in the codec and
+ * in `regionBindingValue`.
+ */
+export function regionsBindingPreset(
+  document: { regions: readonly { id: string; rasterRef?: string | null }[] }, id: string,
+): string[] {
+  const out: string[] = [];
+  for (const region of document.regions) {
+    if ((region.rasterRef ?? null) === id && !out.includes(region.id)) out.push(region.id);
+  }
+  return out;
+}
+
+/**
+ * "Section 2" / "Sections 0, 2 and 3" — the list BOTH arms of the delete
+ * refusal spell, from one place so the two cannot drift in shape.
+ *
+ * ⚠ THE `and` IS THIS SENTENCE FAMILY'S, NOT THE SCENE RELATION'S. The region
+ * relation sentence in effects-aeon.ts spells its list `regions b, c bind`; this
+ * refusal has spelled `Sections 0, 2 and 3 bind` since EFFECTS-W1 defect 11 and
+ * its wording row pins it exactly. One refusal must read the same way in both
+ * of its arms, so the region arm takes this one rather than the other file's.
+ */
+function bindingListWords(
+  one: string, many: string, items: readonly (number | string)[],
+): string {
+  return items.length === 1
+    ? `${one} ${items[0]}`
+    : `${many} ${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+/**
  * Why this preset cannot be deleted right now, or null.
  *
  * ═══ EFFECTS-W1 DEFECT 11 — THE UNGUARDED DELETE ═══
@@ -841,17 +893,114 @@ export function sectionsBindingPreset(
  */
 export function deletePresetRefusal(
   sections: readonly ({ rasterRef: string | null } | null)[], id: string,
+  act?: { regions?: ActRegionsState },
 ): string | null {
+  // ═══ REGION MODE (DELETE-PRESET-REGION-BOUND, 2026-09-17) ═══
+  //
+  // ⚠ THIS IS THE ONE READING ON THE BAND-PRESET SURFACE THAT IS NOT SUPPRESSED
+  // IN REGION MODE, and the difference is the question it asks. Every other
+  // verdict there asks about a SECTION as the owner of a binding, and on a
+  // region-mode act it is not one. This asks whether ANYTHING still names the
+  // document about to be deleted, which is a question both modes answer — the
+  // owners just move. Suppressing it would be the defect, not the fix.
+  //
+  // `undefined` act, and `noRegionsLoaded()`'s state, are section mode by
+  // `actHasRegionsFile`'s own rule, and take the arm below unchanged.
+  const regions = act?.regions;
+  if (regions !== undefined && actHasRegionsFile(regions)) {
+    return regionModeDeletePresetRefusal(regions, sections, id);
+  }
   const bound = sectionsBindingPreset(sections, id);
   if (bound.length === 0) return null;
-  const list = bound.length === 1
-    ? `Section ${bound[0]}`
-    : `Sections ${bound.slice(0, -1).join(', ')} and ${bound[bound.length - 1]}`;
+  const list = bindingListWords('Section', 'Sections', bound);
   return `${list} ${bound.length === 1 ? 'binds' : 'bind'} "${id}". Deleting it would leave `
     + `${bound.length === 1 ? 'that binding' : 'those bindings'} naming a document that does not `
     + 'exist, and aeon\'s build refuses that by name. Set the raster binding back to '
     + `"${RASTER_REF_ROW.unbound}" on ${bound.length === 1 ? 'that section' : 'those sections'} `
     + 'first, in the Section dropdown above.';
+}
+
+/**
+ * The row label the region-mode refusal points at, in the Regions panel's own
+ * words. Not imported from `regions-aeon.ts` so this module keeps its import
+ * graph; `preset-delete-guard.test.ts`'s `[ctrl]` row asserts it EQUALS
+ * `BINDING_LABELS.raster`, which is the map that panel's rows are built from,
+ * so a rename there fails here rather than sending an author to a row that no
+ * longer carries that name.
+ */
+export const REGION_RASTER_BINDING_ROW = 'raster';
+
+/**
+ * Why this preset document cannot be deleted on a REGION-MODE act, or null.
+ *
+ * ═══ DELETE-PRESET-REGION-BOUND (2026-09-17) ═══
+ *
+ * The caller has already asked `actHasRegionsFile`, ruling B1's one mode
+ * predicate, so this never decides the mode itself. It answers the same
+ * question `deletePresetRefusal`'s section arm answers — is anything still
+ * naming this document — against the installers a region-mode act actually
+ * has.
+ *
+ * ⚠ A REFUSED regions.json IS ITS OWN ANSWER, AND IT IS A REFUSAL. `document`
+ * null with `unreadable` set is state 3 of `ActRegionsState`: the file exists
+ * and the read or the codec turned it down, so WHETHER a region binds this
+ * document is unknown. Returning null there would print a clean bill of health
+ * derived from a failed read, on the one control whose whole reason for
+ * existing is that a dangling ref is met later as a misattributed build
+ * failure. The cost is stated rather than hidden: while an act's regions.json
+ * is refused, Delete is disabled for every preset on that act, and the way out
+ * is the Regions panel's own notice about that file. An act in that state
+ * already writes nothing and removes nothing on save (`ActRegionsState`'s
+ * header), so a destructive delete is the wrong thing to let through.
+ *
+ * ⚠ BOTH CAUSES ARE REPORTED, NOT THE FIRST ONE FOUND. A region-mode act can
+ * carry a readable regions.json AND section sidecars still holding refs — the
+ * tree `sectionRasterWriteRefusal` exists because of. Both bindings dangle if
+ * the document goes, so suppressing the section clause here would make this
+ * guard WEAKER on a region-mode act than it is on a section-mode one, which is
+ * a protection removed by the mode rather than moved by it. The sidecar clause
+ * says the ref is itself refused beside regions.json and that clearing it is
+ * allowed, because on this act clearing is the only write that select permits
+ * and it is the repair for both faults at once.
+ *
+ * The pointer is the REGIONS panel, never the Section dropdown, for the
+ * region clause: on this act that select refuses a binding outright, so
+ * pointing there for the region cause would send an author to a wall. B1's
+ * wording ("the Regions panel, under Bindings") is the register in force.
+ */
+function regionModeDeletePresetRefusal(
+  regions: ActRegionsState,
+  sections: readonly ({ rasterRef: string | null } | null)[],
+  id: string,
+): string | null {
+  const clauses: string[] = [];
+  if (regions.document === null) {
+    clauses.push(`Aurora cannot tell whether a region binds "${id}": this act is in region mode `
+      + 'and its regions.json could not be read, so the region rows that would name it are '
+      + 'unknown. Deleting it could leave a binding naming a document that does not exist, which '
+      + 'aeon\'s build refuses by name. The Regions panel says why the file was refused.');
+  } else {
+    const binders = regionsBindingPreset(regions.document, id);
+    if (binders.length > 0) {
+      const one = binders.length === 1;
+      clauses.push(`${bindingListWords('Region', 'Regions', binders)} ${one ? 'binds' : 'bind'} `
+        + `"${id}". Deleting it would leave ${one ? 'that binding' : 'those bindings'} naming a `
+        + 'document that does not exist, and aeon\'s build refuses that by name. Select '
+        + `${one ? 'that region' : 'those regions'} in the Regions panel and use "revert to `
+        + `inherited" on ${one ? 'its' : 'the'} ${REGION_RASTER_BINDING_ROW} row, under Bindings, `
+        + 'first.');
+    }
+  }
+  const bound = sectionsBindingPreset(sections, id);
+  if (bound.length > 0) {
+    const one = bound.length === 1;
+    clauses.push(`${bindingListWords('Section', 'Sections', bound)} still `
+      + `${one ? 'carries' : 'carry'} rasterRef "${id}" in ${one ? 'its sidecar' : 'their sidecars'} `
+      + 'beside regions.json, which aeon\'s check_mode_conflict refuses. Clearing '
+      + `${one ? 'it' : 'them'} in the Section dropdown above is allowed, and it is what removes `
+      + `${one ? 'that binding' : 'those bindings'}.`);
+  }
+  return clauses.length === 0 ? null : clauses.join(' ');
 }
 
 /**

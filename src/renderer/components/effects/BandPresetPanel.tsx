@@ -307,12 +307,23 @@ export default function BandPresetPanel(): React.ReactElement | null {
   // The zone id is needed only to name the chooser function in the sentence —
   // the wiring itself was derived at load time, from aeon's files.
   const zoneId = getCurrentZone(useProjectStore.getState())?.id ?? '';
-  // The delete guard's subject is the SECTIONS, not the library: a binding lives
-  // in a section's sidecar, so "is anything pointing at this document" can only
-  // be asked of the act.
+  // The delete guard's subject is the ACT, not the library: a binding lives in a
+  // section's sidecar or on a region row, so "is anything pointing at this
+  // document" can only be asked of the act.
+  //
+  // ⚠ THE WHOLE `act` IS PASSED BESIDE `act.sections`, and it is not redundant
+  // (DELETE-PRESET-REGION-BOUND, 2026-09-17): `act.regions` is what tells the
+  // guard whether this act binds rasters on REGION rows, and on OJZ act 1 it
+  // does. Handed sections alone the guard saw nothing and Delete offered a clean
+  // bill of health for a document region `sec5` still binds. This is the same
+  // shape `sceneSelectionRelation` takes for the scene relation sentence.
+  //
+  // ⚠ AND IT IS NOT GATED ON `regionNotice` BELOW, unlike every other verdict on
+  // this surface. Those ask about a SECTION as the owner of a binding; this asks
+  // whether anything at all still names the document, which both modes answer.
   const deleteRefusal = (act === null || selected === null)
     ? null
-    : deletePresetRefusal(act.sections, selected.id);
+    : deletePresetRefusal(act.sections, selected.id, act);
   // ═══ REGION MODE (ruling B, 2026-09-17) ═══
   //
   // Non-null exactly when this act's regions.json exists (`actHasRegionsFile`,
