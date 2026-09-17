@@ -150,9 +150,22 @@ inside the interface.
 
 ### Four things a page built on this must not assume
 
-1. **`region_id` is OPTIONAL and is AURORA'S WRITE-BACK**, not a naming handed to us. The
-   shipped fixture happens to pre-fill it on both clips (`ehz_s2`, `cpz_s2`, each equal to its
-   own clip `id`), **so the fixture cannot show you the absent case.** Read it as absent-capable.
+1. **`region_id` is OPTIONAL and is AURORA'S WRITE-BACK**, not a naming handed to us. Read it
+   as absent-capable.
+   ⚠ **CORRECTED SAME DAY — I GENERALISED FROM ONE FIXTURE AND SO DID AEON, IN OPPOSITE
+   DIRECTIONS.** This said *"the shipped fixture pre-fills it, so the fixture cannot show you
+   the absent case"*, which is true of the fixture I opened and false of the population.
+   Enumerated at aeon `origin/master` (`ls-tree` over `games/sonic4/data/clips`, then the key
+   set of every clip) — **two fixtures, and they differ**:
+   - `s2_two_clip/clips.json` — **2 of 2** clips carry `region_id` (`ehz_s2`, `cpz_s2`)
+   - `s2_two_clip_pins/clips.json` — **0 of 2** carry it; key set is exactly
+     `['donor','dst_rect','id','src_rect','zone']`. Landed in aeon `0aa5e106`.
+   **So the absent case IS shipped and copyable.** Aeon meanwhile booked a fix (`38185b9c`) on
+   the belief that *both* fixtures pre-fill it; told, with the measurement. **Neither of us was
+   careless — we each read one fixture and neither ran the one-command enumeration.**
+   **The residual risk is real and narrower: `s2_two_clip` is the PROMINENT fixture** (it is the
+   one the spec names and carries the explanatory `note`), so a reader who stops at the first one
+   still writes a presence-assuming loader. Use `s2_two_clip_pins` for the absent-case row here.
 2. **There is NO palette or preset field, and a manifest carrying one is REFUSED, not ignored.**
    A clip supplies the donor's 96 palette bytes; the preset that installs them is named by
    Aurora at paste time. A page that expects to read a palette name out of the manifest is
