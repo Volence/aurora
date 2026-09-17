@@ -436,6 +436,19 @@ describe('the shipped raster-binding limit agrees with aeon\'s real file', () =>
       'the sentence no longer claims the wired homes are bound; if that clause was rewritten '
       + 'deliberately, rewrite this row with it rather than deleting the check')
       .toMatch(/BOTH ARE ALSO BOUND/);
+    // ⚠ AGAINST THE SENTENCE, NOT ONLY AGAINST THE DERIVATION. The first draft of
+    // this row compared aeon's bound owners with aeon's wired homes and checked
+    // the phrase was present, and it stayed GREEN with the pre-b1 sentence
+    // restored on disk: it never read which owners the sentence claims. "BOTH ARE
+    // ALSO BOUND" is a claim about the homes the reading names, so the bound
+    // owners are compared with those.
+    const claim = claimedHomes();
+    expect(claim, 'no reading clause, so the sentence names no homes to be bound: see the row above')
+      .not.toBeNull();
+    expect(derived.bound,
+      `the sentence says the homes {${claim!.homes.join(', ')}} are BOTH ALSO BOUND, and aeon at `
+      + `${AEON_TIP} (${aeonSha}) binds a rasterRef on {${derived.bound.join(', ')}}.`)
+      .toEqual(claim!.homes);
     // ⚠ THIS IS NOT AN INVARIANT ABOUT AEON: a wired home left UNBOUND is a
     // legal, documented state (it resolves to the `hand:` label and changes
     // nothing). It is a check on OUR CLAIM: while the sentence says BOTH ARE
