@@ -93,6 +93,7 @@ import { BG_WIDTH } from '../../core/formats/bg-tiles';
 // the sidecar refusal asks the same predicate and says the same sentence as the
 // raster half in effects-preset.ts.
 import { actHasRegionsFile, type ActRegionsState } from '../../core/formats/regions/act-regions';
+import type { Region } from '../../core/formats/regions/document';
 import { regionModeSectionRefRefusal } from '../../core/formats/raster-binding';
 // A region's own scene binding, read the way the Regions panel's Bindings rows
 // read it, so the Scenes sentence and that panel cannot name different values.
@@ -3678,16 +3679,62 @@ export interface SceneSelectionRelation {
   text: string | null;
 }
 
+/**
+ * The SECTIONS whose own `sceneRef` names this scene, ascending.
+ *
+ * `sectionsBindingPreset`'s scene twin (providers/effects-preset.ts), and the
+ * ONE scan of this field on this surface: `sceneSelectionRelation`'s `users`
+ * and `deleteSceneRefusal` both come through here, so "who uses this scene" has
+ * one answer rather than two that can drift.
+ *
+ * ⚠ THE SECTION'S OWN REF, NEVER THE LIBRARY. A binding lives in the section
+ * sidecar; asking the scene library "is anyone pointing at me" is a question it
+ * cannot answer. And never `rasterRef`, which sits in the same sidecar and
+ * names a different library.
+ */
+export function sectionsBindingScene(
+  sections: readonly ({ sceneRef: string | null } | null)[], id: string,
+): number[] {
+  const out: number[] = [];
+  sections.forEach((s, i) => { if (s !== null && (s.sceneRef ?? null) === id) out.push(i); });
+  return out;
+}
+
+/**
+ * The REGION IDS whose own `sceneRef` names this scene, in author order, once
+ * each.
+ *
+ * ⚠ ONE MENTION PER ID, because a carved region is several `regions[]` entries
+ * sharing one id and ONE Regions panel row (`setRegionBinding`'s docblock: every
+ * entry of one id carries identical bindings). Both sentences built on this
+ * point at that row, so naming it three times would point three times at one
+ * control.
+ *
+ * ⚠ THE FIELD IS `sceneRef`, and it is read through `regionBindingValue` rather
+ * than off the object, so the Regions panel's own reader and this one cannot
+ * disagree about what "the scene this region binds" means. Absent and null are
+ * the same "no binding", as they are in the codec.
+ */
+export function regionsBindingScene(
+  document: { regions: readonly Region[] }, id: string,
+): string[] {
+  const out: string[] = [];
+  for (const region of document.regions) {
+    if (regionBindingValue(region, 'scene') === id && !out.includes(region.id)) out.push(region.id);
+  }
+  return out;
+}
+
 export function sceneSelectionRelation(
   sections: readonly ({ sceneRef: string | null } | null)[],
   activeSectionIndex: number,
   selectedSceneId: string | null,
   act?: { regions?: ActRegionsState },
 ): SceneSelectionRelation {
-  const users: number[] = [];
-  if (selectedSceneId !== null) {
-    sections.forEach((s, i) => { if (s !== null && s.sceneRef === selectedSceneId) users.push(i); });
-  }
+  // ONE SECTION SCAN ON THIS SURFACE, not two (DELETE-SCENE-NO-GUARD): the
+  // delete guard below asks the same question of the same field, and a second
+  // loop here would be a second answer to it.
+  const users = selectedSceneId === null ? [] : sectionsBindingScene(sections, selectedSceneId);
   const section = sections[activeSectionIndex] ?? null;
   if (selectedSceneId === null) return { users, text: null };
   const regions = act?.regions;
@@ -3757,12 +3804,7 @@ function regionModeSceneRelationText(regions: ActRegionsState, selectedSceneId: 
     return `${lead} Edits below change ${selectedSceneId}. This act's regions.json could not be `
       + 'read, so Aurora cannot tell which regions bind it. The Regions panel says why.';
   }
-  const binders: string[] = [];
-  for (const region of regions.document.regions) {
-    if (regionBindingValue(region, 'scene') === selectedSceneId && !binders.includes(region.id)) {
-      binders.push(region.id);
-    }
-  }
+  const binders = regionsBindingScene(regions.document, selectedSceneId);
   if (binders.length === 0) {
     return `${lead} Edits below change ${selectedSceneId}, which no region binds yet: `
       + 'bind it in the Regions panel, under Bindings.';
@@ -3775,6 +3817,162 @@ function regionModeSceneRelationText(regions: ActRegionsState, selectedSceneId: 
 }
 
 /**
+ * "Section 2" / "Sections 0, 2 and 3" — the list BOTH arms of the scene delete
+ * refusal spell.
+ *
+ * ⚠ A LOCAL TWIN OF `bindingListWords` IN effects-preset.ts, AND THAT IS FORCED
+ * RATHER THAN CHOSEN: effects-preset.ts imports FROM this module
+ * (`EFFECTS_FIRE_LINE_MIN`, `FactorOption`, `vDeformValue`), so the arrow cannot
+ * also point back and the helper cannot be shared without a cycle or a third
+ * module. `scene-delete-guard.test.ts`'s `[sec-plural]` row is what stops the
+ * two spellings drifting: it derives the expected fragment from
+ * `deletePresetRefusal` over the same indices instead of typing it.
+ *
+ * The `and` is the DELETE REFUSAL family's, not `regionModeSceneRelationText`'s,
+ * which spells its list `regions b, c bind`. One refusal must read the same way
+ * in both of its arms.
+ */
+function sceneBindingListWords(
+  one: string, many: string, items: readonly (number | string)[],
+): string {
+  return items.length === 1
+    ? `${one} ${items[0]}`
+    : `${many} ${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+/**
+ * The row label the region-mode refusal points at, in the Regions panel's own
+ * words. `scene-delete-guard.test.ts`'s `[ctrl]` row asserts it EQUALS
+ * `BINDING_LABELS.scene`, the map that panel's rows are built from, so a rename
+ * there fails here rather than sending an author to a row that no longer
+ * carries that name.
+ */
+export const REGION_SCENE_BINDING_ROW = 'scene';
+
+/**
+ * Why this scene document cannot be deleted right now, or null.
+ *
+ * ═══ DELETE-SCENE-NO-GUARD (2026-09-17) ═══
+ *
+ * Until this landed the scene delete had NO binding guard, in either mode.
+ * `deleteSceneCommand` refuses only when there is no such scene; the button's
+ * other door, `shell/effects-delete-guard.ts`'s `deleteSceneGuarded`, asks a
+ * CONFIRM when there is a FILE to lose. That is a different question, and both
+ * are wanted: this one DISABLES the button, so a scene that is bound AND has a
+ * file never reaches a confirm it could not answer usefully anyway.
+ *
+ * ⚠ IT IS NOT A CONFIRM, and that is `deletePresetRefusal`'s ruling carried
+ * across rather than a fresh preference: a confirm asks "are you sure?" about a
+ * consequence the author cannot see, and the thing they would have had to go and
+ * find out is WHICH sections or regions still name this document.
+ *
+ * ⚠ IT REFUSES RATHER THAN CLEARING THE BINDINGS FOR YOU. Clearing would be a
+ * second edit nobody asked for, on files the author was not looking at, folded
+ * into a delete. Unbinding is one control away and the sentence says where.
+ *
+ * ⚠ AND IT IS NOT IN THE COMMAND. `deleteSceneCommand` still builds an
+ * unguarded command and the agent handler still calls it directly, exactly as
+ * `deletePresetCommand` does: an agent's request IS its explicit act, and there
+ * is no human at a control to disable.
+ */
+export function deleteSceneRefusal(
+  sections: readonly ({ sceneRef: string | null } | null)[], id: string,
+  act?: { regions?: ActRegionsState },
+): string | null {
+  // `undefined` act, and `noRegionsLoaded()`'s state, are section mode by
+  // `actHasRegionsFile`'s own rule, and take the arm below unchanged.
+  const regions = act?.regions;
+  if (regions !== undefined && actHasRegionsFile(regions)) {
+    return regionModeDeleteSceneRefusal(regions, sections, id);
+  }
+  const bound = sectionsBindingScene(sections, id);
+  if (bound.length === 0) return null;
+  const one = bound.length === 1;
+  return `${sceneBindingListWords('Section', 'Sections', bound)} ${one ? 'binds' : 'bind'} `
+    + `"${id}". Deleting it would leave ${one ? 'that binding' : 'those bindings'} naming a `
+    + 'document that does not exist, and aeon\'s build refuses that by name. Set the scene '
+    + `binding back to "${SCENE_REF_ACT_DEFAULT}" on ${one ? 'that section' : 'those sections'} `
+    + 'first, under Section assignment.';
+}
+
+/**
+ * Why this scene document cannot be deleted on a REGION-MODE act, or null.
+ *
+ * The caller has already asked `actHasRegionsFile`, ruling B1's one mode
+ * predicate, so this never decides the mode itself. It answers the same
+ * question the section arm answers — is anything still naming this document —
+ * against the installers a region-mode act actually has.
+ *
+ * ⚠ A REFUSED regions.json IS ITS OWN ANSWER, AND IT IS A REFUSAL. `document`
+ * null with `unreadable` set is state 3 of `ActRegionsState`: the file exists
+ * and the read or the codec turned it down, so WHETHER a region binds this
+ * document is unknown. Returning null there would print a clean bill of health
+ * derived from a failed read. The cost is stated rather than hidden: while an
+ * act's regions.json is refused, Delete is disabled for every scene on that
+ * act, and the way out is the Regions panel's own notice about that file. Such
+ * an act already writes nothing and removes nothing on save, so letting a
+ * destructive delete through is the wrong direction to fail in.
+ *
+ * ⚠ BOTH CAUSES ARE REPORTED, NOT THE FIRST ONE FOUND. A region-mode act can
+ * carry a readable regions.json AND section sidecars still holding `sceneRef` —
+ * the tree `sectionSceneBindRefusal` exists because of. Both bindings dangle if
+ * the document goes, so suppressing the section clause here would make this
+ * guard WEAKER on a region-mode act than on a section-mode one. The sidecar
+ * clause says the ref is itself refused beside regions.json (aeon's
+ * `check_mode_conflict`) and that clearing it is allowed, because clearing is
+ * the one write `sectionSceneWriteRefusal` permits on such an act and it
+ * repairs both faults at once.
+ *
+ * The pointer is the REGIONS panel for the region clause, never the Section
+ * assignment select: on this act that select refuses a binding outright, so
+ * pointing there for the region cause would send an author to a wall.
+ */
+function regionModeDeleteSceneRefusal(
+  regions: ActRegionsState,
+  sections: readonly ({ sceneRef: string | null } | null)[],
+  id: string,
+): string | null {
+  const clauses: string[] = [];
+  if (regions.document === null) {
+    clauses.push(`Aurora cannot tell whether a region binds "${id}": this act is in region mode `
+      + 'and its regions.json could not be read, so the region rows that would name it are '
+      + 'unknown. Deleting it could leave a binding naming a document that does not exist, which '
+      + 'aeon\'s build refuses by name. The Regions panel says why the file was refused.');
+  } else {
+    const binders = regionsBindingScene(regions.document, id);
+    if (binders.length > 0) {
+      const one = binders.length === 1;
+      clauses.push(`${sceneBindingListWords('Region', 'Regions', binders)} `
+        + `${one ? 'binds' : 'bind'} "${id}". Deleting it would leave `
+        + `${one ? 'that binding' : 'those bindings'} naming a document that does not exist, and `
+        + 'aeon\'s build refuses that by name. Select '
+        + `${one ? 'that region' : 'those regions'} in the Regions panel and use "revert to `
+        + `inherited" on ${one ? 'its' : 'the'} ${REGION_SCENE_BINDING_ROW} row, under Bindings, `
+        + 'first.');
+    }
+  }
+  const bound = sectionsBindingScene(sections, id);
+  if (bound.length > 0) {
+    const one = bound.length === 1;
+    clauses.push(`${sceneBindingListWords('Section', 'Sections', bound)} still `
+      + `${one ? 'carries' : 'carry'} sceneRef "${id}" in ${one ? 'its sidecar' : 'their sidecars'} `
+      + 'beside regions.json, which aeon\'s check_mode_conflict refuses. Clearing '
+      + `${one ? 'it' : 'them'} under Section assignment is allowed, and it is what removes `
+      + `${one ? 'that binding' : 'those bindings'}.`);
+  }
+  return clauses.length === 0 ? null : clauses.join(' ');
+}
+
+/**
+ * The option label for "no section binding", in the ONE place it is spelled.
+ *
+ * The select is built from it (`sceneRefOptions` below) and `deleteSceneRefusal`
+ * names it as the escape, so the sentence cannot point at a word the control
+ * does not carry.
+ */
+export const SCENE_REF_ACT_DEFAULT = 'Act default';
+
+/**
  * The `sceneRef` dropdown for one section: the act default plus every LOADED
  * scene.
  *
@@ -3785,7 +3983,7 @@ function regionModeSceneRelationText(regions: ActRegionsState, selectedSceneId: 
  */
 export function sceneRefOptions(library: EffectsSceneLibrary): FactorOption[] {
   return [
-    { value: '', label: 'Act default' },
+    { value: '', label: SCENE_REF_ACT_DEFAULT },
     ...sceneListEntries(library).map((e) => ({ value: e.id, label: e.label })),
   ];
 }
