@@ -94,6 +94,9 @@ import { BG_WIDTH } from '../../core/formats/bg-tiles';
 // raster half in effects-preset.ts.
 import { actHasRegionsFile, type ActRegionsState } from '../../core/formats/regions/act-regions';
 import { regionModeSectionRefRefusal } from '../../core/formats/raster-binding';
+// A region's own scene binding, read the way the Regions panel's Bindings rows
+// read it, so the Scenes sentence and that panel cannot name different values.
+import { regionBindingValue } from './regions-aeon';
 
 // ---------------------------------------------------------------------------
 // Factor picker
@@ -3679,6 +3682,7 @@ export function sceneSelectionRelation(
   sections: readonly ({ sceneRef: string | null } | null)[],
   activeSectionIndex: number,
   selectedSceneId: string | null,
+  act?: { regions?: ActRegionsState },
 ): SceneSelectionRelation {
   const users: number[] = [];
   if (selectedSceneId !== null) {
@@ -3686,6 +3690,10 @@ export function sceneSelectionRelation(
   }
   const section = sections[activeSectionIndex] ?? null;
   if (selectedSceneId === null) return { users, text: null };
+  const regions = act?.regions;
+  if (regions !== undefined && actHasRegionsFile(regions)) {
+    return { users, text: regionModeSceneRelationText(regions, selectedSceneId) };
+  }
   if (section !== null && section.sceneRef === selectedSceneId) return { users, text: null };
 
   // CLAUSE 1 — what the ACTIVE section uses, in the strip's own words.
@@ -3711,6 +3719,59 @@ export function sceneSelectionRelation(
       : `${selectedSceneId}, which sections ${others.join(', ')} use.`;
 
   return { users, text: `${uses} Edits below change ${reach}` };
+}
+
+/**
+ * THE RELATION SENTENCE ON A REGION-MODE ACT (SCENE-RELATION-REGION-MODE,
+ * 2026-09-17). The caller has already asked `actHasRegionsFile`, ruling b1's one
+ * mode predicate, so this never decides the mode itself.
+ *
+ * On such an act no section binds a scene: aeon's `check_mode_conflict` refuses a
+ * sidecar `sceneRef` beside regions.json and SECTION ASSIGNMENT is disabled. The
+ * section-keyed sentence therefore said two false things on OJZ act 1 (measured
+ * on screen, docs/captures/2026-09-17-region-mode-b1-on-screen): that the active
+ * section "uses the act default scene", and that a scene region `sec4` binds is
+ * one "no section uses yet", pointing at the refusing control.
+ *
+ * ⚠ NO CLAUSE ABOUT THE ACTIVE SECTION, AND NO AGREEMENT SILENCE. A section is
+ * not the owner of a scene binding in this mode, so there is no "this section's
+ * scene" to agree or disagree with, and a leftover sidecar ref (which the build
+ * refuses) cannot be the agreement that silences the sentence. Mapping the
+ * section to a region by geometry was rejected: region rectangles need not sit
+ * on the section grid (the OJZ fixture's `ojz_preset_night` straddles x = 4096),
+ * and a region id spelled `secN` is a name, not a link to section N.
+ *
+ * ⚠ ONLY A REGION'S OWN `sceneRef` COUNTS AS BINDING. A null one is not listed as
+ * "inheriting" the act's scene: aeon's generator lowers it to `rg_parallax: 0`,
+ * which defers to the preset's parallax before the act's, so naming such a
+ * region as a user of the act scene would be a guess.
+ *
+ * Region IDS, not names, for the reason the section sentence spells ids: the
+ * Regions panel shows the id on every row. One mention per id, in author order,
+ * because a carved region is several entries under one id and one panel row.
+ */
+function regionModeSceneRelationText(regions: ActRegionsState, selectedSceneId: string): string {
+  const lead = 'This act is in region mode: scenes are bound on its region rows, not on sections.';
+  if (regions.document === null) {
+    // `actHasRegionsFile` was true with no document: the file exists and was refused.
+    return `${lead} Edits below change ${selectedSceneId}. This act's regions.json could not be `
+      + 'read, so Aurora cannot tell which regions bind it. The Regions panel says why.';
+  }
+  const binders: string[] = [];
+  for (const region of regions.document.regions) {
+    if (regionBindingValue(region, 'scene') === selectedSceneId && !binders.includes(region.id)) {
+      binders.push(region.id);
+    }
+  }
+  if (binders.length === 0) {
+    return `${lead} Edits below change ${selectedSceneId}, which no region binds yet: `
+      + 'bind it in the Regions panel, under Bindings.';
+  }
+  const which = binders.length === 1
+    ? `region ${binders[0]} binds`
+    : `regions ${binders.join(', ')} bind`;
+  return `${lead} Edits below change ${selectedSceneId}, which ${which}. `
+    + 'To change which scene a region binds, use the Regions panel, under Bindings.';
 }
 
 /**
