@@ -826,9 +826,29 @@ export function sectionsBindingPreset(
  * library, required and non-null and validated by aeon's generator against a
  * source Aurora does not open; `rasterRef` is the id of a raster preset
  * DOCUMENT, the same namespace `Section.rasterRef` and this library name, and
- * the only one a document delete can dangle. A scan over `preset` would refuse
- * deletions for ids that are not in this library at all and still miss the
- * binding that breaks the build.
+ * the only one a document delete can dangle.
+ *
+ * ⚠ A SCAN OVER `preset` WOULD BE SILENTLY VACUOUS, NOT OVER-EAGER, AND THE
+ * FIRST VERSION OF THIS NOTE HAD IT BACKWARDS. Measured on aeon's act 1
+ * (2026-09-17): its ten regions carry `preset` values `OJZ_Preset_Sec0` through
+ * `OJZ_Preset_Night`, while the document library holds six lowercase ids. So
+ * such a scan matches NOTHING, prints ok forever, and lets every dangling
+ * delete through — which is worse than refusing too much, because an author
+ * would notice the latter within a click. Re-derive with:
+ *   python3 -c 'import json;d=json.load(open("$AEON_DIR/games/sonic4/data/editor/ojz/act1/regions.json"));print([(r["id"],r["preset"],r.get("rasterRef")) for r in d["regions"]])'
+ *
+ * ⚠ AND THAT DISJOINTNESS IS TODAY'S DATA AND A CONVENTION, NEVER THE
+ * CONTRACT — so do not let any later reader turn it into a guarantee. Read at
+ * empyrean `origin/main:contract/schema/aurora-regions.schema.json`
+ * (`$defs.region.properties`, 2026-09-17): `preset` is
+ * `^[A-Za-z_][A-Za-z0-9_]{0,63}$` and `rasterRef` is `^[a-z][a-z0-9_]{0,31}$`.
+ * Every legal `rasterRef` is therefore ALSO a legal `preset` value — the raster
+ * namespace is a strict SUBSET of the record namespace — so a future record
+ * named `ojz_sec5_showcase` is schema-legal and would collide. Nothing above
+ * depends on the separation: this function is correct either way, because it
+ * reads the one field a document delete can dangle rather than inferring from
+ * a name's shape. The point of the clause is that the RATIONALE decays and the
+ * BEHAVIOUR does not.
  *
  * ⚠ ONE MENTION PER ID, because a carved region is several `regions[]` entries
  * sharing one id and ONE Regions panel row (`setRegionBinding`'s docblock: every
