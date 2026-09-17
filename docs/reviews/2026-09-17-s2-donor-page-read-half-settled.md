@@ -44,8 +44,18 @@ blamed on the owner's go or his six zones, which the read half no longer waits o
 
 `games/sonic4/data/donors/` is **gitignored in aeon** (`.gitignore:205` at `origin/master`,
 verified with `git -C ../aeon check-ignore -v`) and **0 paths are tracked under it**
-(`git -C ../aeon ls-tree -r --name-only origin/master -- games/sonic4/data/donors | wc -l`).
+(`git -C ../aeon ls-tree -r --name-only origin/master -- games/sonic4/data/donors`).
 **So no donor zone exists anywhere yet.**
+
+⚠ **THAT ZERO CARRIES A POSITIVE CONTROL, AND THE FIRST VERSION OF THIS LINE DID NOT.** It was
+originally measured through `| wc -l`, which launders the exit code — the precise mechanism
+that produced a WRONG figure in the relay this file corrects (`find <missing> -type f | wc -l`
+printed a clean `0` while `find` was erroring `No such file or directory`). Audited here:
+`ls-tree` exits **0** with no pipe in the way, and the identical command against a path that
+does exist (`games/sonic4/data/editor/ojz/act1`) returns **62** lines. **So the query is live
+and the zero means "nothing tracked" rather than "the query failed."** The claim was right the
+first time and the method had not earned it; the control is what makes it re-checkable instead
+of lucky. Re-derive both halves, never just the zero.
 
 ⚠ **CORRECTION TO THE RELAY, AND IT CHANGES THE CODE.** The relay said the directory is
 "empty on disk, 0 files". Measured here: **the directory does not exist on disk at all.**
