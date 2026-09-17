@@ -499,6 +499,29 @@ export function sceneIdFromFileName(fileName: string): string | null {
   return fileName.slice(0, -'.json'.length);
 }
 
+/**
+ * The scene id a library PATH names, or null when the path is not a scene
+ * document of the library under `dataRoot`. The inverse of `effectsScenePath`.
+ *
+ * BUILT FROM THE SAME TWO PIECES THE BUILDER AND THE LOADER USE: the directory
+ * is `effectsSceneDir`, and the file name is read by `sceneIdFromFileName`, so a
+ * moved directory moves both halves at once. The one shape not shared by a
+ * function is "directory + one file name", and that is pinned by the round-trip
+ * rows in test/formats/effects-docid-inverse.test.ts rather than by a comment.
+ *
+ * ⚠ ONE LEVEL, NEVER RECURSED. The loader lists this directory and nothing below
+ * it, so a path with a further `/` after the directory is not a scene. That
+ * matters here and not in theory: the preset library is `presets/` INSIDE this
+ * directory, and a basename parse would read `presets/x.json` as scene `x`.
+ */
+export function sceneIdFromPath(dataRoot: string, path: string): string | null {
+  const dir = effectsSceneDir(dataRoot);
+  if (!path.startsWith(dir)) return null;
+  const fileName = path.slice(dir.length);
+  if (fileName.includes('/')) return null;
+  return sceneIdFromFileName(fileName);
+}
+
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
@@ -795,7 +818,9 @@ export async function loadEffectsSceneLibrary(
   for (const entry of entries) {
     const stem = sceneIdFromFileName(entry);
     if (stem === null) continue; // .bin deform tables and anything else live here too
-    const path = `${dir}${entry}`;
+    // THE BUILDER, not `${dir}${entry}` (the same string): every path this
+    // library reports is one `sceneIdFromPath` is tested as the inverse of.
+    const path = effectsScenePath(dataRoot, stem);
     try {
       scenes.push(parseEffectsScene(new TextDecoder().decode(await fa.read(path)), stem));
       loadedPaths.push(path);

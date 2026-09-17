@@ -1220,6 +1220,7 @@ async function loadFullProject(
         // preset library. Was inline here until step 6 gave the same question a
         // second reader; moved rather than copied.
         regionBindingVocabulary({
+          dataRoot: projectDataRoot(config.raw),
           rasterWiring: actOut.rasterWiring,
           effectsScenes,
           effectsPresets,
