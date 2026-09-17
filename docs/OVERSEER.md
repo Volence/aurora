@@ -88,6 +88,14 @@ sections down): when one arrives, go read his transcribed words at a committed r
 decide from those. Here they held, and the hub's pick and this lane's own proposal were the
 same item — but that is a fact discovered by checking, not a reason to skip the check.
 
+## ⚠ A session started by a Dominion rotation does NOT stop for a pick when its `next` row waits on no one
+
+*(Added 2026-09-17, on the hub's flag that three rotated aurora sessions in one night booted into a stop and sat until sleep cleared them again.)*
+
+**Owner, verbatim, 2026-09-02T17:17:18Z**, read at empyrean `origin/main:docs/OVERSEER.md` (grep `2026-09-02T17:17:18Z`, never a line number): *"If something stops we have it work on the next item to get through that list please (unless it's waiting on something else)"*.
+
+So when a session boots from a Dominion rotation (or any boot with no owner at the console) and the `next` row in `docs/lane-status.json` has no `blockedBy`, waits on no other lane and needs no owner call, **take that row after boot**: report, then start. **Keep the `/overseer` skill's stop for rows that really wait on him** (look/taste calls, open decision cards) and for when he is at the console choosing. The skill's "propose and stop" is his file and lives in dominion's tree; this is his own standing sentence applied, not a patch to it. **Re-check the grep before relying on it**: a standing instruction can be superseded, and the committed hub doc is where that shows.
+
 ## The queue
 
 **`docs/ROADMAP.md` is the plan of record — read §2.6 then §5.1 and stop.** §2.6 records
