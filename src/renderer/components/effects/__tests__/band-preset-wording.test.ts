@@ -743,6 +743,21 @@ describe('the panel renders the limits, unconditionally, in the body', () => {
     }
   });
 
+  /**
+   * RULING b1 (2026-09-17): the painted `unbound` text said "a section has to BIND
+   * it, and aeon has to have wired that section". At aeon c7ebe7a1 a region-mode
+   * act binds on a region row, and what aeon wires is the record the binder
+   * installs (bcd844aa). The author-length text owes the same two facts as the
+   * contract sentence, in its own words.
+   */
+  it('LIMIT 1\'s author-length text names both binders and says aeon threads the record, not the section', () => {
+    const body = presetLimitsShort().find((l) => l.key === 'unbound')!.body;
+    expect(body).toMatch(/a section or, on an act with regions\.json, a region row has to BIND it/);
+    expect(body).toMatch(/thread the raster chooser into the record that binder installs/);
+    expect(body).not.toMatch(/wired that section/);
+    expect(body).toMatch(/On a section-mode act the dropdown below says/);
+  });
+
   it('the cut is real: the PAINTED block is a fraction of the contract text', () => {
     const painted = PRESET_HEADLINE.length
       + presetLimitsShort().reduce((n, l) => n + l.title.length + 2 + l.body.length, 0)

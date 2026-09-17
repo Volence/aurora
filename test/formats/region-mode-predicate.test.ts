@@ -141,7 +141,7 @@ describe('actHasRegionsFile answers "does regions.json exist", from the real loa
 
   it('the save decides the file: migrated now is REGION mode, every region deleted is not', async () => {
     const migrated = await actOf(tree());
-    expect(actHasRegionsFile(migrated.regions), 'fixture started in region mode').toBe(false);
+    expect(actHasRegionsFile(migrated.regions), 'fixture did not start in section mode').toBe(false);
     new EditHistory().execute({
       type: 'set-regions', description: 'as a migration would', sectionIndex: -1,
       oldDocument: null, newDocument: ojzShapedDocument(),
@@ -150,7 +150,7 @@ describe('actHasRegionsFile answers "does regions.json exist", from the real loa
     expect(actHasRegionsFile(migrated.regions)).toBe(true);
 
     const cleared = await actOf(tree({ [REGIONS_PATH]: enc(JSON.stringify(ojzShapedDocument())) }));
-    expect(actHasRegionsFile(cleared.regions), 'fixture started in section mode').toBe(true);
+    expect(actHasRegionsFile(cleared.regions), 'fixture did not start in region mode').toBe(true);
     new EditHistory().execute({
       type: 'set-regions', description: 'delete every region', sectionIndex: -1,
       oldDocument: cloneRegionsDocument(cleared.regions.document!), newDocument: null,

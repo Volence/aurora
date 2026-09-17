@@ -403,9 +403,14 @@ export interface PresetLimitShort {
 }
 
 const SHORT_BODIES: Record<PresetLimit['key'], string> = {
+  // ⚠ CORRECTED 2026-09-17 (ruling b1). It said "a section has to BIND it, and aeon has
+  // to have wired that section", which is false twice over at aeon c7ebe7a1: on a
+  // region-mode act a REGION ROW binds it (in the Regions panel), and since aeon
+  // bcd844aa what aeon wires is the RECORD the binder installs, not the section.
   unbound:
-    'Saving writes the document; a section has to BIND it, and aeon has to have wired that '
-    + 'section. The panel says which state the section you are on is in, at the dropdown below.',
+    'Saving writes the document; a section or, on an act with regions.json, a region row has to '
+    + 'BIND it, and aeon has to thread the raster chooser into the record that binder installs. On a '
+    + 'section-mode act the dropdown below says which state the section you are on is in.',
   debug_chord:
     'A preset also needs a row in aeon\'s band-demo table or a section binding to be reachable '
     + 'at all. aeon\'s build fails loudly when it has neither, so this is never silent.',

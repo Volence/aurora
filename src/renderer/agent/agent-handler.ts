@@ -29,7 +29,7 @@ import { danglingBgRef, makeBgId } from '../../core/formats/bg-library';
 import { parseEffectsScene } from '../../core/formats/effects/scene';
 import { sceneIdRefusal } from '../../core/formats/effects/scene-ui';
 import {
-  deleteSceneCommand, replaceSceneCommand, sectionSceneCommand,
+  deleteSceneCommand, replaceSceneCommand, sectionSceneCommand, sectionSceneWriteRefusal,
 } from '../providers/effects-aeon';
 import { parseEffectsPreset, presetProgramArm } from '../../core/formats/effects/preset';
 import {
@@ -972,6 +972,13 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       }
       const section = ctx.act.sections[req.section];
       if (!section) throw new Error(`section ${req.section} is empty`);
+      // ⚠ REGION MODE REFUSES FIRST (ruling b1, condition 5). aeon's
+      // `check_mode_conflict` refuses a sidecar sceneRef beside regions.json, as it
+      // does a rasterRef, so this write would hand the caller a tree aeon will not
+      // build. The SAME function the scene panel's select asks; clearing (null) is
+      // still allowed, and on a section-mode act it is always null.
+      const modeRefusal = sectionSceneWriteRefusal(ctx.act, req.section, section.sceneRef, req.sceneId);
+      if (modeRefusal !== null) throw new Error(`assign_section_scene refused: ${modeRefusal}`);
       const library = useProjectStore.getState().project!.effectsScenes;
       if (req.sceneId !== null && !library.scenes.some(s => s.id === req.sceneId)) {
         // Deliberately refuses an UNREADABLE id too — it is not in `scenes`.

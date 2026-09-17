@@ -392,7 +392,10 @@ export const EDITOR_METHODS: EditorMethod[] = [
     },
     description: 'Assign which effects scene a section uses (sceneRef in its meta sidecar): a scene id, or '
       + 'null to fall back to the act default. One undo step. Refuses an id that is not a readable scene: '
-      + 'a ref the build cannot resolve is worse than no ref.' },
+      + 'a ref the build cannot resolve is worse than no ref. On an act whose regions.json exists (region '
+      + 'mode) it refuses any scene id, because aeon\'s tools/effects_gen.py check_mode_conflict refuses '
+      + 'the build while a section sidecar carries a sceneRef: bind the scene on a region instead, in the '
+      + 'Regions panel under Bindings. Clearing (null) is still allowed there, since that is the repair.' },
 
   // ---- Wave 2: raster PRESETS --------------------------------------------
   // The scene trio, mirrored onto the OTHER effects document. Same registry

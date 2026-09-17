@@ -95,7 +95,8 @@ export function regionsPathFor(dataPath: string): string {
  *
  * ═══ AEON'S PREDICATE, AND THIS IS THE ONLY COPY OF IT IN AURORA ═══
  *
- * aeon `tools/effects_gen.py` at `origin/master` (`e20863ad`), read there:
+ * aeon `tools/effects_gen.py` at `c7ebe7a1` (re-read 2026-09-17; first read at
+ * `e20863ad`), unchanged between them on these lines:
  *
  *     def has_act_regions(repo, zone, act) -> bool:
  *         """True when this act is in REGION mode. The whole of the mode decision."""
@@ -128,6 +129,21 @@ export function regionsPathFor(dataPath: string): string {
  * any write made now has to survive: a sidecar `rasterRef` written just after
  * `Migrate sections` (document set, nothing saved yet) is refused by
  * `check_mode_conflict` at the next save and build, so it is region mode now.
+ *
+ * ═══ THE ONE WINDOW WHERE THIS AND aeon DISAGREE, AND IT IS NOT DRIFT ═══
+ *
+ * RATIFIED by ruling REGION-MODE-RASTER-FALSE-OUTPUT-b1 (condition 1). aeon asks
+ * the DISK (`os.path.isfile`); this asks the LOADED DOCUMENT. They answer
+ * differently in exactly one window: AFTER "Migrate sections" and BEFORE the
+ * save. In that window the migration has set `document` (so this says region
+ * mode) while regions.json is not yet on disk (so aeon, and an unsaved build,
+ * still say section mode). It is deliberate: the migration already cleared the
+ * sidecar refs in the model, and the save it is waiting for writes regions.json,
+ * so refusing a new sidecar ref now forbids nothing the save would keep. The
+ * mirror window, every region deleted and not yet saved, says section mode while
+ * the file is still on disk until the save removes it. Anyone comparing this
+ * predicate with aeon's across those two windows is looking at the save, not at
+ * a divergence.
  *
  * `undefined` is a hand-built `Act` that never carried the field, which is
  * `noRegionsLoaded()`'s state by that function's own rule: nothing was looked

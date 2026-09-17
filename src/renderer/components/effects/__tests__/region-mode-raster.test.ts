@@ -158,7 +158,12 @@ describe('the surfaces are wired to the gate (source)', () => {
     expect(pickerCode).toMatch(/\{regionNotice === null && act\.rasterWiring\.descriptor\.parsed && \(/);
     expect(pickerCode).toMatch(/\{regionNotice === null && advisory !== null && \(/);
     expect(pickerCode).toMatch(/\{regionNotice === null && extraAdvisory !== null && \(/);
-    expect(pickerCode).toMatch(/\) : regionNotice !== null \? \(\s*<>\s*scene <code[^\n]*\n\s*<\/>\s*\) : \(\s*<>\s*scene <code[^\n]*\n\s*\{' · '\}\s*raster <code/);
+    // ⚠ THE REGION ARM NO LONGER PRINTS A SIDECAR REF (ruling b1, condition 5):
+    // its `act default` was false on a region-mode act. The section arm still does.
+    expect(pickerCode).toMatch(/\) : regionNotice !== null \? \(\s*<>\s*scene and raster are bound on this act's region rows, in the Regions panel\s*<\/>\s*\) : \(\s*<>\s*scene <code[^\n]*\n\s*\{' · '\}\s*raster <code/);
+    const regionArm = /\) : regionNotice !== null \? \(([\s\S]*?)\) : \(/.exec(pickerCode);
+    expect(regionArm, 'the region-mode arm of the bindings line was not found').not.toBeNull();
+    expect(regionArm![1], 'the region-mode arm prints a sidecar ref').not.toMatch(/section\.(sceneRef|rasterRef)/);
   });
 
   it('the agent case asks the same refusal before it builds the command', () => {

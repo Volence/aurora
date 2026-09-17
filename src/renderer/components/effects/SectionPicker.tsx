@@ -329,11 +329,14 @@ export default function SectionPicker({ children }: {
           {section === null ? (
             <>This section is empty: nothing is bound to it.</>
           ) : regionNotice !== null ? (
-            // REGION MODE: the raster half read a sidecar `rasterRef` and is
-            // dropped; the scene half is left exactly as it was (ruling B is
-            // about raster bindings; see the review file for the scene half).
+            // REGION MODE (ruling b1, condition 5): BOTH halves read a sidecar,
+            // and on this act neither sidecar ref is the binding. The scene half
+            // used to stay and printed `act default` for every section of OJZ
+            // act 1 while its region rows bind scenes (sec0 binds
+            // ojz_act1_start at aeon c7ebe7a1), which is false. So neither half
+            // is printed from the sidecar: the line says where both live.
             <>
-              scene <code style={{ color: T.textHi }}>{section.sceneRef ?? 'act default'}</code>
+              scene and raster are bound on this act's region rows, in the Regions panel
             </>
           ) : (
             <>
