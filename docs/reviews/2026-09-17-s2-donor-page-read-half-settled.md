@@ -45,7 +45,30 @@ blamed on the owner's go or his six zones, which the read half no longer waits o
 `games/sonic4/data/donors/` is **gitignored in aeon** (`.gitignore:205` at `origin/master`,
 verified with `git -C ../aeon check-ignore -v`) and **0 paths are tracked under it**
 (`git -C ../aeon ls-tree -r --name-only origin/master -- games/sonic4/data/donors`).
-**So no donor zone exists anywhere yet.**
+**So no donor bytes exist on any machine right now.**
+
+⚠ **BUT "ABSENT" WAS THE WRONG WORD AND IT MISDIRECTS THE WHOLE DECISION BELOW — CORRECTED
+2026-09-17 BY AEON, AGAINST MY FIRST VERSION.** The donor trees are **DERIVED AND GITIGNORED,
+not unavailable**. They regenerate in about a second from committed inputs with one published
+command, in `/home/volence/sonic_hacks/aeon`:
+
+```sh
+python3 tools/s2_zone_convert.py convert --all-six      # or --all-zones for all 19 pairs
+```
+
+Verified here: `tools/s2_zone_convert.py` is present at aeon `origin/master` and its parser
+carries both `--all-six` and `--all-zones`; **both donor sources are present on this machine**
+(`s2disasm` and `s2-simonwai-disasm` as sibling checkouts). The owner's six are EHZ, CPZ, OOZ,
+MTZ and WFZ from `s2disasm`, plus HPZ from `s2-simonwai-disasm`.
+
+**This kills the reproducibility argument I made against option 2 below, so read that
+correction before the options.** I wrote that a locally-converted zone *"proves nothing a
+successor can re-run"*. **That is false:** a successor re-runs it with the line above, and
+`zone.json` carries a per-file SHA-256 so two runs can be compared rather than trusted.
+**Derived-and-regenerable is a different category from absent, and I collapsed the two** —
+the same one-quantity-over shape this file already corrects twice. Reproducibility here comes
+from *the generator plus the hashes*, which is exactly how a build input works; committed
+bytes were never the only route to it.
 
 ⚠ **THAT ZERO CARRIES A POSITIVE CONTROL, AND THE FIRST VERSION OF THIS LINE DID NOT.** It was
 originally measured through `| wc -l`, which launders the exit code — the precise mechanism
@@ -86,14 +109,25 @@ Three options, to be decided **before** the page reads a path:
    `6180a1af`. Survives a clear, a clean clone and another lane's day. Costs a shape that can
    drift from aeon's without anything saying so — so it needs a currency row against the
    published `zone.json`, which is the pattern this repo already runs for the regions schema.
-2. **Run aeon's converter locally** to produce a real zone. Highest fidelity, and the result
-   is un-committable by aeon's current ignore, so it proves nothing a successor can re-run.
+2. **Run aeon's converter to produce a real zone.** Highest fidelity, one published command,
+   and **re-runnable by anyone on this machine** — so the objection I first wrote here (that
+   it proves nothing a successor can repeat) is withdrawn. Its real cost is different and
+   smaller: the tree is absent until someone runs it, so anything depending on it must
+   generate it or skip loudly, and a fresh machine also needs the two donor checkouts.
 3. **Skip loudly** when no donor tree is present, naming the variable and the path. Honest,
    and on its own it means the page's main path is never exercised by anything.
 
-**The recommendation: 1 plus 3** — an owned fixture for the behaviour, a loud reasoned skip
-for the real-tree path, and a currency row so the fixture cannot silently diverge. That is
-the same division this repo already uses where a peer's data is not committable.
+**The recommendation, REVISED once option 2 stopped being weak: 1 and 2 and 3, with distinct
+jobs.** An owned fixture carries the *behaviour* rows (fast, committed, no external
+dependency, so `npm test` stays hermetic). A **real converted tree** carries the *fidelity*
+claim, generated on demand by a rig that runs the command itself or skips loudly naming it —
+never a row that reads the path and hopes. A currency row against the published `zone.json`
+keeps the owned fixture from silently diverging from aeon's shape. Three legs, three different
+failure modes, and no leg standing in for another.
 
-**Whichever is chosen, "no donors present" is a first-class state of the page, not an error**
-— today it is the *only* state that can occur on any machine, including the owner's.
+**And "no donors present" is a first-class state of the PAGE, which this correction makes
+MORE true rather than less.** Derived-and-gitignored means absent is the *normal* state of a
+fresh checkout, not a transitional one. **So the empty state should name the command** —
+telling an author `python3 tools/s2_zone_convert.py convert --all-six` in aeon is the whole
+difference between a dead page and a one-line fix, and it is the cheapest useful thing this
+page can do before any marquee exists.
