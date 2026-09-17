@@ -450,3 +450,5 @@ it is unseen.** `"harness:regions-facet"` is registered.
   produce `unreadable` (it deliberately touches no disk), so the `refused` arm of
   the panel is under a node row and under `tsc`, and has not been on screen. It
   would need a real `regions.json` in a checkout, which is step 7's territory.
+
+**2026-09-17, CLOSED (REGIONS-DOCID-TRANSCRIBED-INVERSE):** the limit `documentIdFromPath` carried into `vocabulary.ts` is closed at `6860f694` (tests `d04f0583`, branch `regions-docid-inverse`). The function is gone; rule 3 reads refused ids through `sceneIdFromPath` / `presetIdFromPath` beside their builders, and `RegionVocabularySources` now takes the `dataRoot` both readers pass. Pinned by `test/formats/effects-docid-inverse.test.ts`.
