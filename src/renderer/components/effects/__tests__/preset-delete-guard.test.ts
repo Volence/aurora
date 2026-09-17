@@ -16,8 +16,12 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { deletePresetRefusal, sectionsBindingPreset } from '../../../providers/effects-preset';
+import {
+  deletePresetRefusal, sectionsBindingPreset, regionsBindingPreset,
+  REGION_RASTER_BINDING_ROW,
+} from '../../../providers/effects-preset';
 import { BINDING_LABELS } from '../../../providers/regions-aeon';
+import { parseRegionsDocument } from '../../../../core/formats/regions/document';
 
 const panel = readFileSync(join(__dirname, '..', 'BandPresetPanel.tsx'), 'utf8');
 const code = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
@@ -101,10 +105,10 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
   // aeon's OJZ act 1 regions.json, the committed copy (provenance beside it) —
   // the same blob the scene-relation sentence's rows read. Every id below is
   // DERIVED from the file, never typed.
+  // Through the REAL CODEC, so these rows depend on a document the app could
+  // actually load rather than on a `JSON.parse` this file trusts.
   const OJZ_ACT1 = resolve(__dirname, '../../../../../test/fixtures/regions/ojz_act1.regions.json');
-  const ojzDoc = () => JSON.parse(readFileSync(OJZ_ACT1, 'utf8')) as {
-    regions: Array<{ id: string; rasterRef?: string | null; preset: string }>;
-  };
+  const ojzDoc = () => parseRegionsDocument(readFileSync(OJZ_ACT1, 'utf8'));
   const ojzAct = () => ({
     regions: { document: ojzDoc(), loadedPath: 'x/regions.json', unreadable: null },
   });
@@ -176,11 +180,28 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
     // guard over `preset` would refuse this delete for no reason.
     const act = regionAct([{ id: 'a', preset: 'mine', rasterRef: null }]);
     expect(deletePresetRefusal([sec(null)], 'mine', act)).toBeNull();
-    // ...and it does find the REF, so the row above is not green by accident.
+    expect(regionsBindingPreset(act.regions.document, 'mine')).toEqual([]);
+    // ...and it does find the REF, so the rows above are not green by accident.
     const bound = regionAct([{ id: 'a', preset: 'Other_Record', rasterRef: 'mine' }]);
     expect(deletePresetRefusal([sec(null)], 'mine', bound)).toMatch(/^Region a binds "mine"\./);
+    expect(regionsBindingPreset(bound.regions.document, 'mine')).toEqual(['a']);
     // Absent and null are the same "no binding", as everywhere else in the codec.
     expect(deletePresetRefusal([sec(null)], 'mine', regionAct([{ id: 'a' }]))).toBeNull();
+    expect(regionsBindingPreset(regionAct([{ id: 'a' }]).regions.document, 'mine')).toEqual([]);
+  });
+
+  it('[carve] a carved region is named ONCE: one id, one Regions panel row', () => {
+    // `setRegionBinding`'s invariant: a region with several rectangles is
+    // several `regions[]` entries sharing an id, all carrying identical
+    // bindings, and the panel shows one row for them. The sentence points at
+    // that row, so naming it three times would point three times at one
+    // control.
+    const doc = regionAct([
+      { id: 'b', rasterRef: 'mine' }, { id: 'b', rasterRef: 'mine' },
+      { id: 'b', rasterRef: 'mine' },
+    ]).regions.document;
+    expect(doc.regions.length).toBe(3);
+    expect(regionsBindingPreset(doc, 'mine')).toEqual(['b']);
   });
 
   it('[both] a leftover section sidecar is reported too, beside the region cause', () => {
@@ -238,6 +259,10 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
       join(__dirname, '..', '..', 'regions', 'RegionsPanel.tsx'), 'utf8');
     expect(regionsPanel).toContain('revert to inherited');
     expect(regionsPanel).toContain('title="Bindings"');
+    // The row word in the sentence IS the map the panel's rows are built from,
+    // so a rename there fails here instead of sending an author to a row that
+    // no longer carries that name.
+    expect(REGION_RASTER_BINDING_ROW).toBe(BINDING_LABELS.raster);
     const why = deletePresetRefusal([sec(null)], 'mine',
       regionAct([{ id: 'a', rasterRef: 'mine' }]))!;
     expect(why).toContain('"revert to inherited"');
