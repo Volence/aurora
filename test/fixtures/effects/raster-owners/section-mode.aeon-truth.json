@@ -1,0 +1,65 @@
+{
+  "_rekey_bound_to_record": {
+    "OJZ_Preset_Sec5": "ojz_sec5_showcase",
+    "OJZ_Preset_Sec6": "ojz_sec6_baseswap"
+  },
+  "channel_call_sites": {
+    "cycle": {},
+    "patch motion": {
+      "OJZ_Preset_Sec5": {
+        "OJZ_Preset_Sec5": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    "patch world-Y": {
+      "OJZ_Preset_Sec5": {
+        "OJZ_Preset_Sec5": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    "variant": {}
+  },
+  "fn_preset_raster": "ojz_act1_preset_raster",
+  "has_act_regions": false,
+  "homes_whose_record_threads_itself": [
+    "5",
+    "6"
+  ],
+  "owner_maps.owner_records": {
+    "0": "OJZ_Preset_Sec0",
+    "1": "OJZ_Preset_Sec1",
+    "2": "OJZ_Preset_Sec2",
+    "3": "OJZ_Preset_Sec3",
+    "4": "OJZ_Preset_Depth",
+    "5": "OJZ_Preset_Sec5",
+    "6": "OJZ_Preset_Sec6",
+    "7": "OJZ_Preset_Sec7",
+    "8": "OJZ_Preset_Plain"
+  },
+  "owner_maps.raster_refs": {
+    "5": "ojz_sec5_showcase",
+    "6": "ojz_sec6_baseswap"
+  },
+  "raster_call_sites": {
+    "OJZ_Preset_Sec5": "OJZ_Preset_Sec5",
+    "OJZ_Preset_Sec6": "OJZ_Preset_Sec6"
+  },
+  "sha256_of_inputs": {
+    "descriptor": "7cb3b68d282059554665c7efd1868c7a97ab22372abcd0f085ba3183fbb5a9a8",
+    "library": "00159e098ecf71ede4ae1010d280cc961e32c68365c44e2f0ae0a7d527fdfe9b",
+    "section_0.meta.json": "3b375c4e884e2ea97a0392f26fa5a5833deab2606c98040ecf08b373ee8227b9",
+    "section_4.meta.json": "f16ce9cb5d895cd8a89ef453034730b2bdedc7566010a8eebdc5c85d72522bdd",
+    "section_5.meta.json": "b599f780cedc8896547d919e60b50b56259d6bba99c86f31c1d054578b560045",
+    "section_6.meta.json": "cfa192b08eea54286c93b701c7bb45571029288b63898440226bc2d8bd5de4af",
+    "section_7.meta.json": "e19f56dfdfb59afa283b3c38bdb3c25ff205008e3cf29e983bfd108c456313b9",
+    "section_8.meta.json": "97b0adf56e499c537891df4de324add19ba21a67505231e3660f09f95ddcc8b2"
+  }
+}

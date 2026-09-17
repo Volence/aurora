@@ -1,0 +1,67 @@
+{
+  "_rekey_bound_to_record": {
+    "OJZ_Preset_Sec5": "ojz_sec5_showcase",
+    "OJZ_Preset_Sec6": "ojz_sec6_baseswap"
+  },
+  "channel_call_sites": {
+    "cycle": {},
+    "patch motion": {
+      "OJZ_Preset_Sec5": {
+        "OJZ_Preset_Sec5": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    "patch world-Y": {
+      "OJZ_Preset_Sec5": {
+        "OJZ_Preset_Sec5": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    "variant": {}
+  },
+  "fn_preset_raster": "ojz_act1_preset_raster",
+  "has_act_regions": true,
+  "homes_whose_record_threads_itself": [
+    "sec5",
+    "sec6"
+  ],
+  "owner_maps.owner_records": {
+    "ojz_preset_night": "OJZ_Preset_Night",
+    "sec0": "OJZ_Preset_Sec0",
+    "sec1": "OJZ_Preset_Sec1",
+    "sec2": "OJZ_Preset_Sec2",
+    "sec3": "OJZ_Preset_Sec3",
+    "sec4": "OJZ_Preset_Depth",
+    "sec5": "OJZ_Preset_Sec5",
+    "sec6": "OJZ_Preset_Sec6",
+    "sec7": "OJZ_Preset_Sec7",
+    "sec8": "OJZ_Preset_Plain"
+  },
+  "owner_maps.raster_refs": {
+    "sec5": "ojz_sec5_showcase",
+    "sec6": "ojz_sec6_baseswap"
+  },
+  "raster_call_sites": {
+    "OJZ_Preset_Sec5": "OJZ_Preset_Sec5",
+    "OJZ_Preset_Sec6": "OJZ_Preset_Sec6"
+  },
+  "sha256_of_inputs": {
+    "descriptor": "a69133dadebad801507fcf6ec4fd9b6534a1ef5ecb7b3ca78a588b3f0bd8e625",
+    "library": "00159e098ecf71ede4ae1010d280cc961e32c68365c44e2f0ae0a7d527fdfe9b",
+    "regions.json": "7a8c2ed27a4a39ba43eb19140fcb4eda66f575590baddbc98849864ea287fa85",
+    "section_0.meta.json": "4fa859d5da678b947d6c35d0a819f5df61c225bbc1c958288372ca19f2dec260",
+    "section_4.meta.json": "4b4521d4fbc7d440521d3eca42499eb5dfd53d15a5a59f234488fb2ef5c160f1",
+    "section_5.meta.json": "a83a209a13ad582c9d8cb4fc1fc7b52681cdfc02fedd27035105208978206ce5",
+    "section_6.meta.json": "a83a209a13ad582c9d8cb4fc1fc7b52681cdfc02fedd27035105208978206ce5",
+    "section_7.meta.json": "a83a209a13ad582c9d8cb4fc1fc7b52681cdfc02fedd27035105208978206ce5",
+    "section_8.meta.json": "4b4521d4fbc7d440521d3eca42499eb5dfd53d15a5a59f234488fb2ef5c160f1"
+  }
+}

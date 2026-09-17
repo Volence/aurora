@@ -236,7 +236,8 @@ export default function SectionPicker({ children }: {
   // — because which choosers a section owes is a function of that document's
   // KEYS (aeon `effects_gen.document_channels`). The cold read's D-A: section 5
   // showed ✓✓ and the build still refused, because the preset it bound carried
-  // `cycles` and nothing threads `ojz_act1_sec_cycle(sec: 5)`.
+  // `cycles` and nothing threaded the cycle chooser for it (then
+  // `ojz_act1_sec_cycle(sec: 5)`; record-keyed since aeon `bcd844aa`).
   const boundPreset = section?.rasterRef ?? null;
   const boundDoc = boundPreset === null ? null
     : (useProjectStore.getState().project?.effectsPresets.presets
@@ -362,15 +363,17 @@ export default function SectionPicker({ children }: {
         {regionNotice === null && (<>
         <ConditionRow n={1} label="own preset" cond={cond.ownPreset} unmet={unmet}
           title={`CONDITION 1 of 3: a section can carry an editor-authored raster band only if it `
-            + `binds a preset record NO OTHER SECTION binds. Threading a section-keyed band into a `
-            + `shared record would give every section that shares it the same band, and aeon's `
-            + `build refuses that by name. Read from the act descriptor on every load.`
+            + `binds a preset record. aeon's raster chooser is keyed on that RECORD, so when other `
+            + `sections bind the same record they install the same band, and aeon's build refuses `
+            + `sections of one record that name different preset documents. Read from the act `
+            + `descriptor on every load.`
             + (advisory ? `\n\n${advisory}` : '')} />
         <ConditionRow n={2} label="threaded" cond={cond.threaded} unmet={unmet}
-          title={`CONDITION 2 of 3: some preset() in the game's effects library must actually pass `
-            + `${chooser}(sec: N) to its raster: channel. Without it the generator emits the binding `
-            + `row and nothing reads it, which presents to the author as an assignment that did `
-            + `nothing. That is one line in aeon. Read from the effects library on every load.`
+          title={`CONDITION 2 of 3: the preset() of the record this section binds must pass `
+            + `${chooser}(preset: <that record>_KEY) to its raster: channel, with its own key. `
+            + `Without it the generator emits the binding and nothing reads it, which presents to `
+            + `the author as an assignment that did nothing. That is one line in aeon. Read from the `
+            + `effects library on every load.`
             + (advisory ? `\n\n${advisory}` : '')} />
         <ConditionRow n={3} label="its channels" cond={extra} unmet={unmet}
           title={`CONDITION 3 of 3: one rasterRef binds the WHOLE preset document (aeon ruling Q1), `
@@ -409,9 +412,9 @@ export default function SectionPicker({ children }: {
           <div style={{ fontSize: T.t2xs, color: T.textFaint, fontFamily: T.fontMono }}
             data-effects-act-sets=""
             title={'Three act-wide sets, each derived from its own question.\n\n'
-              + 'own preset: the sections whose aeon preset RECORD no other section shares '
-              + '(condition 1).\n'
-              + `threaded: the sections some preset() passes ${chooser}(sec: N) to (condition 2).\n`
+              + 'own preset: the sections that bind an aeon preset RECORD (condition 1).\n'
+              + `threaded: the sections whose record passes ${chooser}(preset: <record>_KEY) with `
+              + 'its own key (condition 2).\n'
               // ⚠ THIS LINE MUST NOT BEGIN WITH THE WORD `bound`, and the
               // reason is a gate that went green on a mutation. `bound` is a
               // RENDERED row in scripts/check-guide-text.mjs with `prefix:

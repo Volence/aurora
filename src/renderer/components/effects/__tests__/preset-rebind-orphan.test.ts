@@ -55,7 +55,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { rebindOrphanNotice, sectionsBindingPreset } from '../../../providers/effects-preset';
-import { boundSections } from '../../../../core/formats/effects/section-wiring';
+import {
+  boundSections, libraryRasterChooserCalls, rasterChooserName,
+} from '../../../../core/formats/effects/section-wiring';
 import { peerRepo, resolveRev, readAtRev } from '../../../../../test/support/peer-repo';
 
 const panel = readFileSync(join(__dirname, '..', 'BandPresetPanel.tsx'), 'utf8');
@@ -73,33 +75,15 @@ const HOTKEY = 'games/sonic4/test/ojz_scroll_test.emp';
 const REGIONS = 'games/sonic4/data/editor/ojz/act1/regions.json';
 const LIB = 'games/sonic4/data/effects/ojz_effects.emp';
 /**
- * aeon `ActNames`' record-keyed raster chooser, as renamed at aeon bcd844aa.
- * Spelled here and NOT taken from section-wiring.ts's `rasterChooserName`,
- * which still returns the pre-bcd844aa `<zone>_<act>_sec_raster`.
+ * aeon `ActNames`' record-keyed raster chooser, renamed at aeon bcd844aa, and the
+ * record-keyed parse of it. Until 2026-09-17 both were spelled HERE, because
+ * section-wiring.ts still returned and parsed the pre-bcd844aa
+ * `<zone>_<act>_sec_raster(sec: N)`. Ruling REGION-MODE-RASTER-FALSE-OUTPUT-b1
+ * moved that parse into the product ("reuse that parse rather than writing a
+ * second one"), so this file now calls the product's.
  */
-const RASTER_CHOOSER = 'ojz_act1_preset_raster';
-
-/**
- * `{preset record: the record whose _KEY it passes}` for every `preset()` record
- * whose `raster:` channel CALLS the record-keyed chooser. The record split is the
- * `(pub )?(const|data) <Name>:` one `libraryRasterChooserCalls` uses, with line
- * comments stripped first: aeon's library discusses the chooser in prose, and a
- * home read out of a comment would be a home that does not exist.
- */
-function recordsThreadingRasterChooser(lib: string, chooserFn: string): Record<string, string> {
-  const code = lib.replace(/\/\/[^\n]*/g, '');
-  const decl = /\b(?:pub\s+)?(?:const|data)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:/g;
-  const marks: { name: string; at: number }[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = decl.exec(code)) !== null) marks.push({ name: m[1], at: m.index });
-  const call = new RegExp(`raster\\s*:\\s*${chooserFn}\\s*\\(\\s*preset\\s*:\\s*([A-Za-z_][A-Za-z0-9_]*)_KEY\\b`);
-  const out: Record<string, string> = {};
-  for (let i = 0; i < marks.length; i++) {
-    const hit = call.exec(code.slice(marks[i].at, marks[i + 1]?.at ?? code.length));
-    if (hit) out[marks[i].name] = hit[1];
-  }
-  return out;
-}
+const RASTER_CHOOSER = rasterChooserName('ojz', 'act1');
+const recordsThreadingRasterChooser = libraryRasterChooserCalls;
 
 describe('rebindOrphanNotice: it fires on the ONE shape aeon refuses', () => {
   it('nothing bound here, nothing to displace', () => {

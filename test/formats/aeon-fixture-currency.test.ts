@@ -74,6 +74,11 @@ const VENDORED: Vendored[] = [
   // from another certifies nothing — so they are re-vendored together.
   'regions/ojz_act1.regions.json',
   'regions/ojz_act1.rows.json',
+  // aeon's SHIPPED effects library for OJZ, vendored 2026-09-17 at aeon c7ebe7a1
+  // for ruling REGION-MODE-RASTER-FALSE-OUTPUT-b1: the record-keyed chooser calls
+  // Aurora's raster-binding derivation is held to. Not JSON, so its sidecar is
+  // `ojz_effects.provenance.json` (the extension is replaced, whatever it is).
+  'effects/ojz_effects.emp',
 ].map((rel) => {
   // ⚠ THE ENTRIES ARE PATHS UNDER `test/fixtures`, NOT BARE BASENAMES, and the
   // directory is no longer hard-coded to `effects`. It was, and the vendored
@@ -82,7 +87,7 @@ const VENDORED: Vendored[] = [
   // collection time, and been "fixed" by writing a second table beside this one,
   // which is the duplication the note above forbids.
   const fixture = resolve(__dirname, '../fixtures', rel);
-  const provenance = fixture.replace(/\.json$/, '.provenance.json');
+  const provenance = fixture.replace(/\.(json|emp)$/, '.provenance.json');
   const prov = JSON.parse(readFileSync(provenance, 'utf8')) as Provenance;
   return { name: rel, fixture, provenance, prov, bytes: readFileSync(fixture, 'utf8') };
 });
