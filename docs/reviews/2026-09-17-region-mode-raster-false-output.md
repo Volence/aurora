@@ -66,3 +66,5 @@ B stops every false statement and the refused-build advice now, and unblocks eve
 which the red master is currently blocking. A mostly re-answers, in the section panel, what the
 Regions panel already answers. If the owner later wants section-panel disclosure on region-mode acts,
 A can be booked then as its own row. B is reversible and adds nothing A would have to undo.
+
+2026-09-17, ruling B landed on branch region-mode-b: predicate actHasRegionsFile at f7c4471e; strip notice, suppressed section-keyed verdicts and the Section select and assign_section_preset refusals at 2c115419; an additive region-mode clause at the head of RASTER_SECTION_BINDING_LIMIT at e4816583. STOPPED: the sentence cut-back and the two red rows of raster-binding-threaded-set.test.ts (they derive the wired and bound sets section-keyed and require both non-empty, so no true sentence turns them green), and the Migrate sections pointer (every region-mode act already has a document, which planActMigration refuses).
