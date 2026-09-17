@@ -453,9 +453,24 @@ describe('base_swap is neither capability-gated nor DEBUG-gated', () => {
 // can never execute is itself the vacuous construct bar 2e names. The
 // loud-skip discipline did not disappear, it MOVED to the currency file, where
 // unmeasurability is real — see docs/reviews/2026-09-04-baseswap-vendor-fixture.md.
+//
+// ⚠ 2026-09-17: THE BINDING MOVED, AND THE BINDING ROW CHECKS LESS ON ONE AXIS.
+// aeon e2af59ea put OJZ act 1 in REGION MODE: `regions.json` owns the act's
+// scene and raster bindings, every `section_N.meta.json` scene/raster ref was
+// nulled, and aeon's `check_mode_conflict` refuses a region-mode act whose
+// sidecar still carries one. The re-vendored section-6 sidecar is therefore
+// `rasterRef: null`, and the binding row below now reads the vendored shipped
+// regions document (`ojz_act1.regions.json`, same revision) instead.
+//   LESS: it no longer ties the binding to SECTION 6. A region row carries a
+//     rectangle and an id, no section index, so "the row that binds this preset
+//     is section 6's" is no longer a fact either file states; the row asserts
+//     that EXACTLY ONE region binds the document, and does not look at where.
+//   MORE: "exactly one" (the old row could not see a second binder), and the
+//     sidecar is asserted null, which is the region-mode half aeon refuses.
 const FIXTURES = resolve(__dirname, '../fixtures/effects');
 const SHIPPED = join(FIXTURES, 'ojz_sec6_baseswap.json');
 const META = join(FIXTURES, 'ojz_act1_section_6.meta.json');
+const REGIONS = join(FIXTURES, 'ojz_act1.regions.json');
 /** The id the codec must bind — DERIVED from the fixture's filename, which is the rule under test. */
 const SHIPPED_STEM = basename(SHIPPED, '.json');
 
@@ -556,13 +571,26 @@ describe('the shipped section-6 document opens', () => {
     );
   });
 
-  it('is what section 6 is BOUND to: the reason the editor had to open it', () => {
-    // A claim about the vendored PAIR, both pinned at the same aeon revision:
-    // the section's rasterRef names the id the codec parsed out of the preset
-    // beside it. It fails if one of the two is ever re-vendored alone.
-    const meta = JSON.parse(readFileSync(META, 'utf8')) as { rasterRef: string | null };
+  it('is what a region of act 1 is BOUND to: the reason the editor had to open it', () => {
+    // A claim about the vendored TRIO, all describing aeon at e2af59ea: exactly
+    // one region row of the shipped regions document names the id the codec
+    // parsed out of the preset beside it, and the section-6 sidecar that used to
+    // carry the binding carries none. It fails if one of the three is ever
+    // re-vendored alone into a disagreeing state. See the banner above for what
+    // this checks less than its section-mode predecessor.
     const preset = parseEffectsPreset(SHIPPED_TEXT, SHIPPED_STEM);
-    expect(meta.rasterRef).toBe(preset.id);
+    const doc = JSON.parse(readFileSync(REGIONS, 'utf8')) as {
+      regions: { id: string; rasterRef?: string | null }[];
+    };
+    // Anti-vacuous: a document with no rows would make "exactly one" unreachable
+    // for a reason that has nothing to do with the binding.
+    expect(doc.regions.length, 'the vendored regions document parsed with no rows').toBeGreaterThan(0);
+    const binders = doc.regions.filter((r) => r.rasterRef === preset.id).map((r) => r.id);
+    expect(binders, `the shipped regions document must bind ${preset.id} on exactly one region row`)
+      .toHaveLength(1);
+    const meta = JSON.parse(readFileSync(META, 'utf8')) as { rasterRef?: string | null };
+    expect(meta.rasterRef ?? null, 'in region mode the section-6 sidecar must not carry the binding '
+      + '(aeon check_mode_conflict refuses it)').toBeNull();
   });
 
   it('round-trips byte-for-byte through serialize, inventing and dropping nothing', () => {

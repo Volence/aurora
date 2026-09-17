@@ -1,27 +1,31 @@
 {
-  "$what": "Provenance of ojz_act1_section_6.meta.json — aeon's OJZ act-1 section-6 sidecar, VENDORED into Aurora at a named aeon revision. Its `rasterRef` is the BINDING that makes ojz_sec6_baseswap.json a document the editor must be able to open: an author who selects section 6 opens exactly this preset.",
+  "$what": "Provenance of ojz_act1_section_6.meta.json — aeon's OJZ act-1 section-6 sidecar, VENDORED into Aurora at a named aeon revision. ⚠ SINCE aeon e2af59ea (2026-09-16, regions-emit-bindings 3/3) THIS SIDECAR NO LONGER CARRIES THE BINDING. OJZ act 1 is in REGION MODE: `games/sonic4/data/editor/ojz/act1/regions.json` owns every scene and raster binding, and every `section_N.meta.json` scene/raster ref was nulled in the same commit. The binding that makes ojz_sec6_baseswap.json a document the editor must be able to open now lives on a REGION ROW, vendored beside this file as ojz_act1.regions.json. This file is kept, re-vendored, because its null `rasterRef` is itself the region-mode half of the claim: aeon's `tools/effects_gen.py` `check_mode_conflict` refuses the build when a region-mode act's sidecar still carries a scene or raster ref.",
   "$why_vendored": "It was read out of aeon's live working tree by test/formats/effects-preset-base-swap.test.ts alongside the preset. Same defect, same repair — see docs/OVERSEER.md bar 19 and docs/reviews/2026-09-04-baseswap-vendor-fixture.md. The vendored name differs from aeon's basename (`section_6.meta.json`) because this fixture directory is flat and holds documents from several acts; the aeon path below is authoritative.",
   "aeon": {
     "repo": "git@github.com:Volence/aeon.git",
     "path": "games/sonic4/data/editor/ojz/act1/section_6.meta.json",
     "branch_that_answers_currency": "origin/master",
-    "revision": "d8d2c952a50cd7ad48f0510c160bb708ce01d4cf",
-    "revision_is": "aeon origin/master AT THE MOMENT OF VENDORING (2026-09-04 ~05:20Z) — the same revision the preset beside it was pinned at, deliberately, so the pair is internally consistent at one point in aeon's history rather than stitched from two.",
-    "blob": "2fa39a2c8db54996c5f9531cac95030de03588c2",
-    "last_changed_by": "6ae88363d1b796130e68c88ec48fccc0e076ea20 (2026-09-03) feat(effects): EFFECTS-W1 item 11a authorable — base_swap preset key + real section 6 binding",
-    "resolved_by": "git -C <aeon> rev-parse origin/master, blob id from git -C <aeon> rev-parse <rev>:<path>, bytes extracted with git -C <aeon> show <rev>:<path> — never the sibling working tree. Re-hashed here with `git hash-object`, returning 2fa39a2c… , the same object aeon stores.",
-    "revision_published": "d8d2c952… is the tip of aeon's PUBLISHED master; the sidecar sweep in test/formats/aeon-fixture-currency.test.ts re-asserts reachability on every run"
+    "revision": "e2af59ea6de7aa066550fb7fa8eb470dae94c580",
+    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log --oneline 83ec56d2 -- games/sonic4/data/editor/ojz/act1/section_6.meta.json` names e2af59ea newest (one parent, not a merge). Re-derived per path at 2026-09-17 with aeon origin/master = 83ec56d2d190a97a4d40eb5bc1a78b56b634b0bb (local ref, no fetch run). ⚠ THE PRESET BESIDE IT IS NOT PINNED AT d8d2c952, whatever this sidecar's first version implied: its own provenance pins f8beaad0 (last changed by f7f527e2), and at d8d2c952 that path resolves to a DIFFERENT blob, b415b959. Measured 2026-09-17: the preset's blob 9cdf62d4 is what `git rev-parse <rev>:games/sonic4/data/editor/effects/presets/ojz_sec6_baseswap.json` answers at e2af59ea and at 83ec56d2 (f7f527e2 is the newest commit touching it), so the preset, this sidecar and ojz_act1.regions.json all describe aeon at e2af59ea.",
+    "blob": "ce1c789545b3864f4d076af43b45d25292725226",
+    "last_changed_by": "e2af59ea6de7aa066550fb7fa8eb470dae94c580 (2026-09-16) regions-emit-bindings 3/3: act 1 reads its regions from the editor's file, and the flip moved ZERO bytes",
+    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> <AEON_DIR> <path> e2af59ea — bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
+    "revision_published": "e2af59ea is an ancestor of aeon origin/master (83ec56d2); the sidecar sweep in test/formats/aeon-fixture-currency.test.ts re-asserts reachability on every run"
   },
   "fixture": {
     "path": "test/fixtures/effects/ojz_act1_section_6.meta.json",
-    "bytes": 104,
-    "sha256": "cfa192b08eea54286c93b701c7bb45571029288b63898440226bc2d8bd5de4af",
-    "git_blob": "2fa39a2c8db54996c5f9531cac95030de03588c2",
+    "bytes": 89,
+    "sha256": "a83a209a13ad582c9d8cb4fc1fc7b52681cdfc02fedd27035105208978206ce5",
+    "git_blob": "ce1c789545b3864f4d076af43b45d25292725226",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
   },
   "what_the_two_checks_measure": {
-    "binding": "test/formats/effects-preset-base-swap.test.ts asserts this document's `rasterRef` equals the id the codec parsed OUT OF the preset fixture beside it. That is a cross-file consistency claim about the vendored PAIR — it fails if one of the two is re-vendored and the other is not — and it is the sentence that says why the preset fixture exists at all.",
+    "binding": "test/formats/effects-preset-base-swap.test.ts asserts, over the vendored TRIO, that exactly one region row of ojz_act1.regions.json carries `rasterRef` equal to the id the codec parsed out of the preset fixture, AND that this sidecar's `rasterRef` is null. Until e2af59ea it asserted this sidecar's `rasterRef` equalled that id; see that row's own comment for what the rewrite checks less and more.",
     "currency": "test/formats/aeon-fixture-currency.test.ts — the same content-currency instrument the preset gets, against aeon's origin/master."
   },
-  "re_vendor": "git -C <aeon> fetch origin && git -C <aeon> show origin/master:games/sonic4/data/editor/ojz/act1/section_6.meta.json > test/fixtures/effects/ojz_act1_section_6.meta.json — then update `aeon.revision`, `aeon.blob`, `fixture.sha256` and `fixture.git_blob` here."
+  "pin_history_current_last": [
+    "2fa39a2c, d8d2c952 (last changed by 6ae88363, 2026-09-03), the first vendoring (2026-09-04): `rasterRef: \"ojz_sec6_baseswap\"`, the section-mode binding.",
+    "ce1c7895, e2af59ea, the region-mode flip (2026-09-17 re-vendor): `rasterRef` \"ojz_sec6_baseswap\" -> null, and nothing else moved (`bgLayoutRef`, `paletteRef`, `sceneRef` were already null). The binding moved to the `sec6` row of games/sonic4/data/editor/ojz/act1/regions.json."
+  ],
+  "re_vendor": "node scripts/revendor.mjs test/fixtures/effects/ojz_act1_section_6.meta.json test/fixtures/effects/ojz_act1_section_6.meta.provenance.json <AEON_DIR> games/sonic4/data/editor/ojz/act1/section_6.meta.json <the commit that last touched the path, from `git log origin/master -- <path>`> — then update `last_changed_by`, `revision_is` and `pin_history_current_last` here, and RE-VENDOR ojz_act1.regions.json at a revision that agrees, since the binding row reads the two together."
 }
