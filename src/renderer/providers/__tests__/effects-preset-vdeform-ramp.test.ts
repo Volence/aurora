@@ -42,12 +42,14 @@ import type { EffectsPreset, EffectsPresetLibrary } from '../../../core/formats/
 import {
   V_DEFORM_RAMP_LEAD, V_DEFORM_RAMP_NOTE, RAMP_SCROLL_COLUMN_WIDTH_PX,
   RAMP_SCROLL_MODE_NOTE, RAMP_SCROLL_LEAD,
-  vDeformRampSentence,
+  vDeformRampSentence, vDeformRampRegionSentence, vDeformRampRegionsUnreadableSentence,
 } from '../../../core/formats/effects/ramp-scroll-mode';
 import {
   vDeformRampBindings, vDeformRampAdvisory, sectionSceneRef,
-  rampScrollBindings,
+  rampScrollBindings, vDeformRampRegionBindings,
 } from '../effects-preset';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const SCENE = 'aurora_local_vdefimpact_scene';
 const OTHER_SCENE = 'aurora_local_vdefimpact_other';
@@ -323,5 +325,181 @@ describe('the seam: both directions resolve the binding through ONE chain', () =
     expect(backward!.short).toContain(V_DEFORM_RAMP_LEAD.narrowed);
     expect(backward!.short).toContain(`${RAMP_SCROLL_COLUMN_WIDTH_PX}-pixel column`);
     expect(RAMP_SCROLL_LEAD.column).toContain(`${RAMP_SCROLL_COLUMN_WIDTH_PX}-PIXEL COLUMN`);
+  });
+});
+
+// ═══ THE SAME JOIN ON A REGION-MODE ACT ═══
+//
+// (SCENE-RELATION-REGION-MODE, the rest, 2026-09-18 — candidate row 3 of the
+// shipped parcel's review packet.)
+//
+// ⚠ WHAT WAS ACTUALLY WRONG, AND IT IS NOT WHAT THE PACKET SAID. The packet
+// pointed at `ramp-scroll-mode.ts`'s `act-unset` clause ("takes the act default
+// and this act names no editor scene"), which belongs to `rampScrollModeSentence`
+// and is reachable only from `BandPresetPanel`, not from the scene panel. The
+// defect at the SCENE panel's call is the attribution: `vDeformRampBindings`
+// needs a SECTION `rasterRef`, which is exactly what aeon's check_mode_conflict
+// refuses beside regions.json, and it reaches the scene through the act-default
+// fallback — so on a region-mode act every row it can produce names a section
+// that owns no binding and a preset bound by a ref the build rejects.
+describe('vDeformRampAdvisory in region mode: the bindings live on region rows', () => {
+  const rect = { x: 0, y: 0, w: 2048, h: 2048 };
+  const doc = (regions: Array<{ id: string; sceneRef?: string | null; rasterRef?: string | null }>) =>
+    ({ schema: 1, act: 'zz_act1', regions: regions.map((r) => ({ ...r, rect, preset: 'ZZ' })) });
+  const regionAct = (regions: Parameters<typeof doc>[0]) =>
+    ({ regions: { document: doc(regions) as never, loadedPath: 'data/regions.json', unreadable: null } });
+  const refusedAct = () =>
+    ({ regions: { document: null, loadedPath: null, unreadable: { path: 'r.json', reason: 'bad' } } });
+  const sectionModeAct = () => ({ regions: { document: null, loadedPath: null, unreadable: null } });
+
+  it('[c1] the section walk claimed a narrowed ramp on an act whose sections bind nothing', () => {
+    // THE DEFECT, HELD SIDE BY SIDE WITH ITS FIX. Same sections, same presets,
+    // same act scene; the only difference is whether the act's regions.json is
+    // handed in. Without it the sentence names Section 0 and preset "r1".
+    const sections = [sec('r1', null)];
+    const presets = presetLib([rampPreset('r1')]);
+    const before = vDeformRampAdvisory(SCENE, sections, SCENE, presets);
+    expect(before).not.toBeNull();
+    expect(before!.short).toContain(V_DEFORM_RAMP_LEAD.narrowed);
+    expect(before!.short).toContain('Section 0');
+    // With it, the section rows are gone: no region of this act binds the scene.
+    expect(vDeformRampAdvisory(SCENE, sections, SCENE, presets, regionAct([{ id: 'sec0' }])))
+      .toBeNull();
+  });
+
+  it('[c2] a REGION binding this scene and a ramp preset is the narrowed row, named by region id', () => {
+    const s = vDeformRampAdvisory(SCENE, [], null, presetLib([rampPreset('r1')]),
+      regionAct([{ id: 'sec4', sceneRef: SCENE, rasterRef: 'r1' }]));
+    expect(s).not.toBeNull();
+    expect(s!.short).toContain(V_DEFORM_RAMP_LEAD.narrowed);
+    expect(s!.short).toContain('Region sec4 binds this scene and preset "r1"');
+    expect(s!.short).toContain(`${RAMP_SCROLL_COLUMN_WIDTH_PX}-pixel column`);
+    // THE HOVER IS THE SAME DOCUMENT IN BOTH MODES, and that is the assertion
+    // that the region arm is the same sentence and not a second transcription.
+    expect(s!.full).toBe(V_DEFORM_RAMP_NOTE);
+  });
+
+  it('[c3] the two arms are ONE sentence body: only the binder noun differs', () => {
+    // DERIVED, not eyeballed. The same rows through both entry points must
+    // differ in exactly the binder words and in nothing else.
+    const region = vDeformRampRegionSentence([
+      { regionId: '0', presetId: 'r1', carries: 'ramp', reason: null },
+      { regionId: '2', presetId: 'r2', carries: 'unknown', reason: 'preset-dangling' },
+    ]);
+    const section = vDeformRampSentence([
+      { section: 0, presetId: 'r1', carries: 'ramp', reason: null, via: 'section' },
+      { section: 2, presetId: 'r2', carries: 'unknown', reason: 'preset-dangling', via: 'section' },
+    ]);
+    expect(region!.short.replace(/Region/g, 'Section').replace(/region /g, 'section '))
+      .toBe(section!.short);
+    expect(region!.full).toBe(section!.full);
+  });
+
+  it('[c4] one row per region ID, in author order, with the plural verb', () => {
+    // A carved region is several entries under one id carrying identical
+    // bindings and ONE Regions panel row; naming it twice would point twice at
+    // one control. `b` below is carved.
+    const rows = vDeformRampRegionBindings(SCENE, doc([
+      { id: 'b', sceneRef: SCENE, rasterRef: 'r1' },
+      { id: 'a', sceneRef: OTHER_SCENE, rasterRef: 'r1' },
+      { id: 'b', sceneRef: SCENE, rasterRef: 'r1' },
+      { id: 'c', sceneRef: SCENE, rasterRef: 'r2' },
+    ]) as never, presetLib([rampPreset('r1'), rampPreset('r2')]));
+    expect(rows.map((r) => r.regionId)).toEqual(['b', 'c']);
+    const s = vDeformRampRegionSentence(rows);
+    expect(s!.short).toContain('Regions b and c bind this scene and presets "r1" and "r2"');
+  });
+
+  it('[c5] a null region rasterRef is not "inherits the act raster", and a null sceneRef is not a binder', () => {
+    // Design call 2 of the shipped parcel, applied to BOTH fields: aeon lowers an
+    // absent region binding to a defer, so resolving either to the act's would be
+    // a guess about rung 2.
+    const presets = presetLib([rampPreset('r1')]);
+    expect(vDeformRampRegionBindings(SCENE, doc([{ id: 'a', sceneRef: SCENE }]) as never, presets))
+      .toEqual([]);
+    expect(vDeformRampRegionBindings(SCENE, doc([{ id: 'a', rasterRef: 'r1' }]) as never, presets))
+      .toEqual([]);
+  });
+
+  it('[c6] a preset the region binds that Aurora cannot read DECLINES, naming which failure', () => {
+    const dangling = vDeformRampRegionBindings(
+      SCENE, doc([{ id: 'a', sceneRef: SCENE, rasterRef: 'gone' }]) as never, presetLib([]));
+    expect(dangling).toEqual([
+      { regionId: 'a', presetId: 'gone', carries: 'unknown', reason: 'preset-dangling' },
+    ]);
+    const unreadable = vDeformRampRegionBindings(
+      SCENE, doc([{ id: 'a', sceneRef: SCENE, rasterRef: 'broken' }]) as never,
+      presetLib([], [{ path: '/p/editor/effects/presets/broken.json', reason: 'bad json' }]));
+    expect(unreadable[0].reason).toBe('preset-unreadable');
+    expect(vDeformRampRegionSentence(unreadable)!.short)
+      .toContain('region a binds preset "broken", whose file could not be read');
+  });
+
+  it('[c7] a region binding a preset with NO ramp says nothing, which is derived and not a hedge', () => {
+    // The anti-constant row: the scene, the region and the binding are held
+    // fixed and ONLY the preset moves, so a function returning one answer
+    // forever cannot pass all three arms.
+    const region = [{ id: 'a', sceneRef: SCENE, rasterRef: 'p' }];
+    const act = regionAct(region);
+    expect(vDeformRampAdvisory(SCENE, [], null, presetLib([rampPreset('p')]), act)!.short)
+      .toContain(V_DEFORM_RAMP_LEAD.narrowed);
+    expect(vDeformRampAdvisory(SCENE, [], null, presetLib([bandPreset('p')]), act)).toBeNull();
+    expect(vDeformRampAdvisory(SCENE, [], null, presetLib([]), act)!.short)
+      .toContain(V_DEFORM_RAMP_LEAD.unknown);
+  });
+
+  it('[c8] a refused regions.json says the bindings cannot be told, not that nothing is narrowed', () => {
+    const s = vDeformRampAdvisory(SCENE, [sec('r1', SCENE)], SCENE,
+      presetLib([rampPreset('r1')]), refusedAct());
+    expect(s).toEqual(vDeformRampRegionsUnreadableSentence());
+    expect(s!.short).toContain(V_DEFORM_RAMP_LEAD.regionsUnreadable);
+    expect(s!.short).toContain('The Regions panel says why the file was refused.');
+    // It is a THIRD state: it must claim neither arm.
+    expect(s!.short).not.toContain(V_DEFORM_RAMP_LEAD.narrowed);
+    expect(s!.short).not.toContain('Section 0');
+  });
+
+  it('[c9] SECTION MODE IS UNTOUCHED: an act with no regions file answers exactly as before', () => {
+    const sections = [sec('r1', SCENE), sec('gone', SCENE)];
+    const presets = presetLib([rampPreset('r1')]);
+    expect(vDeformRampAdvisory(SCENE, sections, null, presets, sectionModeAct()))
+      .toEqual(vDeformRampAdvisory(SCENE, sections, null, presets));
+    expect(vDeformRampAdvisory(SCENE, sections, null, presets)!.short)
+      .toContain('Section 0');
+  });
+
+  it('[c10] on OJZ act 1 as shipped, nothing is narrowed, and that is read out of the file', () => {
+    // NOT A TYPED EXPECTATION. The committed copy of aeon's OJZ act 1
+    // regions.json (provenance beside it) is read here and the claim is
+    // DERIVED from it: no region of that act carries a sceneRef and a rasterRef
+    // at the same time, so no region can both bind a scene and narrow a ramp.
+    // A re-vendor that added one would flip this row rather than leave a stale
+    // pin green.
+    const document = JSON.parse(readFileSync(
+      resolve(__dirname, '../../../../test/fixtures/regions/ojz_act1.regions.json'), 'utf8'));
+    const both = (document.regions as Array<{ id: string; sceneRef?: string | null; rasterRef?: string | null }>)
+      .filter((r) => (r.sceneRef ?? null) !== null && (r.rasterRef ?? null) !== null);
+    expect(both).toEqual([]);
+    const bound = (document.regions as Array<{ id: string; sceneRef?: string | null }>)
+      .filter((r) => (r.sceneRef ?? null) !== null);
+    expect(bound.length).toBeGreaterThan(0);
+    const act = { regions: { document, loadedPath: 'x/regions.json', unreadable: null } };
+    for (const r of bound) {
+      expect(vDeformRampAdvisory(r.sceneRef as string, [], null,
+        presetLib([rampPreset('r1')]), act), `scene ${r.sceneRef}`).toBeNull();
+    }
+  });
+
+  it('[c11] no en dash or em dash in any region-mode ramp sentence', () => {
+    const texts = [
+      vDeformRampAdvisory(SCENE, [], null, presetLib([rampPreset('r1')]),
+        regionAct([{ id: 'a', sceneRef: SCENE, rasterRef: 'r1' }]))!.short,
+      vDeformRampAdvisory(SCENE, [], null, presetLib([]),
+        regionAct([{ id: 'a', sceneRef: SCENE, rasterRef: 'gone' }]))!.short,
+      vDeformRampRegionsUnreadableSentence().short,
+    ];
+    const codes = texts.flatMap((t) => [...t].map((ch) => ch.codePointAt(0)));
+    expect(codes).not.toContain(0x2013);
+    expect(codes).not.toContain(0x2014);
   });
 });

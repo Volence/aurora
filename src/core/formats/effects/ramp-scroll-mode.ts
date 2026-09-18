@@ -464,6 +464,48 @@ export interface VDeformRampBinding {
 export const V_DEFORM_RAMP_LEAD = Object.freeze({
   narrowed: 'THIS NARROWS A RAMP ELSEWHERE:',
   unknown: 'THIS MAY NARROW A RAMP ELSEWHERE, AURORA CANNOT READ THE PRESET:',
+  /**
+   * The region-mode third state: not "no ramp is narrowed" and not "one is", but
+   * the act's own regions.json refused, so the bindings cannot be told at all
+   * (SCENE-RELATION-REGION-MODE, the rest). A fourth lead rather than a reuse of
+   * `unknown`, because the document Aurora could not read is a DIFFERENT one and
+   * the repair is in a different panel.
+   */
+  regionsUnreadable: 'THIS MAY NARROW A RAMP ELSEWHERE, AURORA CANNOT READ THIS ACT\'S REGIONS:',
+});
+
+/**
+ * ONE SCENE BOUND ON A REGION ROW, for the V-deform sentence on a region-mode act.
+ *
+ * ⚠ A SEPARATE TYPE RATHER THAN A NULLABLE FIELD ON `VDeformRampBinding`. The
+ * binder is a section INDEX in one mode and a region ID in the other; carrying
+ * both on one row would be two facts wearing one value, and every row would then
+ * have to be read with a mode in hand to know which half is meaningful.
+ *
+ * `carries` and `reason` mean exactly what they mean on the section row, and the
+ * sentence body is literally the same function, so the two cannot drift.
+ */
+export interface VDeformRampRegionBinding {
+  /** The region id, as the Regions panel spells it on its row. */
+  regionId: string;
+  /** The preset id in the REGION's own `rasterRef`. */
+  presetId: string;
+  carries: 'ramp' | 'unknown';
+  reason: 'preset-dangling' | 'preset-unreadable' | null;
+}
+
+/**
+ * The binder's words, so one sentence body serves both modes.
+ *
+ * Capitalised mid-sentence for `one`/`many` because that is how the shipped
+ * section sentence reads ("...per-column mode, and Section 0 binds this scene...")
+ * and lowercase for the unknown clause because that one is a list item inside a
+ * longer sentence. Both spellings are the SHIPPED section ones; the region column
+ * is the only thing added here.
+ */
+const V_DEFORM_RAMP_BINDER_WORDS = Object.freeze({
+  section: Object.freeze({ one: 'Section', many: 'Sections', lower: 'section' }),
+  region: Object.freeze({ one: 'Region', many: 'Regions', lower: 'region' }),
 });
 
 /**
@@ -497,25 +539,85 @@ export const V_DEFORM_RAMP_NOTE: string =
 export function vDeformRampSentence(
   bindings: readonly VDeformRampBinding[],
 ): { short: string; full: string } | null {
-  const narrowed = bindings.filter((b) => b.carries === 'ramp');
-  const unknown = bindings.filter((b) => b.carries === 'unknown');
+  return vDeformRampSentenceFor('section', bindings.map((b) => ({
+    who: String(b.section), presetId: b.presetId, carries: b.carries, reason: b.reason,
+  })));
+}
+
+/**
+ * The same sentence for an act whose scene bindings live on REGION rows
+ * (SCENE-RELATION-REGION-MODE, the rest, 2026-09-18).
+ *
+ * ⚠ IT IS NOT A SECOND SENTENCE. `vDeformRampSentenceFor` below is the only place
+ * either arm is composed, so the mechanism clause, the column width, the pointer
+ * at the Colour panel and the CAP_PER_COL_VSRAM conjunct cannot come to differ
+ * between the two modes. Only the binder's noun changes.
+ *
+ * ⚠ AND SECTION ROWS ARE NOT MERGED IN. On a region-mode act a section sidecar
+ * `rasterRef` is exactly what aeon's `check_mode_conflict` refuses, so a section
+ * row here would describe a consequence of a binding the build rejects outright.
+ * `vDeformRampRegionBindings` in the provider therefore reads regions only.
+ */
+export function vDeformRampRegionSentence(
+  bindings: readonly VDeformRampRegionBinding[],
+): { short: string; full: string } | null {
+  return vDeformRampSentenceFor('region', bindings.map((b) => ({
+    who: b.regionId, presetId: b.presetId, carries: b.carries, reason: b.reason,
+  })));
+}
+
+/**
+ * What the V-deform row says when the act is in region mode and its regions.json
+ * was REFUSED: the bindings cannot be told, so whether anything is narrowed is not
+ * decidable, and saying nothing would render that as "nothing is narrowed".
+ */
+export function vDeformRampRegionsUnreadableSentence(): { short: string; full: string } {
+  return {
+    short: `${V_DEFORM_RAMP_LEAD.regionsUnreadable} this act is in region mode and its `
+      + 'regions.json could not be read, so which regions bind this scene, and which raster '
+      + 'presets those regions bind, are both unknown. Any VSRAM ramp among them would scroll a '
+      + `single ${RAMP_SCROLL_COLUMN_WIDTH_PX}-pixel column instead of the full width. The `
+      + 'Regions panel says why the file was refused.',
+    full: V_DEFORM_RAMP_NOTE,
+  };
+}
+
+/** One binder's row, with the binder already reduced to the word the sentence prints. */
+interface VDeformRampRow {
+  who: string;
+  presetId: string;
+  carries: 'ramp' | 'unknown';
+  reason: 'preset-dangling' | 'preset-unreadable' | null;
+}
+
+/** The ONE composition of the V-deform ramp sentence. See both exports above. */
+function vDeformRampSentenceFor(
+  kind: keyof typeof V_DEFORM_RAMP_BINDER_WORDS, rows: readonly VDeformRampRow[],
+): { short: string; full: string } | null {
+  const words = V_DEFORM_RAMP_BINDER_WORDS[kind];
+  const narrowed = rows.filter((b) => b.carries === 'ramp');
+  const unknown = rows.filter((b) => b.carries === 'unknown');
   if (narrowed.length === 0 && unknown.length === 0) return null;
 
-  const presetList = (rows: readonly VDeformRampBinding[]): string => {
+  const binderList = (items: readonly string[]): string => {
+    if (items.length === 1) return `${words.one} ${items[0]}`;
+    return `${words.many} ${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+  };
+  const presetList = (list: readonly VDeformRampRow[]): string => {
     const ids: string[] = [];
-    rows.forEach((b) => { if (!ids.includes(b.presetId)) ids.push(b.presetId); });
+    list.forEach((b) => { if (!ids.includes(b.presetId)) ids.push(b.presetId); });
     const quoted = ids.map((i) => `"${i}"`);
     if (quoted.length === 1) return `preset ${quoted[0]}`;
     return `presets ${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}`;
   };
-  const unknownWhy = (b: VDeformRampBinding): string => (b.reason === 'preset-unreadable'
-    ? `section ${b.section} binds preset "${b.presetId}", whose file could not be read`
-    : `section ${b.section} binds preset "${b.presetId}", which is not a preset in this project`);
+  const unknownWhy = (b: VDeformRampRow): string => (b.reason === 'preset-unreadable'
+    ? `${words.lower} ${b.who} binds preset "${b.presetId}", whose file could not be read`
+    : `${words.lower} ${b.who} binds preset "${b.presetId}", which is not a preset in this project`);
 
   const parts: string[] = [];
   if (narrowed.length > 0) {
     parts.push(`${V_DEFORM_RAMP_LEAD.narrowed} V deform puts VSRAM in per-column mode, and `
-      + `${sectionList(narrowed.map((b) => b.section))} `
+      + `${binderList(narrowed.map((b) => b.who))} `
       + `${narrowed.length === 1 ? 'binds' : 'bind'} this scene and `
       + `${presetList(narrowed)}, whose VSRAM ramp therefore scrolls a single `
       + `${RAMP_SCROLL_COLUMN_WIDTH_PX}-pixel column instead of the full width. That ramp is `

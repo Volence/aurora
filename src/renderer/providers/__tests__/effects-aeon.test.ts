@@ -22,7 +22,8 @@ import {
   vsplitLockAdvisoryParts, sceneVsplitLockAdvisoryParts, joinAdvisory,
   guideBoundNotice,
   EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX,
-  layerCountLine, vFactorHint,
+  layerCountLine, layerCountTitle, sectionAssignmentEmptyHint, REGION_MODE_SCENE_LEAD,
+  vFactorHint,
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, NONE_FACTOR_VALUE,
   factorFieldSelectValue, factorFieldFromSelect, curveFieldValue, curveFromField,
   vsplitFieldValue, vsplitFromToggle, curveAdvisory, clampVSplitAt,
@@ -610,6 +611,117 @@ describe('sceneSelectionRelation in region mode: the bindings live on region row
         { regions: { document: null, loadedPath: null, unreadable: { path: 'r', reason: 'x' } } }).text,
     ];
     const codes = texts.flatMap((t) => [...String(t)].map((ch) => ch.codePointAt(0)));
+    expect(codes).not.toContain(0x2013);
+    expect(codes).not.toContain(0x2014);
+  });
+});
+
+// ═══ REGION MODE, THE REST (SCENE-RELATION-REGION-MODE, 2026-09-18) ═══
+//
+// The shipped parcel above fixed ONE sentence and its review packet
+// (docs/reviews/2026-09-17-scene-relation-region-mode.md, last section) listed
+// four more surfaces still giving section-keyed advice on an act whose scene
+// bindings live on region rows. Two of them are in this module.
+//
+// ⚠ EVERY ROW BELOW PAIRS ITS REGION-MODE ASSERTION WITH THE SECTION-MODE ONE.
+// Three of these four sentences are a conditional over ONE predicate, and a row
+// that only ever asks the region arm cannot tell "the region arm is right" from
+// "the function now says the region thing unconditionally" — which would be a
+// regression on every act in the game that has no regions.json.
+describe('region mode, the rest: LAYERS scope and the empty SECTION ASSIGNMENT slot', () => {
+  const regionAct = (regions: Array<{ id: string; sceneRef?: string | null }>) => ({
+    regions: {
+      document: {
+        schema: 1,
+        act: 'zz_act1',
+        regions: regions.map((r) => ({ ...r, rect: { x: 0, y: 0, w: 2048, h: 2048 }, preset: 'ZZ' })),
+      },
+      loadedPath: 'data/regions.json',
+      unreadable: null,
+    },
+  });
+  const refusedAct = () => ({
+    regions: { document: null, loadedPath: null, unreadable: { path: 'r.json', reason: 'bad' } },
+  });
+  const sectionModeAct = () => ({ regions: { document: null, loadedPath: null, unreadable: null } });
+
+  // ── item 1: the LAYERS scope clause ──────────────────────────────────────
+  //
+  // Painted under LAYERS on every scene of the act (the overseer's capture
+  // region-mode-parallax-scene-panel.png), and false there: no section of a
+  // region-mode act is assigned a scene, because check_mode_conflict refuses a
+  // sidecar sceneRef beside regions.json.
+
+  it('[r1] layerCountLine says scenes are bound on REGION ROWS in region mode, and per section otherwise', () => {
+    const s = newEffectsScene('canopy', 'Canopy');
+    // DERIVED FROM THE SCHEMA, not typed: the cap half of the line must not move
+    // with the mode, because MAX_PARALLAX_BANDS is per SCENE in both.
+    const cap = `${s.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers `;
+    expect(layerCountLine(s, regionAct([{ id: 'a', sceneRef: 'canopy' }])))
+      .toContain(`${cap}(per scene; scenes are bound on region rows)`);
+    expect(layerCountLine(s, sectionModeAct()))
+      .toContain(`${cap}(per scene; scenes are assigned per section)`);
+    // NO ACT AT ALL is section mode, which is what every existing caller relies on.
+    expect(layerCountLine(s)).toBe(layerCountLine(s, sectionModeAct()));
+  });
+
+  it('[r2] a REFUSED regions.json is still region mode here: the file exists, so no section binds', () => {
+    // actHasRegionsFile is true for `unreadable`, and that is the whole point of
+    // ruling B1's predicate: the sections do not become bindable because Aurora
+    // could not parse the file. A row that only fed it a readable document would
+    // pass while this arm said the section sentence.
+    const s = newEffectsScene('canopy', 'Canopy');
+    expect(layerCountLine(s, refusedAct())).toContain('scenes are bound on region rows');
+    expect(layerCountTitle(refusedAct())).toBe('a region can bind its own scene');
+  });
+
+  it('[r3] the LAYERS hover moves with the line it explains, and is no longer a JSX literal', () => {
+    expect(layerCountTitle(regionAct([{ id: 'a' }]))).toBe('a region can bind its own scene');
+    expect(layerCountTitle(sectionModeAct())).toBe('a section can bind its own scene');
+    expect(layerCountTitle()).toBe('a section can bind its own scene');
+  });
+
+  // ── item 4: SECTION ASSIGNMENT on an EMPTY act slot ───────────────────────
+  //
+  // The B1 refusal needs a section to name, so the panel asks it only on the
+  // populated branch; the empty branch gave EMPTINESS as the only reason, which
+  // implies a populated section could take a scene here.
+
+  it('[r4] the empty-slot hint keeps its shipped sentence in section mode, character for character', () => {
+    expect(sectionAssignmentEmptyHint(3, sectionModeAct()))
+      .toBe('Section 3 is empty: nothing to assign a scene to.');
+    expect(sectionAssignmentEmptyHint(3)).toBe('Section 3 is empty: nothing to assign a scene to.');
+  });
+
+  it('[r5] in region mode it leads with the mode and denies that emptiness is the reason', () => {
+    const text = sectionAssignmentEmptyHint(3, regionAct([{ id: 'a', sceneRef: 'canopy' }]));
+    // The LEAD is the shipped one, read from the module rather than retyped, so
+    // the two sentences an author meets within one screen cannot drift apart.
+    expect(text.startsWith(REGION_MODE_SCENE_LEAD)).toBe(true);
+    expect(text).toContain('Section 3 is empty as well, but that is not why this panel binds nothing');
+    expect(text).toContain('no section of this act takes a scene');
+    // AND IT POINTS AT THE CONTROL THAT WORKS, B1's pointer, not at SECTION
+    // ASSIGNMENT, which is the control this very hint is standing in.
+    expect(text).toContain('the Regions panel, under Bindings');
+    expect(text).not.toContain('nothing to assign a scene to');
+  });
+
+  it('[r6] and it still names the slot, so the missing select is explained too', () => {
+    // Dropping the emptiness would leave an author asking why the control is
+    // here one section over and absent on this one.
+    for (const i of [0, 7]) {
+      expect(sectionAssignmentEmptyHint(i, regionAct([{ id: 'a' }]))).toContain(`Section ${i} is empty`);
+    }
+  });
+
+  it('[r7] neither sentence carries an en dash or an em dash', () => {
+    const texts = [
+      layerCountLine(newEffectsScene('c'), regionAct([{ id: 'a', sceneRef: 'c' }])),
+      layerCountTitle(regionAct([{ id: 'a' }])),
+      sectionAssignmentEmptyHint(2, regionAct([{ id: 'a' }])),
+      sectionAssignmentEmptyHint(2, refusedAct()),
+    ];
+    const codes = texts.flatMap((t) => [...t].map((ch) => ch.codePointAt(0)));
     expect(codes).not.toContain(0x2013);
     expect(codes).not.toContain(0x2014);
   });

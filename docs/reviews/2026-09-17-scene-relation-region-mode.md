@@ -89,6 +89,12 @@ Region mode, after:
 
 ## Other wrong advice in region mode (found, NOT fixed; candidate rows)
 
+⚠ **ITEMS 1 TO 4 ARE FIXED**, 2026-09-18, in
+`docs/reviews/2026-09-18-scene-relation-region-mode-rest.md` (tests `426dfa66`, fix
+`9233d9eb`). They are left listed below, unedited, because that packet corrects two of
+them and the correction only makes sense beside the original wording. **Item 5 is still
+open and still deliberately inert.**
+
 1. `src/renderer/providers/effects-aeon.ts:3157`, `layerCountLine`: "(per scene; scenes are assigned
    per section)", painted under LAYERS at `EffectsScenePanel.tsx:649` (visible in the capture
    `region-mode-parallax-scene-panel.png`), with the title "a section can bind its own scene".
