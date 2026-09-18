@@ -235,17 +235,42 @@ function sliceFrom(file, startMarker, endMarker, what) {
 function literalsOf(slice) {
   const body = slice.replace(/\$\{[^{}]*\}/g, HOLE);
   const out = [];
-  for (const m of body.matchAll(/`([^`]*)`/g)) out.push(...m[1].split(HOLE));
-  for (const m of body.matchAll(/'((?:[^'\\]|\\.)*)'/g)) out.push(m[1].replace(/\\'/g, "'"));
+  // ⚠ TEMPLATES FIRST, AND THEN REMOVED FROM THE BODY. Running the
+  // single-quote matcher over text that still holds a backtick template makes
+  // the APOSTROPHE in `aeon's generator` open a bogus quoted run that closes on
+  // the next real literal's opening quote — which is how the first draft of [d2]
+  // produced a 60-character "fragment" spanning a `+` and a newline and went red
+  // against a panel that was painting the sentence correctly.
+  let rest = body;
+  for (const m of body.matchAll(/`([^`]*)`/g)) {
+    out.push(...m[1].split(HOLE));
+    rest = rest.replace(m[0], '\u0001');
+  }
+  for (const m of rest.matchAll(/'((?:[^'\\]|\\.)*)'/g)) out.push(m[1].replace(/\\'/g, "'"));
   return [...new Set(out.filter((s) => s.length >= 8))];
 }
 
-/** One `export const NAME = '...'` single-quoted value, read from source. */
+/**
+ * One `export const NAME = '...' + '...' ;` value, read from source.
+ *
+ * ⚠ IT CONCATENATES. The first draft read only the FIRST quoted chunk, which
+ * silently truncated `REELS_BINDING_ADVICE_TAIL` — a two-literal constant — and
+ * made [c2b] fail against a panel that was painting the whole sentence
+ * correctly. A gate that reads part of a constant is a gate that measures a
+ * string nothing produces.
+ */
 function constString(file, name) {
   const src = readFileSync(file, 'utf8');
-  const m = src.match(new RegExp(`${name}\\s*=\\s*\\n?\\s*'((?:[^'\\\\]|\\\\.)*)'`));
-  if (!m) throw new Error(`CANNOT MEASURE: ${name} is not a single-quoted string in ${file}`);
-  return m[1].replace(/\\'/g, "'");
+  const at = src.indexOf(`${name} =`);
+  if (at < 0) throw new Error(`CANNOT MEASURE: ${name} is not declared in ${file}`);
+  const end = src.indexOf(';', at);
+  if (end < 0) throw new Error(`CANNOT MEASURE: ${name} has no terminating ; in ${file}`);
+  const decl = src.slice(at + name.length + 2, end);
+  const parts = [...decl.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1].replace(/\\'/g, "'"));
+  if (parts.length === 0) {
+    throw new Error(`CANNOT MEASURE: ${name} is not a quoted string (or concatenation) in ${file}`);
+  }
+  return parts.join('');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -277,8 +302,18 @@ const SENTENCE_REPORT = (needle) => String.raw`
   if (!leaf) return { domNodes: all.length, leaf: false, leaves: 0 };
   leaf.scrollIntoView({ block: 'center' });
   const b = leaf.getBoundingClientRect();
+  // THE HIT TEST IS ON A LINE BOX, NOT ON THE UNION BOX. A sentence in a 200px
+  // column is an INLINE element wrapped over a dozen line boxes, and
+  // getBoundingClientRect returns their UNION - a rectangle the element does not
+  // paint, whose centre can legitimately land in the leading between two lines
+  // and hit the parent. Testing the widest getClientRects() entry tests a point
+  // the element really occupies; it is no weaker (the hit must still be the leaf
+  // or inside it) and it stops a wrap from reading as an occlusion.
+  const boxes = [...leaf.getClientRects()];
+  const widest = boxes.length === 0 ? b
+    : boxes.reduce((w, r) => (r.width * r.height > w.width * w.height ? r : w), boxes[0]);
   const hit = document.elementFromPoint(
-    Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2));
+    Math.round(widest.left + widest.width / 2), Math.round(widest.top + widest.height / 2));
   const text = (leaf.textContent || '').trim();
   const withTitle = leaf.closest('[title]');
   return {
@@ -290,6 +325,7 @@ const SENTENCE_REPORT = (needle) => String.raw`
       ? leaf.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : null,
     hitIsLeaf: !!(hit && (hit === leaf || leaf.contains(hit))),
     hitTag: hit ? hit.tagName : null,
+    hitBox: { x: Math.round(widest.x), y: Math.round(widest.y), w: Math.round(widest.width), h: Math.round(widest.height) },
     titleAttr: leaf.getAttribute('title'),
     nearestTitle: withTitle ? withTitle.getAttribute('title') : null,
     rect: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) },
@@ -326,8 +362,13 @@ const ADVISORY_REPORT = String.raw`
   return els.map((el) => {
     el.scrollIntoView({ block: 'center' });
     const b = el.getBoundingClientRect();
+    // The widest LINE BOX, for SENTENCE_REPORT's reason: a wrapped inline's
+    // union rect is not a box it paints.
+    const boxes = [...el.getClientRects()];
+    const widest = boxes.length === 0 ? b
+      : boxes.reduce((w, r) => (r.width * r.height > w.width * w.height ? r : w), boxes[0]);
     const hit = document.elementFromPoint(
-      Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2));
+      Math.round(widest.left + widest.width / 2), Math.round(widest.top + widest.height / 2));
     return {
       text: (el.textContent || '').trim(),
       rects: el.getClientRects().length,
@@ -476,8 +517,13 @@ async function main() {
     return m[1];
   })();
 
+  // ⚠ THE NARROWED CLAUSE ONLY. `vDeformRampSentenceFor` also composes the
+  // UNKNOWN-preset arm ("… is not a preset in this project", "… is not decidable
+  // from here"), which this run does not provoke; folding those literals in made
+  // the gate UNSATISFIABLE rather than strict, which is the same defect as a
+  // slice that wanders. The slice is the one `parts.push` the narrowed rows take.
   const rampComposerSrc = sliceFrom(RAMP_MODULE,
-    'function vDeformRampSentenceFor(', '\n}\n', 'vDeformRampSentenceFor');
+    'if (narrowed.length > 0) {', 'if (unknown.length > 0) {', 'vDeformRampSentenceFor narrowed arm');
   const RAMP_LEAD_NARROWED = (() => {
     const m = readFileSync(RAMP_MODULE, 'utf8').match(/narrowed:\s*'((?:[^'\\]|\\.)*)'/);
     if (!m) throw new Error('CANNOT MEASURE: V_DEFORM_RAMP_LEAD.narrowed is no longer quoted');
@@ -504,7 +550,7 @@ async function main() {
   // reword stops the run at the aim rather than five rows later.
   const REELS_TITLE = (() => {
     const s = sliceFrom(SCENE_PROVIDER, 'export const REELS_ROW = Object.freeze({', '});', 'REELS_ROW');
-    const m = s.match(/title:\s*'((?:[^'\\]|\\.)*)'\s*\+\s*\n\s*'((?:[^'\\]|\\.)*)'\s*\+\s*\n\s*EFFECTS_REELS_DEBUG_NOTE\.short/);
+    const m = s.match(/title:\s*'((?:[^'\\]|\\.)*)'\s*\+\s*'((?:[^'\\]|\\.)*)'\s*\+\s*EFFECTS_REELS_DEBUG_NOTE\.short/);
     if (!m) throw new Error('CANNOT MEASURE: REELS_ROW.title is no longer two literals plus the debug note');
     // The third term is derived from the contract at module load and cannot be
     // read here, so the aim uses a PREFIX rather than the whole attribute.
@@ -512,7 +558,7 @@ async function main() {
   })();
   const REELS_UNIT_HINT = (() => {
     const s = sliceFrom(SCENE_PROVIDER, 'export const REELS_ROW = Object.freeze({', '});', 'REELS_ROW');
-    const m = s.match(/unitHint:\s*'((?:[^'\\]|\\.)*)'\s*\+\s*\n\s*'((?:[^'\\]|\\.)*)'/);
+    const m = s.match(/unitHint:\s*'((?:[^'\\]|\\.)*)'\s*\+\s*'((?:[^'\\]|\\.)*)'/);
     if (!m) throw new Error('CANNOT MEASURE: REELS_ROW.unitHint is no longer two literals');
     return (m[1] + m[2]).replace(/\\'/g, "'");
   })();
@@ -565,17 +611,9 @@ async function main() {
     + (missingReels.length ? `\n        NOT IN THE EXPECTED SENTENCE: ${JSON.stringify(missingReels)}`
       : `\n        region words = ${JSON.stringify(reelsRegionWords)}; section scope = ${JSON.stringify(reelsSectionWords)}`));
 
-  const rampLiterals = literalsOf(rampComposerSrc)
-    // The composer holds the UNKNOWN-preset arm and the plural arm too; this run
-    // provokes exactly one NARROWED row, so only the narrowed clause is required.
-    .filter((s) => expectedNarrowedClause(s));
-  function expectedNarrowedClause(s) {
-    return !s.includes('is not a preset in this project')
-      && !s.includes('whose file could not be read')
-      && !s.includes('is not decidable from here')
-      && !s.includes('so whether ')
-      && s !== 'presets ' && s !== ' and ' && s !== ', ';
-  }
+  // The narrowed arm carries a plural ternary (`binds`/`bind`); the HOLE removal
+  // in `literalsOf` already drops both arms of it, so nothing needs filtering.
+  const rampLiterals = literalsOf(rampComposerSrc);
   const expectedRamp = rampSentenceFor('REGION_ID', 'PRESET_ID');
   const missingRamp = rampLiterals.filter((f) => !expectedRamp.includes(f));
   check('d3', 'ANTI-DRIFT: the narrowed-arm literals of vDeformRampSentenceFor are in the expected V-deform sentence',
@@ -1013,15 +1051,26 @@ async function main() {
     // The populated-slot control FIRST, so the absence in [c4b] has a partner.
     await c.evalExpr('window.__dbg.aeon.setActiveSection(0)');
     await sleep(900);
-    const boundSlotHint = await c.json(SENTENCE_REPORT(REGION_MODE_SCENE_LEAD));
+    // ⚠ THE LEAD ALONE IS NOT THE DISCRIMINATOR, and the first draft of this row
+    // was wrong about that. `REGION_MODE_SCENE_LEAD` is hoisted and SHARED: the
+    // scene selection relation opens with the same sentence and is painted on
+    // every slot ("… Edits below change <scene>, which region <id> binds."). So
+    // the control asks for the absence of the EMPTY HINT, which is check 4's
+    // actual subject, and for the presence of the binding control it replaces.
+    const boundSlotHint = await c.json(SENTENCE_REPORT(emptyHintFor(0)));
+    const leadElsewhere = await c.json(SENTENCE_REPORT(REGION_MODE_SCENE_LEAD));
     const assignBody = await c.json(ELEMENT_REPORT(
       `document.querySelector('[data-section="${ASSIGN_SECTION}"]')`));
     check('c4c', 'CHECK 4\'s POSITIVE CONTROL: on a POPULATED slot the SECTION ASSIGNMENT panel paints its binding control and NO empty hint',
       assignBody.present === true && assignBody.rects > 0 && assignBody.visible === true
-      && /Section 0/.test(assignBody.text) && boundSlotHint.leaf === false,
+      && /Section 0/.test(assignBody.text) && boundSlotHint.leaf === false
+      && boundSlotHint.domNodes === 0,
       `[data-section="${ASSIGN_SECTION}"] ${JSON.stringify({ rects: assignBody.rects, visible: assignBody.visible, hitIsEl: assignBody.hitIsEl })}\n        `
       + `its text: ${JSON.stringify(assignBody.text)}\n        `
-      + `the region-mode lead in the document: ${JSON.stringify(boundSlotHint)}\n        `
+      + `the EMPTY hint for this slot: ${JSON.stringify(boundSlotHint)}\n        `
+      + `⚠ the region-mode LEAD is on screen here anyway — ${JSON.stringify(leadElsewhere.text ?? null)} — `
+      + 'because it is hoisted and shared with the scene selection relation, so its PRESENCE is '
+      + 'not what check 4 is about.\n        '
       + 'This is what makes [c4b] below non-vacuous: the SAME panel, one slot over, says something '
       + 'ELSE — so an absent hint there is a state of the panel and not a dead panel.');
 
