@@ -141,6 +141,21 @@ stale one was the more actionable of the pair. Nothing was wrong with either row
 written. The landing step that closes an item is *replace the row*, never *add the outcome
 beside it*.
 
+### ⚠ `state` AND `blockedBy` CAN DISAGREE IN EITHER DIRECTION, AND ONLY ONE DIRECTION HURTS
+
+*(2026-09-18. Found here at boot while measuring my own queue for the hub; the hub hit the INVERSE within the hour, found by seraph, and banked it at empyrean `25b5091b`. Recorded here because a correction that lands only in the hub's tree has no local reader in this one.)*
+
+Two fields carry the same claim and nothing makes them agree. **Both spellings of the disagreement exist:**
+
+- **`open`/`next` while carrying a `blockedBy`** — this lane's `UX-PANEL-TIDY`, state `open`, blocker *"your word after the lens sweep"*.
+- **`blockedBy: null` while the TITLE names a blocker** — the hub's `SKILL-BOOT-STOP-UNDER-SLEEP`, startable on its board while its own title said *"ask the dominion session"* and no such session was up.
+
+**The asymmetry is the whole finding, and it is the hub's: a row that looks blocked merely gets SKIPPED; a row that looks startable gets REASONED FROM.** So the costly direction is always the one that reads as available. Mine would have cost a successor a false start. The hub's cost a peer a correct accusation it had to make itself — the hub held a fix for seraph's eleven wakes while answering it as a seraph question, **because its own board told it the row was free.** A board can hide a row from its own author.
+
+⚠ **`check-lane-status.mjs` ALREADY GUARDS ONE SPELLING, AND THE HOLE IS EXACTLY THE ONE I FELL IN.** This paragraph first said the gate caught *neither*, which is the more alarming claim and was false; measured at `scripts/check-lane-status.mjs`, its rule fires on `state === 'next' && blockedBy` — so a `next` row naming a blocker is red, and my `open` row naming one sailed through every write. **A gate covering one of two spellings is worse than none at this, because its green is read as a verdict on the pair.** The third spelling (a blocker named only in free-text `title`) is not checkable from the file at all.
+
+**Widening it to `open` is NOT obviously right and is not being done here on my own say-so:** `open` is the ordinary state of a backlog row, many of which legitimately record what they wait on, so the gate would fire on the whole queue and the fix would be to strip true blockers to silence it — buying a red for a worse board. **That is the question to put to the hub, which owns the contract**, and until then this is a READING discipline: read `state` and `blockedBy` against each other whenever you touch a row, and when they disagree **do not guess which is stale** — take the conservative side so nothing starts, and say in the report that the direction is unmeasured. Clearing a live blocker to make a row look tidy is the expensive mistake.
+
 ### This file is bounded, and shrinking it is THREE moves — the first is a MEASUREMENT
 
 *(Suite contract: `OVERSEER-PROTOCOL.md` "The boot read is bounded" and `contract/LANE_STATUS.md`
@@ -336,8 +351,15 @@ Aurora". The grant above is what governs.
 ## What the overseer implements
 
 Aurora is a TypeScript/Electron app: features, tests and harnesses all go to agents in
-worktrees. The overseer's own work is judging returned work, running the **foreground**
-runtime harnesses ("Instruments" in `docs/OVERSEER-REFERENCE.md` — agents cannot), rulings, and landing.
+worktrees, **CDP harnesses included** — the overseer's own work is judging returned work,
+rulings, landing, and the **emulator** surface, which is the part an agent genuinely cannot hold.
+
+⚠ **THIS LINE SAID "running the foreground runtime harnesses (agents cannot)" UNTIL 2026-09-18, AND IT CONTRADICTED THE FILE IT POINTED AT.** `docs/OVERSEER-REFERENCE.md`'s Instruments section says the opposite in operational detail — *"Put BOTH in every dispatch brief that runs a harness from a worktree"* (`ELECTRON_BIN` and `AURORA_BUILT_TREE`), and it records an agent that ran three harness passes from one. **Each sentence is correct where it sits; the contradiction existed only in the reader holding both** — protocol bar 13, with the booting overseer as the carrier, and it is the shape where correcting either source alone fixes nothing.
+**The resolution, stated as a call and not a discovery:** agents DO run xvfb CDP harnesses. What is non-delegable is **`mcp__oracle__*`** (it deadlocks from a background agent) and **the overseer's own re-run before landing** — the reference's own model harness says *"both frames re-run by the overseer before landing"*, which only parses if the agent ran them first.
+**SWEPT SUITE-WIDE 2026-09-18, so nobody re-runs it: this doc was the ONLY over-broad one.** I guessed five lanes carried the shape and said so as a worry; the hub measured each lane at its committed tip and found **one** — this file. Oracle carries the correctly-scoped ancestor of the whole family — *"aeon's binding constraint is that their subagents cannot use MCP"* — **re-derived here firsthand rather than taken from the relay, at oracle `origin/main` `5b3d551`, `docs/2026-08-22-aeon-instrument-asks.md` line 83** (`git -C ../oracle show origin/main:docs/2026-08-22-aeon-instrument-asks.md`). Aeon had generalised from it to "it boots an emulator, and agents cannot", which is aeon's to settle.
+⚠ **AND NOTE WHY THAT RE-DERIVATION WAS NOT OPTIONAL: `check:doc-citations` WENT GREEN ON THAT LINE WITHOUT CHECKING IT.** Its rule N2 excludes a citation whose line names a peer tree — the gate's own header says so, and lists *"a peer citation that names its tree and is WRONG about that tree"* among what it does not judge. So naming `oracle` on the line is what bought the green, and the gate is verifying that the path is not falsely local, **never that the peer's file says what I claim.** A green here is not evidence about a peer's tree, and this lane will read it as one the day it stops re-deriving. **My estimate was 5x the truth and I had not measured it — a caution stated without a measurement still reads to a peer as a finding.**
+
+⚠ **AND DO NOT RELAY "it has never been rendered" AS A REASON SOMETHING IS NON-DELEGABLE.** That is what makes a row non-**vacuous** — the node suite cannot see React, a canvas or a running app, so only the app settles it. It is an argument about the INSTRUMENT, never about who holds it, and this lane said the wrong one to the hub before catching it.
 
 ## Read at a specific moment → `docs/OVERSEER-REFERENCE.md` and `docs/OVERSEER-REVIEW-BARS.md`
 
