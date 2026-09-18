@@ -561,6 +561,10 @@ async function main() {
       + '`{!collapsed && children}`, so there is no element to ask checkVisibility() of. '
       + 'An author meets a greyed button with NO reason beside it.');
 
+    // THE PICTURE OF THE FINDING, taken BEFORE the click that reveals the
+    // reason: a greyed Delete with nothing beside it is what an author meets.
+    await shot(c, 'preset-AS-IT-ARRIVES-collapsed');
+
     // ── [p4] one click, and the same sentence is painted ──────────────────
     const pOpened = await c.evalExpr(openSectionOrThrow(PRESET_SECTION));
     await sleep(900);
@@ -570,6 +574,11 @@ async function main() {
       && pShown.visible === true && pShown.hitIsLeaf === true && pShown.afterControl === true,
       `section open → ${pOpened}; ${JSON.stringify(pShown)}\n        `
       + `EXPECTED: ${JSON.stringify(PRESET_SENTENCE)}`);
+
+    // THE PICTURE OF THE SENTENCE, taken BEFORE the floor selects another
+    // document: the shot that used to sit at the end of this block showed the
+    // FREE preset's enabled Delete, which is a different claim.
+    await shot(c, 'preset-EXPANDED-refusal');
 
     // ── [p2] THE ANTI-VACUOUS FLOOR ───────────────────────────────────────
     //
@@ -587,7 +596,7 @@ async function main() {
       + `refusal text present? ${JSON.stringify(fHint)} — NOT CLICKED: an enabled Delete on the `
       + 'live aeon tree is never pressed by this run');
 
-    await shot(c, 'preset-expanded');
+    await shot(c, 'preset-FLOOR-enabled');
 
     // ══════════════════════════════════════════════════════════════════════
     // THE SCENE PANEL  (Effects > Parallax > Scene: <id>)
@@ -612,6 +621,8 @@ async function main() {
       `[data-section="${SCENE_SECTION}"] data-section-collapsed=${JSON.stringify(sCollapsedBefore)}; `
       + `sentence: ${JSON.stringify(sHidden)}`);
 
+    await shot(c, 'scene-AS-IT-ARRIVES-collapsed');
+
     const sOpened = await c.evalExpr(openSectionOrThrow(SCENE_SECTION));
     await sleep(900);
     const sShown = await c.json(SENTENCE_REPORT(SCENE_SENTENCE, BUTTON_BY_LABEL(sLabel)));
@@ -620,6 +631,8 @@ async function main() {
       && sShown.visible === true && sShown.hitIsLeaf === true && sShown.afterControl === true,
       `section open → ${sOpened}; ${JSON.stringify(sShown)}\n        `
       + `EXPECTED: ${JSON.stringify(SCENE_SENTENCE)}`);
+
+    await shot(c, 'scene-EXPANDED-refusal');
 
     // ── [s0] THE SCENE-SIDE FLOOR HAS NO SUBJECT ON DISK ──────────────────
     //
@@ -678,7 +691,7 @@ async function main() {
       `${JSON.stringify(bCtl)}\n        refusal text present? ${JSON.stringify(bHint)} — `
       + 'NOT CLICKED, and never saved');
 
-    await shot(c, 'scene-expanded');
+    await shot(c, 'scene-FLOOR-enabled');
   } finally {
     try { c && c.close(); } catch { /* closing a dead socket is not a result */ }
     await killTree(child);
