@@ -18,6 +18,7 @@ import type { Act, BgLibraryEntry, Section, Tile } from '../../../core/model/s4-
 import type { BgOverrideState } from '../../../core/formats/bg-override/bg-override-io';
 import { unknownWiring } from '../../../core/formats/effects/section-wiring';
 import { noRegionsLoaded } from '../../../core/formats/regions/act-regions';
+import { regionRulesNotRead } from '../../../core/formats/regions/act-constants';
 import {
   BG_OVERRIDE_CONSUMER_OUT_DIR, BG_LAYOUT_WORDS, TILE_PIXELS,
   type BgOverrideDocument,
@@ -57,7 +58,8 @@ function act(stripPath: string | null, sectionRef: string | null): Act {
     startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
     bgLayout: new Uint16Array(BG_LAYOUT_WORDS).fill(0xAC7),
     bgTiles: modelTiles(8, 9),
-    rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'), regions: noRegionsLoaded(),
+    rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'),
+    regionRules: regionRulesNotRead('a hand-built act reads no aeon files'), regions: noRegionsLoaded(),
       sceneRef: null,
     stripPath,
   };

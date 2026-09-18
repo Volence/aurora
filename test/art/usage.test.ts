@@ -4,6 +4,7 @@ import { createSection, packNametableWord } from '../../src/core/model/s4-types'
 import type { Act } from '../../src/core/model/s4-types';
 import { unknownWiring } from '../../src/core/formats/effects/section-wiring';
 import { noRegionsLoaded } from '../../src/core/formats/regions/act-regions';
+import { regionRulesNotRead } from '../../src/core/formats/regions/act-constants';
 
 function makeAct(): Act {
   return {
@@ -16,7 +17,8 @@ function makeAct(): Act {
     bgTiles: null,
     // Hand-built: nothing was read, so nothing is removable (ActSectionFileLedger).
     sectionFiles: { loadedPaths: [], unreadablePaths: [] },
-    rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'), regions: noRegionsLoaded(), sceneRef: null, stripPath: null,
+    rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'),
+    regionRules: regionRulesNotRead('a hand-built act reads no aeon files'), regions: noRegionsLoaded(), sceneRef: null, stripPath: null,
   };
 }
 

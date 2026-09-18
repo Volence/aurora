@@ -78,9 +78,14 @@ import {
 import {
   coverage,
   disjointness,
+  validateRect,
   validateRectInAct,
   type RegionPiece,
 } from '../../core/editing/region-geometry';
+import {
+  regionRulesNotRead,
+  type RegionRuleResolution,
+} from '../../core/formats/regions/act-constants';
 // THE OVERLAY'S `unionBounds`, IMPORTED AND NOT COPIED. Both modules are under
 // `src/renderer`, so this import is legal where a `src/core` one would not be,
 // and a second copy of the arithmetic is how the panel's box and the map's
@@ -620,6 +625,16 @@ export interface RegionStatusInput {
    * has run.
    */
   sidecarsWithRefs: number;
+  /**
+   * RULE 4's CONSTANTS, resolved from aeon's own files at load time, or every
+   * reason they could not be — `Act.regionRules`.
+   *
+   * REQUIRED, and not defaulted here. A default would be the one thing this
+   * row has always refused to be: a number with no source producing verdicts.
+   * A caller with no aeon files says so with `regionRulesNotRead(reason)` and
+   * the row stays `unmeasurable` with that reason on it.
+   */
+  rules: RegionRuleResolution;
 }
 
 /**
@@ -634,18 +649,32 @@ export interface RegionStatusInput {
  * HERE, where the author is looking at the thing being judged. This is the
  * surface that ruling deferred them to.
  *
- * ═══ AND WHAT IS NOT HERE, LOUDLY ═════════════════════════════════════════
+ * ═══ RULE 4 RUNS NOW, AND STAYS LOUD WHEN IT CANNOT ═══════════════════════
  *
- * RULE 4 — the 32 px minimum span and the reachable-edge family. It is NOT
- * checked and it renders as `unmeasurable`, never as silence and never as a
- * pass. `region-geometry.ts` implements it in `validateRect` and takes
- * `REGION_MIN_SPAN` and `CENTRE_{X,Y}_{MIN,MAX}` as PARAMETERS, because those
- * numbers belong to aeon's act descriptor and that module's header forbids a
- * default: "a value typed into this file would be a second home for a number
- * aeon owns". Aurora does not read an act descriptor — the parcel is "Aurora
- * reads an act descriptor", booked at the step-5 landing — so typing 32 here to
- * make the row green would be a number with no source quietly producing
- * verdicts, which is the failure the whole module is shaped against.
+ * RULE 4 — the 32 px minimum span and the reachable-edge family. Until ROADMAP
+ * row 201 this row was hard-wired `unmeasurable`, and its sentence said the
+ * numbers come "from the act's .emp descriptor, which Aurora does not read".
+ * THAT SENTENCE WAS RIGHT ABOUT THE READ AND WRONG ABOUT THE FILE, which is
+ * why it is quoted here rather than quietly deleted: measured at aeon
+ * `e0317db8`, the descriptor DERIVES the five constants and every leaf they
+ * name leaves the file, into `engine/system/constants.emp`. A parcel that had
+ * only taught Aurora to read an act descriptor would have resolved none of
+ * them. `core/formats/regions/act-constants.ts` reads both halves and carries
+ * the measurement.
+ *
+ * `region-geometry.ts` implements the rule in `validateRect` and has since
+ * step 5; it takes the constants as PARAMETERS and its header forbids a
+ * default, because "a value typed into this file would be a second home for a
+ * number aeon owns". Nothing here supplies one: the resolution arrives on
+ * `RegionStatusInput.rules`, and when it failed this row is `unmeasurable`
+ * with the names of the constants that failed and the files looked in. Never
+ * 0, never a default, never green.
+ *
+ * ⚠ AND IT REPORTS ONLY RULE 4's OWN CODES. `validateRect` also runs the three
+ * act-extent rules, and those already reach the reader through the binding
+ * rows above (`regionsValidationNotices` calls `validateRectInAct`). Pushing
+ * the whole finding list here would say each of them twice, in two voices,
+ * which is how a panel and a load come to look like they disagree.
  *
  * ⚠ AND THE SENTENCE §3.4 ASKS FOR IS ITSELF SUPERSEDED. "a piece below 32 px
  * names the TWO REGIONS that make it" is a FLATTENING sentence: under painter's
@@ -746,16 +775,68 @@ export function regionStatusRows(input: RegionStatusInput): RegionStatusRow[] {
     rows.push({ id: 'sidecars', tone: 'ok', text: 'sidecars: none carry refs.' });
   }
 
-  // ── Rule 4: NOT CHECKED, and said out loud ───────────────────────────────
-  rows.push({
-    id: 'min-span',
-    tone: 'unmeasurable',
-    text: 'Rule 4 (minimum span, reachable edges) NOT CHECKED: it needs REGION_MIN_SPAN and '
-      + "CENTRE_{X,Y}_{MIN,MAX} from the act's .emp descriptor, which Aurora does not read. "
-      + 'A document clean here can still be refused by the build.',
-  });
+  // ── Rule 4: CHECKED when the constants resolved, loud when they did not ──
+  rows.push(rule4Row(doc, input.rules));
 
   return rows;
+}
+
+/** Rule 4's own finding codes. The other three `validateRect` emits are the binding rows'. */
+const RULE_4_CODES = new Set([
+  'min-span',
+  'edge-left-unreachable',
+  'edge-right-unreachable',
+  'edge-top-unreachable',
+  'edge-bottom-unreachable',
+]);
+
+/**
+ * The rule-4 status row: the verdict, or the reason there is none.
+ *
+ * ⚠ THE PASSING ARM NAMES THE NUMBERS IT USED. "Rule 4 passes" and "rule 4 was
+ * skipped" look identical on screen unless the row says which constants it
+ * checked against, and the whole point of row 201 is that this row used to be
+ * unable to say anything at all. The figures are the RESOLVED values, printed
+ * from the resolution rather than retyped, so the sentence cannot drift from
+ * the check the way a typed-in 32 would.
+ */
+function rule4Row(doc: RegionsDocument, rules: RegionRuleResolution): RegionStatusRow {
+  if (rules.kind === 'unresolved') {
+    const named = rules.unresolved.map((u) => `${u.name} (${u.reason})`).join(' ');
+    const where = rules.unresolved[0]?.lookedIn ?? [];
+    return {
+      id: 'min-span',
+      tone: 'unmeasurable',
+      text: 'Rule 4 (minimum span, reachable edges) NOT CHECKED: '
+        + `${rules.unresolved.length} of ${rules.unresolved.length + rules.resolved.length} `
+        + `constants did not resolve. ${named}`
+        + (where.length > 0 ? ` Looked in: ${where.join(', ')}.` : '')
+        + ' A document clean here can still be refused by the build.',
+    };
+  }
+
+  const r = rules.rules;
+  const findings = doc.regions.flatMap((region, i) => validateRect(
+    region.rect, r, { regionId: region.id, pieceIndex: i },
+  )).filter((f) => RULE_4_CODES.has(f.code));
+
+  const bands = `minimum span ${r.minSpan} px, camera centre reachable on x in `
+    + `[${r.centreXMin}, ${r.centreXMax}] and y in [${r.centreYMin}, ${r.centreYMax}]`;
+
+  if (findings.length > 0) {
+    return {
+      id: 'min-span',
+      tone: 'warning',
+      text: `Rule 4: ${findings.length} ${findings.length === 1 ? 'problem' : 'problems'} `
+        + `(${bands}). ${findings.map((f) => f.message).join(' ')}`,
+    };
+  }
+  return {
+    id: 'min-span',
+    tone: 'ok',
+    text: `Rule 4 passes for all ${doc.regions.length} `
+      + `${doc.regions.length === 1 ? 'region' : 'regions'}: ${bands}.`,
+  };
 }
 
 /** Rules 2 and 3, from the load's own module. Split out so a test can aim at it. */
@@ -900,6 +981,9 @@ export function regionsPanelState(
     status: regionStatusRows({
       doc, act: extent, vocab,
       sidecarsWithRefs: sidecarsCarryingRefs(act.sections),
+      // RULE 4's CONSTANTS AS THE LOAD RESOLVED THEM, never re-derived here.
+      // The load has the aeon files; this module is pure.
+      rules: act.regionRules,
     }),
     // BY ID: an id that no longer names a region resolves to null, which is a
     // visible "nothing selected" rather than a silent jump to a neighbour.

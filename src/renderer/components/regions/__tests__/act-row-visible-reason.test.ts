@@ -40,6 +40,7 @@ import {
 import type { RegionBindingVocabulary } from '../../../../core/formats/regions/validate';
 import type { RegionsDocument } from '../../../../core/formats/regions/document';
 import { SECTION_PIXEL_SIZE } from '../../../../core/model/s4-types';
+import { regionRulesNotRead } from '../../../../core/formats/regions/act-constants';
 
 const ACT = { actW: SECTION_PIXEL_SIZE, actH: SECTION_PIXEL_SIZE };
 const ACT_SCENE = 'ojz_act1_start';
@@ -73,7 +74,10 @@ function openState(): Extract<RegionsPanelState, { kind: 'open' }> {
     act: ACT,
     rows: regionListRows(doc, defaults, []),
     actRow: actListRow(doc, defaults, []),
-    status: regionStatusRows({ doc, act: ACT, vocab: VOCAB, sidecarsWithRefs: 0 }),
+    status: regionStatusRows({
+      doc, act: ACT, vocab: VOCAB, sidecarsWithRefs: 0,
+      rules: regionRulesNotRead('this test builds no aeon files'),
+    }),
     selected: null,
     presetRecords: VOCAB.presetRecords,
   };

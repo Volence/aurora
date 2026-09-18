@@ -444,7 +444,7 @@ export interface DescriptorEffectsRows {
  * `31c0ddd8`, `6bd8ed89` and, for regions step 5, `807bfdd5`), so none is
  * handled.
  */
-function maskCommentsAndStrings(src: string): string {
+export function maskCommentsAndStrings(src: string): string {
   const out = src.split('');
   let i = 0;
   while (i < src.length) {
@@ -511,7 +511,7 @@ function enclosingOpenBrace(code: string, pos: number): number {
  * has no DEBUG and no release (the 2026-09-16 ruling's own sentence), so there
  * is nothing here for it to be right or wrong about.
  */
-function enclosingCondition(code: string, pos: number): string | null {
+export function enclosingCondition(code: string, pos: number): string | null {
   for (let at = pos; ;) {
     const open = enclosingOpenBrace(code, at);
     if (open < 0) return null;
@@ -1061,6 +1061,39 @@ export function wiringPaths(dataPath: string, zoneId: string)
     descriptor: `${game}/data/levels/${tail}/act_descriptor.emp`,
     library: `${game}/data/effects/${zoneId}_effects.emp`,
   };
+}
+
+/**
+ * aeon's ENGINE CONSTANTS file, from the same `dataPath`, or null.
+ *
+ * ⚠ THIS IS NOT AN ACT'S FILE AND THAT IS THE WHOLE POINT. Regions rule 4's
+ * constants are a chain: the act descriptor derives `CENTRE_X_MAX = ACT_W -
+ * SCREEN_WIDTH + CAM_SCREEN_HALF_W`, and `SCREEN_WIDTH` and `CAM_SCREEN_HALF_W`
+ * are declared in `engine/system/constants.emp`, which the descriptor names in
+ * its own `use engine.constants.{…}` line. A reader that only located the
+ * descriptor would resolve none of the five. See
+ * `core/formats/regions/act-constants.ts` for the chain and the measurement.
+ *
+ * THE DERIVATION GOES UP TWO LEVELS FROM THE GAME ROOT, and it REFUSES rather
+ * than guessing: `wiringPaths` gives `games/sonic4`, this requires that to end
+ * in `games/<one segment>`, and the engine root is what precedes it. A layout
+ * that does not carry a `games/` segment yields null and the caller reports
+ * "could not locate" — never a path assembled out of hope, which would surface
+ * as "the file is missing" and send a reader looking for the wrong thing.
+ *
+ * The path alone proves nothing about the file's contents; `act-constants.ts`
+ * additionally holds whatever it reads here to the MODULE the descriptor
+ * imported the names from.
+ */
+export function engineConstantsPath(dataPath: string): string | null {
+  const marker = '/data/editor/';
+  const at = dataPath.indexOf(marker);
+  if (at < 0) return null;
+  const game = dataPath.slice(0, at);
+  const m = /(?:^|\/)games\/[^/]+$/.exec(game);
+  if (m === null) return null;
+  const root = game.slice(0, m.index);
+  return `${root === '' ? '' : `${root}/`}engine/system/constants.emp`;
 }
 
 // ---------------------------------------------------------------------------

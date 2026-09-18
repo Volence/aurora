@@ -44,10 +44,14 @@ import {
 import { parseSectionMeta } from '../../formats/section-meta';
 import { loadEffectsSceneLibrary } from '../../formats/effects/scene';
 import {
-  wiringPaths, unknownWiring, readDescriptorWiring, libraryRasterChooserCalls,
+  wiringPaths, engineConstantsPath, unknownWiring, readDescriptorWiring, libraryRasterChooserCalls,
   libraryChannelCalls, libraryPatchedArmBindings, libraryPresetRecordNames, rasterChooserName,
   type SectionRasterWiring,
 } from '../../formats/effects/section-wiring';
+import {
+  resolveRegionRules, readEmpSource, unreadEmpSource,
+  type EmpSource, type RegionRuleResolution,
+} from '../../formats/regions/act-constants';
 import { loadEffectsPresetLibrary } from '../../formats/effects/preset';
 import { loadBgOverride } from '../../formats/bg-override/bg-override-io';
 import {
@@ -837,17 +841,30 @@ async function loadFullProject(
       // them. That is why every read here is inside its own try.
       const wiringAt = wiringPaths(actConfig.dataPath, zoneConfig.id);
       let rasterWiring: SectionRasterWiring;
+      // THE SAME DESCRIPTOR READ, HANDED ON — regions rule 4 (ROADMAP row 201).
+      // `readDescriptorWiring` below consumes the descriptor's text for the
+      // raster rows; the rule-4 constants are derived from the SAME bytes, so
+      // this carries that one read out of the try rather than opening the file
+      // a second time. A second independent read is how two views of one file
+      // come to disagree about it.
+      let descSource: EmpSource = unreadEmpSource(actConfig.dataPath, 'not read');
       if (wiringAt === null) {
         rasterWiring = unknownWiring(
           actConfig.dataPath, actConfig.dataPath,
           'this act\'s dataPath is not under a data/editor/ directory, so aeon\'s act '
           + 'descriptor and effects library could not be located from it',
         );
+        descSource = unreadEmpSource(
+          actConfig.dataPath,
+          'this act\'s dataPath is not under a data/editor/ directory, so aeon\'s act '
+          + 'descriptor could not be located from it',
+        );
       } else {
         const chooser = rasterChooserName(zoneConfig.id, actConfig.id);
         rasterWiring = unknownWiring(wiringAt.descriptor, wiringAt.library, 'not read');
         try {
           const descText = new TextDecoder().decode(await fa.read(wiringAt.descriptor));
+          descSource = readEmpSource(wiringAt.descriptor, descText);
           // THE REGION ROWS, PAIRED BY CALL AND NOT BY ORDER, and every row that
           // could not be keyed REPORTED rather than dropped. See section-wiring.ts's
           // READING THE DESCRIPTOR banner. `readDescriptorWiring` makes the whole
@@ -866,6 +883,9 @@ async function loadFullProject(
             path: wiringAt.descriptor, parsed: false,
             reason: e instanceof Error ? e.message : 'could not be read',
           };
+          descSource = unreadEmpSource(
+            wiringAt.descriptor, e instanceof Error ? e.message : 'could not be read',
+          );
         }
         try {
           const libText = new TextDecoder().decode(await fa.read(wiringAt.library));
@@ -906,6 +926,49 @@ async function loadFullProject(
         }
       }
 
+      // ── REGIONS RULE 4's CONSTANTS ──────────────────────────────────────
+      //
+      // The OTHER HALF of the chain. The descriptor derives `CENTRE_X_MAX =
+      // ACT_W - SCREEN_WIDTH + CAM_SCREEN_HALF_W`; `SCREEN_WIDTH` and
+      // `CAM_SCREEN_HALF_W` are declared in aeon's engine constants and in no
+      // act file, which is why "Aurora reads an act descriptor" was necessary
+      // and not sufficient. See core/formats/regions/act-constants.ts.
+      //
+      // ⚠ IT MUST NOT FAIL A LOAD, on the same rule as the wiring read above:
+      // these are aeon's source files, not Aurora's documents. A project
+      // without them opens exactly as before and the panel says rule 4 could
+      // not be measured, naming the constants and the files.
+      const enginePath = engineConstantsPath(actConfig.dataPath);
+      let engineSource: EmpSource;
+      if (enginePath === null) {
+        engineSource = unreadEmpSource(
+          actConfig.dataPath,
+          'aeon\'s engine constants could not be located from this act\'s dataPath, which does '
+          + 'not sit under a games/<game>/data/editor/ directory',
+        );
+      } else {
+        try {
+          engineSource = readEmpSource(
+            enginePath, new TextDecoder().decode(await fa.read(enginePath)),
+          );
+        } catch (e) {
+          engineSource = unreadEmpSource(
+            enginePath, e instanceof Error ? e.message : 'could not be read',
+          );
+        }
+      }
+      const regionRules: RegionRuleResolution = resolveRegionRules({
+        // THE ACT'S OWN SIZE, FROM ITS GRID, and the same expression the
+        // regions extent uses six hundred lines below. act-constants.ts's
+        // header carries the argument: one act width in the panel, not two.
+        act: {
+          actW: actConfig.gridWidth * SECTION_PIXEL_SIZE,
+          actH: actConfig.gridHeight * SECTION_PIXEL_SIZE,
+        },
+        descriptor: descSource,
+        engine: engineSource,
+      });
+
       acts.push({
         id: actConfig.id,
         gridWidth: actConfig.gridWidth,
@@ -923,6 +986,9 @@ async function loadFullProject(
         bgLayout,
         bgTiles,
         rasterWiring,
+        // REGIONS RULE 4's CONSTANTS, resolved from aeon's two files above, or
+        // every reason they could not be. See Act.regionRules.
+        regionRules,
         // WHAT `{dataPath}regions.json` HELD AND WHETHER AURORA UNDERSTOOD IT —
         // the record the save's write/remove/refuse branch is gated on. See
         // ActRegionsState for why "no document" and "a document I refused" are

@@ -5,6 +5,7 @@ import type { Act, Section } from '../../src/core/model/s4-types';
 import { createSection } from '../../src/core/model/s4-types';
 import { unknownWiring } from '../../src/core/formats/effects/section-wiring';
 import { noRegionsLoaded } from '../../src/core/formats/regions/act-regions';
+import { regionRulesNotRead } from '../../src/core/formats/regions/act-constants';
 
 function makeLevel(): { level: S4Level; act: Act; original: Section } {
   const original = createSection(0, 'Section 0');
@@ -18,7 +19,8 @@ function makeLevel(): { level: S4Level; act: Act; original: Section } {
     bgTiles: null,
     // Hand-built: nothing was read, so nothing is removable (ActSectionFileLedger).
     sectionFiles: { loadedPaths: [], unreadablePaths: [] },
-    rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'), regions: noRegionsLoaded(), sceneRef: null, stripPath: null,
+    rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'),
+    regionRules: regionRulesNotRead('a hand-built act reads no aeon files'), regions: noRegionsLoaded(), sceneRef: null, stripPath: null,
   };
   return { level: { sections: act.sections, act }, act, original };
 }

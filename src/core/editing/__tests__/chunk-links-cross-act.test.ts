@@ -40,6 +40,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { unknownWiring } from '../../formats/effects/section-wiring';
 import { noRegionsLoaded } from '../../formats/regions/act-regions';
+import { regionRulesNotRead } from '../../formats/regions/act-constants';
 
 const black = (): Color => ({ r: 0, g: 0, b: 0, a: 255 });
 const line = () => ({ colors: Array.from({ length: 16 }, black) });
@@ -85,7 +86,8 @@ function act(id: string, sectionCount: number): Act {
     // Hand-built: nothing was read, so nothing is removable.
     sectionFiles: { loadedPaths: [], unreadablePaths: [] },
     startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
-    bgLayout: null, bgTiles: null, rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'), regions: noRegionsLoaded(), sceneRef: null, stripPath: null,
+    bgLayout: null, bgTiles: null, rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'),
+    regionRules: regionRulesNotRead('a hand-built act reads no aeon files'), regions: noRegionsLoaded(), sceneRef: null, stripPath: null,
   };
 }
 

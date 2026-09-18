@@ -37,6 +37,12 @@ import { EditHistory } from '../../src/core/editing/history';
 import { noRegionsLoaded } from '../../src/core/formats/regions/act-regions';
 import type { S4Level } from '../../src/core/editing/commands';
 import type { Act } from '../../src/core/model/s4-types';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  regionRulesNotRead, readEmpSource, unreadEmpSource, resolveRegionRules,
+  type RegionRuleResolution,
+} from '../../src/core/formats/regions/act-constants';
 
 // ---------------------------------------------------------------------------
 // Fixtures — the same shapes regions-validation.test.ts uses, so the two files
@@ -616,9 +622,20 @@ describe('a binding edit reaches EVERY entry of a multi-entry region (step 8B it
 // 6. THE STATUS LINE — §2.5 live
 // ---------------------------------------------------------------------------
 
-const statusOf = (doc: RegionsDocument, over: Partial<{ v: RegionBindingVocabulary; sidecars: number }> = {}) =>
+/**
+ * ⚠ THE DEFAULT `rules` IS AN UNRESOLVED ONE, ON PURPOSE. These rows are about
+ * rules 2, 3 and 5; handing them aeon's real constants would make every one of
+ * them depend on a fixture they have nothing to do with. The rule-4 rows below
+ * pass their own resolution in, and they are the only ones that may.
+ */
+const NO_RULES = regionRulesNotRead('this test supplied no aeon files');
+const statusOf = (
+  doc: RegionsDocument,
+  over: Partial<{ v: RegionBindingVocabulary; sidecars: number; rules: RegionRuleResolution }> = {},
+) =>
   regionStatusRows({
     doc, act: ACT, vocab: over.v ?? vocab(), sidecarsWithRefs: over.sidecars ?? 0,
+    rules: over.rules ?? NO_RULES,
   });
 const rowById = (doc: RegionsDocument, id: string, over = {}) =>
   statusOf(doc, over).find((r) => r.id === id);
@@ -739,19 +756,118 @@ describe('the status line: §2.5 live, where the author is looking at the thing 
       .toContain('1 sidecar still carries refs: migrate');
   });
 
-  it('RULE 4 is UNMEASURABLE on EVERY document, clean or broken: never ok, never a warning', () => {
-    // The rule this repository cannot answer must not render as a pass. It
-    // names the constants and where they live, so the reader knows what is
-    // missing rather than that something is.
-    for (const doc of [tiledDoc(), docOf(), docOf(region({ id: 'tiny', rect: { x: 0, y: 0, w: 1, h: 1 } }))]) {
-      const row = regionStatusRows({ doc, act: ACT, vocab: vocab(), sidecarsWithRefs: 0 })
-        .find((r) => r.id === 'min-span')!;
-      expect(row.tone).toBe('unmeasurable');
-      expect(row.text).toContain('NOT CHECKED');
-      expect(row.text).toContain('REGION_MIN_SPAN');
-    }
+  // ── RULE 4 — checked since ROADMAP row 201, loud when it cannot be ───────
+  //
+  // ⚠ THESE ROWS REPLACED ONE THAT PINNED THE OPPOSITE BEHAVIOUR. Until row 201
+  // the rule-4 row was hard-wired `unmeasurable` on every document and a test
+  // here asserted exactly that, for the good reason that Aurora read no aeon
+  // file. The unmeasurable arm survives -- it is the fourth row below -- and
+  // what changed is that it is now a STATE and not the only state.
+
+  /** aeon's real constants, folded over THIS test's act size (one section). */
+  const realRules = () => {
+    const at = (n: string) => resolve(__dirname, '../fixtures/regions/act-constants', n);
+    const r = resolveRegionRules({
+      act: ACT,
+      descriptor: readEmpSource('act_descriptor.emp', readFileSync(at('act_descriptor.emp'), 'utf8')),
+      engine: readEmpSource('constants.emp', readFileSync(at('engine_constants.emp'), 'utf8')),
+    });
+    if (r.kind !== 'resolved') throw new Error('the vendored aeon fixtures did not resolve');
+    return r;
+  };
+
+  it('RULE 4 is CHECKED when the constants resolve, and the row names the bands it used', () => {
+    const rules = realRules();
+    const row = rowById(tiledDoc(), 'min-span', { rules })!;
+    expect(row.tone).toBe('ok');
+    // THE FIGURES ARE DERIVED FROM THE RESOLUTION, not retyped: a row that
+    // printed a stale number while checking a live one is the defect the
+    // resolution exists to remove.
+    expect(row.text).toContain(`minimum span ${rules.rules.minSpan} px`);
+    expect(row.text).toContain(`[${rules.rules.centreXMin}, ${rules.rules.centreXMax}]`);
+    expect(row.text).toContain(`[${rules.rules.centreYMin}, ${rules.rules.centreYMax}]`);
+    // ANTI-VACUOUS: the bands are not the same numbers on both axes, so a row
+    // that printed one twice would not pass this.
+    expect(rules.rules.centreXMax).not.toBe(rules.rules.centreYMax);
+  });
+
+  it('a region one pixel under the RESOLVED minimum span is a warning', () => {
+    const rules = realRules();
+    const span = rules.rules.minSpan;
+    // ⚠ THE SLIVER SITS IN THE MIDDLE OF THE ACT, NOT AT ITS EDGE, and that is
+    // forced by the rule being tested beside this one: at this act's size a
+    // 32 px column at either end has an interior edge OUTSIDE the camera band,
+    // so a sliver-at-the-edge document is red for two reasons and proves
+    // neither. 200 is inside the band on both sides with room for the sliver.
+    const IN_BAND = 200;
+    const tile = (w: number) => docOf(
+      region({ id: 'left', rect: { x: 0, y: 0, w: IN_BAND, h: ACT.actH } }),
+      region({ id: 'sliver', rect: { x: IN_BAND, y: 0, w, h: ACT.actH } }),
+      region({ id: 'rest', rect: { x: IN_BAND + w, y: 0, w: ACT.actW - IN_BAND - w, h: ACT.actH } }),
+    );
+    const row = rowById(tile(span - 1), 'min-span', { rules })!;
+    expect(row.tone).toBe('warning');
+    expect(row.text).toContain('sliver');
+    expect(row.text).toContain(`minimum span of ${span} px`);
+    // The CONTROL: the same document at exactly the span is clean, so the
+    // warning is the one pixel and not the shape of the document.
+    expect(rowById(tile(span), 'min-span', { rules })!.tone).toBe('ok');
+  });
+
+  /**
+   * VECTOR B AT THE PANEL. A right edge exactly ON CENTRE_X_MAX is the one the
+   * engine refuses and the naive mirror of its left-edge rule accepts; a right
+   * edge one pixel in is accepted by both. So this pair is what separates the
+   * panel running aeon's rule from the panel running a plausible lookalike.
+   */
+  it('a right edge exactly at CENTRE_X_MAX is reported, one pixel in is not', () => {
+    const rules = realRules();
+    const max = rules.rules.centreXMax;
+    const split = (x1: number) => docOf(
+      region({ id: 'left', rect: { x: 0, y: 0, w: x1 + 1, h: ACT.actH } }),
+      region({ id: 'right', rect: { x: x1 + 1, y: 0, w: ACT.actW - x1 - 1, h: ACT.actH } }),
+    );
+    const onIt = rowById(split(max), 'min-span', { rules })!;
+    expect(onIt.tone).toBe('warning');
+    expect(onIt.text).toContain('right edge');
+    expect(onIt.text).toContain(`x = ${max}`);
+    expect(rowById(split(max - 1), 'min-span', { rules })!.tone).toBe('ok');
+  });
+
+  it('RULE 4 stays UNMEASURABLE when a constant did not resolve, and NAMES it', () => {
+    const unresolved = resolveRegionRules({
+      act: ACT,
+      descriptor: readEmpSource(
+        'act_descriptor.emp',
+        ['const CENTRE_X_MIN = CAM_SCREEN_HALF_W', 'const CENTRE_X_MAX = 1888',
+          'const CENTRE_Y_MIN = 112', 'const CENTRE_Y_MAX = 1936',
+          'const REGION_MIN_SPAN = 32'].join('\n'),
+      ),
+      engine: unreadEmpSource('engine/system/constants.emp', 'ENOENT'),
+    });
+    const row = rowById(tiledDoc(), 'min-span', { rules: unresolved })!;
+    expect(row.tone).toBe('unmeasurable');
+    expect(row.text).toContain('NOT CHECKED');
+    // WHICH constant, WHICH leaf, and WHERE Aurora looked -- the three things
+    // "not checked" on its own does not say.
+    expect(row.text).toContain('CENTRE_X_MIN');
+    expect(row.text).toContain('CAM_SCREEN_HALF_W');
+    expect(row.text).toContain('engine/system/constants.emp');
+    expect(row.text).toContain('ENOENT');
+    // And the four that DID resolve are counted, so the reader can tell one
+    // missing leaf from a file nobody opened.
+    expect(row.text).toContain('1 of 5');
+  });
+
+  it('an act that read no aeon files at all says so, and never renders a 0', () => {
+    const row = rowById(tiledDoc(), 'min-span', {
+      rules: regionRulesNotRead('this act\'s dataPath is not under a data/editor/ directory'),
+    })!;
+    expect(row.tone).toBe('unmeasurable');
+    expect(row.text).toContain('not under a data/editor/ directory');
+    expect(row.text).not.toContain('minimum span 0');
     // ANTI-VACUOUS: `unmeasurable` is a tone this function can NOT emit for
-    // everything — the other rows in the same call carry real verdicts.
+    // everything -- the other rows in the same call carry real verdicts.
     const tones = new Set(statusOf(tiledDoc()).map((r) => r.tone));
     expect(tones.has('ok')).toBe(true);
   });
