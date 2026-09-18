@@ -184,14 +184,40 @@ export function SectionBody({ children, style }: {
   );
 }
 
-export function PanelHeader({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
+/**
+ * `note` IS A SECOND LINE INSIDE THE HEADER'S OWN BOX, above its bottom border.
+ *
+ * It exists for a sentence that belongs to a control in `right` — today, the
+ * reason a Delete is greyed (DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE). Two
+ * placements were tried and this is the one that reads:
+ *
+ *   • INSIDE `right`, on the title line: the title may be a long generated id,
+ *     the row is one flex line, and the sentence ends up three words wide.
+ *   • AFTER the whole header, as a sibling: it then sits BELOW the border, in
+ *     the gap before the next section, and reads as that section's note rather
+ *     than as this one's. Measured in the running app before this version.
+ *
+ * So the header becomes a block with a flex row inside it. With no `note` that
+ * is the same box it always was: the padding, the border and the row are
+ * unchanged, and a flex row inside a padded block lays out identically to a
+ * padded flex row.
+ *
+ * ⚠ THE NOTE INHERITS THIS BLOCK'S TYPE — uppercase, letter-spaced, semibold,
+ * 10px. A sentence must turn all four off itself; see `HeaderRefusal` in
+ * effects/column-layout.tsx, which does.
+ */
+export function PanelHeader({ children, right, note }: {
+  children: React.ReactNode; right?: React.ReactNode; note?: React.ReactNode;
+}) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: `${T.s2} ${PANEL_INSET}`, fontSize: T.t2xs, fontWeight: T.wSemibold, color: T.textLo,
       textTransform: 'uppercase', letterSpacing: 1, borderBottom: `1px solid ${T.border}`,
     }}>
-      <span>{children}</span>{right}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span>{children}</span>{right}
+      </div>
+      {note}
     </div>
   );
 }

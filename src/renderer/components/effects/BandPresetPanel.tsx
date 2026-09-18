@@ -51,7 +51,7 @@
 
 import React from 'react';
 import { T, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
-import { Field, Hint, GroupHints, Card, CONTROL_INSET } from './column-layout';
+import { Field, Hint, GroupHints, Card, CONTROL_INSET, HeaderRefusal } from './column-layout';
 import { actAndDropFocus } from '../ui/act-and-drop-focus';
 import { deletePresetGuarded } from '../../shell/effects-delete-guard';
 // THE APP'S OWN SWATCH AND THE APP'S OWN PICKER. `GenesisColorSliders` is the
@@ -690,6 +690,16 @@ export default function BandPresetPanel(): React.ReactElement | null {
           id="aeon.effects.preset.bands"
           title={`Preset: ${selected.id}`}
           defaultCollapsed
+          // THE REASON TRAVELS WITH THE BUTTON (DISABLED-CONTROL-REASON-BEHIND-
+          // DISCLOSURE). The Delete below is in the always-visible header and
+          // this section arrives COLLAPSED, so the `<Hint>` in the body was not
+          // in the DOM at the moment an author met the greyed control — measured
+          // by scratchpad/delete-refusal-onscreen-harness.mjs, row [p3]. The
+          // short form is the SAME derivation, not a second sentence: see
+          // core/formats/effects/delete-refusal.ts.
+          headerNote={deleteRefusal !== null && (
+            <HeaderRefusal refusal={deleteRefusal} testid="effects-preset-delete-refusal-short" />
+          )}
           right={
             // GUARDED, WITH THE REASON UNDER IT (EFFECTS-W1 defect 11). This
             // deleted the document with no confirmation and left every binding
@@ -715,7 +725,11 @@ export default function BandPresetPanel(): React.ReactElement | null {
               onClick={(e) => actAndDropFocus(e, () => { void deletePresetGuarded(library, selected.id, run); })} />
           }>
           <SectionBody>
-            {deleteRefusal !== null && <Hint tone="warning">{deleteRefusal}</Hint>}
+            {/* THE FULL SENTENCE STAYS HERE, and the header carries the short
+                form of the SAME derivation. The two lengths cannot disagree
+                (one `lead` per clause, delete-refusal.ts); the body is where
+                the consequence and the repair have room to be stated. */}
+            {deleteRefusal !== null && <Hint tone="warning">{deleteRefusal.full}</Hint>}
             <Field label="Name" title="name: the writer's display label. Read by nothing and
               dropped when the generator lowers this document; it exists for you, not the build.">
               <input

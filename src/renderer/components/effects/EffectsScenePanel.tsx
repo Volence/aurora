@@ -51,7 +51,7 @@ import {
   committedDriftParts,
 } from '../ui';
 import type { NumberFieldRefusalDetail } from '../ui';
-import { Field, Hint, Card, Advisory } from './column-layout';
+import { Field, Hint, Card, Advisory, HeaderRefusal } from './column-layout';
 import { actAndDropFocus } from '../ui/act-and-drop-focus';
 import { deleteSceneGuarded } from '../../shell/effects-delete-guard';
 import { useProjectStore, getActiveLevel } from '../../state/projectStore';
@@ -1405,6 +1405,15 @@ export default function EffectsScenePanel(): React.ReactElement {
       {selected && (
         <CollapsibleSection id="aeon.effects.scene" title={`Scene: ${selected.id}`}
           defaultCollapsed
+          // THE REASON TRAVELS WITH THE BUTTON (DISABLED-CONTROL-REASON-BEHIND-
+          // DISCLOSURE), for the preset panel's reason and measured the same
+          // way: row [s3] of scratchpad/delete-refusal-onscreen-harness.mjs read
+          // `domNodes` 0 for this sentence on arrival, because this section is
+          // `defaultCollapsed` and a collapsed section renders no children at
+          // all. Short and full are one derivation, never two sentences.
+          headerNote={deleteRefusal !== null && (
+            <HeaderRefusal refusal={deleteRefusal} testid="effects-scene-delete-refusal-short" />
+          )}
           right={<IconButton icon={<span>Delete</span>} label={`Delete scene ${selected.id}`}
             // DISABLED WITH THE REASON UNDER IT (DELETE-SCENE-NO-GUARD). The
             // same idiom the preset Delete uses: `deleteSceneRefusal` is the ONE
@@ -1428,7 +1437,9 @@ export default function EffectsScenePanel(): React.ReactElement {
             // inside `act()` — so d-27's subject is untouched.
             onClick={(e) => actAndDropFocus(e, () => { void deleteSceneGuarded(library, selected.id, run); })} />}>
          <SectionBody>
-          {deleteRefusal !== null && <Hint tone="warning">{deleteRefusal}</Hint>}
+          {/* THE FULL SENTENCE STAYS HERE; the header carries the short form of
+              the SAME derivation (delete-refusal.ts, one `lead` per clause). */}
+          {deleteRefusal !== null && <Hint tone="warning">{deleteRefusal.full}</Hint>}
           <Field label="Name">
             <input value={typeof selected.name === 'string' ? selected.name : ''}
               onChange={(e) => run(setSceneFieldCommand(

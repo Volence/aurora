@@ -27,8 +27,31 @@ import { loadPanelState, savePanelState, isCollapsed, togglePanel, subscribePane
  */
 export type SectionVariant = 'content' | 'list';
 
-export function CollapsibleSection({ id, title, right, variant = 'content', defaultCollapsed = false, collapsedOverride, children }: {
+export function CollapsibleSection({ id, title, right, headerNote, variant = 'content', defaultCollapsed = false, collapsedOverride, children }: {
   id: string; title: string; right?: React.ReactNode; defaultCollapsed?: boolean;
+  /**
+   * A LINE THAT STAYS WHEN THE SECTION SHUTS, under the header row.
+   *
+   * It exists for one thing: an always-visible control in `right` whose
+   * EXPLANATION would otherwise be in `children`, which a collapsed section
+   * does not render at all (`{!collapsed && children}` below, and it is not
+   * merely hidden — there is no element in the DOM to find, to search, or to
+   * read out). Measured on both Delete buttons in the Effects column and
+   * settled by card DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE.
+   *
+   * ⚠ IT IS NOT A SECOND `right`. It renders on its own line UNDER the title
+   * row and INSIDE the header's box (`PanelHeader`'s `note`), because the
+   * header row is one flex line holding a title that may be a long generated
+   * id, and a sentence squeezed into what is left of that line wraps to three
+   * words a row. Inside the box rather than after it, or it sits below the
+   * header's bottom border and reads as a note on the NEXT section.
+   *
+   * ⚠ AND IT IS FOR A SENTENCE A DISABLED CONTROL OWES THE AUTHOR, not for
+   * ordinary guidance. Anything that merely describes the form belongs in the
+   * form, where it sits beside what it describes; putting it here would spend
+   * the one always-visible line on something nothing visible promises.
+   */
+  headerNote?: React.ReactNode;
   /** See SectionVariant. Default `content` — the safe one; it cannot bury anything. */
   variant?: SectionVariant;
   /**
@@ -101,7 +124,12 @@ export function CollapsibleSection({ id, title, right, variant = 'content', defa
     <div data-section={id} data-section-collapsed={collapsed ? 'true' : 'false'}
       style={collapsed || variant !== 'list' ? CONTENT_SECTION : LIST_SECTION}>
       <div onClick={onHeaderClick} style={{ cursor: 'pointer' }}>
-        <PanelHeader right={right}>
+        {/* `note` and not a sibling below: see PanelHeader. It goes inside the
+            header's own box, above its bottom border, or it reads as a note on
+            the NEXT section. It is inside the toggle's hit area too, which is
+            right — the note explains a control whose full sentence is one
+            click away, and that click is this one. */}
+        <PanelHeader right={right} note={headerNote}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <span style={{ display: 'inline-flex', transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.1s', color: T.textLo }}>
               <IconChevron size={12} />

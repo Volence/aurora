@@ -120,7 +120,11 @@
 // harness's [L3] row counts label+control pairs per row to keep it that way.
 
 import React from 'react';
-import { T } from '../ui';
+import { T, PANEL_INSET } from '../ui';
+// The refusal PAIR, which is the only thing `HeaderRefusal` below accepts. See
+// its docblock: taking the pair rather than a string is what stops a second,
+// hand-typed short form ever reaching a header.
+import type { DeleteRefusal } from '../../../core/formats/effects/delete-refusal';
 
 /**
  * The label column, in px. See the docblock — it is measured, and it is a FIXED
@@ -253,6 +257,58 @@ export function Hint({ children, under = false, tone, style, testid }: {
       ...(under ? { marginLeft: CONTROL_INSET } : {}),
       ...style,
     }}>{children}</div>
+  );
+}
+
+/**
+ * ═══ WHY A DISABLED CONTROL IN A SECTION HEADER CANNOT KEEP ITS REASON IN THE
+ *     BODY (DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE, 2026-09-18) ═══
+ *
+ * Both Delete buttons in this column sit in a `CollapsibleSection`'s
+ * always-visible `right` slot while their refusal sat in the `SectionBody`, and
+ * those sections are `defaultCollapsed`. `ui/CollapsibleSection.tsx` renders
+ * `{!collapsed && children}`, so on arrival the reason was NOT IN THE DOM:
+ * measured, not read off the source, by
+ * `scratchpad/delete-refusal-onscreen-harness.mjs` rows [p3]/[s3] — `domNodes`
+ * 0, which is stronger than invisible. An author met a greyed button with
+ * nothing on screen, in a search, or in a screen reader saying why.
+ *
+ * This is the line that fixes that: the refusal's SHORT form, painted under the
+ * header row whether the section is open or shut, through
+ * `CollapsibleSection`'s `headerNote` slot.
+ *
+ * ⚠ IT TAKES THE PAIR, NEVER A STRING, and that is the anti-drift construction
+ * rather than a convention. `DeleteRefusal` can only be built by
+ * `core/formats/effects/delete-refusal.ts`'s composer, which derives `short` and
+ * `full` from ONE `lead` per clause; a component that accepted a `string` would
+ * accept a second sentence typed to match, which is exactly the cost the card
+ * weighed. The `title` carries `full` as well, so a mouse reaches the whole
+ * sentence without opening anything — but the body keeps it too, because hover
+ * is not reachable by keyboard or touch and this lane already has one open row
+ * about a hover-only sentence.
+ */
+export function HeaderRefusal({ refusal, testid }: {
+  refusal: DeleteRefusal;
+  /** How an instrument finds this line without matching on its prose. */
+  testid: string;
+}) {
+  return (
+    <div data-testid={testid} title={refusal.full} style={{
+      ...WARN,
+      // No side padding: this renders INSIDE `PanelHeader`'s box, which already
+      // supplies the panel gutter. Only a gap from the title row above it.
+      padding: `${T.s2} 0 0`,
+      // `anywhere` for `Hint`'s reason: a document id is one unbreakable token
+      // and this column is ~300px wide, so a preset named after its section
+      // would otherwise push the panel into horizontal scroll.
+      overflowWrap: 'anywhere',
+      // Header text is uppercase with letter spacing; this is a SENTENCE and
+      // inherits neither, and it renders INSIDE `PanelHeader`'s box, which
+      // declares all four (uppercase, letter-spaced, semibold, 10px) on the
+      // element this one is a child of. So all four are turned off here, not as
+      // a precaution but because the inherited value is wrong for prose.
+      textTransform: 'none', letterSpacing: 0, fontWeight: T.wRegular,
+    }}>{refusal.short}</div>
   );
 }
 
