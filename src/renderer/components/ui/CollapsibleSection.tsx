@@ -39,11 +39,12 @@ export function CollapsibleSection({ id, title, right, headerNote, variant = 'co
    * read out). Measured on both Delete buttons in the Effects column and
    * settled by card DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE.
    *
-   * ⚠ IT IS NOT A SECOND `right`. It renders BELOW the header row rather than
-   * inside it, because the header is one flex line holding a title that may be
-   * a long generated id, and a sentence squeezed into what is left of that line
-   * wraps to three words a row. It is also OUTSIDE the header's click target,
-   * so reading it never toggles the section.
+   * ⚠ IT IS NOT A SECOND `right`. It renders on its own line UNDER the title
+   * row and INSIDE the header's box (`PanelHeader`'s `note`), because the
+   * header row is one flex line holding a title that may be a long generated
+   * id, and a sentence squeezed into what is left of that line wraps to three
+   * words a row. Inside the box rather than after it, or it sits below the
+   * header's bottom border and reads as a note on the NEXT section.
    *
    * ⚠ AND IT IS FOR A SENTENCE A DISABLED CONTROL OWES THE AUTHOR, not for
    * ordinary guidance. Anything that merely describes the form belongs in the
@@ -123,7 +124,12 @@ export function CollapsibleSection({ id, title, right, headerNote, variant = 'co
     <div data-section={id} data-section-collapsed={collapsed ? 'true' : 'false'}
       style={collapsed || variant !== 'list' ? CONTENT_SECTION : LIST_SECTION}>
       <div onClick={onHeaderClick} style={{ cursor: 'pointer' }}>
-        <PanelHeader right={right}>
+        {/* `note` and not a sibling below: see PanelHeader. It goes inside the
+            header's own box, above its bottom border, or it reads as a note on
+            the NEXT section. It is inside the toggle's hit area too, which is
+            right — the note explains a control whose full sentence is one
+            click away, and that click is this one. */}
+        <PanelHeader right={right} note={headerNote}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <span style={{ display: 'inline-flex', transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.1s', color: T.textLo }}>
               <IconChevron size={12} />
@@ -132,14 +138,6 @@ export function CollapsibleSection({ id, title, right, headerNote, variant = 'co
           </span>
         </PanelHeader>
       </div>
-      {/* AFTER the header div and OUTSIDE the collapse gate, in that order and
-          for two separate reasons. Outside the gate is the whole point: this is
-          the line that survives a shut section. After the header div is a
-          contract with every instrument that opens a section by clicking
-          `[data-section="..."]`'s FIRST element child (scratchpad/lib/
-          strict-aim.mjs, `openSectionOrThrow`) — a note rendered first would
-          silently become the thing they click. */}
-      {headerNote}
       {!collapsed && children}
     </div>
   );

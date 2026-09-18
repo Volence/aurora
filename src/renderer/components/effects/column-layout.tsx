@@ -295,17 +295,18 @@ export function HeaderRefusal({ refusal, testid }: {
   return (
     <div data-testid={testid} title={refusal.full} style={{
       ...WARN,
-      // The header row's own gutter, so the sentence starts under the title
-      // rather than under the chevron, and its own bottom padding, so it is not
-      // flush against whatever the body draws first when the section is open.
-      padding: `0 ${PANEL_INSET} ${T.s2}`,
+      // No side padding: this renders INSIDE `PanelHeader`'s box, which already
+      // supplies the panel gutter. Only a gap from the title row above it.
+      padding: `${T.s2} 0 0`,
       // `anywhere` for `Hint`'s reason: a document id is one unbreakable token
       // and this column is ~300px wide, so a preset named after its section
       // would otherwise push the panel into horizontal scroll.
       overflowWrap: 'anywhere',
       // Header text is uppercase with letter spacing; this is a SENTENCE and
-      // inherits neither. It sits outside `PanelHeader`, so this only guards
-      // against a future style reaching it from the section wrapper.
+      // inherits neither, and it renders INSIDE `PanelHeader`'s box, which
+      // declares all four (uppercase, letter-spaced, semibold, 10px) on the
+      // element this one is a child of. So all four are turned off here, not as
+      // a precaution but because the inherited value is wrong for prose.
       textTransform: 'none', letterSpacing: 0, fontWeight: T.wRegular,
     }}>{refusal.short}</div>
   );
