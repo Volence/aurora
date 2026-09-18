@@ -27,8 +27,30 @@ import { loadPanelState, savePanelState, isCollapsed, togglePanel, subscribePane
  */
 export type SectionVariant = 'content' | 'list';
 
-export function CollapsibleSection({ id, title, right, variant = 'content', defaultCollapsed = false, collapsedOverride, children }: {
+export function CollapsibleSection({ id, title, right, headerNote, variant = 'content', defaultCollapsed = false, collapsedOverride, children }: {
   id: string; title: string; right?: React.ReactNode; defaultCollapsed?: boolean;
+  /**
+   * A LINE THAT STAYS WHEN THE SECTION SHUTS, under the header row.
+   *
+   * It exists for one thing: an always-visible control in `right` whose
+   * EXPLANATION would otherwise be in `children`, which a collapsed section
+   * does not render at all (`{!collapsed && children}` below, and it is not
+   * merely hidden — there is no element in the DOM to find, to search, or to
+   * read out). Measured on both Delete buttons in the Effects column and
+   * settled by card DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE.
+   *
+   * ⚠ IT IS NOT A SECOND `right`. It renders BELOW the header row rather than
+   * inside it, because the header is one flex line holding a title that may be
+   * a long generated id, and a sentence squeezed into what is left of that line
+   * wraps to three words a row. It is also OUTSIDE the header's click target,
+   * so reading it never toggles the section.
+   *
+   * ⚠ AND IT IS FOR A SENTENCE A DISABLED CONTROL OWES THE AUTHOR, not for
+   * ordinary guidance. Anything that merely describes the form belongs in the
+   * form, where it sits beside what it describes; putting it here would spend
+   * the one always-visible line on something nothing visible promises.
+   */
+  headerNote?: React.ReactNode;
   /** See SectionVariant. Default `content` — the safe one; it cannot bury anything. */
   variant?: SectionVariant;
   /**
@@ -110,6 +132,14 @@ export function CollapsibleSection({ id, title, right, variant = 'content', defa
           </span>
         </PanelHeader>
       </div>
+      {/* AFTER the header div and OUTSIDE the collapse gate, in that order and
+          for two separate reasons. Outside the gate is the whole point: this is
+          the line that survives a shut section. After the header div is a
+          contract with every instrument that opens a section by clicking
+          `[data-section="..."]`'s FIRST element child (scratchpad/lib/
+          strict-aim.mjs, `openSectionOrThrow`) — a note rendered first would
+          silently become the thing they click. */}
+      {headerNote}
       {!collapsed && children}
     </div>
   );

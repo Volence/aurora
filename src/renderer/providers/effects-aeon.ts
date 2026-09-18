@@ -81,6 +81,12 @@ import {
 // keeps it. (`factorRatio` moved out of this file with the curve advisory: the
 // re-pointed one compares a SCROLL, so it calls the decode instead.)
 import { packFactor, resolveFactor } from '../../core/formats/effects/factor-decode';
+// THE TWO LENGTHS OF A DELETE REFUSAL, composed in ONE place so the header's
+// short form and the body's full sentence cannot come to name different
+// bindings (DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE). The preset refusal in
+// effects-preset.ts takes the same composer, which is why it lives in core/.
+import { deleteRefusalOf } from '../../core/formats/effects/delete-refusal';
+import type { DeleteRefusal, DeleteRefusalClause } from '../../core/formats/effects/delete-refusal';
 // The re-pointed curve advisory's arithmetic and its ONE transcribed pair of
 // aeon measurements. Kept out of this file so the drift gate that re-reads aeon
 // has a single small module to point at — see `curveRateAdvisoryParts`.
@@ -3922,11 +3928,19 @@ export const REGION_SCENE_BINDING_ROW = 'scene';
  * unguarded command and the agent handler still calls it directly, exactly as
  * `deletePresetCommand` does: an agent's request IS its explicit act, and there
  * is no human at a control to disable.
+ *
+ * ⚠ IT SPEAKS IN TWO LENGTHS (DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE,
+ * 2026-09-18), for `deletePresetRefusal`'s reason and through the same composer:
+ * this button sits in a `CollapsibleSection` header that arrives collapsed, so
+ * the body sentence is not in the DOM at the moment an author meets the greyed
+ * control. `core/formats/effects/delete-refusal.ts` builds `short` and `full`
+ * from ONE `lead` per clause, so the header and the body cannot name different
+ * bindings.
  */
 export function deleteSceneRefusal(
   sections: readonly ({ sceneRef: string | null } | null)[], id: string,
   act?: { regions?: ActRegionsState },
-): string | null {
+): DeleteRefusal | null {
   // `undefined` act, and `noRegionsLoaded()`'s state, are section mode by
   // `actHasRegionsFile`'s own rule, and take the arm below unchanged.
   const regions = act?.regions;
@@ -3936,11 +3950,15 @@ export function deleteSceneRefusal(
   const bound = sectionsBindingScene(sections, id);
   if (bound.length === 0) return null;
   const one = bound.length === 1;
-  return `${sceneBindingListWords('Section', 'Sections', bound)} ${one ? 'binds' : 'bind'} `
-    + `"${id}". Deleting it would leave ${one ? 'that binding' : 'those bindings'} naming a `
-    + 'document that does not exist, and aeon\'s build refuses that by name. Set the scene '
-    + `binding back to "${SCENE_REF_ACT_DEFAULT}" on ${one ? 'that section' : 'those sections'} `
-    + 'first, under Section assignment.';
+  return deleteRefusalOf([{
+    lead: `${sceneBindingListWords('Section', 'Sections', bound)} ${one ? 'binds' : 'bind'} `
+      + `"${id}"`,
+    joiner: '. ',
+    rest: `Deleting it would leave ${one ? 'that binding' : 'those bindings'} naming a `
+      + 'document that does not exist, and aeon\'s build refuses that by name. Set the scene '
+      + `binding back to "${SCENE_REF_ACT_DEFAULT}" on ${one ? 'that section' : 'those sections'} `
+      + 'first, under Section assignment.',
+  }]);
 }
 
 /**
@@ -3979,36 +3997,48 @@ function regionModeDeleteSceneRefusal(
   regions: ActRegionsState,
   sections: readonly ({ sceneRef: string | null } | null)[],
   id: string,
-): string | null {
-  const clauses: string[] = [];
+): DeleteRefusal | null {
+  const clauses: DeleteRefusalClause[] = [];
   if (regions.document === null) {
-    clauses.push(`Aurora cannot tell whether a region binds "${id}": this act is in region mode `
-      + 'and its regions.json could not be read, so the region rows that would name it are '
-      + 'unknown. Deleting it could leave a binding naming a document that does not exist, which '
-      + 'aeon\'s build refuses by name. The Regions panel says why the file was refused.');
+    clauses.push({
+      lead: `Aurora cannot tell whether a region binds "${id}"`,
+      joiner: ': ',
+      rest: 'this act is in region mode '
+        + 'and its regions.json could not be read, so the region rows that would name it are '
+        + 'unknown. Deleting it could leave a binding naming a document that does not exist, which '
+        + 'aeon\'s build refuses by name. The Regions panel says why the file was refused.',
+    });
   } else {
     const binders = regionsBindingScene(regions.document, id);
     if (binders.length > 0) {
       const one = binders.length === 1;
-      clauses.push(`${sceneBindingListWords('Region', 'Regions', binders)} `
-        + `${one ? 'binds' : 'bind'} "${id}". Deleting it would leave `
-        + `${one ? 'that binding' : 'those bindings'} naming a document that does not exist, and `
-        + 'aeon\'s build refuses that by name. Select '
-        + `${one ? 'that region' : 'those regions'} in the Regions panel and use "revert to `
-        + `inherited" on ${one ? 'its' : 'the'} ${REGION_SCENE_BINDING_ROW} row, under Bindings, `
-        + 'first.');
+      clauses.push({
+        lead: `${sceneBindingListWords('Region', 'Regions', binders)} `
+          + `${one ? 'binds' : 'bind'} "${id}"`,
+        joiner: '. ',
+        rest: 'Deleting it would leave '
+          + `${one ? 'that binding' : 'those bindings'} naming a document that does not exist, and `
+          + 'aeon\'s build refuses that by name. Select '
+          + `${one ? 'that region' : 'those regions'} in the Regions panel and use "revert to `
+          + `inherited" on ${one ? 'its' : 'the'} ${REGION_SCENE_BINDING_ROW} row, under Bindings, `
+          + 'first.',
+      });
     }
   }
   const bound = sectionsBindingScene(sections, id);
   if (bound.length > 0) {
     const one = bound.length === 1;
-    clauses.push(`${sceneBindingListWords('Section', 'Sections', bound)} still `
-      + `${one ? 'carries' : 'carry'} sceneRef "${id}" in ${one ? 'its sidecar' : 'their sidecars'} `
-      + 'beside regions.json, which aeon\'s check_mode_conflict refuses. Clearing '
-      + `${one ? 'it' : 'them'} under Section assignment is allowed, and it is what removes `
-      + `${one ? 'that binding' : 'those bindings'}.`);
+    clauses.push({
+      lead: `${sceneBindingListWords('Section', 'Sections', bound)} still `
+        + `${one ? 'carries' : 'carry'} sceneRef "${id}" in `
+        + `${one ? 'its sidecar' : 'their sidecars'}`,
+      joiner: ' ',
+      rest: 'beside regions.json, which aeon\'s check_mode_conflict refuses. Clearing '
+        + `${one ? 'it' : 'them'} under Section assignment is allowed, and it is what removes `
+        + `${one ? 'that binding' : 'those bindings'}.`,
+    });
   }
-  return clauses.length === 0 ? null : clauses.join(' ');
+  return deleteRefusalOf(clauses);
 }
 
 /**

@@ -42,7 +42,7 @@ describe('a preset nothing binds deletes exactly as before', () => {
 
 describe('a preset a section binds is refused, and the sentence is actionable', () => {
   it('one section: names it, names the build\'s own failure, and says what to do', () => {
-    const why = deletePresetRefusal([sec(null), sec(null), sec('mine')], 'mine')!;
+    const why = deletePresetRefusal([sec(null), sec(null), sec('mine')], 'mine')!.full;
     expect(why).toMatch(/^Section 2 binds "mine"\./);
     expect(why).toMatch(/aeon's build refuses that by name/);
     // THE ESCAPE, named as a control the author can find — the difference
@@ -52,7 +52,7 @@ describe('a preset a section binds is refused, and the sentence is actionable', 
   });
 
   it('several sections: all of them, in index order, in English', () => {
-    const why = deletePresetRefusal([sec('mine'), sec(null), sec('mine'), sec('mine')], 'mine')!;
+    const why = deletePresetRefusal([sec('mine'), sec(null), sec('mine'), sec('mine')], 'mine')!.full;
     expect(why).toMatch(/^Sections 0, 2 and 3 bind "mine"\./);
     expect(why).toMatch(/those bindings naming a document that does not exist/);
   });
@@ -137,7 +137,7 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
     const solo = bound.find((b) => bound.filter((o) => o.ref === b.ref).length === 1)!;
     expect(solo).toBeDefined();
     const sections = Array.from({ length: 9 }, () => sec(null));
-    const why = deletePresetRefusal(sections, solo.ref, ojzAct())!;
+    const why = deletePresetRefusal(sections, solo.ref, ojzAct())!.full;
     expect(why).toBe(`Region ${solo.id} binds "${solo.ref}". Deleting it would leave that binding `
       + 'naming a document that does not exist, and aeon\'s build refuses that by name. Select '
       + `that region in the Regions panel and use "revert to inherited" on its `
@@ -153,7 +153,7 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
       { id: 'b', rasterRef: 'mine' }, { id: 'a', rasterRef: 'other' },
       { id: 'b', rasterRef: 'mine' }, { id: 'c', rasterRef: 'mine' }, { id: 'd' },
     ]);
-    const why = deletePresetRefusal([sec(null)], 'mine', act)!;
+    const why = deletePresetRefusal([sec(null)], 'mine', act)!.full;
     expect(why).toMatch(/^Regions b and c bind "mine"\./);
     expect(why).toMatch(/those bindings naming a document that does not exist/);
     expect(why).toMatch(/Select those regions in the Regions panel/);
@@ -164,7 +164,7 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
     // "the file exists and could not be read": whether a region binds this
     // document is UNKNOWN, and answering null here would print a clean bill of
     // health derived from a failed read.
-    const why = deletePresetRefusal([sec(null)], 'mine', refusedAct());
+    const why = deletePresetRefusal([sec(null)], 'mine', refusedAct())?.full ?? null;
     expect(why).not.toBeNull();
     expect(why!).toMatch(/^Aurora cannot tell whether a region binds "mine":/);
     expect(why!).toMatch(/regions\.json could not be read/);
@@ -183,7 +183,7 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
     expect(regionsBindingPreset(act.regions.document, 'mine')).toEqual([]);
     // ...and it does find the REF, so the rows above are not green by accident.
     const bound = regionAct([{ id: 'a', preset: 'Other_Record', rasterRef: 'mine' }]);
-    expect(deletePresetRefusal([sec(null)], 'mine', bound)).toMatch(/^Region a binds "mine"\./);
+    expect(deletePresetRefusal([sec(null)], 'mine', bound)!.full).toMatch(/^Region a binds "mine"\./);
     expect(regionsBindingPreset(bound.regions.document, 'mine')).toEqual(['a']);
     // Absent and null are the same "no binding", as everywhere else in the codec.
     expect(deletePresetRefusal([sec(null)], 'mine', regionAct([{ id: 'a' }]))).toBeNull();
@@ -210,7 +210,7 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
     // exists for. Both bindings dangle if the document goes, and clearing the
     // sidecar is the repair for the mode conflict as well, so both are said.
     const act = regionAct([{ id: 'a', rasterRef: 'mine' }]);
-    const why = deletePresetRefusal([sec('mine'), sec(null), sec('mine')], 'mine', act)!;
+    const why = deletePresetRefusal([sec('mine'), sec(null), sec('mine')], 'mine', act)!.full;
     expect(why).toMatch(/^Region a binds "mine"\./);
     expect(why).toMatch(/Sections 0 and 2 still carry rasterRef "mine" in their sidecars/);
     expect(why).toMatch(/check_mode_conflict refuses/);
@@ -222,13 +222,13 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
     // sidecar. The clause must not read as a continuation of a clause that is
     // not there.
     const why = deletePresetRefusal([sec(null), sec('mine')], 'mine',
-      regionAct([{ id: 'a', rasterRef: 'other' }]))!;
+      regionAct([{ id: 'a', rasterRef: 'other' }]))!.full;
     expect(why).toMatch(/^Section 1 still carries rasterRef "mine" in its sidecar/);
     expect(why).toMatch(/Clearing it in the Section dropdown above is allowed/);
   });
 
   it('[unread-both] a refused document and a leftover sidecar say both things', () => {
-    const why = deletePresetRefusal([sec('mine')], 'mine', refusedAct())!;
+    const why = deletePresetRefusal([sec('mine')], 'mine', refusedAct())!.full;
     expect(why).toMatch(/^Aurora cannot tell whether a region binds "mine":/);
     expect(why).toMatch(/Section 0 still carries rasterRef "mine" in its sidecar/);
   });
@@ -240,14 +240,18 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
     const sections = [sec(null), sec(null), sec('mine')];
     const old = deletePresetRefusal(sections, 'mine')!;
     const none = { regions: { document: null, loadedPath: null, unreadable: null } };
-    expect(deletePresetRefusal(sections, 'mine', none)).toBe(old);
-    expect(deletePresetRefusal(sections, 'mine', {})).toBe(old);
-    expect(old).toMatch(/^Section 2 binds "mine"\./);
-    expect(old).toMatch(/Section dropdown above/);
+    // `toEqual` and not `toBe` since the refusal became a PAIR: the composer
+    // returns a fresh object per call, so identity would now be false for two
+    // sentences that are word for word the same. Both halves are compared,
+    // which is what this row is about.
+    expect(deletePresetRefusal(sections, 'mine', none)).toEqual(old);
+    expect(deletePresetRefusal(sections, 'mine', {})).toEqual(old);
+    expect(old.full).toMatch(/^Section 2 binds "mine"\./);
+    expect(old.full).toMatch(/Section dropdown above/);
     // ...and the region-mode arm really does say something else, so the row
     // above is not comparing one sentence with itself.
     expect(deletePresetRefusal(sections, 'mine', regionAct([{ id: 'a', rasterRef: 'mine' }])))
-      .not.toBe(old);
+      .not.toEqual(old);
   });
 
   it('[ctrl] the region sentence names a control that exists in the Regions panel', () => {
@@ -264,7 +268,7 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
     // no longer carries that name.
     expect(REGION_RASTER_BINDING_ROW).toBe(BINDING_LABELS.raster);
     const why = deletePresetRefusal([sec(null)], 'mine',
-      regionAct([{ id: 'a', rasterRef: 'mine' }]))!;
+      regionAct([{ id: 'a', rasterRef: 'mine' }]))!.full;
     expect(why).toContain('"revert to inherited"');
     expect(why).toContain(`${BINDING_LABELS.raster} row`);
     expect(why).toContain('under Bindings');
@@ -278,7 +282,13 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
       deletePresetRefusal([sec('mine')], 'mine', refusedAct()),
       deletePresetRefusal([sec('mine')], 'mine', regionAct([{ id: 'a' }])),
     ];
-    const codes = texts.flatMap((t) => [...String(t)].map((ch) => ch.codePointAt(0)));
+    // ⚠ BOTH LENGTHS, and `String(t)` would no longer reach either: the refusal
+    // is a `{ short, full }` PAIR since DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE,
+    // and stringifying an object yields `[object Object]`, which contains no
+    // dash and would make this row vacuous against every sentence it names.
+    const codes = texts.flatMap((t) => [...`${t?.short ?? ''}${t?.full ?? ''}`]
+      .map((ch) => ch.codePointAt(0)));
+    expect(codes.length).toBeGreaterThan(400);
     expect(codes).not.toContain(0x2013);
     expect(codes).not.toContain(0x2014);
   });
@@ -287,7 +297,15 @@ describe('deleting a preset a REGION binds is refused (DELETE-PRESET-REGION-BOUN
 describe('the panel is wired to the guard, from one derivation', () => {
   it('Delete is disabled by the refusal and the refusal is rendered', () => {
     expect(code).toMatch(/disabled=\{deleteRefusal !== null\}/);
-    expect(code).toMatch(/\{deleteRefusal !== null && <Hint tone="warning">\{deleteRefusal\}<\/Hint>\}/);
+    expect(code).toMatch(/\{deleteRefusal !== null && <Hint tone="warning">\{deleteRefusal\.full\}<\/Hint>\}/);
+    // ...and the SHORT form of the same derivation is in the always-visible
+    // header, which is the whole of DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE:
+    // this section is `defaultCollapsed`, so a reason that lives only in the
+    // body is not in the DOM at the moment the greyed button is met.
+    expect(code).toMatch(/headerNote=\{deleteRefusal !== null && \(\s*<HeaderRefusal refusal=\{deleteRefusal\}/);
+    // The header takes the PAIR, never a string, so there is nowhere for a
+    // second hand-typed sentence to enter.
+    expect(code).not.toMatch(/<HeaderRefusal[^>]*refusal=\{deleteRefusal\.(short|full)\}/);
     // ONE derivation for both — the disabled state and the sentence cannot
     // describe different conditions, which is `lastBandRefusal`'s rule.
     expect(code).toMatch(/deletePresetRefusal\(act\.sections, selected\.id, act\)/);

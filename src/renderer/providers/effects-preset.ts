@@ -194,6 +194,13 @@ import {
 import {
   rampSignRateCaveat, RAMP_SIGN_FIELDS_AWAITING_AEON,
 } from '../../core/formats/effects/ramp-sign-lag';
+// THE TWO LENGTHS OF A DELETE REFUSAL, composed in ONE place so the header's
+// short form and the body's full sentence cannot come to name different
+// bindings (DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE). core/ and not here
+// because `deleteSceneRefusal` in effects-aeon.ts needs the same composer and
+// this module already imports FROM that one.
+import { deleteRefusalOf } from '../../core/formats/effects/delete-refusal';
+import type { DeleteRefusal, DeleteRefusalClause } from '../../core/formats/effects/delete-refusal';
 // WHICH OF TWO EFFECTS A VSRAM RAMP PRODUCES — the sentences and the measured
 // aeon chain live in core/, this file only RESOLVES the bindings. Same split as
 // the caveat above and for the same reason: the fact is a peer repo's, measured
@@ -918,11 +925,20 @@ function bindingListWords(
  * ⚠ IT IS NOT A CONFIRM DIALOG EITHER. A confirm asks "are you sure?" about a
  * consequence the author cannot see; this names the sections, which is the thing
  * they would have had to go and find out.
+ *
+ * ⚠ IT SPEAKS IN TWO LENGTHS (DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE,
+ * 2026-09-18), and NEITHER is composed here. The control it explains sits in a
+ * `CollapsibleSection` header that arrives collapsed, so a ~250-character
+ * sentence in the section BODY is not in the DOM at the moment an author meets
+ * the greyed button. `core/formats/effects/delete-refusal.ts` builds `short`
+ * and `full` from ONE `lead` per clause: the header paints `short`, the body
+ * paints `full`, and there is no second statement of who binds what for the two
+ * to disagree about.
  */
 export function deletePresetRefusal(
   sections: readonly ({ rasterRef: string | null } | null)[], id: string,
   act?: { regions?: ActRegionsState },
-): string | null {
+): DeleteRefusal | null {
   // ═══ REGION MODE (DELETE-PRESET-REGION-BOUND, 2026-09-17) ═══
   //
   // ⚠ THIS IS THE ONE READING ON THE BAND-PRESET SURFACE THAT IS NOT SUPPRESSED
@@ -941,11 +957,15 @@ export function deletePresetRefusal(
   const bound = sectionsBindingPreset(sections, id);
   if (bound.length === 0) return null;
   const list = bindingListWords('Section', 'Sections', bound);
-  return `${list} ${bound.length === 1 ? 'binds' : 'bind'} "${id}". Deleting it would leave `
-    + `${bound.length === 1 ? 'that binding' : 'those bindings'} naming a document that does not `
-    + 'exist, and aeon\'s build refuses that by name. Set the raster binding back to '
-    + `"${RASTER_REF_ROW.unbound}" on ${bound.length === 1 ? 'that section' : 'those sections'} `
-    + 'first, in the Section dropdown above.';
+  return deleteRefusalOf([{
+    lead: `${list} ${bound.length === 1 ? 'binds' : 'bind'} "${id}"`,
+    joiner: '. ',
+    rest: 'Deleting it would leave '
+      + `${bound.length === 1 ? 'that binding' : 'those bindings'} naming a document that does not `
+      + 'exist, and aeon\'s build refuses that by name. Set the raster binding back to '
+      + `"${RASTER_REF_ROW.unbound}" on ${bound.length === 1 ? 'that section' : 'those sections'} `
+      + 'first, in the Section dropdown above.',
+  }]);
 }
 
 /**
@@ -1000,35 +1020,51 @@ function regionModeDeletePresetRefusal(
   regions: ActRegionsState,
   sections: readonly ({ rasterRef: string | null } | null)[],
   id: string,
-): string | null {
-  const clauses: string[] = [];
+): DeleteRefusal | null {
+  const clauses: DeleteRefusalClause[] = [];
   if (regions.document === null) {
-    clauses.push(`Aurora cannot tell whether a region binds "${id}": this act is in region mode `
-      + 'and its regions.json could not be read, so the region rows that would name it are '
-      + 'unknown. Deleting it could leave a binding naming a document that does not exist, which '
-      + 'aeon\'s build refuses by name. The Regions panel says why the file was refused.');
+    // ⚠ THE SHORT FORM OF THIS CLAUSE IS THE CANNOT-TELL ITSELF, never a
+    // shortened version of the cause. "Aurora cannot tell whether a region
+    // binds this" is the fact a greyed button needs beside it; WHY it cannot
+    // tell (the file, the read, the Regions panel's own notice) is the body's.
+    clauses.push({
+      lead: `Aurora cannot tell whether a region binds "${id}"`,
+      joiner: ': ',
+      rest: 'this act is in region mode '
+        + 'and its regions.json could not be read, so the region rows that would name it are '
+        + 'unknown. Deleting it could leave a binding naming a document that does not exist, which '
+        + 'aeon\'s build refuses by name. The Regions panel says why the file was refused.',
+    });
   } else {
     const binders = regionsBindingPreset(regions.document, id);
     if (binders.length > 0) {
       const one = binders.length === 1;
-      clauses.push(`${bindingListWords('Region', 'Regions', binders)} ${one ? 'binds' : 'bind'} `
-        + `"${id}". Deleting it would leave ${one ? 'that binding' : 'those bindings'} naming a `
-        + 'document that does not exist, and aeon\'s build refuses that by name. Select '
-        + `${one ? 'that region' : 'those regions'} in the Regions panel and use "revert to `
-        + `inherited" on ${one ? 'its' : 'the'} ${REGION_RASTER_BINDING_ROW} row, under Bindings, `
-        + 'first.');
+      clauses.push({
+        lead: `${bindingListWords('Region', 'Regions', binders)} ${one ? 'binds' : 'bind'} `
+          + `"${id}"`,
+        joiner: '. ',
+        rest: `Deleting it would leave ${one ? 'that binding' : 'those bindings'} naming a `
+          + 'document that does not exist, and aeon\'s build refuses that by name. Select '
+          + `${one ? 'that region' : 'those regions'} in the Regions panel and use "revert to `
+          + `inherited" on ${one ? 'its' : 'the'} ${REGION_RASTER_BINDING_ROW} row, under Bindings, `
+          + 'first.',
+      });
     }
   }
   const bound = sectionsBindingPreset(sections, id);
   if (bound.length > 0) {
     const one = bound.length === 1;
-    clauses.push(`${bindingListWords('Section', 'Sections', bound)} still `
-      + `${one ? 'carries' : 'carry'} rasterRef "${id}" in ${one ? 'its sidecar' : 'their sidecars'} `
-      + 'beside regions.json, which aeon\'s check_mode_conflict refuses. Clearing '
-      + `${one ? 'it' : 'them'} in the Section dropdown above is allowed, and it is what removes `
-      + `${one ? 'that binding' : 'those bindings'}.`);
+    clauses.push({
+      lead: `${bindingListWords('Section', 'Sections', bound)} still `
+        + `${one ? 'carries' : 'carry'} rasterRef "${id}" in `
+        + `${one ? 'its sidecar' : 'their sidecars'}`,
+      joiner: ' ',
+      rest: 'beside regions.json, which aeon\'s check_mode_conflict refuses. Clearing '
+        + `${one ? 'it' : 'them'} in the Section dropdown above is allowed, and it is what removes `
+        + `${one ? 'that binding' : 'those bindings'}.`,
+    });
   }
-  return clauses.length === 0 ? null : clauses.join(' ');
+  return deleteRefusalOf(clauses);
 }
 
 /**
