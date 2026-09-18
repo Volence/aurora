@@ -141,6 +141,16 @@ stale one was the more actionable of the pair. Nothing was wrong with either row
 written. The landing step that closes an item is *replace the row*, never *add the outcome
 beside it*.
 
+### ⚠ THIS LANE'S QUEUE LIVES IN A FILE GIT DOES NOT TRACK — A FOLD IS A RESCUE, NOT A TIDY
+
+*(2026-09-18, measured here before folding. Swept suite-wide by the hub the same hour: `docs/lane-status.json` is **tracked** in aeon, oracle, seraph and empyrean and **gitignored** in aurora and sigil. Two of six, and both exposed lanes looked identical to the four safe ones from the board.)*
+
+**Measured across all 20 rows: EIGHT existed in no committed file at all**, six of them `open` work. `docs/lane-status.json` is gitignored here, so the backlog was living where no reader but the live session could open it, and **nothing would have announced the loss** — the console reads `ok` either way, because **it validates SHAPE and never DURABILITY**. Rescued verbatim to `docs/ROADMAP.md` §5.1 rows 192-203.
+
+⚠ **THE TEST IS NOT "DOES THE ID APPEAR IN A COMMITTED FILE". IT IS "DOES IT APPEAR IN A FILE THAT RECORDS *OPEN WORK*".** Two more rows here were booked only in `docs/lane-log.jsonl`, which records what HAPPENED and never what is OPEN; sigil's sample found the same shape, plus one row booked only in `docs/decisions.jsonl`. **Both files make a row look booked to a naive grep while recording something else**, so the obvious check calls those rows safe. `ROADMAP.md` §5.1 and a review packet book open work; the log and the decisions ledger do not.
+
+**So before removing ANY row from `lane-status.json`, grep its id and read what the hit actually is.** A fold that deletes a row whose only home was the log destroys it silently, and the deletion looks exactly like tidying.
+
 ### ⚠ `state` AND `blockedBy` CAN DISAGREE IN EITHER DIRECTION, AND ONLY ONE DIRECTION HURTS
 
 *(2026-09-18. Found here at boot while measuring my own queue for the hub; the hub hit the INVERSE within the hour, found by seraph, and banked it at empyrean `25b5091b`. Recorded here because a correction that lands only in the hub's tree has no local reader in this one.)*
