@@ -22,6 +22,7 @@ import {
   reelsEnabled, reelRatesValue, reelStripLabel, reelStripTitle,
   reelRateWriteRefusal, reelsToggleCommand, setReelRateCommand, reelsBindingAdvisories,
 } from '../../src/renderer/providers/effects-aeon';
+import { REELS_BINDING_ADVICE_TAIL } from '../../src/core/formats/effects/scene';
 
 /**
  * `reels` — the AUTHORING half of EFFECTS-W1 DoD item 10 (EW-REELS-PANEL).
@@ -542,6 +543,122 @@ describe('the binding advisory is surfaced WITHOUT being turned into a clearance
     expect(warning).not.toBe(EFFECTS_REELS_BINDING_NOTE.short);
     expect(PANEL_SRC).toContain('REELS_ROW.binding.short');
     expect(PANEL_SRC).toContain('reelsBindingAdvisories(selected, act.sections)');
+  });
+});
+
+// ═══ THE BINDING ADVISORY ON A REGION-MODE ACT ═══
+//
+// (SCENE-RELATION-REGION-MODE, the rest, 2026-09-18 — candidate row 2 of the
+// shipped parcel's review packet.)
+//
+// ⚠ THIS ARM WAS NOT QUIET, IT WAS INVERTED. On an act whose regions.json
+// exists, every section sidecar `sceneRef` is null (aeon's check_mode_conflict
+// refuses one), so the section lookup found no binder and warned on EVERY scene
+// of the act — loudest of all on the scene a region actually binds at rung 1,
+// which is the case the generator ACCEPTS. That is the one shape of wrong
+// advice that teaches an author to stop reading the channel.
+describe('the reels binding advisory follows the bindings onto region rows', () => {
+  const regionsAct = (regions: Array<{ id: string; sceneRef?: string | null }>) => ({
+    regions: {
+      document: {
+        schema: 1,
+        act: 'zz_act1',
+        regions: regions.map((r) => ({ ...r, rect: { x: 0, y: 0, w: 2048, h: 2048 }, preset: 'ZZ' })),
+      },
+      loadedPath: 'data/regions.json',
+      unreadable: null,
+    },
+  });
+  const refusedAct = () => ({
+    regions: { document: null, loadedPath: null, unreadable: { path: 'r.json', reason: 'bad' } },
+  });
+  const sectionModeAct = () => ({ regions: { document: null, loadedPath: null, unreadable: null } });
+  const reelScene = () => scene({ rates: descendingRates() });
+  // Every section is null-ref, which is what region mode looks like on disk.
+  const emptyRefs = [{ sceneRef: null }, { sceneRef: null }];
+
+  it('[g1] is SILENT when a region binds the scene, where the section lookup warned', () => {
+    const s = reelScene();
+    // The section arm on the same inputs: this is the sentence that was on screen.
+    expect(reelsBindingAdvisories(s, emptyRefs)).toHaveLength(1);
+    // With the act, the region that binds it is found and there is nothing to say.
+    expect(reelsBindingAdvisories(s, emptyRefs, regionsAct([{ id: 'sec4', sceneRef: s.id }])))
+      .toEqual([]);
+  });
+
+  it('[g2] warns in the REGION\'s words when no region binds it, and keeps the advice tail', () => {
+    const s = reelScene();
+    const msgs = reelsBindingAdvisories(s, emptyRefs, regionsAct([
+      { id: 'sec0', sceneRef: 'somebody_else' }, { id: 'sec1' },
+    ]));
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain(`no region in this act names "${s.id}" in its sceneRef`);
+    expect(msgs[0]).not.toContain('no section in this project');
+    // THE HALF THAT MUST NEVER BE DROPPED, asserted by reading the constant both
+    // arms are built from rather than by matching a phrase of it: an arm that
+    // lost the tail would still read like a warning and would have become a verdict.
+    expect(msgs[0].endsWith(REELS_BINDING_ADVICE_TAIL)).toBe(true);
+    expect(reelsBindingAdvisories(s, [{ sceneRef: 'other' }])[0].endsWith(REELS_BINDING_ADVICE_TAIL))
+      .toBe(true);
+  });
+
+  it('[g3] a null region sceneRef is NOT a binder: it lowers to a defer, not to rung 1', () => {
+    // The shipped parcel's design call 2, applied here. A region with no scene
+    // binding of its own resolves through the preset's parallax, which is not
+    // the rung the association table is keyed on, so counting it would
+    // manufacture exactly the clearance this advisory may never give.
+    const s = reelScene();
+    expect(reelsBindingAdvisories(s, emptyRefs, regionsAct([{ id: 'sec0', sceneRef: null }])))
+      .toHaveLength(1);
+  });
+
+  it('[g4] a LEFTOVER sidecar sceneRef does not silence it: the build refuses that ref', () => {
+    const s = reelScene();
+    const msgs = reelsBindingAdvisories(s, [{ sceneRef: s.id }], regionsAct([{ id: 'sec0' }]));
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain('no region in this act');
+  });
+
+  it('[g5] a refused regions.json SPEAKS: the bindings cannot be told, which is not "none"', () => {
+    const s = reelScene();
+    const msgs = reelsBindingAdvisories(s, emptyRefs, refusedAct());
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain('regions.json could not be read');
+    expect(msgs[0]).toContain('The Regions panel says why the file was refused.');
+    // It must not claim the negative case it cannot have measured.
+    expect(msgs[0]).not.toContain('no region in this act names');
+    expect(msgs[0].endsWith(REELS_BINDING_ADVICE_TAIL)).toBe(true);
+  });
+
+  it('[g6] a scene with no reels key says nothing in region mode either', () => {
+    // The gate the codec applies first. Without it the refused arm above would
+    // warn about a key that is not there, on every scene of an act whose file
+    // was refused.
+    expect(reelsBindingAdvisories(scene(), emptyRefs, regionsAct([{ id: 'a' }]))).toEqual([]);
+    expect(reelsBindingAdvisories(scene(), emptyRefs, refusedAct())).toEqual([]);
+  });
+
+  it('[g7] SECTION MODE IS UNTOUCHED, including the empty-list silence', () => {
+    const s = reelScene();
+    const act = sectionModeAct();
+    expect(reelsBindingAdvisories(s, [{ sceneRef: 'other' }], act))
+      .toEqual(reelsBindingAdvisories(s, [{ sceneRef: 'other' }]));
+    expect(reelsBindingAdvisories(s, [{ sceneRef: s.id }], act)).toEqual([]);
+    // "this project has no sections" is still a different fact from "no section
+    // binds this scene", and an act with no regions file must not change that.
+    expect(reelsBindingAdvisories(s, [], act)).toEqual([]);
+    expect(reelsBindingAdvisories(s, [null, null], act)).toEqual([]);
+  });
+
+  it('[g8] no en dash or em dash in any region-mode reels sentence', () => {
+    const s = reelScene();
+    const texts = [
+      ...reelsBindingAdvisories(s, emptyRefs, regionsAct([{ id: 'a' }])),
+      ...reelsBindingAdvisories(s, emptyRefs, refusedAct()),
+    ];
+    const codes = texts.flatMap((t) => [...t].map((ch) => ch.codePointAt(0)));
+    expect(codes).not.toContain(0x2013);
+    expect(codes).not.toContain(0x2014);
   });
 });
 
