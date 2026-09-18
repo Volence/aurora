@@ -86,6 +86,13 @@ MUTATIONS = [
      'if (true as boolean) {',
      'the preset region arm becomes a WALL — every preset refuses',
      '[p2] [p4]'),
+    ('M10', PROV_S,
+     ' row, under Bindings, ',
+     ' row, under Binding, ',
+     'the provider rewords the SCENE sentence by one letter — [ds]s own '
+     'mutation, which M4 does NOT supply: M4 only touches the preset provider, '
+     'so without this the scene anti-drift gate is an unproven row',
+     '[ds] [s4]'),
     ('M9', PROV_S,
      'if (binders.length > 0) {',
      'if (true as boolean) {',
