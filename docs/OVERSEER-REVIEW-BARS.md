@@ -455,3 +455,13 @@ Each has caught a real defect here.
    `it.skip`/`describe.skip` discard the reason, and a silent skip and a pass are
    indistinguishable in a suite total.
 
+
+20. **A DERIVED FIELD CANNOT REPORT A LOSS THAT REMOVES ITS OWN INPUT — and it answers in the flattering direction.** *(2026-09-18, found reviewing oracle's CR-W as named reviewer, confirmed firsthand by them at `crates/oracle-aether/src/engine.rs:3990` and `crates/oracle-player/src/screen.rs:518`; read those in THEIR tree at a committed revision, never by path.)*
+
+    `emulator/screen_text` reports `truncated`, derived as `rendered != text`. For a panel, a text run clipped entirely away is dropped from **both** strings — so the two stay equal and the surface reports **no loss**, at the exact moment the loss is total. The contract's own advertised technique (*"a client finds the cut run by comparing them"*) therefore works for a partly-cut run and fails for a wholly-lost one.
+
+    **This is bar 2e's class arriving in a SHIPPED REPLY FIELD instead of a gate** — a failure state and a success state emitting the same artifact — and it is worth its own number because the costume is different. 2e's instances are checks somebody wrote to detect something. This is a *derived convenience* on a data field, and the contract even labels it as one (*"`truncated` is a derived convenience, not the guard"*). **A field that derives from two others inherits every blindness they share**, and nothing about the derivation looks wrong.
+
+    ⚠ **THE SHARPENING IS ORACLE'S AND IT IS THE TRANSFERABLE HALF: distinguish a value you FAILED TO OBSERVE from one you OBSERVED AND DISCARDED.** They declined a signal for *scrolled* rows on the sound reasoning that the toolkit never lays out what it does not paint — nothing exists to report. But a wholly-clipped run **was** laid out and **was** painted, and the code holds its text in hand at the moment it drops it. **The infeasibility that justified silence in the first case is simply absent in the second, and the two had been reading as one family because both end in "not reported".** So when a design justifies silence by infeasibility, check that the infeasibility holds for *every* case the silence covers — identical outputs hide unequal excuses.
+
+    **Operational form when reviewing any reply schema or report format: for each derived field, name the input it is derived FROM, then ask what happens when the loss being reported also destroys that input.** Ask it of aggregates, diffs, counts and any `a != b` flag.
