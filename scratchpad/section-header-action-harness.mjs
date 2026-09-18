@@ -688,18 +688,28 @@ async function main() {
       (() => {
         // A count badge in an Explorer header: a span holding only digits that
         // sits inside a PanelHeader div.
+        // ⚠ WALKS UP; it does NOT require the IMMEDIATE parent (2026-09-18).
+        // PanelHeader used to be a single padded flex row, so a right-slot badge's
+        // parent WAS the uppercase box. The header-note change (the reason a Delete
+        // is greyed) made it a padded BLOCK wrapping a flex row, so the badge's
+        // parent is now that inner row and the uppercase box is its grandparent.
+        // This row went COULD NOT MEASURE against a working app: the badge never
+        // moved on screen, only its DEPTH changed. Depth was never the property.
+        const headerBoxOf = (el) => {
+          for (let p = el.parentElement, i = 0; p && i < 4; p = p.parentElement, i++) {
+            if (p.tagName === 'DIV'
+                && getComputedStyle(p).textTransform === 'uppercase'
+                && parseFloat(getComputedStyle(p).paddingLeft) > 0) return p;
+          }
+          return null;
+        };
         const spans = [...document.querySelectorAll('span')];
-        const badge = spans.find((e) => {
-          if (!/^\d+$/.test((e.textContent || '').trim())) return false;
-          let p = e.parentElement;
-          return !!(p && p.tagName === 'DIV'
-                    && getComputedStyle(p).textTransform === 'uppercase'
-                    && parseFloat(getComputedStyle(p).paddingLeft) > 0);
-        });
+        const badge = spans.find((e) =>
+          /^\d+$/.test((e.textContent || '').trim()) && headerBoxOf(e));
         if (!badge) return { found: false, why: 'no digits-only count badge in any PanelHeader' };
-        const header = badge.parentElement;
-        const section = header.parentElement.parentElement;
+        const header = headerBoxOf(badge);
         const wrapper = header.parentElement;
+        const section = wrapper.parentElement;
         const heading = (header.querySelector('span') || {}).textContent || '';
         const r = badge.getBoundingClientRect();
         return {
@@ -715,16 +725,19 @@ async function main() {
       await clickAt(c, cnt.pt);
       const after6 = await c.json(String.raw`
         (() => {
+          const headerBoxOf = (el) => {
+            for (let p = el.parentElement, i = 0; p && i < 4; p = p.parentElement, i++) {
+              if (p.tagName === 'DIV'
+                  && getComputedStyle(p).textTransform === 'uppercase'
+                  && parseFloat(getComputedStyle(p).paddingLeft) > 0) return p;
+            }
+            return null;
+          };
           const spans = [...document.querySelectorAll('span')];
-          const badge = spans.find((e) => {
-            if (!/^\d+$/.test((e.textContent || '').trim())) return false;
-            let p = e.parentElement;
-            return !!(p && p.tagName === 'DIV'
-                      && getComputedStyle(p).textTransform === 'uppercase'
-                      && parseFloat(getComputedStyle(p).paddingLeft) > 0);
-          });
+          const badge = spans.find((e) =>
+            /^\d+$/.test((e.textContent || '').trim()) && headerBoxOf(e));
           if (!badge) return { found: false };
-          const header = badge.parentElement, wrapper = header.parentElement;
+          const header = headerBoxOf(badge), wrapper = header.parentElement;
           const section = wrapper.parentElement;
           return { found: true,
             bodyKids: [...section.children].filter((el) => el !== wrapper).length };
