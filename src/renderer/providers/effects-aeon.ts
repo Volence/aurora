@@ -26,6 +26,7 @@ import type {
 import {
   EFFECTS_LAYER_DEFAULTS,
   EFFECTS_REEL_BAND_COUNT, EFFECTS_REEL_RATE_BOUNDS, advisoryReelsBinding,
+  reelsBindingWarning, REELS_BINDING_ADVICE_TAIL,
   type EffectsScene, type EffectsSceneLibrary, type EffectsFactor, type EffectsLayer,
   type EffectsTableRef, type EffectsCurve, type EffectsVSplit, type EffectsDrift,
   type EffectsSceneDeform, type EffectsVDeform, type EffectsLayerDeform,
@@ -3152,10 +3153,22 @@ export function sceneVsplitLockAdvisory(
  * the section, and on a locked scene the layers divide one screen. This
  * docblock said "8" until empyrean `277bc15` raised it to 16 — the function was
  * always derived, so only the sentence describing it was ever wrong.
+ *
+ * ⚠ THE SCOPE CLAUSE IS MODE-DEPENDENT AND THE CAP IS NOT (SCENE-RELATION-REGION-
+ * MODE, the rest, 2026-09-18). `MAX_PARALLAX_BANDS` is per SCENE in both modes, so
+ * `N of M` never moves; what moves is WHO BINDS THE SCENE. On a region-mode act no
+ * section binds one (aeon's `check_mode_conflict` refuses a sidecar `sceneRef`
+ * beside regions.json), so "scenes are assigned per section" was false on every
+ * scene of such an act, painted under LAYERS on OJZ act 1. Mode through
+ * `actHasRegionsFile`, ruling B1's one predicate, and the act is OPTIONAL so every
+ * existing caller keeps the section sentence unchanged.
  */
-export function layerCountLine(scene: Pick<EffectsScene, 'layers'>): string {
+export function layerCountLine(
+  scene: Pick<EffectsScene, 'layers'>, act?: { regions?: ActRegionsState },
+): string {
   const base = `${scene.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers `
-    + '(per scene; scenes are assigned per section)';
+    + `(per scene; ${actBindsScenesOnRegions(act)
+      ? 'scenes are bound on region rows' : 'scenes are assigned per section'})`;
   // AND WHY EVERY `Remove layer` BUTTON IS DEAD, WHEN THEY ARE
   // (EW-INERT-CONTROL-SILENCE, the census row beside cold read C5). At the floor
   // the buttons grey with no sentence anywhere, and the state is not rare: a
@@ -3166,6 +3179,32 @@ export function layerCountLine(scene: Pick<EffectsScene, 'layers'>): string {
   if (scene.layers.length > EFFECTS_LAYER_COUNT.min) return base;
   return `${base}. Remove is off: the schema keeps at least `
     + `${EFFECTS_LAYER_COUNT.min}, so this one cannot go.`;
+}
+
+/**
+ * The hover on the count line above — the same fact in one clause, and it moves
+ * with the mode for the same reason.
+ *
+ * ⚠ IT IS NOT A LITERAL AT THE CALL SITE ANY MORE. It was `title="a section can
+ * bind its own scene"` in `EffectsScenePanel.tsx`, one attribute away from the
+ * line it explains and invisible to every region-mode check; a mode-dependent
+ * sentence spelled in JSX is a sentence no provider test can reach.
+ */
+export function layerCountTitle(act?: { regions?: ActRegionsState }): string {
+  return actBindsScenesOnRegions(act)
+    ? 'a region can bind its own scene' : 'a section can bind its own scene';
+}
+
+/**
+ * Does this act bind scenes on REGION rows rather than on sections?
+ *
+ * RULING B1'S ONE PREDICATE, asked in one place. `actHasRegionsFile` already
+ * takes `undefined` and answers false for it, so an absent act, a hand-built
+ * fixture and `noRegionsLoaded()` all mean section mode, which is what every
+ * caller that passes no act is relying on.
+ */
+function actBindsScenesOnRegions(act?: { regions?: ActRegionsState }): boolean {
+  return actHasRegionsFile(act?.regions);
 }
 
 /**
@@ -3725,6 +3764,15 @@ export function regionsBindingScene(
   return out;
 }
 
+/**
+ * THE ONE SENTENCE THAT SAYS WHERE A SCENE BINDING LIVES ON THIS ACT, spelled
+ * once because three surfaces now open with it: the selection relation, the empty
+ * SECTION ASSIGNMENT slot, and anything after them. A second transcription is a
+ * second thing to drift, and these three are read within one screen of each other.
+ */
+export const REGION_MODE_SCENE_LEAD =
+  'This act is in region mode: scenes are bound on its region rows, not on sections.';
+
 export function sceneSelectionRelation(
   sections: readonly ({ sceneRef: string | null } | null)[],
   activeSectionIndex: number,
@@ -3798,7 +3846,7 @@ export function sceneSelectionRelation(
  * because a carved region is several entries under one id and one panel row.
  */
 function regionModeSceneRelationText(regions: ActRegionsState, selectedSceneId: string): string {
-  const lead = 'This act is in region mode: scenes are bound on its region rows, not on sections.';
+  const lead = REGION_MODE_SCENE_LEAD;
   if (regions.document === null) {
     // `actHasRegionsFile` was true with no document: the file exists and was refused.
     return `${lead} Edits below change ${selectedSceneId}. This act's regions.json could not be `
@@ -4029,6 +4077,40 @@ export function sectionSceneBindRefusal(
 ): string | null {
   if (!actHasRegionsFile(act.regions)) return null;
   return regionModeSectionRefRefusal('sceneRef', sectionIndex, currentRef);
+}
+
+/**
+ * What SECTION ASSIGNMENT says about an act slot that holds NO section.
+ *
+ * ═══ THE HOLE THE B1 REFUSAL DOES NOT COVER (SCENE-RELATION-REGION-MODE, rest) ═══
+ *
+ * `sectionSceneBindRefusal` above needs a section to name, so the panel asks it
+ * only on the populated branch and the empty branch painted "Section N is empty:
+ * nothing to assign a scene to." in BOTH modes. On a region-mode act that sentence
+ * gives emptiness as the ONLY reason, which says by implication that a populated
+ * section could take a scene here — the exact claim ruling B1 refuses, reached by
+ * moving the section select to an empty slot.
+ *
+ * ⚠ THE REGION ARM LEADS WITH THE MODE, NOT WITH THE EMPTINESS. Both facts are
+ * true and only one of them is why this panel binds nothing: the mode holds on
+ * every slot of the act, the emptiness on this one. Leading with the local fact is
+ * what produced the wrong implication in the first place.
+ *
+ * ⚠ AND IT STILL SAYS THE SLOT IS EMPTY. Dropping that would leave an author
+ * wondering why the select is missing here and present one section over, which is
+ * a second question invented to answer the first.
+ *
+ * Section mode is byte-identical to the sentence that shipped.
+ */
+export function sectionAssignmentEmptyHint(
+  sectionIndex: number, act?: { regions?: ActRegionsState },
+): string {
+  if (!actBindsScenesOnRegions(act)) {
+    return `Section ${sectionIndex} is empty: nothing to assign a scene to.`;
+  }
+  return `${REGION_MODE_SCENE_LEAD} Section ${sectionIndex} is empty as well, but that is not `
+    + 'why this panel binds nothing: no section of this act takes a scene. To bind one, use the '
+    + 'Regions panel, under Bindings.';
 }
 
 /**
@@ -4983,11 +5065,60 @@ export function setReelRateCommand(
 export function reelsBindingAdvisories(
   scene: EffectsScene,
   sections: readonly ({ sceneRef?: string | null } | null)[],
+  act?: { regions?: ActRegionsState },
 ): string[] {
+  // The narrowing idiom `sceneSelectionRelation` and `deleteSceneRefusal` use, so
+  // the three region-mode entry points in this file ask the predicate one way.
+  const regions = act?.regions;
+  if (regions !== undefined && actHasRegionsFile(regions)) {
+    return regionModeReelsBindingAdvisories(scene, regions);
+  }
   const refs = sections
     .filter((s): s is { sceneRef?: string | null } => s !== null)
     .map((s) => s.sceneRef ?? null);
   return advisoryReelsBinding(scene, refs).map((a) => a.message);
+}
+
+/**
+ * THE SAME LOOKUP ON AN ACT WHOSE BINDINGS LIVE ON REGION ROWS
+ * (SCENE-RELATION-REGION-MODE, the rest, 2026-09-18).
+ *
+ * ⚠ THE SECTION ARM WAS NOT MERELY UNHELPFUL HERE, IT WAS BACKWARDS. On a
+ * region-mode act every section sidecar `sceneRef` is null (check_mode_conflict
+ * refuses one), so `advisoryReelsBinding` found no binder and warned on EVERY
+ * scene of the act — including `ojz_act1_depth`, which region `sec4` binds at
+ * rung 1 and which is therefore exactly the case aeon's generator ACCEPTS. A
+ * warning that fires hardest on the compliant document is worse than no warning.
+ *
+ * ⚠ ONLY A REGION'S OWN `sceneRef` COUNTS, read through `regionBindingValue` —
+ * `regionsBindingScene`'s rule and the shipped parcel's design call 2. A null one
+ * lowers to `rg_parallax: 0` and defers to the preset's parallax, which is rung 2,
+ * not rung 1, so counting it as a binder would manufacture the clearance this
+ * advisory is forbidden to give.
+ *
+ * ⚠ A REFUSED regions.json SPEAKS RATHER THAN GOING SILENT. The bindings cannot
+ * be TOLD, which is a third state and not the negative case; saying nothing would
+ * render "could not measure" as an all-clear on the one surface whose whole
+ * docblock is about silence not being one.
+ *
+ * NO EMPTY-LIST ARM, and that is derived rather than omitted: `aurora-regions.schema.json`
+ * makes `regions` `minItems: 1`, so a document with no regions at all does not
+ * exist, and the section arm's "this project has no sections" case has no twin here.
+ */
+function regionModeReelsBindingAdvisories(
+  scene: EffectsScene, regions: ActRegionsState,
+): string[] {
+  if (scene.reels === undefined) return [];
+  if (regions.document === null) {
+    return [`EDITOR-SIDE WARNING, not the refusal: this act is in region mode and its `
+      + `regions.json could not be read, so Aurora cannot tell whether a region binds "${scene.id}" `
+      + 'in its sceneRef, and that is what decides whether aeon\'s generator accepts a reels key '
+      + '(the association table is keyed on the lowered config label, which is unique only for a '
+      + `sceneRef-bound region). The Regions panel says why the file was refused. `
+      + REELS_BINDING_ADVICE_TAIL];
+  }
+  if (regionsBindingScene(regions.document, scene.id).length > 0) return [];
+  return [reelsBindingWarning(scene.id, 'region')];
 }
 
 // ---------------------------------------------------------------------------

@@ -81,7 +81,7 @@ import {
   clampVFactor, clampVCenter, clampVOffset,
   layerTopBounds, clampLayerTop, planeLineOf, fireLineAdvisory, vsplitOrderAdvisory,
   vsplitLockAdvisoryParts, sceneVsplitLockAdvisoryParts,
-  layerCountLine, vFactorHint,
+  layerCountLine, layerCountTitle, sectionAssignmentEmptyHint, vFactorHint,
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
   sceneSelectionRelation, deleteSceneRefusal,
   sectionSceneCommand, createSceneCommand, sectionSceneBindRefusal, sectionSceneOptions,
@@ -666,7 +666,8 @@ export default function EffectsScenePanel(): React.ReactElement {
             count-free: every rendered ceiling above comes from
             EFFECTS_LAYER_COUNT, so a number here could only ever disagree.
           */}
-          <Hint><span title="a section can bind its own scene">{layerCountLine(selected)}</span></Hint>
+          <Hint><span title={layerCountTitle(act ?? undefined)}>
+            {layerCountLine(selected, act ?? undefined)}</span></Hint>
           {selected.layers.map((layer, i) => (
             // THE INDEX TITLES THE CARD; it does not prefix a field name. The
             // old first row read `#0 world_y`, which made the longest label in
@@ -1668,7 +1669,7 @@ export default function EffectsScenePanel(): React.ReactElement {
             // an empty list means "this project has no sections" — a different
             // fact from "no section binds this scene" — so it says nothing.
             const binding = (!on || act === null)
-              ? [] : reelsBindingAdvisories(selected, act.sections);
+              ? [] : reelsBindingAdvisories(selected, act.sections, act);
             return (
               <>
                 <Field label={REELS_ROW.label} title={REELS_ROW.title}>
@@ -1973,6 +1974,10 @@ export default function EffectsScenePanel(): React.ReactElement {
             const impact = vDeformRampAdvisory(
               selected.id, act.sections, act.sceneRef,
               state.project?.effectsPresets ?? EMPTY_PRESETS,
+              // ⚠ THE WHOLE ACT, for `deleteSceneRefusal`'s reason: `act.regions`
+              // is what says the bindings live on region rows, and on such an act
+              // the section walk beside it resolves refs the build refuses.
+              act,
             );
             return impact === null ? null : (
               <Hint under style={{ marginBottom: 0 }}>
@@ -2025,7 +2030,10 @@ export default function EffectsScenePanel(): React.ReactElement {
        <SectionBody>
         {!section ? (
           <Hint style={{ marginBottom: 0 }}>
-            Section {activeSectionIndex} is empty: nothing to assign a scene to.
+            {/* ASKED THROUGH THE PROVIDER, never by reading act.regions here -
+                `sceneModeRefusal` above is the rule this branch was outside of.
+                In region mode emptiness is not why this panel binds nothing. */}
+            {sectionAssignmentEmptyHint(activeSectionIndex, act ?? undefined)}
           </Hint>
         ) : (
           <>

@@ -201,10 +201,18 @@ import {
 // should be restated.
 import {
   rampScrollModeSentence, vDeformRampSentence,
+  vDeformRampRegionSentence, vDeformRampRegionsUnreadableSentence,
 } from '../../core/formats/effects/ramp-scroll-mode';
 import type {
   RampScrollBinding, RampScrollUnknownReason, VDeformRampBinding,
+  VDeformRampRegionBinding,
 } from '../../core/formats/effects/ramp-scroll-mode';
+// WHAT A REGION BINDS IS THE REGIONS PANEL'S OWN READER, not a second opinion:
+// `regionBindingValue` is what the Bindings rows are built from, so that panel
+// and this sentence cannot disagree. (The mode predicate is `actHasRegionsFile`,
+// imported above with the raster refusals that already use it.)
+import { regionBindingValue } from './regions-aeon';
+import type { Region } from '../../core/formats/regions/document';
 // THE ONE DERIVATION OF "DOES THIS SCENE ATTACH A PER-COLUMN TABLE".
 // `vDeformValue` is what the scene panel's own V-deform row reads; testing
 // `=== 'none'` a second time here is how this sentence and that control would
@@ -4079,8 +4087,76 @@ export function vDeformRampAdvisory(
   sections: readonly ({ rasterRef: string | null; sceneRef: string | null } | null)[],
   actSceneRef: string | null,
   presets: EffectsPresetLibrary,
+  act?: { regions?: ActRegionsState },
 ): { short: string; full: string } | null {
+  const regions = act?.regions;
+  if (regions !== undefined && actHasRegionsFile(regions)) {
+    if (regions.document === null) return vDeformRampRegionsUnreadableSentence();
+    return vDeformRampRegionSentence(
+      vDeformRampRegionBindings(sceneId, regions.document, presets));
+  }
   return vDeformRampSentence(vDeformRampBindings(sceneId, sections, actSceneRef, presets));
+}
+
+/**
+ * THE SAME JOIN ON A REGION-MODE ACT (SCENE-RELATION-REGION-MODE, the rest,
+ * 2026-09-18): which REGIONS bind this scene, and what their own `rasterRef`
+ * carries.
+ *
+ * ═══ WHY THE SECTION WALK WAS WRONG HERE AND NOT MERELY QUIET ═══
+ *
+ * `vDeformRampBindings` above needs `s.rasterRef !== null` on a SECTION, and a
+ * section sidecar `rasterRef` beside regions.json is precisely what aeon's
+ * `check_mode_conflict` refuses (`sectionRasterBindRefusal` is the editor half of
+ * that rule). So every row it can produce on such an act rests on a binding the
+ * build rejects, and it reaches the scene through `sectionSceneRef`'s act-default
+ * fallback, which attributes the binding to a section that does not own one. The
+ * sentence then named a section, a preset and a consequence, all three of which
+ * the act's own regions.json contradicts.
+ *
+ * ⚠ ONLY A REGION'S OWN REFS, BOTH OF THEM, read through `regionBindingValue`.
+ * A null `sceneRef` is not "inherits the act scene" and a null `rasterRef` is not
+ * "inherits the act raster": aeon lowers an absent region binding to a defer, so
+ * resolving either one to the act's would be a guess about rung 2. This is the
+ * shipped parcel's design call 2, applied to the second field.
+ *
+ * ⚠ ONE ROW PER ID, IN AUTHOR ORDER. A carved region is several `regions[]`
+ * entries under one id carrying identical bindings and ONE Regions panel row, so a
+ * three-entry carve would otherwise name one control three times.
+ *
+ * ⚠ NO GEOMETRY. Nothing here compares a region rect to a section grid: region
+ * rectangles need not sit on it, and an id spelled `secN` is a name.
+ */
+export function vDeformRampRegionBindings(
+  sceneId: string,
+  document: { regions: readonly Region[] },
+  presets: EffectsPresetLibrary,
+): VDeformRampRegionBinding[] {
+  const out: VDeformRampRegionBinding[] = [];
+  const seen: string[] = [];
+  for (const region of document.regions) {
+    if (seen.includes(region.id)) continue;
+    if (regionBindingValue(region, 'scene') !== sceneId) continue;
+    seen.push(region.id);
+    const presetId = regionBindingValue(region, 'raster');
+    if (presetId === null) continue;
+    const preset = presets.presets.find((p) => p.id === presetId);
+    if (preset !== undefined) {
+      if (preset.ramp === undefined) continue;
+      out.push({ regionId: region.id, presetId, carries: 'ramp', reason: null });
+      continue;
+    }
+    // Spelled exactly as `vDeformRampBindings` spells it, so the two arms cannot
+    // disagree about which failure a missing preset was.
+    const unreadable = presets.unreadable.some((u) => u.path.endsWith(`/${presetId}.json`));
+    out.push({
+      regionId: region.id,
+      presetId,
+      carries: 'unknown',
+      reason: unreadable ? 'preset-unreadable' : 'preset-dangling',
+    });
+  }
+  return out;
 }
 
 // ── commands ───────────────────────────────────────────────────────────────

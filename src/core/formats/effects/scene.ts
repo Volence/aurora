@@ -926,17 +926,63 @@ export function advisoryReelsBinding(
   if (scene.reels === undefined) return [];
   if (sceneRefs.length === 0) return [];
   if (sceneRefs.some(ref => ref === scene.id)) return [];
-  return [{
-    path: '/reels',
-    message:
-      `EDITOR-SIDE WARNING, not the refusal: no section in this project names "${scene.id}" in ` +
-      'its sceneRef, and aeon\'s generator refuses a reels key on a scene whose sections resolve ' +
-      'through a preset or the act default instead of an editor sceneRef (the association table ' +
-      'is keyed on the lowered config label, which is unique only for a sceneRef-bound section). ' +
-      'Saving is not blocked, and this check is one-sided: its silence is not a clearance, ' +
-      'because only the build can say whether the key is accepted.',
-  }];
+  return [{ path: '/reels', message: reelsBindingWarning(scene.id, 'section') }];
 }
+
+/**
+ * The words the warning above uses for the thing that CARRIES a `sceneRef`.
+ *
+ * ⚠ THIS IS A VOCABULARY, NOT A SECOND RULE, and the codec deliberately learns
+ * nothing about regions from it: `reelsBindingWarning` below is handed a word, not
+ * a document, and there is no `Region` type, no regions schema and no mode
+ * predicate anywhere in this file. What decides the mode is `actHasRegionsFile` in
+ * the renderer provider, ruling B1's one predicate, exactly as it does for every
+ * other region-aware sentence.
+ *
+ * ⚠ AND IT EXISTS SO THE AEON MECHANISM IS TRANSCRIBED ONCE. The refusal's
+ * substance — the association table keyed on the LOWERED CONFIG LABEL, unique only
+ * for a binding made at `Effects_ResolveParallax`'s rung 1 — is the same fact in
+ * both modes; only the noun for the binder changes. A second copy of that sentence
+ * in the provider would be a second thing to drift from §2.7.
+ */
+const REELS_BINDING_WORDS = Object.freeze({
+  section: Object.freeze({ scope: 'no section in this project', plural: 'sections', bound: 'section' }),
+  region: Object.freeze({ scope: 'no region in this act', plural: 'regions', bound: 'region' }),
+});
+
+/** Which binder a reels warning is phrased for. See `REELS_BINDING_WORDS`. */
+export type ReelsBindingBinder = keyof typeof REELS_BINDING_WORDS;
+
+/**
+ * The one-sided reels binding warning, in one binder's words.
+ *
+ * `'section'` reproduces the sentence `advisoryReelsBinding` has always emitted,
+ * character for character; `'region'` is the same sentence for an act whose
+ * bindings live on region rows (`reelsBindingAdvisories` in
+ * `renderer/providers/effects-aeon.ts` decides which). The closing clause is
+ * IDENTICAL in both and is the half that must never be dropped: it says this is
+ * advice, that saving is not blocked, and that the silence is not a clearance.
+ */
+export function reelsBindingWarning(sceneId: string, binder: ReelsBindingBinder): string {
+  const w = REELS_BINDING_WORDS[binder];
+  return `EDITOR-SIDE WARNING, not the refusal: ${w.scope} names "${sceneId}" in ` +
+    `its sceneRef, and aeon's generator refuses a reels key on a scene whose ${w.plural} resolve ` +
+    'through a preset or the act default instead of an editor sceneRef (the association table ' +
+    `is keyed on the lowered config label, which is unique only for a sceneRef-bound ${w.bound}). ` +
+    REELS_BINDING_ADVICE_TAIL;
+}
+
+/**
+ * The half of the reels warning that is the same in every mode, and the half a
+ * surface must never paraphrase away.
+ *
+ * Separate and named so a test can assert BOTH arms end in it: an arm that lost
+ * this tail would still read like a plausible warning while having quietly become
+ * a verdict.
+ */
+export const REELS_BINDING_ADVICE_TAIL =
+  'Saving is not blocked, and this check is one-sided: its silence is not a clearance, ' +
+  'because only the build can say whether the key is accepted.';
 
 export function advisoryLayerDeformConflicts(scene: EffectsScene): SceneAdvisory[] {
   const out: SceneAdvisory[] = [];

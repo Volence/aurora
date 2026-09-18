@@ -542,7 +542,7 @@ describe('the binding advisory is surfaced WITHOUT being turned into a clearance
     const warning = reelsBindingAdvisories(s, [{ sceneRef: 'other' }])[0];
     expect(warning).not.toBe(EFFECTS_REELS_BINDING_NOTE.short);
     expect(PANEL_SRC).toContain('REELS_ROW.binding.short');
-    expect(PANEL_SRC).toContain('reelsBindingAdvisories(selected, act.sections)');
+    expect(PANEL_SRC).toContain('reelsBindingAdvisories(selected, act.sections, act)');
   });
 });
 
