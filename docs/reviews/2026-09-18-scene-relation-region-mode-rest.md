@@ -186,3 +186,37 @@ node suite can reach every arm, but only a real screen can say they are PAINTED.
   hint leads with the region-mode sentence and no longer implies a populated section could
   take a scene.
 - Control, a section-mode act: all four sentences are the ones that shipped.
+
+## ⚠ THE FIVE CHECKS ABOVE WERE RUN, AND TWO OF THEM DO NOT SURVIVE THIS FIXTURE
+
+*(Appended 2026-09-18 by the overseer after `scratchpad/region-mode-advice-onscreen-harness.mjs`
+landed: 29 rows, 29 passed, 1 UNMEASURABLE, re-run on merged master. The wording above is left
+UNEDITED, because the corrections only make sense beside what they correct.)*
+
+**Checks 1 and 2 are PAINTED**, exactly as written: the LAYERS line reads the region wording with
+the section clause at zero elements document-wide, and the reels advisory is absent on the document
+`sec4` binds while the region-worded one paints on a scene no region binds.
+
+**Check 3 has NO SUBJECT on the shipped `regions.json`.** No region carries both a `sceneRef` and a
+`rasterRef`, so the region walk yields nothing — **and every section sidecar `rasterRef` is null, so
+the pre-fix section walk yielded nothing either.** A row written to check 3 as worded would pass on
+master-before-the-fix and prove nothing. The harness's `[c3a]` records exactly that in its own
+output; `[c3b]` is the row with a subject, giving one region a `rasterRef` in-session through the
+real codec and never saving.
+
+**Check 4's GESTURE is not performable here.** All nine sections of OJZ act 1 are populated, so the
+Editing select offers no empty slot to move to. `[c4b]` reaches the provider branch through a debug
+door and **says so in the row**, rather than implying a user path that does not exist.
+
+**Check 5 is UNMEASURABLE and the row STAYS OPEN.** This machine's aeon checkout has exactly one act
+and it is region mode, so nothing here proves a real section-mode act paints correctly — only that
+the four sentences move with the mode predicate (shown by five mutations, each rebuilt before
+running). **Re-open condition: a section-mode act existing on disk.** Regions were deliberately NOT
+cleared in-session to manufacture one; that would have measured a different application.
+
+**And a finding beyond the four sentences, the same class as the two 2026-09-17 delete packets:**
+`aeon.effects.scene` is `defaultCollapsed`, so the reels advisory and the V-deform sentence are
+**not in the DOM at all on arrival**. Checks 1 and 4 are open on the page; 2 and 3 sit behind one
+click. That widens the subject of decision card `DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE` from a
+disabled control's reason to advice in general — **the card's question, options and recommendation
+are unchanged, so it gets no new entry**, per `contract/DECISIONS.md`.
