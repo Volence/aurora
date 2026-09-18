@@ -158,22 +158,41 @@ function note(what, detail) {
 // the other two arms of the same function (the unreadable-regions.json clause
 // and the leftover-sidecar clause) speak sentences this run does not provoke,
 // and folding them in would make the gate unsatisfiable rather than strict.
-function regionBranchLiterals(file, startMarker, endMarker) {
+//
+// ⚠ AND IT IS ANCHORED IN THE FUNCTION FIRST, WHICH THE FIRST DRAFT WAS NOT.
+// `regionsBindingScene` has a SECOND caller earlier in `effects-aeon.ts`
+// (`regionModeSceneRelationText`, which the scene packet says now shares the
+// scan), so a bare `indexOf` of the binder line sliced ~500 lines of two other
+// functions and their docblocks: 29 "fragments", 25 of them prose. That went
+// RED rather than silently green, which is the gate working — but a gate whose
+// slice can wander is measuring the wrong text, so it starts from the function
+// that owns the sentence.
+// A sentinel that cannot occur in TypeScript source. NOT a NUL: a literal
+// U+0000 in this file makes it a BINARY file to grep, `file`, and every tool
+// that reads it, which cost one round of confusion already.
+const HOLE = '<<<INTERP>>>';
+
+function regionBranchLiterals(file, fnName, startMarker, endMarker) {
   const src = readFileSync(file, 'utf8');
-  const a = src.indexOf(startMarker);
+  const fn = src.indexOf(`function ${fnName}(`);
+  if (fn < 0) {
+    throw new Error(`CANNOT MEASURE: ${file} no longer declares ${fnName} — the anti-drift gate `
+      + 'has lost its slice and would otherwise pass vacuously.');
+  }
+  const a = src.indexOf(startMarker, fn);
   const b = src.indexOf(endMarker, a);
   if (a < 0 || b < 0) {
-    throw new Error(`CANNOT MEASURE: ${file} no longer contains ${JSON.stringify(startMarker)} `
-      + `followed by ${JSON.stringify(endMarker)} — the anti-drift gate has lost its slice and `
-      + 'would otherwise pass vacuously.');
+    throw new Error(`CANNOT MEASURE: ${fnName} in ${file} no longer contains `
+      + `${JSON.stringify(startMarker)} followed by ${JSON.stringify(endMarker)} — the `
+      + 'anti-drift gate has lost its slice and would otherwise pass vacuously.');
   }
   // ⚠ INTERPOLATIONS ARE REMOVED, NOT EXTRACTED. `${one ? 'binds' : 'bind'}`
   // carries BOTH arms of a ternary; keeping them would demand that the singular
   // sentence contain the plural words too. Removing the `${…}` spans leaves
   // exactly the text that is the same whatever the ids are.
-  const body = src.slice(a, b).replace(/\$\{[^{}]*\}/g, ' ');
+  const body = src.slice(a, b).replace(/\$\{[^{}]*\}/g, HOLE);
   const out = [];
-  for (const m of body.matchAll(/`([^`]*)`/g)) out.push(...m[1].split(' '));
+  for (const m of body.matchAll(/`([^`]*)`/g)) out.push(...m[1].split(HOLE));
   for (const m of body.matchAll(/'((?:[^'\\]|\\.)*)'/g)) out.push(m[1].replace(/\\'/g, "'"));
   // 8 chars: long enough that a fragment is a PHRASE rather than a word like
   // `binds` that appears everywhere, short enough to keep every seam of the
@@ -352,9 +371,9 @@ async function main() {
   // ── The anti-drift slices, read BEFORE the app is launched ──────────────
   const PRESET_PROVIDER = `${ROOT}/src/renderer/providers/effects-preset.ts`;
   const SCENE_PROVIDER = `${ROOT}/src/renderer/providers/effects-aeon.ts`;
-  const presetLiterals = regionBranchLiterals(PRESET_PROVIDER,
+  const presetLiterals = regionBranchLiterals(PRESET_PROVIDER, 'regionModeDeletePresetRefusal',
     'const binders = regionsBindingPreset', 'const bound = sectionsBindingPreset');
-  const sceneLiterals = regionBranchLiterals(SCENE_PROVIDER,
+  const sceneLiterals = regionBranchLiterals(SCENE_PROVIDER, 'regionModeDeleteSceneRefusal',
     'const binders = regionsBindingScene', 'const bound = sectionsBindingScene');
   // The row word the sentence points at, read from source rather than typed —
   // it is asserted equal to `BINDING_LABELS.<kind>` by the node suite, and
