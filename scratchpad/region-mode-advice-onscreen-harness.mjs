@@ -116,6 +116,35 @@
 //     time. A mismatch is printed loudly and the run CARRIES ON, because the
 //     rows measure the app either way.
 //
+// ── RED-FIRST: WHICH ROWS DISCRIMINATE, MEASURED RATHER THAN ASSERTED ─────
+//
+// Five narrow mutations, each applied to the committed baseline, REBUILT (the
+// harness drives `dist/`, so an unrebuilt mutation measures the unmutated app
+// and prints a false green), run, then restored with `git show HEAD:<path> >
+// <path>` and re-checked clean with `git status --porcelain`. Baseline and
+// restored baseline both: 29/29, 0 failed, 1 UNMEASURABLE.
+//
+//   m1  layerCountLine's region arm → the section clause      [d1] [c1a] [c1a2] [c1b]
+//   m2  layerCountTitle's region arm → the section hover      [d1] [c1b] [c1b2]
+//   m3  reelsBindingAdvisories' mode predicate → `if (false…` [c2a] [c2b] [c2b2]
+//   m4  vDeformRampAdvisory's mode predicate → `if (false…`   [c3b]
+//   m5  sectionAssignmentEmptyHint's mode test → `if (true)`  [c4b]
+//
+// ⚠ [c1b] IS NOT INDEPENDENT OF [c1a] AND SAYS SO. Its claim is "the PAINTED
+// element carries the attribute", so it requires the painted element and m1
+// reds it too. m2 is the mutation that separates them: it reds [c1b]/[c1b2]
+// and leaves [c1a] green.
+//
+// ⚠ AND [c3a], [c4a], [dis], [fx], [1a]-[1e], [2a0], [c2b0], [c2b1], [c3a0],
+// [c3b0] PASS REGARDLESS. They are instrument checks and fixture statements,
+// not evidence for the fix. [c3a] in particular WOULD PASS ON
+// MASTER-BEFORE-THE-FIX, and its own detail line says so.
+//
+// m3's red is worth reading rather than counting: the section arm puts the
+// section-worded warning ON SCREEN on `ojz_act1_depth`, the document region
+// sec4 binds at rung 1 and the one aeon's generator ACCEPTS. That is the
+// packet's "the warning fired hardest on the compliant document", photographed.
+//
 // ⚠ NOTHING IS STITCHED FROM TWO RUNS. ⚠ NO EMULATOR, EVER.
 // ⚠ NOTHING IS WRITTEN TO THE AEON TREE. No save is ever issued. The two
 //   session-only mutations are stated in their own rows: a scene created
