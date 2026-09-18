@@ -93,6 +93,18 @@ MUTATIONS = [
      'mutation, which M4 does NOT supply: M4 only touches the preset provider, '
      'so without this the scene anti-drift gate is an unproven row',
      '[ds] [s4]'),
+    # ⚠ M11 MUTATES THE HARNESS, NOT THE APP, and that is the only way to
+    # isolate [fx]: the row compares the LIVE aeon fixture with this repo's
+    # vendored copy, and neither operand may be written by this parcel (the
+    # aeon tree is another lane's, and a fixture edit is a different parcel).
+    # Pointing the vendored operand at a DIFFERENT committed regions fixture is
+    # the fixture moving, simulated on the only side this lane owns.
+    ('M11', 'scratchpad/delete-refusal-onscreen-harness.mjs',
+     "const VENDORED = `${ROOT}/test/fixtures/regions/ojz_act1.regions.json`;",
+     "const VENDORED = `${ROOT}/package.json`;",
+     'the vendored operand of [fx] points at a different file — "the fixture '
+     'moved under this run", which must be LOUD rather than silent',
+     '[fx]'),
     ('M9', PROV_S,
      'if (binders.length > 0) {',
      'if (true as boolean) {',
@@ -169,10 +181,13 @@ def main():
         blob = subprocess.run(['git', 'show', f'HEAD:{rel}'], cwd=ROOT,
                               check=True, capture_output=True, text=True).stdout
         open(path, 'w').write(blob)
-        d = git('status', '--porcelain', '--', 'src').strip()
-        print(f'  restored from HEAD:{rel} — git status src/ = {d!r}')
+        # THE MUTATED FILE ITSELF, not a hardcoded `src` — M11 mutates the
+        # HARNESS, and a restore check aimed at a directory the mutation was
+        # never in is a check that cannot fail.
+        d = git('status', '--porcelain', '--', rel).strip()
+        print(f'  restored from HEAD:{rel} — git status {rel} = {d!r}')
         if d:
-            sys.exit('REFUSING TO CONTINUE: src/ did not restore clean.')
+            sys.exit(f'REFUSING TO CONTINUE: {rel} did not restore clean.')
 
     print(f'\n{"=" * 74}\nrebuilding the clean tree so the next run measures the baseline')
     build()
