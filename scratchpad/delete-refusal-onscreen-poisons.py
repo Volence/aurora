@@ -28,10 +28,20 @@ import re
 import subprocess
 import sys
 
-ROOT = '/home/volence/sonic_hacks/aurora-wt-refusal'
+# THIS tree is OBSERVED from this file's own location, never a literal: a
+# literal names a worktree that stops existing (empyrean contract/SUITE_PATHS.md,
+# and `check:peer-path-literals` fails the suite over it -- which it did over
+# this file's first draft).
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# The electron binary is the caller's override first, then this tree's own. A
+# LITERAL is not a default: an agent worktree that has no node_modules must be
+# able to borrow one by setting ELECTRON_BIN, and a hardlinked one resolves
+# in-tree without the operator saying anything.
+ELECTRON_BIN = os.environ.get('ELECTRON_BIN') or os.path.join(
+    ROOT, 'node_modules', '.bin', 'electron')
 ENV = dict(os.environ,
            VITE_AURORA_DEBUG='1',
-           ELECTRON_BIN='/home/volence/sonic_hacks/aurora/node_modules/.bin/electron',
+           ELECTRON_BIN=ELECTRON_BIN,
            AURORA_BUILT_TREE=ROOT)
 
 PANEL_P = 'src/renderer/components/effects/BandPresetPanel.tsx'
