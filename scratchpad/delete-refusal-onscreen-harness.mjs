@@ -111,6 +111,33 @@
 //     repo's vendored copy; every id below is DERIVED from the live file at run
 //     time, never typed.
 //
+// ── WHAT EACH NEW ROW DISCRIMINATES — MEASURED, 2026-09-18 ────────────────
+//
+// Three mutations, each applied on disk, REBUILT (these rows drive `dist/`, so
+// an unrebuilt mutation measures the unmutated app and prints a false green),
+// run, and restored from the committed baseline. Named so a later reader can
+// re-plant them rather than trust this list:
+//
+//   M1  drop `headerNote={...}` from BandPresetPanel.tsx ONLY
+//       → 20/22. RED: [p3], [p4b]. Every scene row stayed GREEN, which is what
+//         says the two panels are measured independently rather than by one
+//         reading with two entrances.
+//   M2  in delete-refusal.ts, make ONLY the short form name a different
+//       document (`c.lead.replace(/"[^"]*"/, '"other_doc"')`) — the exact drift
+//       the card weighed
+//       → 18/22. RED: [p3], [s3], [p4b], [s4b]. [p4]/[s4] stayed GREEN, which
+//         says those read the FULL sentence and these read the short one.
+//         Node suite under the same mutation: 15 red, all in
+//         test/formats/effects-delete-refusal.test.ts (12 [prefix] arms,
+//         [one], [two], [who]); both delete-guard files stayed green, because
+//         they pin the full sentence and nothing else.
+//   M3  in EffectsScenePanel.tsx, paint a header refusal even when nothing is
+//       refused (`deleteRefusal ?? { short: ..., full: ... }`)
+//       → 21/22. RED: [s2] ONLY, and ONLY on the testid count: its text search
+//         reported `domNodes 0` in the same read, because the sentence a floor
+//         row would have to search for is the one that does not exist. That is
+//         the whole reason [p2]/[s2] ask the app's own marker as well.
+//
 // ⚠ NOTHING IS STITCHED FROM TWO RUNS. ⚠ NO EMULATOR, EVER.
 // ⚠ NOTHING IS WRITTEN TO THE AEON TREE: no save is issued, and no enabled
 //   Delete is ever clicked. The ONE session-only mutation is [s0]: this act's
