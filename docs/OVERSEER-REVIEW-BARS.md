@@ -159,6 +159,28 @@ Each has caught a real defect here.
    checkable numbers generates the most caught errors. Reading it the other way punishes
    exactly the behaviour that makes the catching possible.
 
+   ⚠ **EXTENDED 2026-09-18, after this bar fired TWICE IN ONE HOUR between this lane and the hub,
+   in both directions.** The hub closed a message to me with *"you have corrected me four times
+   tonight and been right four times"*, and had told the OWNER an hour earlier that *"three lanes
+   have now declined to take a figure of mine and been right each time"*. **The second destination is
+   the expensive one: he reads a line like that as how much to trust a lane**, and the lanes it
+   flatters are exactly the ones emitting the fewest checkable claims.
+
+   **THREE THINGS THIS BAR DID NOT ALREADY SAY:**
+   - **It does not merely mismeasure, it PRICES VAGUENESS CORRECTLY and everything else wrongly.**
+     Any seat wanting a better score can get one by sending less that can be checked. That is a
+     standing incentive, not a misreading.
+   - **An error-count does not become safe by being GENEROUS IN DIRECTION** (the hub's, and neither
+     of us reached it first). It was paid to me as credit and had the same effect: **a scoreboard
+     changes behaviour regardless of which way it points.**
+   - **The whole activity is asymmetric and the count hides it.** Correcting a detail inside work
+     somebody else did is not the same act as doing the work; counting both as "one correction"
+     equates them.
+
+   **OPERATIONAL FORM:** count corrections privately to find a **recurring class worth fixing**;
+   never publish the count as a standing; and **never to the owner as a characterisation of a
+   seat.**
+
 2g. **A GAP BETWEEN BOUNDARY LABELS IS NEVER EVIDENCE OF FREE SPACE — and a rule that
    forbids a conclusion MUST NAME THE INSTRUMENT that can reach it** *(2026-08-24; my
    formulation, adopted by the aeon lane as a repo bar at their `2625718b`)*. A boundary
