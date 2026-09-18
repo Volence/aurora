@@ -1,0 +1,29 @@
+{
+  "$what": "Provenance of engine_constants.emp — aeon's engine/system/constants.emp, vendored VERBATIM at a named aeon revision. It is the OTHER HALF of rule 4's constant chain: the act descriptor derives REGION_MIN_SPAN and the four CENTRE_* bounds, and the leaves those derivations name (SCREEN_WIDTH, SCREEN_HEIGHT, CAM_SCREEN_HALF_W, CAM_SCREEN_HALF_H, CAM_MAX_Y_STEP) are declared HERE and nowhere in the act file.",
+  "$why_the_file_is_renamed": "The vendored basename is engine_constants.emp, not constants.emp. `aeon.path` carries the real path and is what the currency sweep reads; the local name says which constants these are, in a fixtures directory that already holds an act descriptor. The bytes are untouched.",
+  "$why_the_whole_86_kb": "Same reason as the descriptor beside it: a trimmed constants file is a hand-written one. The five leaves this reader needs sit among hundreds of other declarations, several of which are derived from each other (SCREEN_TILES_W = SCREEN_WIDTH >> 3) and many of which are written in aeon's `$XXXX` hex. A reader that only works on a 20-line excerpt has not been tested on the file it will actually be handed.",
+  "aeon": {
+    "repo": "git@github.com:Volence/aeon.git",
+    "path": "engine/system/constants.emp",
+    "branch_that_answers_currency": "origin/master",
+    "revision": "7d4d0ce6a777714b727006ba79fc899fc6131a9d",
+    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log --oneline e0317db8 -- engine/system/constants.emp` names 7d4d0ce6 as the newest. Measured 2026-09-18 with aeon origin/master = e0317db84f302d4bca2c6719a0eccef227ce7f04 (local remote-tracking ref, no fetch run), the revision this lane measured every constant resolution at. The blob is the same at both.",
+    "blob": "536d89f544d7664be71ed558cbdcab419f325d4d",
+    "last_changed_by": "7d4d0ce6 tools: the act art pool page size is read from the engine on the bake/verify path (PAGE-SIZE-CONSTANT-ONLY)",
+    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> <AEON_DIR> <path> 7d4d0ce6 — bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
+    "revision_published": "7d4d0ce6 is an ancestor of aeon origin/master (e0317db8), checked with `git merge-base --is-ancestor` (exit 0); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run."
+  },
+  "fixture": {
+    "path": "test/fixtures/regions/act-constants/engine_constants.emp",
+    "bytes": 86127,
+    "sha256": "930020d4ce18cb70ac5ff30c66fb00ad87e403a7e065cc019f3bd08fbc38f124",
+    "git_blob": "536d89f544d7664be71ed558cbdcab419f325d4d",
+    "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
+  },
+  "paired_with": {
+    "fixture": "test/fixtures/regions/act-constants/act_descriptor.emp",
+    "why": "The descriptor holds the derivations, this file holds their leaves. Neither half resolves a rule-4 constant alone."
+  },
+  "module_line_is_load_bearing": "This file declares `module engine.constants`, and the descriptor imports its leaves with `use engine.constants.{…}`. Aurora's reader checks those two agree before it trusts a value read out of this file, so a day when aeon moves these constants to another module fails loudly instead of resolving a name out of whatever file Aurora happened to open.",
+  "re_vendor": "node scripts/revendor.mjs test/fixtures/regions/act-constants/engine_constants.emp test/fixtures/regions/act-constants/engine_constants.provenance.json <AEON_DIR> engine/system/constants.emp <the commit that last touched the path, from `git log origin/master -- <path>`> — then update `last_changed_by` and `revision_is` here, re-vendor act_descriptor.emp at a revision that agrees, and re-run the full suite."
+}

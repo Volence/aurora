@@ -79,6 +79,16 @@ const VENDORED: Vendored[] = [
   // Aurora's raster-binding derivation is held to. Not JSON, so its sidecar is
   // `ojz_effects.provenance.json` (the extension is replaced, whatever it is).
   'effects/ojz_effects.emp',
+  // RULE 4's CONSTANT CHAIN, BOTH HALVES, vendored 2026-09-18 for ROADMAP row
+  // 201 (REGIONS-ACT-DESCRIPTOR-READ). The act descriptor derives
+  // REGION_MIN_SPAN and the four CENTRE_* bounds; the leaves those derivations
+  // name (SCREEN_WIDTH, SCREEN_HEIGHT, CAM_SCREEN_HALF_W, CAM_SCREEN_HALF_H,
+  // CAM_MAX_Y_STEP) are declared in the engine file and in NO act file, so the
+  // pair is vendored and re-vendored together for the same reason the shared
+  // golden's two halves are: a derivation from one aeon commit evaluated over
+  // leaves from another is a number no build ever computed.
+  'regions/act-constants/act_descriptor.emp',
+  'regions/act-constants/engine_constants.emp',
 ].map((rel) => {
   // ⚠ THE ENTRIES ARE PATHS UNDER `test/fixtures`, NOT BARE BASENAMES, and the
   // directory is no longer hard-coded to `effects`. It was, and the vendored

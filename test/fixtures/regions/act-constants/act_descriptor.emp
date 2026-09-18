@@ -1,0 +1,1042 @@
+// OJZ Act 1 — level descriptor and section tables (§4 Phase 1, §2 A.3).
+//
+// The Tier-1+2 act shape (docs/superpowers/notes/2026-07-10-act-descriptor-
+// design.md): the descriptor is a TYPED Act literal (field-order drift
+// cannot compile; the type IS the old `* == Act_len` size guard), the nine
+// sections flow through one validating constructor, and the engine
+// invariants are written ONCE as comptime checks instead of per-act
+// if/error blocks. Generated data (pool pages, block blobs, palettes, BG) lives
+// in separate natively-placed `.emp` sections; act_descriptor reads their
+// symbols cross-module.
+module games.sonic4.act_descriptor_ojz_act1 in act_descriptor
+
+// ---- The Sec/Act ROM-descriptor structs live in the shared engine.structs
+// module: it carries the layout + the per-field drift wall; act keeps the
+// validating constructor + field defaults below.
+use engine.structs.{Act, Sec, Region}
+
+// The Effects P1 gate fixtures (OJZ_TestRaster / OJZ_TestPal / OJZ_TestGradient /
+// OJZ_TestVsram / OJZ_TestRamp) were imported here to feed the pal:/raster: constructor
+// arguments. Those arguments are gone (2026-09-04, painted-regions audit row 3), and with
+// them the last name this file took from that part of the library — so the import went too
+// rather than sitting unused. The fixtures are alive and unchanged: the PRESETS name them
+// now (games/sonic4/data/effects/ojz_effects.emp), and the preset import two lines down
+// keeps that module on this file's `use` closure, so no guard in it goes dark.
+// Parcel C2 Task 12 — total-binding presets. One per distinct section (0-3),
+// one shared instance for the three identical plain sections (6-8). This line said
+// "five ... (4-8)" and was stale twice over — section 4 took OJZ_Preset_Depth at d-15,
+// section 5 took OJZ_Preset_Sec5 at EFFECTS-W1 item 1 step 5. The twin of this sentence
+// in ojz_effects.emp was corrected in the same parcel; this copy was missed, which is
+// why the rule is to grep the COMMENTS of anything built against a ruling that moved.
+//
+// (STALE AGAIN AS OF 2026-09-03: "one shared instance for the three identical plain
+// sections (6-8)" is now two — section 6 took OJZ_Preset_Sec6 at EFFECTS-W1 item 11a's
+// authorable half, so only 7 and 8 still share OJZ_Preset_Plain.)
+//
+// (AND AS OF 2026-09-05 it is ONE: section 7 took OJZ_Preset_Sec7 for item 9c's live patch
+// channels, so OJZ_Preset_Plain is section 8's alone. The record is still SHARED-SHAPED and
+// stays that way — a ninth section would point at it — but nothing shares it today.)
+use games.sonic4.ojz_effects.{OJZ_Preset_Sec0, OJZ_Preset_Sec1, OJZ_Preset_Sec2, OJZ_Preset_Sec3, OJZ_Preset_Plain, OJZ_Preset_Depth, OJZ_Preset_Sec5, OJZ_Preset_Sec6, OJZ_Preset_Sec7, OJZ_Preset_Night, OJZ_Preset_NightSnap, OJZ_Preset_Showcase}
+// The act-default parallax record (`act_parallax_config` below — the fallback for sections
+// that declare none). NAMED rather than left to resolve as a link extern (scanline-P1
+// Task 9): an unknown name in a Label position does not error in .emp, it silently becomes
+// an extern, so a misspelling here would have surfaced as a runtime wrong-picture instead
+// of a build failure. The record is emitted by the scene registry now — it is
+// `lower4(SCENES[0])` off Scene_OJZ_Default, not a hand-written header.
+use games.sonic4.scene_registry.{ParallaxConfig_OJZ_Default, SCENE_ACT_SPAN_Y}
+
+// ---- THE EDITOR-SCENE BINDING SEAM (scanline P5 slice 5, wave-1 design §3) ----
+//
+// The two binding functions in the generated module
+// games/sonic4/data/generated/ojz/act1/effects_scenes.emp — the ONLY route by which
+// an Aurora-authored scene reaches this ROM. `tools/effects_gen.py` writes them from
+// the sidecars' `sceneRef` + project.json; nothing about them is hand-typed here.
+//
+// THIS IMPORT IS UNCONDITIONAL, AND SO IS EVERY CALL BELOW (owner ruling 2026-08-22,
+// design §9 Q-c — the always-emitted default binding). The generator emits both
+// functions for every act whether or not editor content exists: with none they
+// return the `hand:` fallback this file passes, with content they return the lowered
+// editor record. So there is exactly ONE path here, always live — no conditional, no
+// arm that is dead in either state, and no name that appears or vanishes with
+// content. Deleting the `hand:` arguments would move that decision back into this
+// file, which is the shape the ruling rejected.
+//
+// A NAME LIST, NEVER A GLOB (design §3, docs/DEFERRED_WORK.md's glob re-evaluation
+// note) — and this line is also the module's REACHABILITY edge. Drop it and the
+// generated module leaves the `use` closure, at which point every guard in it,
+// including the editor-scene budget fold, builds GREEN while asserting nothing
+// (measured on this seam, 2026-08-22: an `ensure(1 == 0)` there built clean with an
+// unchanged CRC). tools/effects_seam_gate.py pins that this edge is live by reading
+// the generated module's witness equates out of the build's own listing.
+use games.sonic4.ojz_effects_editor_act1.{ojz_act1_act_default}
+// THE ACT'S GRID AND ITS SECTION ROWS PAST THE NINTH — both GENERATED, both read
+// here (S2-COMPRESSED-ACT parcel 9). See the banner over `const GRID_W` below for why
+// the grid stopped being two hand-written numbers in this file.
+use games.sonic4.ojz_act_grid_act1.{OJZ_ACT_GRID_W, OJZ_ACT_GRID_H}
+use games.sonic4.ojz_sec_grid_extra_act1.{OJZ_ACT_SEC_EXTRA_ROWS}
+// THE REGION TABLE, LOWERED FROM THE EDITOR'S DOCUMENT (2026-09-16, REGIONS-EMIT-BINDINGS).
+// `ojz_act1_sec_scene` is NOT imported and no longer exists: in region mode each row carries
+// its scene binding as a `rg_parallax` POINTER, so the chooser that stood between this file
+// and those symbols has no call site and is not emitted. `ojz_act1_act_default` stays — the
+// act default is not a row's property and is still resolved through the seam.
+use games.sonic4.ojz_regions_act1.{OJZ_ACT1_GENERATED_REGION_ROWS,
+                                   OJZ_ACT1_ROW_SEC2, OJZ_ACT1_ROW_SEC5, OJZ_ACT1_ROW_SEC8,
+                                   OJZ_ACT1_ROW_SEC3,
+                                   OJZ_ACT1_ROW_SEC2_PRESET, OJZ_ACT1_ROW_SEC5_PRESET,
+                                   OJZ_ACT1_ROW_SEC8_PRESET, OJZ_ACT1_ROW_SEC3_PRESET}
+use games.sonic4.ojz_effects_editor_act1.{OJZ_Preset_Sec2_KEY, OJZ_Preset_Sec5_KEY,
+                                          OJZ_Preset_Plain_KEY, OJZ_Preset_Sec3_KEY}
+
+// SECTION_SIZE_SHIFT + EDGE_CLAMP are engine constants — imported from their sole
+// author now that engine.constants is the definition (the P5 ownership flip).
+// The imported consts are plain comptime ints, so EDGE_CLAMP range-proves into
+// the u8 field directly (a link-folded extern could not — the old mirror note).
+use engine.constants.{SECTION_SIZE_SHIFT, EDGE_CLAMP, MAX_ACT_SECTIONS, PAGE_TABLE_MAX, ART_POOL_PAGE_BYTES}
+// The region table's per-row invariants read the camera clamp's own terms (see ojz_region()).
+use engine.constants.{SCREEN_WIDTH, SCREEN_HEIGHT, CAM_SCREEN_HALF_W, CAM_SCREEN_HALF_H, CAM_MAX_Y_STEP}
+
+// Generated interior-island manifests: the art-pool page count/tile
+// total and the per-section block-dict lengths are `.emp` const modules the
+// generators emit (tools/ojz_strip_gen.py / ojz_block_gen.py) — comptime ints
+// consumed directly (they range-prove into the u16 fields; a link-folded extern
+// could not, and the pool-tile ceiling proof below now fails at COMPTIME).
+use games.sonic4.ojz_act_assets_act1.{BG_LAYOUT_TALL_SPAN}   // regions part 2 step 5
+use games.sonic4.ojz_act_pool_manifest_act1.{OJZ_ACT_POOL_PAGES}
+use games.sonic4.ojz_block_dicts_act1.{
+    OJZ_SEC0_BLOCK_DICT_LEN,
+    OJZ_SEC1_BLOCK_DICT_LEN,
+    OJZ_SEC2_BLOCK_DICT_LEN,
+    OJZ_SEC3_BLOCK_DICT_LEN,
+    OJZ_SEC4_BLOCK_DICT_LEN,
+    OJZ_SEC5_BLOCK_DICT_LEN,
+    OJZ_SEC6_BLOCK_DICT_LEN,
+    OJZ_SEC7_BLOCK_DICT_LEN,
+    OJZ_SEC8_BLOCK_DICT_LEN,
+}
+
+// P2b residency cutover (plan Task 5 §2e): the pool is no longer VRAM-tile-bounded.
+// The residency cache streams pages through PAGE_FRAMES fixed 64-tile frames and
+// page-in DMAs to an ALLOCATED frame (frame*64*32), never to tile page_id*64 — so
+// the resident VRAM footprint is bounded to the FG art window by the frame
+// allocator REGARDLESS of pool size. The real ceiling is therefore the residency
+// page table's capacity, not POOL_TILE_CEILING. (The old
+// `OJZ_ACT_POOL_TILES <= POOL_TILE_CEILING` identity-residency guard — "would DMA
+// over the character region at tile 960" — is obsolete under frame allocation; it
+// mirrors the generator's `pages <= PAGE_TABLE_MAX` assert, which the Task-5
+// cutover already switched to.)
+ensure(OJZ_ACT_POOL_PAGES <= PAGE_TABLE_MAX,
+       "OJZ act 1 art pool {OJZ_ACT_POOL_PAGES} pages exceeds PAGE_TABLE_MAX residency page-table capacity")
+
+// ---- the act's shape, written once ----
+//
+// AND WRITTEN SOMEWHERE ELSE SINCE 2026-09-17 (S2-COMPRESSED-ACT parcel 9). These two
+// used to be `const GRID_W = 3` / `const GRID_H = 3`, hand-typed here, with
+// tools/act_grid.py parsing them straight out of this file and comparing them against
+// project.json on every build. They are now the LOWERING of project.json — the same
+// numbers, reached through games/sonic4/data/generated/ojz/act1/act_grid.emp, which is
+// generated from it. One statement instead of two that agree.
+//
+// WHY IT MATTERS AND IT IS NOT TIDINESS. The S2CLIP throwaway bake (tools/clip_rom_bake.py)
+// rewrites the GENERATED tree and nothing else, so while the grid lived here it was a
+// number a clip act could not reach: R21 could only REFUSE a clip declaring any grid but
+// this act's, which capped every clip act at 6,144 px however much donor zone was left
+// over. Emerald Hill act 1 is 12,288 px wide, so half of it was unreachable by
+// construction. A clip act now declares its own grid in its own manifest.
+//
+// THE BYTES DO NOT MOVE FOR IT. The generated module says 3 x 3 for the shipped act,
+// which is what these two lines said; the section table below composes to the same nine
+// rows; and every derived const (ACT_W, the camera band, the region rules) folds to the
+// value it folded to before.
+const GRID_W = OJZ_ACT_GRID_W
+const GRID_H = OJZ_ACT_GRID_H
+
+// The old per-act if/error blocks, as comptime facts (they fail the build
+// HERE, not at link): grid capacity, and the <= $8000 axis-extent ceiling that
+// guards BOTH boundary-clamp hazards (grid dim <= 16 sections, tighter than
+// either): (a) the signed-word MIN clamp — an axis extent at or past $8000 reads
+// negative and min-clamps to 0; (b) the word-truncated MAX clamp in engine/level/camera.emp
+// AND games/sonic4/player/player_common.emp (subi.w/cmp.w) that wraps above $FFFF px =
+// grid dim > 31.
+// Floating-origin Phase 4 lifts both.
+ensure(GRID_W * GRID_H <= MAX_ACT_SECTIONS,
+       "act grid {GRID_W}x{GRID_H} exceeds MAX_ACT_SECTIONS")
+// P3 TASK 7 — the scene registry's act-span mirror, held to the grid it mirrors.
+//
+// scene_registry.emp bounds every authored world-Y layer top against SCENE_ACT_SPAN_Y
+// (assert_act_relative_tagged), and that bound must be THIS act's vertical extent rather
+// than a number somebody typed. The mirror lives over there and the pin lives here
+// because the `use` edge only runs this way — act_descriptor imports scene_registry for
+// ParallaxConfig_OJZ_Default, so the reverse import would be a cycle. GRID_H and
+// SECTION_SIZE_SHIFT are both in scope here and are the authority.
+ensure(SCENE_ACT_SPAN_Y == (GRID_H << SECTION_SIZE_SHIFT),
+       "scene_registry's SCENE_ACT_SPAN_Y ({SCENE_ACT_SPAN_Y}) drifted from this act's own vertical span (GRID_H {GRID_H} << SECTION_SIZE_SHIFT {SECTION_SIZE_SHIFT}) — the world-Y layer-top bound would be checking the wrong act")
+ensure(GRID_W >= 1 && GRID_H >= 1,
+       "act grid {GRID_W}x{GRID_H}: a zero axis makes the camera clamp bound negative (extent < screen)")
+ensure((GRID_W << SECTION_SIZE_SHIFT) <= $8000,
+       "grid_w axis extent breaks the signed-word camera clamp")
+ensure((GRID_H << SECTION_SIZE_SHIFT) <= $8000,
+       "grid_h axis extent breaks the signed-word camera clamp")
+// Section_GetSecPtrXY (engine/level/section.emp) indexes the Sec grid with
+// `adda.w d0, a0`, d0 = flat_id × sizeof(Sec)=22; adda.w SIGN-EXTENDS the word, so
+// an act above $7FFF / 26 = 1260 flat sections wraps the pointer. MAX_ACT_SECTIONS
+// is the flat-section ceiling. The stride derives from the struct, so the
+// ceiling moves with Sec instead of staying pinned to whatever it is today, and
+// the message reports both operands rather than a baked-in limit. Note the
+// consumers still spell the stride as a literal under section.emp's
+// `ensure(sizeof(Sec) == 22)`, so a Sec change trips THAT first — this guard is
+// the ceiling's own net, not the stride's.
+ensure(MAX_ACT_SECTIONS * sizeof(Sec) <= $7FFF,
+       "MAX_ACT_SECTIONS ({MAX_ACT_SECTIONS}) x sizeof(Sec) ({sizeof(Sec)}) exceeds $7FFF: Section_GetSecPtrXY adda.w sign-extends and wraps — widen the adda or pre-multiply flat_id as a long")
+
+// P2c Task 10 RIDER — sub-page-budget init deadlock guard. Level init bulk-loads
+// the pool at <=1 page/frame while page_in charges each landing against this
+// per-act byte budget; a budget below one page (ART_POOL_PAGE_BYTES) can never
+// admit even a single page, so the display-off load loop would defer forever and
+// never reach gameplay. Written once as a comptime fact so a mis-set descriptor
+// fails HERE, not as a silent boot hang. (2 pages/frame ceiling = 2×2048.)
+const ACT_ART_BUDGET = 4096
+ensure(ACT_ART_BUDGET >= ART_POOL_PAGE_BYTES,
+       "OJZ act 1 art budget {ACT_ART_BUDGET} < one page ({ART_POOL_PAGE_BYTES}) — init page-load would defer forever (deadlock)")
+
+pub data OJZ_Act1_Descriptor: Act = Act{
+    sec_grid_ptr:        OJZ_Act1_Sections,
+    grid_w:              GRID_W,
+    grid_h:              GRID_H,
+    start_local_x:       $0100,                          // 256px into section 0
+    start_local_y:       $0100,                          // ground level
+    start_sec_x:         0,
+    start_sec_y:         0,
+    act_bg_layout:       OJZ_Act1_BG_Layout,             // §2 A.5 T1 zone-wide BG
+    act_bg_tiles:        OJZ_Act1_BG_Tiles,
+    // The act default, through the editor binding seam: project.json's act
+    // `sceneRef` decides, and `hand:` is what stands when it is null (which is the
+    // state today, so this resolves to ParallaxConfig_OJZ_Default exactly as it did
+    // before the seam landed — the ROM bytes are unchanged).
+    act_parallax_config: ojz_act1_act_default(hand: ParallaxConfig_OJZ_Default),
+    act_art_pool_table:  OJZ_Act_Pool_PageTable,         // manifest v2 table [PageManifest;N] (generated)
+    act_art_pool_pages:  OJZ_ACT_POOL_PAGES,             // generated manifest const
+    edge_mode:           EDGE_CLAMP,                     // §10; OJZ ships CLAMP
+    pad_21:              default,
+    act_sec_local_maps:  OJZ_Sec_LocalMaps,              // P2b per-section local->global tables (generated)
+    act_art_budget:      ACT_ART_BUDGET,                  // P2c Task 9: 2 pages/frame (2×2048) steady-state ceiling; guarded above
+    act_regions:         OJZ_Act1_Regions,               // painted-regions v1 — the table at the end of this file
+    act_region_count:    OJZ_ACT1_REGION_ROWS.len,       // the SAME const the guards below read
+}
+
+// -----------------------------------------------
+// Section definition table — 9 entries × sizeof(Sec). STORAGE ONLY since painted-regions v1:
+// which preset each place installs is the region table's business (end of this file).
+// Grid layout (3×3):  Row 0 = Sec0,Sec1,Sec2 (unique art)
+//                     Row 1 = Sec3,Sec4,Sec5 (clone Sec0 art, distinct sky tint)
+//                     Row 2 = Sec6,Sec7,Sec8 (clone Sec0 art, distinct sky tint)
+// -----------------------------------------------
+// The standard OJZ section, built through ONE constructor: the varying
+// facts are the four per-section pointers and the dict pair; everything
+// else is the declared Sec default. (Tier 3 — deriving the stems from the
+// section NUMBER — waits on computed-name extern(); see the design note.)
+//
+// THE pal:/raster:/cycle: ARGUMENTS ARE GONE (2026-09-04, painted-regions audit row 3),
+// together with the nine dead Sec fields they and their siblings fed. The note that
+// stood here said, in terms, "deleting them is Task 13's job, once reachability of the
+// preset path is established". Task 13 (e6b016e5) established exactly that — "every
+// section now sets sec_effects" — and then deleted the READERS without deleting the
+// writers, so three constructor arguments went on feeding three fields nothing read.
+// Every channel they used to name (base palette, raster program, palette-cycle script)
+// now arrives through a region row's `effects:` -> EffectsPreset -> Effects_InstallPreset, which writes
+// all of them itself. See engine/structs.emp's Sec header for the field-by-field
+// re-verification and the 288-byte figure.
+//
+// A section palette is 96 bytes = CRAM lines 1-3. Line 0 is the CHARACTER line
+// (CharacterDef.cd_palette) and the level must never write it — the preset's
+// ep_pal carries that contract now (engine/effects/palette.emp, Palette_LoadPal).
+//
+// THE `effects:` AND `sec:` ARGUMENTS ARE GONE (2026-09-13, painted-regions v1, step 4),
+// with the two Sec fields they fed. A section's IDENTITY — the EffectsPreset it installs and
+// the editor scene that outranks the preset's own parallax — is bound by the REGION table at
+// the end of this file (OJZ_ACT1_REGION_ROWS): each row names its preset (`effects:`, still
+// REQUIRED, and ensured non-zero as well, so a written 0 fails the build too) and its
+// sidecar's scene binding (`parallax: ojz_act1_sec_scene(sec: N)`). `sec:` fed nothing else,
+// so it went too: a section row is storage only, and its index in this table is its flat id.
+comptime fn ojz_sec(blocks: Label, objects: Label, rings: Label, type_table: Label, dict: int, dict_len: int) -> Sec {
+    return Sec{
+        sec_block_index:      blocks,
+        sec_objects:          objects,
+        sec_rings:            rings,
+        sec_type_table:       type_table,
+        sec_block_dict:       dict,
+        sec_block_dict_len:   dict_len,
+    }
+}
+
+// THE NINE HAND-WRITTEN ROWS. They are a `const` array rather than the `pub data` they
+// used to be, so that a wider act's remaining rows can be appended to them — see
+// `OJZ_Act1_Sections` below the ninth. At 3 x 3 the append is with an EMPTY array and
+// the emitted table is byte-for-byte what this literal always produced.
+const OJZ_SEC_ROWS_BASE: array = [
+    ojz_sec(blocks: OJZ_Sec0_Blocks,
+            objects: OJZ_Sec0_Objects, rings: OJZ_Sec0_Rings,
+            type_table: OJZ_Sec0_TypeTable,
+            // Effects P3 gate: the first VSRAM raster program in this engine.
+            // Below screen line 112 plane B's vertical scroll snaps to a fixed
+            // offset, so the BG jumps 67 px at that line and stops tracking the
+            // camera below it — the engine's first vertical scroll BANDING, and
+            // the proof that Raster_HInt was never CRAM-specific. 67 and not 64
+            // because the OJZ BG art repeats every 64 px vertically — a 64 px
+            // shift is pixel-invisible. On section 0 so it is on screen at
+            // spawn with no navigation. (The ramp reaches the ROM through this
+            // section's preset now — OJZ_Preset_Sec0's ep_raster — not through a
+            // `raster:` argument here; Task 13's deletion finally happened.)
+            dict: extern("OJZ_Sec0_Blocks") + extern("BLOCK_INDEX_SIZE"),
+            dict_len: OJZ_SEC0_BLOCK_DICT_LEN),
+    ojz_sec(blocks: OJZ_Sec1_Blocks,
+            objects: OJZ_Sec1_Objects, rings: OJZ_Sec1_Rings,
+            type_table: OJZ_Sec1_TypeTable,
+            // SECTION 1 CARRIES NO RASTER PROGRAM since 2026-09-12. It used to carry the
+            // Effects P1 fixture `OJZ_TestRaster` (S/H + backdrop split below screen line
+            // 120) — owner ruling: "Take them out of the map but keep them in the engine to
+            // inject anywhere wwe may want." The program is unbound, not deleted; the
+            // ruling, what moved and what did not, and the two ways to inject it again are
+            // in the banner above `OJZ_Preset_Sec1` (games/sonic4/data/effects/
+            // ojz_effects.emp). `OJZ_Preset_Sec1` still exists and is still section 1's
+            // alone, so re-binding is one word in one place.
+            dict: extern("OJZ_Sec1_Blocks") + extern("BLOCK_INDEX_SIZE"),
+            dict_len: OJZ_SEC1_BLOCK_DICT_LEN),
+    ojz_sec(blocks: OJZ_Sec2_Blocks,
+            objects: OJZ_Sec2_Objects, rings: OJZ_Sec2_Rings,
+            type_table: OJZ_Sec2_TypeTable,
+            // Effects P1 gate: section 2 proves the per-section base palette on its own
+            // — crossing in must snap the palette, crossing back out must restore it.
+            // (Through OJZ_Preset_Sec2's ep_pal since Task 12; the sec_pal field it
+            // originally used is deleted.)
+            // Effects P2 Task 5 gate: section 2 also carries the DENSE-tier program (a
+            // 96-line ramp on screen lines 96-191). Sited here, adjacent to the P1
+            // raster section, so ONE sustained right-hold walks sparse -> dense and the
+            // sparse tier is proven un-regressed on the same run.
+            //
+            // ⚠ THAT PARAGRAPH EXPIRED ON 2026-09-12 and is quoted rather than deleted.
+            // Section 2 no longer carries `OJZ_TestGradient` — same owner ruling as section
+            // 1 above. With it goes the "one sustained right-hold walks sparse -> dense"
+            // property: NO section of this act binds a dense-tier program any more, so the
+            // dense tier is now proven by INJECTION only (tools/scenes/
+            // effects_raster_dense.json stages `Raster_Pending`, which is how
+            // tools/raster_off_gate.py has always reached the equally unbound
+            // `OJZ_TestVsram`). If a dense effect is ever wanted on the map again, binding
+            // it is one word in `OJZ_Preset_Sec2`.
+            dict: extern("OJZ_Sec2_Blocks") + extern("BLOCK_INDEX_SIZE"),
+            dict_len: OJZ_SEC2_BLOCK_DICT_LEN),
+    ojz_sec(blocks: OJZ_Sec3_Blocks,
+            objects: OJZ_Sec3_Objects, rings: OJZ_Sec3_Rings,
+            type_table: OJZ_Sec3_TypeTable,
+            // Effects P2 Task 8 gate: section 3 carries a palette-cycling band
+            // (line 2 entries 8-11, 8-frame period). Read CRAM per frame to see it.
+            dict: extern("OJZ_Sec3_Blocks") + extern("BLOCK_INDEX_SIZE"),
+            dict_len: OJZ_SEC3_BLOCK_DICT_LEN),
+    ojz_sec(blocks: OJZ_Sec4_Blocks,
+            objects: OJZ_Sec4_Objects, rings: OJZ_Sec4_Rings,
+            type_table: OJZ_Sec4_TypeTable,
+            // THE SHOWCASE DEPTH SECTION (owner decision d-15, 2026-08-26): Plain plus the
+            // vertical-split program lowered from this section's own Aurora scene. The
+            // parallax half — the curved BG factors — arrives separately through
+            // ojz_act1_sec_scene(sec: 4) below, from the same editor JSON.
+            dict: extern("OJZ_Sec4_Blocks") + extern("BLOCK_INDEX_SIZE"),
+            dict_len: OJZ_SEC4_BLOCK_DICT_LEN),
+    ojz_sec(blocks: OJZ_Sec5_Blocks,
+            objects: OJZ_Sec5_Objects, rings: OJZ_Sec5_Rings,
+            type_table: OJZ_Sec5_TypeTable,
+            // SECTION 5 OWNS ITS PRESET (EFFECTS-W1 item 1 step 5). It exists so this
+            // section's raster channel can be bound from its sidecar's `rasterRef` without
+            // dragging sections 6-8 along. See ojz_effects.emp at OJZ_Preset_Sec5.
+            //
+            // ⚠ CORRECTED 2026-09-09 (parcel/section-effects-record-fix). This note used to
+            // read "Identical to OJZ_Preset_Plain in every byte today". IT NO LONGER IS —
+            // quoted rather than deleted so a reader who remembers it meets the correction.
+            // Against OJZ_Preset_Plain (ojz_effects.emp at `OJZ_Preset_Plain`, which takes preset()'s
+            // defaults: parallax 0, all-PATCH_ANCHOR_NONE, all-ANCHOR_MOTION_NONE), the
+            // record at :1664-1684 differs in FOUR fields, all derived from source:
+            //   raster:            EditorRaster_OJZ_Act1_ojz_sec5_showcase, via the
+            //                      `OJZ_Preset_Sec5` arm of effects_scenes.emp's
+            //                      ojz_act1_preset_raster              (Plain: none)
+            //   parallax:          ParallaxConfig_OJZ_Underwater (:1675) — the d-53 LOAN, and
+            //                      the act's ONLY LIVE install of that record, because
+            //                      section 5 has no rung-1 arm while section 0 does
+            //   patch_world_ys[0]: 2272, via the same arm of
+            //                      ojz_act1_preset_patch_world_y  (Plain: PATCH_ANCHOR_NONE)
+            //   patch_motion[0]:   anchor_sweep(amp_shift: 4, period_shift: 1), via
+            //                      ojz_act1_preset_patch_motion (Plain: ANCHOR_MOTION_NONE)
+            // ⚠ CITED BY NAME AND NOT BY LINE, 2026-09-16. These were `effects_scenes.emp:399`
+            // / `:525` / `:536`; shape B′ added a 43-line preset-key block above them and every
+            // one of the three drifted in the same commit. tools/test_citation_form.py caught
+            // exactly one of the three (`:525`, which landed on a bare `}`) and the other two
+            // stayed GREEN pointing at the wrong lines, which is the CITATION-LIVE-LINE defect
+            // that booking names: the gate asks "is that line alive", not "is that the line".
+            // A generated file nobody edits is the worst possible thing to cite by line number.
+            // Section 5 is where the act's row-remap waterline actually renders. That is an
+            // owner-facing content fact, not a tidy: see ojz_effects.emp at OJZ_Preset_Sec5.
+            dict: extern("OJZ_Sec5_Blocks") + extern("BLOCK_INDEX_SIZE"),
+            dict_len: OJZ_SEC5_BLOCK_DICT_LEN),
+    ojz_sec(blocks: OJZ_Sec6_Blocks,
+            objects: OJZ_Sec6_Objects, rings: OJZ_Sec6_Rings,
+            type_table: OJZ_Sec6_TypeTable,
+            // EFFECTS-W1 item 11a's authorable half (2026-09-03): the mid-frame
+            // nametable-base swap, bound through a `base_swap` preset document
+            // (games/sonic4/data/editor/effects/presets/ojz_sec6_baseswap.json) instead
+            // of existing only as OJZ_BaseSwap's DEBUG-only demo. Scroll right into
+            // section 6 to see it: TWO BANDS WITH THE LAYERS' ROLES INVERTED BETWEEN THEM
+            // (T3, 2026-09-04, owner ask).
+            //   lines 3..64     the BACKGROUND layer draws the FOREGROUND's map
+            //                   (reg $04, Plane B's base, pointed at VRAM_PLANE_A)
+            //   lines 65..158   both layers normal — this gap is what makes them two
+            //                   bands rather than one long swap
+            //   lines 159..220  the FOREGROUND layer draws the BACKGROUND's map
+            //                   (reg $02, Plane A's base, pointed at VRAM_PLANE_B)
+            //   lines 221..223  normal again; the bottom band closes on its own edge
+            //                   rather than running off the screen
+            // The bottom band's lines are the top band's REFLECTED through the display's
+            // midline (223 - L), so both bands are 61 lines and the margins above and
+            // below are both 3 rows.
+            // (⚠ This said "64 lines above the screen bottom" until 2026-09-04; that
+            // described the retired line-160 single-edge program, and stayed here through
+            // `8bf6df74`'s move to line 3. F2 gave the program its second edge and T3 gave
+            // it a second band on the OTHER register — the two halves of the owner's
+            // sentence are two DIFFERENT VDP registers, which is why "move the band down"
+            // was not what was needed.)
+            dict: extern("OJZ_Sec6_Blocks") + extern("BLOCK_INDEX_SIZE"),
+            dict_len: OJZ_SEC6_BLOCK_DICT_LEN),
+    ojz_sec(blocks: OJZ_Sec7_Blocks,
+            objects: OJZ_Sec7_Objects, rings: OJZ_Sec7_Rings,
+            type_table: OJZ_Sec7_TypeTable,
+            // THE ACT'S SECOND SECTION WITH LIVE PATCH CHANNELS (EFFECTS-W1 item 9c
+            // precondition, 2026-09-05). OJZ_WorldWater's two `patchable()` records ride
+            // channels 2 and 3 with world anchors in THIS section's row, so both boundaries
+            // track the world instead of the screen:
+            //   ch 2  the water surface — a 3-colour tint band + S/H, band 3..160,
+            //         `offscreen_ship` so a camera below the surface tints the whole screen
+            //   ch 3  a plane-B vertical scroll split ($0043), band 162..223
+            // Channels 2 and 3 rather than 0 and 1 so the act-wide channel->band map the
+            // effects tools build stays unambiguous; see OJZ_WorldWater's own note.
+            //
+            // ⚠ CORRECTED 2026-09-09 (parcel/section-effects-record-fix). THE FIVE LINES
+            // THAT USED TO SIT HERE READ: "THE SCENE HALF IS UNBOUND ON PURPOSE. Section 7
+            // has no `section_7.meta.json`, so `ojz_act1_sec_scene(sec: 7)` returns 0 and
+            // the act default stands. An anchored scene is authored by adding that sidecar
+            // — this call site already threads the chooser and needs no edit for it." They
+            // are quoted rather than deleted because this exact sentence has already been
+            // COPIED FORWARD into a design document as a verified fact (see below), and a
+            // reader who remembers it must meet the correction rather than inherit a new
+            // value silently.
+            //
+            // THE SCENE HALF IS BOUND. `games/sonic4/data/editor/ojz/act1/section_7.meta.json`
+            // landed at c1d0a6be, 2026-09-05, reading `"sceneRef": "ojz_act1_sec7_worldwater"`.
+            // The generated chooser therefore carries `if sec == 7 { out =
+            // EditorSceneBinding_OJZ_Act1_Sec7 }` (ojz_act1_sec_scene's `sec == 7` arm in
+            // effects_scenes.emp), and that binding
+            // is a real emitted `pub data` record (:168 = lower3(EditorScenes_OJZ_Act1[2])).
+            // `ojz_act1_sec_scene(sec: 7)` DOES NOT RETURN 0. Section 7 resolves at RUNG 1 to
+            // the editor scene `ojz_act1_sec7_worldwater` — 3 bands, v_factor 15, v_offset
+            // 288, no anchor (Scene_Editor_ojz_act1_sec7_worldwater in effects_scenes.emp)
+            // — and the act default does NOT stand.
+            // The anchored-scene authoring this note invited is what already happened.
+            //
+            // WHERE THE STALE SENTENCE TRAVELLED, recorded because it is the reason this
+            // correction is worth more than a comment fix:
+            // `docs/superpowers/designs/2026-09-09-regions-v1-design.md` §3.1 — a table headed
+            // "What act 1 looks like today, VERIFIED" — transcribed it as the row "returns 0,
+            // act default stands", and §4 step 1 proposes a 1:1 transcription of that table
+            // into the regions migration. That row is corrected in place in the design doc by
+            // this same parcel. Two more copies were corrected with it: ojz_effects.emp's
+            // OJZ_Preset_Sec7 banner, and games/sonic4/test/ojz_scroll_test.emp's parallax
+            // readout rationale.
+            dict: extern("OJZ_Sec7_Blocks") + extern("BLOCK_INDEX_SIZE"),
+            dict_len: OJZ_SEC7_BLOCK_DICT_LEN),
+    ojz_sec(blocks: OJZ_Sec8_Blocks,
+            objects: OJZ_Sec8_Objects, rings: OJZ_Sec8_Rings,
+            type_table: OJZ_Sec8_TypeTable,
+            dict: extern("OJZ_Sec8_Blocks") + extern("BLOCK_INDEX_SIZE"),
+            dict_len: OJZ_SEC8_BLOCK_DICT_LEN),
+]
+
+// THE SECTION TABLE THE ENGINE READS = the nine rows above ++ whatever a wider act baked
+// past them (S2-COMPRESSED-ACT parcel 9). `OJZ_ACT_SEC_EXTRA_ROWS` is generated beside the
+// block dictionaries (sec_grid_extra.emp) and is EMPTY for the shipped 3 x 3 act, so this
+// emits the same 9 x sizeof(Sec) bytes at the same place it always did.
+//
+// THE ARITY IS CHECKED AGAINST THE GRID, which is the guarantee R21 used to give from the
+// Python side and now gives from here as well, where it cannot be skipped by a bake that
+// forgot to run a checker: Section_GetSecPtrXY indexes this table by flat id over GRID_W x
+// GRID_H, so a table SHORTER than the grid reads whatever the linker put next — the
+// 2026-09-12 F2 incident's failure mode, one table over. A table LONGER than the grid is
+// dead bytes and a sign the bake and the grid disagree, so it is refused too.
+const OJZ_SEC_ROWS_BASE_LEN = OJZ_SEC_ROWS_BASE.len
+const OJZ_SEC_ROWS_EXTRA_LEN = OJZ_ACT_SEC_EXTRA_ROWS.len
+const OJZ_SEC_ROWS_TOTAL = OJZ_SEC_ROWS_BASE_LEN + OJZ_SEC_ROWS_EXTRA_LEN
+ensure(OJZ_SEC_ROWS_TOTAL == GRID_W * GRID_H,
+       "OJZ act 1 section table has {OJZ_SEC_ROWS_TOTAL} rows ({OJZ_SEC_ROWS_BASE_LEN} hand-written + {OJZ_SEC_ROWS_EXTRA_LEN} generated) for a {GRID_W}x{GRID_H} grid. Section_GetSecPtrXY indexes this table by flat id over the grid; short, it reads past the table")
+pub data OJZ_Act1_Sections: [Sec; OJZ_SEC_ROWS_TOTAL] = OJZ_SEC_ROWS_BASE ++ OJZ_ACT_SEC_EXTRA_ROWS
+
+// -----------------------------------------------
+// Region table — the act's IDENTITY scope (painted-regions v1,
+// docs/superpowers/designs/2026-09-09-regions-v1-design.md).
+//
+// A region is an inclusive world-pixel rectangle naming an EffectsPreset (and optionally
+// a parallax config that outranks the preset's). The camera CENTRE's region decides which
+// preset is installed; the section grid above is storage only.
+//
+// THIS TABLE IS A 1:1 TRANSCRIPTION OF THE SECTION GRID, on purpose. Each row names exactly
+// the preset its section's `effects:` names above and exactly the scene binding its
+// section's `ojz_act1_sec_scene(sec: N)` resolves to — so nine rectangles equal to nine
+// sections must produce byte-identical BEHAVIOUR, which is the whole proof strategy of
+// the migration. Row 5's binding is 0 and that does NOT mean "act default": rung 2 then
+// finds OJZ_Preset_Sec5's own ep_parallax (ParallaxConfig_OJZ_Underwater). Row 7's is NOT
+// 0 (section_7.meta.json binds a scene; the design's §3.1 row 7 was wrong about that and
+// is corrected there).
+//
+// `parallax:` IS WHAT THE ROW'S SIDECAR BINDS, asked of the editor seam in place. The seam
+// (`ojz_act1_sec_scene`) is still keyed by the per-section sidecar (section_N.meta.json's
+// `sceneRef`); when the tools parcel moves bindings into regions.json (design §3.3), the
+// argument becomes that file's binding and the sidecar key goes away. A 0 here is legal and
+// means "defer to rung 2" — which is why `effects:`, where 0 is NOT legal, carries its own
+// ensure below: a scalar `Label` argument ACCEPTS a written 0 (measured 2026-09-13; the
+// asymmetry docs/EMP_PITFALLS.md §12 described does not hold for this form), so the missing
+// default catches an omitted binding and only the ensure catches a written one.
+// -----------------------------------------------
+
+// The act's extent, exclusive, in world px.
+const ACT_W = GRID_W << SECTION_SIZE_SHIFT
+const ACT_H = GRID_H << SECTION_SIZE_SHIFT
+// THE CAMERA CENTRE'S REACHABLE BAND, derived from the clamp rather than asserted:
+// Camera_Init (engine/level/camera.emp) clamps Camera_X to [0, ACT_W - SCREEN_WIDTH] and
+// the crossing tests Camera_X + CAM_SCREEN_HALF_W, so the centre spans the band below. An
+// interior edge outside it can never be crossed, so its region could never be entered.
+const CENTRE_X_MIN = CAM_SCREEN_HALF_W
+const CENTRE_X_MAX = ACT_W - SCREEN_WIDTH + CAM_SCREEN_HALF_W
+const CENTRE_Y_MIN = CAM_SCREEN_HALF_H
+const CENTRE_Y_MAX = ACT_H - SCREEN_HEIGHT + CAM_SCREEN_HALF_H
+// The minimum span on either axis. The camera moves at most 16 px a frame on each axis, so
+// a rectangle narrower than 17 px could be stepped over; 32 is one doubling of margin.
+// AUTHORING HYGIENE, NOT SAFETY: a stepped-over rectangle costs a missed identity change,
+// never corruption, because the crossing's fast path simply rescans the next frame. Pinned
+// to the Y step, which engine.constants publishes; the X step (camera.emp's CAM_MAX_X_STEP,
+// also 16) is file-local there and cannot be read from here.
+const REGION_MIN_SPAN = 2 * CAM_MAX_Y_STEP
+
+// THE BACKGROUND PLACEMENT ARGUMENTS (regions part 2 step 1, spec §4.1). `bg_layout` names
+// this region's nametable blob and `bg_span` is that map's HEIGHT in px; both default to 0,
+// which means "the act's own" — Act.act_bg_layout and PLANE_B_SPAN respectively. Every row
+// in this act takes both defaults today, so these three ensures still cost nothing here:
+// they are what makes an illegal span a build error rather than a wrong picture.
+//   CORRECTED TWICE ON 2026-09-16, and the second correction is the one worth reading.
+//   This comment first added "and NOTHING IN THE ENGINE READS EITHER FIELD YET", which step
+//   3 (`17bf60fe`) falsified for `rg_bg_layout` — Section_RedrawPlanes
+//   (engine/level/section.emp) and Draw_BG_TileRow (engine/level/plane_buffer.emp). The
+//   replacement said "it is `rg_bg_span` that still has none; the clamp that reads it is
+//   step 4" — and step 4 LANDED THE SAME DAY (`d1390f1c`), so that sentence was stale
+//   within hours of being written. BOTH FIELDS HAVE READERS: `rg_bg_span` is read by
+//   Parallax_Step5_Vscroll's BG V-scroll clamp (engine/level/parallax.emp), through
+//   Region_Current. What is still true, and is the fact that actually matters here, is that
+//   NO SHIPPED ROW REACHES EITHER READER: all ten of this act's rows take both defaults, so
+//   the clamp takes its VSCROLL_BG_MAX fallback every frame. A field with a reader nothing
+//   reaches is the same shape of trap as a field with no reader. The ensures below are
+//   unchanged either way. (engine/structs.emp's own banner has said this correctly since
+//   step 4; this file is where it went stale.)
+//
+// WHY THE ZERO SENTINEL IS EXEMPT FROM THE HEIGHT FLOOR, and this is a correction to the
+// spec's own wording. §4.1 lists the three rules as "a multiple of 8, at least
+// SCREEN_HEIGHT, and, when rg_bg_layout is 0, equal to 0". Read as three unconditional
+// conjuncts those are UNSATISFIABLE for a defaulted row — 0 is not >= SCREEN_HEIGHT — and
+// the same spec row requires act 1's ten defaulted rows to compile unchanged. So the floor
+// is written against a SPAN THAT IS PRESENT (`bg_span == 0 || ...`); 0 is the sentinel, not
+// a height. The multiple-of-8 rule needs no such exemption because 0 already satisfies it.
+const BG_SPAN_ROW_PX = 8            // one nametable row: the streamer's quantum (8 px cells)
+
+// ojz_region() — one Region row, with every per-row invariant checked HERE, at the call
+// site (a comptime fn's ensures evaluate where it is called, which is what makes them live).
+comptime fn ojz_region(x0: int, x1: int, y0: int, y1: int, effects: Label, parallax: Label = 0,
+                       bg_layout: Label = 0, bg_span: int = 0, bg_tiles: Label = 0) -> Region {
+    // A label beside 0 is the one cross-kind comparison sigil keeps DEFINED (EMP_PITFALLS
+    // §12): a real label is never 0, so this is false exactly for a written zero.
+    ensure(effects != 0,
+           "ojz_region(x0: {x0}, y0: {y0}): effects is 0. Effects_InstallPreset dereferences Region.rg_effects untested, so a null binding would read the 68000 vector table as an EffectsPreset in the release shape")
+    ensure(x0 >= 0 && y0 >= 0,
+           "ojz_region(x0: {x0}, y0: {y0}): a negative edge is outside every act — world px start at 0")
+    ensure(x0 <= x1 && y0 <= y1,
+           "ojz_region(x0: {x0}, x1: {x1}, y0: {y0}, y1: {y1}): an inverted rectangle contains no point. Bounds are INCLUSIVE, so a one-pixel column is x0 == x1, never x1 < x0")
+    ensure(x1 < ACT_W && y1 < ACT_H,
+           "ojz_region(x1: {x1}, y1: {y1}): reaches past the act, whose inclusive maximum is ({ACT_W} - 1, {ACT_H} - 1) — no camera centre can stand there")
+    ensure(x1 - x0 + 1 >= REGION_MIN_SPAN && y1 - y0 + 1 >= REGION_MIN_SPAN,
+           "ojz_region(x0: {x0}, x1: {x1}, y0: {y0}, y1: {y1}): narrower than REGION_MIN_SPAN ({REGION_MIN_SPAN} px) on an axis — the camera moves up to 16 px a frame and could step over it")
+    ensure(x0 == 0 || (x0 - 1 >= CENTRE_X_MIN && x0 <= CENTRE_X_MAX),
+           "ojz_region(x0: {x0}): an interior LEFT edge outside the camera centre's reachable band [{CENTRE_X_MIN}, {CENTRE_X_MAX}] can never be crossed")
+    ensure(x1 == ACT_W - 1 || (x1 >= CENTRE_X_MIN && x1 + 1 <= CENTRE_X_MAX),
+           "ojz_region(x1: {x1}): an interior RIGHT edge outside the camera centre's reachable band [{CENTRE_X_MIN}, {CENTRE_X_MAX}] can never be crossed")
+    ensure(y0 == 0 || (y0 - 1 >= CENTRE_Y_MIN && y0 <= CENTRE_Y_MAX),
+           "ojz_region(y0: {y0}): an interior TOP edge outside the camera centre's reachable band [{CENTRE_Y_MIN}, {CENTRE_Y_MAX}] can never be crossed")
+    ensure(y1 == ACT_H - 1 || (y1 >= CENTRE_Y_MIN && y1 + 1 <= CENTRE_Y_MAX),
+           "ojz_region(y1: {y1}): an interior BOTTOM edge outside the camera centre's reachable band [{CENTRE_Y_MIN}, {CENTRE_Y_MAX}] can never be crossed")
+    // -- the background placement, regions part 2 step 1 (spec §4.1) --
+    // (1) A SPAN IS A WHOLE NUMBER OF NAMETABLE ROWS. The row streamer's quantum is one
+    //     8 px cell row, so a span off that grid would leave a final partial row that no
+    //     row entry can address. 0 (the sentinel) already satisfies this.
+    ensure(bg_span % BG_SPAN_ROW_PX == 0,
+           "ojz_region(x0: {x0}, y0: {y0}): bg_span {bg_span} is not a multiple of {BG_SPAN_ROW_PX} px. The background scrolls and streams in whole nametable rows, so a span off that grid ends in a partial row nothing can draw")
+    // (2) A SPAN MUST COVER THE SCREEN. The clamp the span becomes is
+    //     `0 .. bg_span - SCREEN_HEIGHT`; a span below SCREEN_HEIGHT makes that range
+    //     empty and the bottom of the screen would show whatever follows the map.
+    ensure(bg_span == 0 || bg_span >= SCREEN_HEIGHT,
+           "ojz_region(x0: {x0}, y0: {y0}): bg_span {bg_span} is shorter than the {SCREEN_HEIGHT} px screen, so the scroll clamp `0 .. bg_span - {SCREEN_HEIGHT}` is empty and the map cannot fill the display. Write 0 to mean the act default (PLANE_B_SPAN), never a height below the screen")
+    // (3) NO SPAN WITHOUT A LAYOUT. A row that defers the picture to the act cannot also
+    //     claim a height: the act default's height is the ACT's fact, not the row's, and a
+    //     span written beside layout 0 would be silently ignored by every future reader.
+    //     `bg_layout != 0` is the label-beside-0 form EMP_PITFALLS §12 keeps DEFINED, and
+    //     it is the same spelling the `effects != 0` guard above uses.
+    ensure(bg_layout != 0 || bg_span == 0,
+           "ojz_region(x0: {x0}, y0: {y0}): bg_span {bg_span} is written on a row whose bg_layout is 0. A row with no layout of its own shows the act's background, whose height is the act's fact — name a layout too, or leave bg_span 0")
+    return Region{ rg_x0: x0, rg_x1: x1, rg_y0: y0, rg_y1: y1, rg_effects: effects,
+                   rg_parallax: parallax, rg_bg_layout: bg_layout, rg_bg_span: bg_span,
+                   rg_bg_tiles: bg_tiles }
+}
+
+// THE WIDTH THE REGION DOCUMENT WAS AUTHORED FOR, which since S2-COMPRESSED-ACT parcel 9
+// is not necessarily the width of the act (see `OJZ_WIDE_FILL_ROWS` at the end of this
+// file). Derived from the generated rows rather than typed: the document tiles a rectangle
+// and this is that rectangle's right edge + 1.
+//
+// WHY IT IS NEEDED AT ALL. `regions.emp` is lowered from the editor's regions.json by
+// tools/effects_gen.py, which the S2CLIP throwaway bake does not run — so a clip act that
+// declares a WIDER grid gets the shipped act's region document over a bigger act. Every
+// number below that used to be spelled `6143` or derived from `ACT_W - 1` meant "the right
+// edge of the authored document", and those two stopped being the same number.
+comptime fn region_max_x1(r: array) -> int {
+    comptime var m: int = 0
+    for i in 0..r.len {
+        if r[i].rg_x1 > m { m = r[i].rg_x1 }
+    }
+    return m
+}
+const OJZ_AUTHORED_ACT_W = region_max_x1(OJZ_ACT1_GENERATED_REGION_ROWS) + 1
+ensure(OJZ_AUTHORED_ACT_W <= ACT_W,
+       "OJZ act 1's region document tiles {OJZ_AUTHORED_ACT_W} px of x but the act is only {ACT_W} px wide — rows would reach past the act's right edge, where no camera centre can stand. The document and the grid (the generated act_grid.emp) disagree about which act this is")
+ensure(OJZ_AUTHORED_ACT_W % (1 << SECTION_SIZE_SHIFT) == 0,
+       "OJZ act 1's region document tiles {OJZ_AUTHORED_ACT_W} px of x, which is not a whole number of sections. OJZ_WIDE_FILL_ROWS at the end of this file starts where the document stops, so a document ending mid-section would put a region edge inside a section for no authored reason")
+
+// The first overlapping pair as `i * 1000 + j` (i < j), or -1 when no two rows share a
+// pixel. Inclusive bounds: two rectangles overlap iff each one's low edge is at or below
+// the other's high edge, on both axes.
+comptime fn region_first_overlap(r: array) -> int {
+    for i in 0..r.len {
+        for j in (i + 1)..r.len {
+            if r[i].rg_x0 <= r[j].rg_x1 && r[j].rg_x0 <= r[i].rg_x1 && r[i].rg_y0 <= r[j].rg_y1 && r[j].rg_y0 <= r[i].rg_y1 {
+                return i * 1000 + j
+            }
+        }
+    }
+    return -1
+}
+
+// The summed area of every row, in px².
+comptime fn region_area_sum(r: array) -> int {
+    comptime var s: int = 0
+    for i in 0..r.len {
+        s = s + (r[i].rg_x1 - r[i].rg_x0 + 1) * (r[i].rg_y1 - r[i].rg_y0 + 1)
+    }
+    return s
+}
+
+// THE FIRST EDGE OFF THE SECTION GRID (painted-regions v1, step 5 —
+// docs/superpowers/notes/2026-09-13-regions-p2.md). One rectangle, the NIGHT region, cut out of
+// the top row across the section line at x = 4096: its own palette, and the act's first
+// cross-fade on the way in (OJZ_Preset_Night, ojz_effects.emp). Rows 1 and 2 shrink to make room,
+// so the table still tiles the act with no overlap (the whole-table ensures below).
+//
+// WHY THIS FORM, and not the design's example of an interior rectangle in section 4:
+//   * A STRAIGHT SPLIT is the cheapest honest form — one added row, and two rows that change
+//     one number each. An interior rectangle needs four more rows around it.
+//   * STRADDLING 4096 is the point of it. The owner's question was whether the colour change is
+//     "just region based". With the rectangle spanning a section line, the section line INSIDE
+//     it is crossed with nothing happening at all (Region_Current does not change, so the fast
+//     path never rescans), and the two edges that DO change the colour sit at 3400 and 4800,
+//     neither of them a multiple of 2048 — nor of 128 or 256, so no block or chunk grid lines
+//     up with them either.
+//   * THE TOP ROW is the route a held RIGHT takes from the spawn: the DEBUG shape boots in
+//     free-flight, which moves the camera at its 16 px/frame cap along y = 256, so the edges are
+//     crossed at the fastest the camera ever moves. Sections 1 and 2 bind identical presets with
+//     no raster, patched or cycle channel (OJZ_Preset_Sec1 / _Sec2), so the palette is the ONLY
+//     thing that changes at the edge. The design's section-4 example sits on OJZ_Preset_Depth,
+//     whose vertical-split program would change at the same edge and confound the fade.
+//   * THE X=2048 CROSSING IS UNTOUCHED, which keeps tools/parallax_crossing_gate.py's route
+//     (the region-0 | region-1 edge) exactly as it was.
+//
+// NO `parallax:` ON THE NEW ROW, deliberately: it straddles two sections, so no single
+// section sidecar can key it, and 0 defers to rung 2 (OJZ_Preset_Night's ep_parallax, also 0)
+// and then rung 3, the act default — exactly what rows 1 and 2 resolve to today (neither
+// sidecar binds a scene). When bindings move into regions.json (design §3.3) this row gets its
+// own entry there.
+const OJZ_NIGHT_X0 = 3400                    // inclusive left edge, world px
+const OJZ_NIGHT_X1 = 4799                    // inclusive right edge; the next row starts at 4800
+ensure((OJZ_NIGHT_X0 & ((1 << SECTION_SIZE_SHIFT) - 1)) != 0 && ((OJZ_NIGHT_X1 + 1) & ((1 << SECTION_SIZE_SHIFT) - 1)) != 0,
+       "the night region's edges ({OJZ_NIGHT_X0}, {OJZ_NIGHT_X1} + 1) must lie OFF the section grid — that is the whole of what step 5 proves; an edge on a multiple of the section size would be a section edge again")
+ensure(OJZ_NIGHT_X0 < (2 << SECTION_SIZE_SHIFT) && OJZ_NIGHT_X1 >= (2 << SECTION_SIZE_SHIFT),
+       "the night region must STRADDLE the section line at x = {2 << SECTION_SIZE_SHIFT}: the witness (tools/region_fade_witness.py) proves that a section line inside a region changes nothing, and needs one to cross")
+
+// -----------------------------------------------
+// REGIONS-P2 E2 — THE SNAP EDGE. A DEBUG-SHAPE LOOK FIXTURE, NOT CONTENT.
+//
+// The night region above meets its neighbours with a CROSS-FADE on the way in. E2 asks the
+// other half of the same look question: with the background art unchanged, does the same
+// 48-entry palette swap read as a transition or as a GLITCH when it lands in one frame?
+// So this cuts a second night rectangle out of the top row whose preset does NOT arm the
+// fade (`OJZ_Preset_NightSnap`, ojz_effects.emp — row 2's own argument list with one
+// different palette and nothing else), and the DEBUG ROM then carries BOTH crossings on one
+// held RIGHT: the fade at x = 3400 and the snap at x = 5600, over the same art, minutes
+// apart. That is the comparison the judgement needs and two different ROMs could not give.
+//
+// WHY x = 5600 AND NOT THE 3400 EDGE ITSELF. The obvious fixture — take `transition:` off
+// OJZ_Preset_Night — would REPLACE the fade rather than sit beside it, and it would take
+// tools/region_fade_witness.py's whole premise with it (E0: exactly one row in the table
+// arms the fade). A second edge keeps the shipped fade fixture and its witness intact.
+//
+// WHY THE FAR RIGHT OF ROW 2, AND NOT ANY OTHER EDGE IN THE ACT. Three constraints leave
+// exactly one place:
+//   * NO CONFOUND. The two presets meeting at the edge must differ in `ep_pal` ALONE, or the
+//     owner is judging a colour question against a raster/cycle/water change. Only
+//     OJZ_Preset_Sec1 / _Sec2 / _Plain are that plain, and of those only Sec1 and Sec2 are in
+//     the top row where a held RIGHT from the spawn reaches them.
+//   * NOT ROW 1, EITHER END. Row 1's left edge (x = 2048) is the crossing region_fade_witness
+//     asserts changes no colour (E6); its right edge is the fade edge itself, whose premise
+//     is that the region to the fade's left binds a DIFFERENT ep_pal (E0).
+//   * CLEAR OF THE WITNESS'S ROUTE. That walk's right-most leg stops at
+//     `fade.x1 + 2 = 4801` plus MARGIN_TICKS (24) x PLAYER_DEBUG_FLY_SPEED (16) = x 5185,
+//     one more sample at most. 5600 leaves ~400 px — 25 ticks — of margin beyond it.
+// 5600 is also off every grid the act has: not a multiple of the 2048 section size, nor of
+// 256, nor of 128, so no chunk or block line coincides with it either.
+//
+// THE RELEASE TABLE IS UNTOUCHED. With DEBUG == 0 the extra row is `[]` and row 2 keeps
+// x1 = 6143, so `OJZ_ACT1_REGION_ROWS` is the same ten rows, `act_region_count` is the same
+// 10, and OJZ_Preset_NightSnap emits zero bytes. The only release-shape change this parcel
+// can make is the symbol NAME in the deb2 appendix past EndOfRom (build.sh's header, the
+// 2026-09-04 correction) — measured in the parcel note.
+// -----------------------------------------------
+const OJZ_SNAP_X0 = 5600                     // inclusive left edge of the E2 snap region
+ensure((OJZ_SNAP_X0 & ((1 << SECTION_SIZE_SHIFT) - 1)) != 0,
+       "the E2 snap edge ({OJZ_SNAP_X0}) must lie OFF the section grid, like the night region's own edges — an edge on a multiple of the section size would be a section edge again and the look being judged would be confounded with a streaming seam")
+// The witness's right-most sample, derived from ITS OWN constants rather than quoted: the
+// out leg stops once the centre reaches fade.x1 + 2 and then runs MARGIN_TICKS more ticks at
+// PLAYER_DEBUG_FLY_SPEED. One extra tick of slack for the sample taken on the stopping tick.
+const OJZ_FADE_WITNESS_MAX_X = (OJZ_NIGHT_X1 + 2) + (24 + 1) * 16
+ensure(OJZ_SNAP_X0 > OJZ_FADE_WITNESS_MAX_X,
+       "the E2 snap edge ({OJZ_SNAP_X0}) is at or left of where tools/region_fade_witness.py's out leg reaches ({OJZ_FADE_WITNESS_MAX_X}). That walk would fly into the snap region and the night palette would be under samples its assertions assume are the day one")
+// Row 2 gives up its right end to the snap region in the DEBUG shape and keeps all of it in
+// release. Single-level `if` in value position on purpose — EMP_PITFALLS §1.
+const OJZ_SEC2_X1 = if DEBUG == 1 { OJZ_SNAP_X0 - 1 } else { OJZ_AUTHORED_ACT_W - 1 }
+const OJZ_E2_SNAP_ROWS: array = if DEBUG == 1 {
+    [ ojz_region(x0: OJZ_SNAP_X0, x1: OJZ_AUTHORED_ACT_W - 1, y0: 0, y1: 2047, effects: OJZ_Preset_NightSnap) ]
+} else { [] }
+// Release 10, DEBUG 11. Every whole-table guard below reads the rows themselves, so both
+// shapes are checked for overlap and exact coverage without either count being typed twice.
+//
+// THE `pub data` LINE AT THE END OF THIS FILE SPELLS ITS ARITY `10 + OJZ_E2_SNAP_ROWS_LEN`
+// RATHER THAN THIS NAME, AND THAT IS FOR A READER OUTSIDE THE ASSEMBLER. The literal is the
+// RELEASE row count, which is the count a `.lab_index` PRESET row must be inside in EVERY
+// shape; tools/test_lab_index_lint.py reads that base off this declaration and proves the
+// added term is zero in release. See that file's `_ACT_REGION_ARITY`.
+const OJZ_E2_SNAP_ROWS_LEN = OJZ_E2_SNAP_ROWS.len
+
+// ---- THE TALL-BACKGROUND ROW (regions part 2 step 5; spec step-table row 5) ----
+// DEBUG ONLY, carved out of row 5's right end exactly the way OJZ_E2_SNAP_ROWS is carved
+// out of row 2's — same mechanism, same shape, and the act's tiling proof below still
+// evaluates over the rows themselves, so both shapes are checked without either count
+// being typed twice.
+//
+// WHY IT HAS TO BE A ROW OF ITS OWN, and why THIS rectangle. The step needs a region
+// whose background map is taller than the plane AND whose camera can actually drive the
+// BG scroll past the old ceiling. Those are two separate requirements and only their
+// conjunction is a discriminator:
+//
+//   * THE BG MUST MOVE. Eighteen of the twenty OJZ scenes author `v_factor: 15` — a
+//     LOCKED plane that ignores the camera entirely. A tall map under a locked scene
+//     streams nothing, ever: an instrument that cannot produce the answer it looks for.
+//     This row binds NO parallax and an effects preset that binds none either
+//     (OJZ_Preset_Plain), so it resolves — through Effects_ResolveParallax's
+//     rg_parallax > ep_parallax > act default ladder — to ParallaxConfig_OJZ_Default,
+//     which is `v_factor 3 / v_center 512 / v_offset 0`. The BG moves at 1/8 the camera.
+//   * THE CAMERA MUST REACH HIGH Y. With v_center 512 and v_factor 3 the BG scroll is
+//     (camY - 512) >> 3, so beating the OLD ceiling (VSCROLL_BG_MAX = 288) needs camY >
+//     2816, and beating the NEW one (768 - 224 = 544) needs camY > 4864. That rules out
+//     the whole y 0..2047 band — including the DEBUG row that already exists,
+//     OJZ_E2_SNAP_ROWS, whose scroll tops out at 191 and could never make the two clamps
+//     disagree at all.
+//   * AND IT SPANS TWO SECTION ROWS, y 2048..6143, WHICH IT DID NOT IN THE FIRST DRAFT.
+//     Cut at y 2048..4095 the rectangle reaches raw scroll 192..447, and that is enough
+//     to make the two clamps DISAGREE (the old one binds at 288, the new one does not)
+//     but NOT enough to exercise the new ceiling as a BINDING constraint — 447 < 544, so
+//     the new number would never once be the thing that stopped the scroll. Testing a
+//     clamp only where it does not clamp is half a test. Extending to y 6143 reaches raw
+//     scroll 703, so the new ceiling binds over the last ~1280 px of camera travel while
+//     the window tops still sweep 7..32. Both halves of step 4 are then under the camera
+//     path, which is also what makes step 4's own BG-RATE gate non-vacuous for the first
+//     time. It costs one more carve: rows 5 AND 8 give up their right end in DEBUG.
+//
+// It reuses OJZ_Preset_Plain — row 8's shipped preset — rather than authoring one, so
+// the palette, raster program and variants under this rectangle are a shipped look and
+// the ONLY thing that differs from its neighbour is the background map and its span.
+const OJZ_TALL_X0 = 5120
+// Row 5 gives up its right end to the tall region in the DEBUG shape and keeps all of it
+// in release. Single-level `if` in value position on purpose — EMP_PITFALLS §1.
+const OJZ_SEC5_X1 = if DEBUG == 1 { OJZ_TALL_X0 - 1 } else { OJZ_AUTHORED_ACT_W - 1 }
+const OJZ_SEC8_X1 = if DEBUG == 1 { OJZ_TALL_X0 - 1 } else { OJZ_AUTHORED_ACT_W - 1 }
+const OJZ_TALL_BG_ROWS: array = if DEBUG == 1 {
+    [ ojz_region(x0: OJZ_TALL_X0, x1: OJZ_AUTHORED_ACT_W - 1, y0: 2048, y1: ACT_H - 1, effects: OJZ_Preset_Plain,
+                 bg_layout: OJZ_Act1_BG_Layout_Tall, bg_span: BG_LAYOUT_TALL_SPAN) ]
+} else { [] }
+const OJZ_TALL_BG_ROWS_LEN = OJZ_TALL_BG_ROWS.len
+
+// ---- THE REGION BG SWITCH SHOWCASE ROW (region bg switch, task 2) ----
+// DEBUG ONLY, carved out of row `sec3`'s right half the way the two rows above carve theirs.
+// The one region in the act whose background names its OWN TILES (rg_bg_tiles) as well as
+// its own layout, so crossing into it is an overwrite of the BG tile arena followed by a
+// repaint, and crossing out is the same back to the act's tiles.
+//
+// THE PICTURE IS SONIC 2 OIL OCEAN ZONE'S BACKGROUND IN ITS OWN COLOURS (parcel/
+// showcase-classic-bg, 2026-09-16), replacing the editor library's colonnade after the owner
+// flew it: every library background is a forest, so the switch read as the same forest
+// scrolling. OJZ_Preset_Showcase is row sec3's preset built by the same constructor with a
+// palette whose CRAM line 3 is the donor's (ojz_effects.emp, above OJZ_Preset_Showcase, says
+// why line 3 recolours no foreground). So raster and parallax under it are sec3's, and what
+// differs from its neighbour is the background and line 3. The donor is exactly one plane tall
+// (64 rows), so bg_span stays 0 = PLANE_B_SPAN.
+//
+// WHY THIS RECTANGLE (x 1024..2047, y 2048..4095), derived from what the switch's gate needs
+// and from what the other gates walk:
+//   * an act-default neighbour on a VERTICAL edge (sec3's left half, x 1023|1024) and on a
+//     HORIZONTAL edge (sec0 above, y 2047|2048), so both a horizontal and a vertical crossing
+//     exist;
+//   * off every existing gate route that is typed rather than derived: the E2 fade and snap
+//     witnesses fly y 256 (the top band), the tall row is x >= 5120, and the registered gates
+//     that pick a fixture read it from this table (bg_wipe/bg_window select the row with a
+//     SPAN, which this row does not have);
+//   * interior edges inside the camera-centre bands, spans far above REGION_MIN_SPAN
+//     (ojz_region()'s own ensures check both here, at the call).
+// Plan: docs/superpowers/plans/2026-09-16-region-bg-switch.md, calls C11/C11b.
+const OJZ_SHOWCASE_X0 = 1024
+const OJZ_SEC3_X1 = if DEBUG == 1 { OJZ_SHOWCASE_X0 - 1 } else { 2047 }
+const OJZ_SHOWCASE_BG_ROWS: array = if DEBUG == 1 {
+    [ ojz_region(x0: OJZ_SHOWCASE_X0, x1: 2047, y0: 2048, y1: 4095, effects: OJZ_Preset_Showcase,
+                 bg_layout: OJZ_Act1_BG_Showcase_Layout, bg_tiles: OJZ_Act1_BG_Showcase_Tiles) ]
+} else { [] }
+const OJZ_SHOWCASE_BG_ROWS_LEN = OJZ_SHOWCASE_BG_ROWS.len
+
+// ---- THE ROW THAT COVERS AN ACT WIDER THAN ITS REGION DOCUMENT ----
+// S2-COMPRESSED-ACT parcel 9. EMPTY in every shipped shape; ZERO bytes there.
+//
+// The region table's whole-table invariant is EXACT COVERAGE — the rows' areas must sum to
+// the act's — because a place with no row has no identity and Region_Resolve's "no
+// rectangle contains the point" arm would be reachable. A clip act that declares a wider
+// grid than the shipped one gets a wider ACT and the SAME region document, because
+// `regions.emp` is lowered from the editor by tools/effects_gen.py and the S2CLIP
+// throwaway does not run it. Without this row that act fails the coverage ensure, which is
+// the right failure and a useless one: the act is legal, the document simply does not reach
+// the new right-hand end.
+//
+// SO IT IS ONE ROW, ACROSS THE WHOLE REMAINDER, BINDING THE ACT'S PLAINEST PRESET. Not an
+// identity anybody authored — there is nothing to author it from — but the act's own
+// default look, which is what an unauthored place should show. `OJZ_Preset_Plain` is the
+// preset three of the shipped rows already bind, so nothing new reaches the ROM for it.
+//
+// A CLIP ACT IS NOT THE ONLY THING THIS ADMITS, and that is worth saying out loud rather
+// than discovering later: any future act whose grid outgrows its region document gets the
+// same silent fill. The guard against that is the ensure below — the row is emitted ONLY
+// when ACT_W exceeds the authored width, so on an act whose document does tile it, this is
+// `[]` and the coverage ensure is doing its full job.
+const OJZ_WIDE_FILL_ROWS: array = if ACT_W > OJZ_AUTHORED_ACT_W {
+    [ ojz_region(x0: OJZ_AUTHORED_ACT_W, x1: ACT_W - 1, y0: 0, y1: ACT_H - 1,
+                 effects: OJZ_Preset_Plain) ]
+} else { [] }
+const OJZ_WIDE_FILL_ROWS_LEN = OJZ_WIDE_FILL_ROWS.len
+
+const OJZ_ACT1_REGION_ROW_COUNT = 10 + OJZ_E2_SNAP_ROWS_LEN + OJZ_TALL_BG_ROWS_LEN + OJZ_SHOWCASE_BG_ROWS_LEN + OJZ_WIDE_FILL_ROWS_LEN
+
+// THE ROWS — ONE SOURCE, AND SINCE 2026-09-16 THAT SOURCE IS THE EDITOR'S DOCUMENT.
+// `games/sonic4/data/editor/ojz/act1/regions.json` is act 1's identity, lowered by
+// tools/effects_gen.py into games/sonic4/data/generated/ojz/act1/regions.emp. The ten rows
+// that used to be typed here are gone; what is left is this file's two DEBUG deltas, the
+// per-row rules, and the whole-table guards.
+//
+// ⚠ A GENERATED ROW DID NOT GO THROUGH `ojz_region()`, so it carries NONE of that
+// constructor's per-row ensures. That is a real loss, not a technicality — the minimum span,
+// the reachable-centre band and the three background rules all live in it — and
+// `ojz_region_table_check()` below is the table walk that pays it back. See its own banner.
+//
+// ROW ORDER is the DOCUMENT's order and the document preserves the old one: rows 0-8 are the
+// nine sections' rows in flat-id order and the night region is row 9, so every region index a
+// tool or the effects lab's PRESET rows already name keeps meaning the same preset
+// (games/sonic4/test/ojz_scroll_test.emp's `.lab_index`). Rows 1 and 2 are not whole sections.
+
+// ojz_cut_row() — the DEBUG delta's SHORTENING half, applied against a NAMED row.
+//
+// THE HUB'S RULING (empyrean `a718ea7c`) MAKES THIS SHAPE A CONDITION, not a preference:
+// the delta is not a pure append, it also takes the right end off a row to make room, so the
+// consumer must name the row it cuts and `ensure` that row is what it expects — never a
+// positional index — so that a document edit which moves or renames that region FAILS THE
+// BUILD instead of silently cutting a different one.
+//
+// ⚠ THE RULING SAYS "THE ROW" AND THERE ARE THREE. Its text names `sec2` at x1 6143 binding
+// OJZ_Preset_Sec2, which was the whole of the DEBUG delta when it was written; regions part 2
+// step 5 added the tall-background row, which carves rows 5 AND 8 as well. The condition is
+// unchanged and is simply owed three times — which is why this is a FUNCTION rather than
+// three hand-written rows.
+//
+// WHAT IT CHECKS, and why the binding check is an integer and not a record:
+//   * the row is where the document says (`row:` is a generated `<ACT>_ROW_<ID>` constant —
+//     rename the region and the name disappears, move it and the value changes);
+//   * it still reaches the act's right edge, so the cut is a cut and not a silent widening
+//     of a row someone else already shortened;
+//   * `preset_key:` — the row binds the record the delta was written for. It CANNOT be
+//     spelled `r[row].rg_effects == OJZ_Preset_Sec2`: both sides are Labels and
+//     docs/EMP_PITFALLS.md §12's 2026-09-16 amendment measured that a Label in comptime
+//     supports `!= 0` and nothing else, so a proposition AND its exact negation both pass.
+//     The generated `<ACT>_ROW_<ID>_PRESET` constants are the record's shape-B′ integer KEY,
+//     written from the DOCUMENT, and this argument is written from what the delta EXPECTS —
+//     two different places, so the comparison can genuinely go red.
+//
+// `was_x1` (region bg switch, 2026-09-16): the x1 the delta EXPECTS the row to end at before
+// the cut. It defaults to -1, meaning the act's right edge, which is the only case the first
+// three cuts need. The showcase cut takes the right half off row `sec3`, which ends at an
+// INTERIOR edge (x1 2047), so it names that value explicitly and the check stays exactly as
+// strict: "the row still ends where this delta was written against", not "anything goes".
+comptime fn ojz_cut_row(r: array, row: int, x1: int, was_preset: int, preset_key: int, was_x1: int = -1) -> array {
+    let expect_x1 = if was_x1 < 0 { OJZ_AUTHORED_ACT_W - 1 } else { was_x1 }
+    ensure(row >= 0 && row < r.len,
+           "ojz_cut_row(row: {row}): the table has {r.len} rows. The row constants are generated from the document's ids, so an out-of-range one means the document lost the region this delta cuts")
+    ensure(was_preset == preset_key,
+           "ojz_cut_row(row: {row}): that row binds preset key {was_preset} and this delta was written for key {preset_key}. The document has re-pointed the region at another EffectsPreset record, so the cut would take the right end off a look nobody asked to shorten")
+    ensure(r[row].rg_x1 == expect_x1,
+           "ojz_cut_row(row: {row}): that row already ends at x1 {r[row].rg_x1}, not the {expect_x1} this delta was written against (the authored document's right edge, {OJZ_AUTHORED_ACT_W} - 1, unless `was_x1` names an interior edge). A DEBUG delta CARVES a row whose end it knows; applied to one that ends elsewhere, it would either widen it or cut a second bite out of a row another delta already took")
+    // NEVER WIDENS — and `<=` rather than `<` is the whole subtlety of this line. A delta is
+    // shape-conditional: in RELEASE every OJZ_SEC*_X1 is OJZ_AUTHORED_ACT_W - 1, so the cut is a legal
+    // NO-OP and a strict `<` here refuses the release shape outright (measured: 18 errors,
+    // 2026-09-16, the first build of this block). What must never happen is the other
+    // direction — a delta that WIDENS a row past where the document put it.
+    //
+    // ⚠ AND "THE CUT SILENTLY DID NOTHING IN DEBUG" IS NOT LEFT UNGUARDED BY THE WEAKER
+    // COMPARISON; it is guarded one level up and more strongly. If a cut failed to happen
+    // while its appended row still did, the carved row and the added row would SHARE PIXELS,
+    // and OJZ_ACT1_REGION_OVERLAP (below) reports the first overlapping pair. A local ensure
+    // could only have checked the arithmetic; the whole-table one checks the consequence.
+    ensure(x1 <= r[row].rg_x1,
+           "ojz_cut_row(row: {row}): the new x1 {x1} is RIGHT of the current {r[row].rg_x1}. A build-shape delta may only take a row's right end away, never give it more than the document did")
+    comptime var out: array = []
+    for i in 0..r.len {
+        if i == row {
+            out = out ++ [ Region{ rg_x0: r[i].rg_x0, rg_x1: x1,
+                                   rg_y0: r[i].rg_y0, rg_y1: r[i].rg_y1,
+                                   rg_effects: r[i].rg_effects, rg_parallax: r[i].rg_parallax,
+                                   rg_bg_layout: r[i].rg_bg_layout, rg_bg_span: r[i].rg_bg_span,
+                                   rg_bg_tiles: r[i].rg_bg_tiles } ]
+        } else {
+            out = out ++ [ r[i] ]
+        }
+    }
+    return out
+}
+
+// ojz_region_table_check() — THE PER-ROW RULES A GENERATED TABLE OWES.
+//
+// ⚠ THIS IS NOT A SECOND SET OF RULES. It is `ojz_region()`'s own ensures, restated over a
+// row the constructor never saw, and it exists because a generated row is a struct LITERAL.
+// Why a literal and not a call: `ojz_region()` is not `pub`, and docs/EMP_PITFALLS.md §2
+// makes a cross-module `comptime fn`'s free names resolve at the CALL SITE — `ojz_region`'s
+// body reads a dozen of this file's own consts (ACT_W, CENTRE_X_MIN, REGION_MIN_SPAN, ...)
+// and the pitfall's measured hazard is the PARTIAL case, where some names are in scope and
+// the fn neither errors nor works. So the constructor cannot travel to the generator, and the
+// checks come back to the rows instead.
+//
+// IT RUNS OVER THE COMPOSED ARRAY, which is what makes both build shapes checked without
+// either row count being typed twice — the same reason `region_first_overlap` and
+// `region_area_sum` below read the composed const rather than the generated one. The DEBUG
+// rows go through `ojz_region()` as well, so they are checked twice; that is cheap (a
+// comptime fn emits nothing) and it is the right way round — no row is checked zero times.
+//
+// It returns the FIRST offending row as `row * 16 + rule`, or -1. A code rather than a
+// message because a comptime fn cannot carry one out; the ensure below decodes it, and the
+// rule numbers are the order of `ojz_region()`'s own ensures so a reader can go and find the
+// sentence. The background rules are 6-8 and are UNREACHABLE today (the emitter writes both
+// background fields as the zero sentinel, always) — written anyway, because the day
+// REGIONS-BG-GOLDEN-GAP opens they are the difference between a checked row and a dropped one.
+comptime fn ojz_region_table_check(r: array) -> int {
+    for i in 0..r.len {
+        if r[i].rg_effects == 0 { return i * 16 + 0 }
+        if r[i].rg_x0 > r[i].rg_x1 || r[i].rg_y0 > r[i].rg_y1 { return i * 16 + 1 }
+        if r[i].rg_x1 >= ACT_W || r[i].rg_y1 >= ACT_H { return i * 16 + 2 }
+        if r[i].rg_x1 - r[i].rg_x0 + 1 < REGION_MIN_SPAN { return i * 16 + 3 }
+        if r[i].rg_y1 - r[i].rg_y0 + 1 < REGION_MIN_SPAN { return i * 16 + 3 }
+        if r[i].rg_x0 != 0 && (r[i].rg_x0 - 1 < CENTRE_X_MIN || r[i].rg_x0 > CENTRE_X_MAX) { return i * 16 + 4 }
+        if r[i].rg_x1 != ACT_W - 1 && (r[i].rg_x1 < CENTRE_X_MIN || r[i].rg_x1 + 1 > CENTRE_X_MAX) { return i * 16 + 4 }
+        if r[i].rg_y0 != 0 && (r[i].rg_y0 - 1 < CENTRE_Y_MIN || r[i].rg_y0 > CENTRE_Y_MAX) { return i * 16 + 5 }
+        if r[i].rg_y1 != ACT_H - 1 && (r[i].rg_y1 < CENTRE_Y_MIN || r[i].rg_y1 + 1 > CENTRE_Y_MAX) { return i * 16 + 5 }
+        if r[i].rg_bg_span % BG_SPAN_ROW_PX != 0 { return i * 16 + 6 }
+        if r[i].rg_bg_span != 0 && r[i].rg_bg_span < SCREEN_HEIGHT { return i * 16 + 7 }
+        if r[i].rg_bg_layout == 0 && r[i].rg_bg_span != 0 { return i * 16 + 8 }
+    }
+    return -1
+}
+
+// THE COMPOSITION. Release: the document's ten rows, untouched — every cut is a no-op
+// because OJZ_SEC{2,5,8}_X1 are all OJZ_AUTHORED_ACT_W - 1 in that shape, and both delta arrays are empty.
+// DEBUG: three rows carved and two appended. Written as a chain rather than as twelve typed
+// rows precisely so the release shape and the DEBUG shape cannot disagree about anything but
+// the deltas themselves.
+// ONE CUT PER LINE, AND THE LINE BREAKS ARE NOT STYLE. An initializer must begin on its
+// declaration's own line (the E2 fix, `8fd994c7`), and a chained call written across lines
+// with a leading `++` on the next one is `expected an expression, found Newline` — measured
+// here, 2026-09-16, on the first draft of this block.
+const OJZ_ACT1_ROWS_CUT2 = ojz_cut_row(OJZ_ACT1_GENERATED_REGION_ROWS, OJZ_ACT1_ROW_SEC2, OJZ_SEC2_X1, OJZ_ACT1_ROW_SEC2_PRESET, OJZ_Preset_Sec2_KEY)
+const OJZ_ACT1_ROWS_CUT5 = ojz_cut_row(OJZ_ACT1_ROWS_CUT2, OJZ_ACT1_ROW_SEC5, OJZ_SEC5_X1, OJZ_ACT1_ROW_SEC5_PRESET, OJZ_Preset_Sec5_KEY)
+const OJZ_ACT1_ROWS_CUT8 = ojz_cut_row(OJZ_ACT1_ROWS_CUT5, OJZ_ACT1_ROW_SEC8, OJZ_SEC8_X1, OJZ_ACT1_ROW_SEC8_PRESET, OJZ_Preset_Plain_KEY)
+const OJZ_ACT1_ROWS_CUT3 = ojz_cut_row(OJZ_ACT1_ROWS_CUT8, OJZ_ACT1_ROW_SEC3, OJZ_SEC3_X1, OJZ_ACT1_ROW_SEC3_PRESET, OJZ_Preset_Sec3_KEY, was_x1: 2047)
+const OJZ_ACT1_REGION_ROWS: [Region; OJZ_ACT1_REGION_ROW_COUNT] = OJZ_ACT1_ROWS_CUT3 ++ OJZ_E2_SNAP_ROWS ++ OJZ_TALL_BG_ROWS ++ OJZ_SHOWCASE_BG_ROWS ++ OJZ_WIDE_FILL_ROWS
+
+// ojz_region_table_fault_count() — HOW MANY rows break a rule, beside WHICH one does.
+//
+// ⚠ THE WALK ABOVE RETURNS THE FIRST FAULT AND GETS NO LOUDER AS THE TABLE GETS WORSE. A
+// table with one bad row and a table with every row bad report the same single code, which is
+// the failure family this repo keeps finding in its own gates: the instrument going quiet
+// exactly when the subject is most broken. A `comptime fn` cannot carry a message out, so the
+// remedy is a second number — the count — and the ensure below prints both.
+//
+// MEASURED, not intended (2026-09-16, on the generated table, rows no build-shape delta
+// touches): one bad row reports "1 of 12", three report "3 of 12".
+comptime fn ojz_region_table_fault_count(r: array) -> int {
+    comptime var n: int = 0
+    for i in 0..r.len {
+        if ojz_region_table_check([ r[i] ]) != -1 { n = n + 1 }
+    }
+    return n
+}
+
+// THE PER-ROW RULES, over every row of both shapes. See ojz_region_table_check()'s banner
+// for why a generated row needs them restated at all.
+const OJZ_ACT1_REGION_ROW_FAULTS = ojz_region_table_fault_count(OJZ_ACT1_REGION_ROWS)
+const OJZ_ACT1_REGION_ROW_TOTAL = OJZ_ACT1_REGION_ROWS.len
+const OJZ_ACT1_REGION_ROW_FAULT = ojz_region_table_check(OJZ_ACT1_REGION_ROWS)
+// Decoded into two consts rather than interpolated as arithmetic: an `ensure` message
+// interpolates a NAME, and `{X / 16}` is not one.
+const OJZ_ACT1_REGION_FAULT_ROW = OJZ_ACT1_REGION_ROW_FAULT / 16
+const OJZ_ACT1_REGION_FAULT_RULE = OJZ_ACT1_REGION_ROW_FAULT % 16
+ensure(OJZ_ACT1_REGION_ROW_FAULT == -1,
+       "OJZ act 1: {OJZ_ACT1_REGION_ROW_FAULTS} of {OJZ_ACT1_REGION_ROW_TOTAL} region rows break a per-row rule; the FIRST is row {OJZ_ACT1_REGION_FAULT_ROW}, rule {OJZ_ACT1_REGION_FAULT_RULE} — 0 null effects, 1 inverted rect, 2 past the act, 3 narrower than REGION_MIN_SPAN ({REGION_MIN_SPAN}), 4 an interior X edge outside the camera centre's band [{CENTRE_X_MIN}, {CENTRE_X_MAX}], 5 the same on Y [{CENTRE_Y_MIN}, {CENTRE_Y_MAX}], 6 bg_span off the {BG_SPAN_ROW_PX} px row grid, 7 bg_span below the {SCREEN_HEIGHT} px screen, 8 bg_span on a row with no layout. These are ojz_region()'s own rules; a generated row is a struct literal and never went through it")
+
+// THE WHOLE-TABLE INVARIANTS. Non-overlap plus "the areas sum to the act's" is exact
+// coverage, given every row is inside the act (ojz_region's own ensure): disjoint pieces
+// of a set whose areas add up to the set's area ARE the set. Coverage is what makes
+// Region_Resolve's "no rectangle contains the point" (a0 = 0) unreachable for any camera
+// centre this act can produce, so the crossing's keep-current arm is a robustness net and
+// never a hole an author shipped by forgetting the notch of an arch.
+const OJZ_ACT1_REGION_OVERLAP = region_first_overlap(OJZ_ACT1_REGION_ROWS)
+const OJZ_ACT1_REGION_AREA = region_area_sum(OJZ_ACT1_REGION_ROWS)
+ensure(OJZ_ACT1_REGION_ROWS.len >= 1,
+       "OJZ act 1 has no region rows — Region_Resolve's dbf would count down from $FFFF and the crossing would resolve nothing")
+ensure(OJZ_ACT1_REGION_OVERLAP == -1,
+       "OJZ act 1 region rows overlap (pair code {OJZ_ACT1_REGION_OVERLAP} = row i * 1000 + row j). Identity must be a function of the camera centre alone; with an overlap it depends on scan order")
+ensure(OJZ_ACT1_REGION_AREA == ACT_W * ACT_H,
+       "OJZ act 1 region rows do not tile the act: their areas sum to {OJZ_ACT1_REGION_AREA} px², the act is {ACT_W} x {ACT_H}. A hole is a place with no identity")
+
+pub data OJZ_Act1_Regions: [Region; 10 + OJZ_E2_SNAP_ROWS_LEN + OJZ_TALL_BG_ROWS_LEN + OJZ_SHOWCASE_BG_ROWS_LEN + OJZ_WIDE_FILL_ROWS_LEN] = OJZ_ACT1_REGION_ROWS

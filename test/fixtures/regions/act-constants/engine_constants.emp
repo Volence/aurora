@@ -1,0 +1,1232 @@
+// -----------------------------------------------
+// engine.constants — the shared engine constants (SOLE DEFINITION)
+//
+// This module is the AUTHORITATIVE source of these engine constants. `.emp`
+// consumers read them via `use engine.constants`; the residual AS reads them
+// at comptime through the ownership-flip export — the build harvests every
+// `pub const` here and injects it as a guarded AS `-D` define (a name the
+// residual AS may consume but not re-author; an in-file `=` of it is a hard
+// `[defines.collision]`). engine/constants.asm is DELETED (7dc909fe) and this file is the
+// sole author; the ten "(mirrors engine/constants.asm)" tags that used to head the blocks
+// below were removed 2026-09-07 — they read as "there is a second copy, keep it in step"
+// and there has been no second copy since that commit.
+//
+// `VDP_Shadow_len` is EXCLUDED from this module's harvest: the AS-side symbol
+// is owned by the struct-offset harvest (engine.structs' VdpShadow, the layout
+// author). The `pub const` here is the `.emp`-side named immediate the flush
+// loops read; a wrong value changes the emitted `moveq`, so byte-identity is the
+// drift check against the struct.
+//
+// Pure consts: this module opens no section and emits ZERO bytes in the ROM.
+// -----------------------------------------------
+module engine.constants
+
+// Controller button masks.
+pub const BUTTON_UP    = 1 << 0
+pub const BUTTON_DOWN  = 1 << 1
+pub const BUTTON_LEFT  = 1 << 2
+pub const BUTTON_RIGHT = 1 << 3
+pub const BUTTON_C     = 1 << 5
+pub const BUTTON_A     = 1 << 6
+
+// Controller button BIT NUMBERS (for `btst #BUTTON_x_BIT` — the d-pad bit
+// positions).
+pub const BUTTON_UP_BIT    = 0
+pub const BUTTON_DOWN_BIT  = 1
+pub const BUTTON_LEFT_BIT  = 2
+pub const BUTTON_RIGHT_BIT = 3
+
+// 6-button pad: extra-button masks (the Ext bytes' low nibble) + pad types.
+pub const BUTTON_EXT_Z    = 1 << 0
+pub const BUTTON_EXT_Y    = 1 << 1
+pub const BUTTON_EXT_X    = 1 << 2
+pub const BUTTON_EXT_MODE = 1 << 3
+pub const PAD_3BTN = 0
+pub const PAD_6BTN = 1
+
+// Hardware controller port data registers.
+pub const HW_PORT_1_DATA = $A10003
+pub const HW_PORT_2_DATA = $A10005
+
+// Collision type: air / no surface.
+pub const CTYPE_AIR = 0
+
+// The two collision planes, named. `Sst.layer` (engine/objects/sst.emp, $2D) holds
+// one of these, and it is the SAME value Collision_GetType takes in d3.b: that proc's
+// `tst.b d3 / beq` IS this encoding — zero selects plane A, non-zero adds
+// TILE_CACHE_COLL_SIZE to reach plane B. They exist so a site that MAPS some other
+// encoding onto the layer byte (the loop crossover's XOVER_TO_A/XOVER_TO_B, see
+// docs/LOOP_CROSSOVER_ENCODING.md §3.2) can bind its mapping to the layer's own
+// authority with an `ensure` instead of restating 0 and 1 in a comment.
+pub const LAYER_PATH_A = 0
+pub const LAYER_PATH_B = 1
+
+// Render flags — SST render_flags bit assignments (mirrors
+// this file).
+pub const RF_ONSCREEN  = 0            // set by Draw_Sprite if visible
+pub const RF_XFLIP     = 1            // horizontal flip
+pub const RF_YFLIP     = 2            // vertical flip
+pub const RF_COORDMODE = 3            // 0 = world coords, 1 = screen coords
+pub const RF_MULTISPRITE = 4          // (parent only) batch render via sibling walk
+pub const RF_PRIORITY_SHIFT = 5       // bits 5-7 = sprite priority band (0-7)
+pub const RF_PRIORITY_MASK = $E0      // the band bits themselves — a runtime band change
+                                      // must clear these before or-ing the new band in
+
+// Animation script control codes ($F7-$FF) + interpreter inputs. Animation and
+// test-object data modules read these in both build shapes.
+pub const AF_END       = $FF          // loop: restart from first frame
+pub const AF_BACK      = $FE          // jump back N: next byte = rewind count
+pub const AF_CHANGE    = $FD          // switch animation: next byte = new anim ID
+pub const AF_ROUTINE   = $FC          // increment routine counter (SST_custom byte 0) by 2
+pub const AF_DELETE    = $FB          // auto-despawn command
+pub const AF_CALLBACK  = $FA          // call routine: dc.b $FA, target_hi, target_lo, 0
+pub const AF_SOUND     = $F9          // play sound effect: dc.b $F9, sound_id
+pub const AF_COLLISION = $F8          // set collision type: dc.b $F8, collision_type
+pub const AF_SET_FIELD = $F7          // lowest control code — the $F7+ dispatch threshold
+pub const DUR_DYNAMIC  = $FF          // duration sentinel: hold comes from caller's d3
+pub const OBJ_CODE_BANK = 1           // objroutine bank hi-word (moveq/swap → $00010000)
+pub const FRAME_PIECE_COUNT = 4       // sprite-frame piece-count word offset (after 4 bbox bytes)
+
+// Object slot counts per pool.
+pub const NUM_PLAYERS = 2
+pub const NUM_DYNAMIC = 40
+pub const NUM_SYSTEM  = 8
+pub const NUM_EFFECTS = 16
+
+// Total slot count across all pools + culling geometry + the untagged slot
+// sentinel (the object-core block).
+pub const NUM_TOTAL_SLOTS = NUM_PLAYERS + NUM_DYNAMIC + NUM_SYSTEM + NUM_EFFECTS
+// Occupancy overflow-latch amendment (spec §9): frame-end pending-latch
+// capacity. AllocDynamic at a full live list latches the popped slot instead of
+// compacting mid-frame; RunObjects' tail drains it (one compaction, then append
+// in alloc order). Latch full → alloc-fail. Bounded, rare.
+pub const NUM_DYNAMIC_PENDING = 8
+pub const CULL_DISTANCE_X = $300      // 768px — skip dynamic objects beyond this
+pub const CULL_DISTANCE_Y = $200      // 512px
+
+// Collision response types — the full TouchResponse dispatch family (index
+// into the branch table; COLLISION_NONE = air, COLLISION_TOUCH = dispatch
+// ceiling).
+pub const COLLISION_NONE        = 0
+pub const COLLISION_ENEMY       = 1
+pub const COLLISION_BOSS        = 2
+pub const COLLISION_HURT        = 3
+pub const COLLISION_MONITOR     = 4
+pub const COLLISION_RING        = 5
+pub const COLLISION_BUBBLE      = 6
+pub const COLLISION_PROJECTILE  = 7
+pub const COLLISION_SOLID       = 8
+pub const COLLISION_SOLID_BREAK = 9
+pub const COLLISION_SPRING      = 10
+pub const COLLISION_SOLID_HURT  = 11
+pub const COLLISION_TOUCH       = 12
+
+// SOLID_TOUCH_W — the player's WIDTH contribution to SOLID-family object contact
+// (COLLISION_SOLID..COLLISION_SOLID_HURT), in place of his live `width_pixels`.
+//
+// WHY OBJECTS NEED THIS AND TERRAIN DOES NOT: terrain already works this way.
+// The wall probe is placed at `x +/- PUSH_RADIUS` as a BARE CONSTANT
+// (player_ground.emp:926, player_air.emp:731/749) — never derived from
+// width_pixels, never scaled by state — so a wall stops Sonic at the same reach
+// standing or curled. Object contact was the ONE path computing its reach from
+// the live physics box, and since curling takes that box from 19 to 15, it
+// silently gave a curled player 2px LESS reach per side than a standing one.
+// Measured on a running ROM 2026-09-07: a curled player 24px from a vertical
+// spring's centre passed straight through it (reach 23), where standing reached
+// 25 and the terrain's own rule reaches 26.
+//
+// DERIVED FROM PUSH_RADIUS, not written as a number, because the point is that
+// objects and walls agree: `2r+1` is this engine's full-dimension convention
+// (the sensors halve it back), so the full box matching a radius of PUSH_RADIUS
+// is 2*PUSH_RADIUS+1. Raising PUSH_RADIUS moves both together.
+//
+// It lands on the reference by construction rather than by copying: against a
+// 32-wide spring the AABB gives `2|dx| < 21+32 = 53`, i.e. |dx| <= 26, and S3K's
+// SolidObjectFull2_1P (sonic3k.asm:41068) admits -27..26 — the same face. S3K
+// reaches it from the object side (`Obj_Spring_Up` passes `d1 = $1B` = its own
+// half-width 16 PLUS a fixed 11, and the routine never reads the player's
+// radius); we reach it from the player side. Same rule, stated once here.
+//
+// THE HEIGHT IS DELIBERATELY NOT DONE. The measured defect is horizontal, the
+// vertical band is 45px against a 16px/frame speed cap, and four drop tests
+// (60/120/200/300px, terminal velocity, curled) all launch correctly. A Y
+// constant would be a change with no evidence behind it; booked instead.
+//
+// NOT the damage family (types 0..7), also deliberately: S3K uses a DIFFERENT
+// fixed extent there (half-width 8, NARROWER than standing), so folding the two
+// into one number would be wrong in a way that only shows up once badniks exist.
+pub const SOLID_TOUCH_W = 2 * PUSH_RADIUS + 1
+ensure(SOLID_TOUCH_W >= PLAYER_X_RADIUS * 2 + 1,
+       "the solid touch box must not be NARROWER than the player's standing physics box — that would make a standing player harder to contact than he is to collide with")
+
+// status byte bits — SST_status. Player interpretation. Bits 1-2 align with
+// RF_XFLIP/RF_YFLIP for direct propagation.
+pub const ST_XFLIP       = 1          // 1 = facing left (horizontal flip); = RF_XFLIP
+pub const ST_YFLIP       = 2          // = RF_YFLIP — vertical flip
+pub const ST_IN_AIR      = 3          // 1 = airborne (jumped or falling)
+pub const ST_ROLLING     = 4          // 1 = rolled up (ball)
+pub const ST_ON_OBJECT   = 5          // 1 = standing on a solid object
+pub const ST_PUSHING     = 6          // 1 = pushing against a wall
+pub const ST_UNDERWATER  = 7          // 1 = submerged
+
+// Player + ball collision radii — the engine-wide DEFAULT box a game builds its
+// characters' records from. The curl y-shift that used to sit here is gone: it
+// is a function of a character's two boxes (stand height - ball height, halved),
+// so it is derived from the record at its four player-side sites
+// (curl_head_rise / curl_shift_px, games/sonic4/player/player_common.emp) and
+// published to the camera through Camera_Curl_Offset. A constant here could only
+// ever have been one character's.
+pub const PLAYER_X_RADIUS = 9
+pub const PLAYER_Y_RADIUS = 19
+pub const BALL_X_RADIUS   = 7
+pub const BALL_Y_RADIUS   = 14
+pub const PUSH_RADIUS     = 10        // wall-push sensor half-width
+
+// Level-edge behaviour codes.
+pub const EDGE_CLAMP  = 0
+pub const EDGE_WRAP_V = 1
+pub const EDGE_KILL   = 2
+
+// Player physics parameters — the values Sonic's PhysTable holds plus the shared
+// movement thresholds; player state files consume them.
+pub const PHYS_ACCEL            = $C
+pub const PHYS_DECEL            = $80
+pub const PHYS_FRICTION         = $C
+pub const PHYS_TOP_SPEED        = $600
+pub const PHYS_GRAVITY          = $38
+pub const PHYS_JUMP_FORCE       = $680
+pub const PHYS_AIR_ACCEL        = $18
+pub const PHYS_JUMP_RELEASE_CAP = -$400
+pub const PHYS_SKID_MIN         = $400   // min |gsp| to trigger a skid
+pub const PHYS_JUMP_BUFFER      = 2      // jump-input buffer window (frames)
+// Terminal fall speed — DERIVED, not chosen (owner ruling 2026-08-26, d-18-answered,
+// queue row FALL-CAP-15). The floor probe reads collision CELLS, so the thinnest
+// floor the world can express is one cell; a per-frame Y step of a whole cell can
+// begin the frame flush on a slab's surface and end it below the slab, stepping
+// clean over it. The largest step that can never do that is one pixel short of a
+// cell, in 8.8 fixed point. Flat `$1000` was exactly one cell — one pixel hot — and
+// that was the shipped 1px tunnelling hole this closes. Do not re-type the value:
+// it follows COLLISION_CELL_SHIFT (declared below in the collision section).
+pub const PHYS_FALL_CAP         = ((1 << COLLISION_CELL_SHIFT) - 1) << 8
+// The ruling, executable. Tautological against the derivation directly above and
+// deliberately so: its job is to survive someone re-typing that derivation as a
+// flat literal later. It fires in BOTH directions — a cap raised back to a whole
+// cell, and a COLLISION_CELL_SHIFT lowered under a cap that stayed put — which a
+// check written against a fixed number could not do.
+ensure((PHYS_FALL_CAP >> 8) < (1 << COLLISION_CELL_SHIFT),
+       "PHYS_FALL_CAP must stay STRICTLY below one collision cell: a per-frame fall step of a whole cell can begin flush on the thinnest floor the world can express and end below it, tunnelling through")
+pub const PHYS_SLOPE_WALK       = $20    // walking slope-factor magnitude
+pub const PHYS_SLOPE_ROLL_DOWN  = $50    // rolling downhill slope factor
+pub const PHYS_SLOPE_ROLL_UP    = $14    // rolling uphill slope factor
+pub const PHYS_SLOPE_STAND_MIN  = $D     // min gsp to stand on a slope
+pub const PHYS_ROLL_START_MIN   = $100   // min |gsp| to start a roll
+pub const PHYS_JUMP_HEADROOM    = 6      // clearance needed to jump
+// Max first-frame rise = jump_force >> 8 (Sonic: $680 -> 6.5px) + 1 margin.
+pub const PHYS_JUMP_SKIP_CLEARANCE = 8   // press-frame clearance that makes the
+                                         // same-tick mostly-up ceiling re-probe a
+                                         // guaranteed no-op (G1 skip gate)
+// guards the BUILD-TIME seed only — the runtime phys table is
+// section-modifiable and must never exceed it
+ensure(PHYS_JUMP_SKIP_CLEARANCE * 256 > PHYS_JUMP_FORCE, "skip clearance must cover the first-frame rise")
+pub const PHYS_GSP_CAP          = $1000  // ground-speed cap
+pub const PHYS_ROLL_DECEL       = $20    // roll brake decel
+pub const PHYS_ROLL_FRICTION    = $6     // rolling friction (half PHYS_FRICTION)
+pub const PHYS_ROLL_FORCE_MIN   = $200   // min |gsp| below which a roll cannot start on flat ground
+pub const PHYS_UNROLL_MAX       = $80    // max |gsp| to unroll
+pub const PHYS_KEEP_ROLL_MIN    = $400   // min |gsp| to keep rolling
+pub const PHYS_SLIP_SPEED       = $280   // slip threshold speed
+pub const PHYS_SLIP_ANGLE       = $18    // slip angle window
+pub const PHYS_FALL_ANGLE       = $30    // fall-off angle window
+pub const PHYS_SLIP_NUDGE       = $80    // slip velocity nudge
+pub const PHYS_MOVE_LOCK_TIME   = 30     // control-lock duration after a slip (frames)
+
+// Ring geometry/animation. The game-VARYING ring capacity values
+// (MAX_RING_BUFFER, VRAM_RING_PLACEHOLDER) stay per-profile `-D`s — a game knob.
+pub const RING_HEIGHT      = 16
+pub const RING_ANIM_FRAMES = 4
+pub const RING_ANIM_SPEED  = 8              // frames per animation tick
+
+// Engine-owned BUFFER FORMAT (review item 30/G). The ring buffer record
+// describes the layout of an ENGINE-owned RAM buffer (Ring_Buffer) walked only
+// by engine code (rings.emp / entity_window.emp / ram.emp). It is NOT a game
+// knob: no game may pick a different value, yet both game configs carried
+// byte-identical copies the engine then had to `ensure(extern(..))`-guard
+// against. Homed here, the guard chain disappears with the duplication. Only the
+// COUNT stays a game knob (MAX_RING_BUFFER, a per-profile `-D`).
+// COLLECTED_SLOT_SIZE, the other moved format, lives with its own field-offset
+// companions in the collected-bitmask block below.
+//
+// THE FIELD OFFSETS ARE THE AUTHORITY AND THE SIZE IS DERIVED FROM THEM — the
+// same inversion COLLECTED_SLOT_SIZE below already uses, and it is the reason
+// this block gained the offsets rather than a second hand-written `6`. Their own
+// authority is RingBuffer_Add (rings.emp), which writes the four fields in this
+// order through `(a0)+`: the offsets are a CONSEQUENCE of that write order, not
+// a free choice, so a reordered writer must move these lines with it.
+//
+// PUBLISHED INTERFACE (2026-09-06). Oracle's object/ring picker reads these by
+// name. They are EQUATES, so they land in the listing's Equate Table and are
+// visible to `lookup_equate` and NOT to `lookup_symbol` — asking the wrong one
+// returns a refusal indistinguishable from the name not existing. The ADDRESSES
+// on the other side of that split (Ring_Buffer, Ring_Count, Ring_HighWater,
+// Ring_Add_Dropped) come from engine/ram.emp and are `lookup_symbol`-visible;
+// the deb2 appendix carries addresses only, by construction.
+// A `pub const` earns an EQU row here only because engine/system/constants.emp
+// is one of the harvested files (sigil `harvest_engine_constants`); the same
+// declaration in an ordinary module emits NOTHING. Anywhere else, use `pub equ`.
+pub const RING_ENTRY_X_OFFSET          = 0      // dc.w engine-space X (ring centre)
+pub const RING_ENTRY_Y_OFFSET          = 2      // dc.w engine-space Y (ring centre)
+pub const RING_ENTRY_SECTION_ID_OFFSET = 4      // dc.b owning section id
+pub const RING_ENTRY_LIST_INDEX_OFFSET = 5      // dc.b index in the section's ROM ring list
+pub const RING_BUFFER_ENTRY_SIZE = RING_ENTRY_LIST_INDEX_OFFSET + 1   // 6 — derived, not restated
+
+// RingBuffer_Remove's swap-with-last moves X and Y as ONE `move.l (a1)+,(a0)+`.
+// That is the two coordinate words only while Y sits immediately after X and X
+// is word-aligned inside the record; break either and the long move copies a
+// coordinate and half the key, silently, on every removal.
+ensure(RING_ENTRY_X_OFFSET % 2 == 0 && RING_ENTRY_Y_OFFSET == RING_ENTRY_X_OFFSET + 2,
+       "ring record X/Y must be adjacent aligned words — RingBuffer_Remove copies both with one move.l")
+// EntityWindow_TrySpawnRing's duplicate scan compares section_id and list_index
+// as ONE word (`cmp.w RING_ENTRY_SECTION_ID_OFFSET(a0), d4`), so the pair must be
+// an aligned adjacent byte couple. A layout that split them would have that
+// compare read a coordinate byte and admit duplicate rings into the buffer.
+ensure(RING_ENTRY_SECTION_ID_OFFSET % 2 == 0 && RING_ENTRY_LIST_INDEX_OFFSET == RING_ENTRY_SECTION_ID_OFFSET + 1,
+       "ring record section_id/list_index must be an aligned adjacent byte pair — the entity-window dedup scan compares them as one word")
+
+// THE PER-SECTION ROM RING LIST — the OTHER ring format, and not the one above.
+// `Ring_Buffer` holds the rings that are live right now; this is the immutable
+// ROM array a section spawns them FROM, reached through
+// `EntityScanState.ess_rom_ring_ptr` ($04) and walked by
+// EntityWindow_ScanRingsRight.
+//
+// PUBLISHED FOR THE DEBUGGER'S TEMPORARY-RING PATH (2026-09-06), and these two
+// are the only pieces of that walk that were missing: the pointer offset
+// (`EntityScanState_ess_rom_ring_ptr`), the struct stride (`EntityScanState_len`
+// = $1A), `MAX_TRACKED_SECTIONS`, `MAX_LIST_ENTRIES` ($80) and
+// `COLLECTED_BITMASK_OFFSET` are ALREADY equates via sigil's struct-offset
+// harvest, and `Entity_Scan_State` is already an address row. Nothing here
+// duplicates them.
+//
+// WHY A CONSUMER WALKS IT AT ALL: there is no stored per-section ring count, so
+// the only way to learn one is to walk to the terminator. That count is the
+// FLOOR of the safe `list_index` range for a temporary ring — below it, a
+// fabricated index collides with a real ring's bit in the section's collected
+// bitmask and stops that ring spawning for good. The ceiling is
+// MAX_LIST_ENTRIES. See docs/DEFERRED_WORK.md "RING-PLACE" — and note that
+// COMMENTS DO NOT REACH THE LISTING, so a consumer in another repo sees these
+// names and values and nothing else; the rule has to travel as prose, not here.
+pub const RING_LIST_ENTRY_SIZE = 4      // dc.w X, dc.w Y — section-relative px
+pub const RING_LIST_TERMINATOR = 0      // a LONG zero ends the list
+
+// ONE ensure, not two, and the second one is absent on purpose: a companion
+// `RING_LIST_ENTRY_SIZE == 1 << 2` reads like a separate guard on the seek's
+// shift, but `== 4` already implies it, so it could never fail while this one
+// passed. A guard that cannot fire is worse than no guard — it reads as
+// coverage. Both instructions that depend on the stride are named here instead.
+//
+// `move.l (a0), d0` / `beq` finds the end: it reads exactly one entry and only
+// recognises a zero one, so a stride other than 4 would make the test straddle
+// two entries and a non-zero terminator would never be found. And
+// EntityWindow_ScanRingsRight seeks to the ratchet index with `lsl.w #2`, a
+// literal shift that cannot be spelled with the constant — at any other stride
+// the seek lands mid-entry.
+ensure(RING_LIST_ENTRY_SIZE == 4 && RING_LIST_TERMINATOR == 0,
+       "the ROM ring list is walked by `move.l (a0), d0 / beq` and seeked by `lsl.w #2` — that pair reads exactly one 4-byte entry, only detects a zero terminator, and lands mid-entry at any other stride")
+
+// Driver-keyed BG tile-band animation (engine/level/bg_anim.emp). This sizes
+// engine/ram.emp's BgAnim_LastStep array, which is why it exists here at all —
+// ram.emp cannot import a CODE module's consts at comptime.
+//
+// DELIBERATE MIRROR, not a single authority: bg_anim.emp keeps its OWN
+// module-local BGANIM_MAX_BANDS and must keep it. `bg_anim_port` lowers that file
+// standalone against an empty symbol table, and the constant harvest turns names
+// from this module into LINK EQUATES rather than comptime constants — so a
+// `use engine.constants.{BGANIM_MAX_BANDS}` there compiles to an unresolved fixup
+// and breaks the standalone gate. Collapsing the two needs a comptime ram->code
+// import path that does not exist.
+//
+// THERE ARE THREE AUTHORITIES, NOT TWO, AND THEY ARE GATED — do not sync by hand. This const,
+// bg_anim.emp's module-local mirror, and tools/inject_editor_bg.py's literal (the emitter — the
+// RELEASE defense, since bg_anim's own assert is DEBUG-only). engine/ram.emp NAMES this constant,
+// so it is a consumer and cannot drift. tools/test_bg_emit.py::TestBgAnimBandCeiling reads all
+// three and fails on disagreement, on build.sh's pytest lane. RAISING THE CEILING MEANS EDITING
+// ALL THREE; the gate will tell you which you missed.
+pub const BGANIM_MAX_BANDS = 4              // animated BG strips per act
+
+// Section / level geometry, shared by entity_window + act_descriptor + section.
+// SEC_VOID = flat section-id sentinel ("no section here").
+pub const SECTION_SIZE       = $0800        // section width/height in world px
+pub const SECTION_SIZE_SHIFT = 11           // log2(SECTION_SIZE)
+pub const SEC_VOID           = $FF          // sentinel flat section id (void cell)
+
+// 2D tile-cache geometry. Consolidated here at
+// the shared-struct-module batch: section.emp + tile_cache.emp both mirrored
+// these four the same way — the 2nd-consumer kill condition, so they move to
+// the shared twin (the SECTION_SIZE precedent). The COLL_*/BLOCK_* derivatives
+// stay file-local in tile_cache (single consumer).
+pub const TILE_CACHE_COLS    = 80                                 // viewport 40 + margin 20×2
+pub const TILE_CACHE_ROWS    = 60                                 // viewport 28 + margin 16×2
+pub const TILE_CACHE_STRIDE  = TILE_CACHE_COLS                    // row stride (cols)
+pub const TILE_CACHE_NT_SIZE = TILE_CACHE_COLS * TILE_CACHE_ROWS * 2  // 9600 bytes
+
+// DMA-queue geometry — slot counts per priority sub-queue; the total is the
+// derived sum.
+pub const DMA_CRITICAL_SLOTS   = 8
+pub const DMA_IMPORTANT_SLOTS  = 12
+pub const DMA_DEFERRABLE_SLOTS = 12
+pub const DMA_TOTAL_SLOTS      = DMA_CRITICAL_SLOTS + DMA_IMPORTANT_SLOTS + DMA_DEFERRABLE_SLOTS
+
+// Act art-pool paging + compressed-art wrapper. Every compressed art blob starts
+// with the 4-byte wrapper [u16 BE uncompressed size][u8 flags][u8 version].
+pub const ART_POOL_PAGE_TILES = 64          // tiles per pool page (P2b cutover 256->64; matches ojz_strip_gen)
+pub const ART_HDR_VERSION     = 3           // byte offset of version within wrapper
+pub const ART_HDR_SIZE        = 4           // wrapper bytes ahead of the stream
+pub const ART_VER_S4LZ        = 1           // S4LZ v3 token stream (runtime tier)
+pub const ART_VER_ZX0         = 2           // ZX0 modern/V2 bitstream (load-time tier)
+
+// Manifest v2 (P2b): the act's page-address table (Act.act_art_pool_table) is now
+// a stride-`sizeof(PageManifest)` array of {source.l, tiles.w, form.b, flags.b}.
+// PageIn_Process strides it and dispatches on the form byte (not the wrapper
+// version). pm_form values / pm_flags bits:
+pub const ART_PAGE_FORM_ZX0    = 0          // ZX0 stream (wrapper + salvador bitstream, staged decode)
+pub const ART_PAGE_FORM_RAW    = 1          // raw-direct (uncompressed payload, DMA straight from ROM)
+pub const ART_PAGE_FLAG_PINNED = 1 << 0     // never-evict act-common page (P2b residency cache)
+pub const ART_PAGE_FLAG_PINNED_BIT = 0      // btst-form twin (house mask+_BIT pattern, cf. PF_PINNED_BIT)
+pub const PAGE_TABLE_MAX       = 256        // residency page-table ceiling (matches ojz_strip_gen)
+
+// Residency cache (P2b Task 6, engine.page_cache). The FG VRAM art region is
+// carved into PAGE_FRAMES fixed 64-tile frames; the page table maps a global
+// page id -> the frame holding it (or PAGE_NOT_RESIDENT). POOL_TILE_CEILING /
+// ART_POOL_PAGE_TILES frames span the whole FG art window.
+// NO LITERAL HERE, DELIBERATELY: this comment read "POOL_TILE_CEILING(960) ... =
+// 15 frames" for two relayouts after the value stopped being 960, because a
+// spelled-out number goes stale on exactly the clock the `ensure` below cannot
+// see (it compares the quotient against its own dividend, so it catches inexact
+// division and can never catch the prose). Read the value off POOL_TILE_CEILING.
+pub const PAGE_FRAMES        = POOL_TILE_CEILING / ART_POOL_PAGE_TILES
+ensure(PAGE_FRAMES * ART_POOL_PAGE_TILES == POOL_TILE_CEILING,
+       "PAGE_FRAMES*ART_POOL_PAGE_TILES must tile the FG art window exactly")
+// CAPACITY, deliberately split from the COUNT above (user style ruling
+// 2026-08-11). PAGE_FRAMES sizes two RAM arrays (Page_Frames,
+// Page_Audit_Scratch — the latter debug-only), so before this split a pool
+// resize was secretly a RAM-LAYOUT change: 960->896 slid every debug cell
+// below the scratch array by -2, moved 126 pins, and desynced the replay
+// fixtures on a behaviour-identical build. The arrays are now sized by this
+// fixed capacity and PAGE_FRAMES is just the live count, so POOL_TILE_CEILING
+// is a genuinely VRAM-only knob. Cost: (PAGE_FRAMES_MAX - PAGE_FRAMES) slots
+// of RAM slack, sizeof(PageFrame) bytes apiece — bought deliberately, do not
+// "reclaim" it. (The slack grows every time the pool shrinks; that is the deal.)
+// Raising the capacity IS a RAM-layout change and owes the full pin/goldens
+// ritual; that is the point — you pay it when you CHOOSE to, not as a side
+// effect of a VRAM budget edit.
+pub const PAGE_FRAMES_MAX    = 15
+ensure(PAGE_FRAMES <= PAGE_FRAMES_MAX,
+       "PAGE_FRAMES exceeds PAGE_FRAMES_MAX — raise the capacity (a deliberate RAM-layout change owing the pin/goldens ritual), do not shrink the pool's count math")
+pub const PAGE_NOT_RESIDENT  = $FF          // Page_Table sentinel + free-link terminator
+// pf_flags bits (engine.structs PageFrame):
+pub const PF_PINNED_BIT      = 0            // never a victim (build-marked act-common page)
+pub const PF_EVICTABLE_BIT   = 1            // frame is an eviction candidate (assigned, refcount 0,
+                                            // unpinned, stamped) — F-1 stamp eviction; set on
+                                            // Unref 1->0 + speculative publish, cleared on Ref 0->1
+pub const PF_PINNED          = 1 << PF_PINNED_BIT
+pub const PF_EVICTABLE       = 1 << PF_EVICTABLE_BIT
+// The tile-index field of a nametable word (bits 0-10); bits 11-15 are pal/pri/flip.
+pub const NT_TILE_MASK       = $07FF
+pub const NT_ATTR_MASK       = $F800
+// A resident physical tile index >> PAGE_FRAME_TILE_SHIFT yields its frame id;
+// (index & PAGE_FRAME_TILE_MASK) is the intra-frame tile (0..63). 64 = 2^6.
+pub const PAGE_FRAME_TILE_SHIFT = 6
+pub const PAGE_FRAME_TILE_MASK  = ART_POOL_PAGE_TILES - 1                // 63
+ensure((1 << PAGE_FRAME_TILE_SHIFT) == ART_POOL_PAGE_TILES,
+       "PAGE_FRAME_TILE_SHIFT must equal log2(ART_POOL_PAGE_TILES)")
+// DEBUG residency audit cadence: recompute per-frame refcounts from the whole
+// Tile_Cache_Nametable every PAGECACHE_AUDIT_INTERVAL LOGIC TICKS during play.
+// Chosen large enough that the ~4800-word walk's one-tick cost is a rare,
+// identifiable spike (it perturbs ONLY the DEBUG shape's Lag_Frame_Count —
+// measure lag on the non-audit ticks). The gate lives in the level state's tick,
+// right after Tile_Cache_Fill returns (fix F5 — it used to be gated INSIDE the
+// fill, which charged the ~110,000-cycle pass to the routine the streaming arc
+// measures). The audit also runs unconditionally at level init.
+pub const PAGECACHE_AUDIT_INTERVAL = 128
+
+// Page-in request FIFO (Art-streaming P2a, engine.page_in). The dispatcher pops
+// one request per idle slice, resolving page_id -> source/dest via the act's
+// page-address table. Demand requests dequeue before prefetch (two-pass scan).
+pub const PAGEIN_QUEUE_SLOTS  = 8           // request FIFO depth (S3K ~4-deep + headroom)
+pub const PGRQ_DEMAND_BIT     = 0           // request flags: bit set = demand (dequeue first)
+pub const PGRQ_DEMAND         = 1 << PGRQ_DEMAND_BIT
+pub const PGRQ_BULK_BIT       = 1           // init bulk load: non-speculative (D3-gate-exempt) but still evictable (stamp-scanned)
+pub const PGRQ_BULK           = 1 << PGRQ_BULK_BIT
+pub const PGRQ_PREFETCH       = 0           // speculative: NO flag bits (dequeues after demand; the ONLY gated class)
+
+// Page prefetch (Art-streaming P2b Task 7). When the tile-cache fill's leading edge
+// advances, the page prefetch collects the ahead-strip's referenced pages (via the
+// staged-block LOCAL words map through the same per-word local->global path) and Requests non-resident
+// ones. Bounded per frame so a burst never floods the DMA window.
+pub const PAGE_PREFETCH_MAX   = 2           // max prefetch enqueues attempted per frame
+
+// STRESS_EVICT forced-eviction dev fixture (Task 7). The build define STRESS_EVICT
+// (0 in every shipped shape; 1 only in the off-canonical `stress_evict` dev profile)
+// clamps the usable frame count so OJZ's 10 pages can NO LONGER all be resident (5
+// pinned pages 0/1/7/8/9 + 4 dynamic frames; `python3 tools/fg_page_order.py check`
+// prints the committed pin set), forcing continuous evict/reload traffic
+// through every path. PageCache_Init threads only PAGE_FRAMES_CLAMP frames into the
+// free list; the remaining frame RECORDS stay initialized (audit-clean, unassigned)
+// but unreachable. Byte-INERT at STRESS_EVICT=0 (PAGE_FRAMES_CLAMP == PAGE_FRAMES).
+//
+// CALIBRATION HISTORY (the fixture floor for OJZ is 9; overseer ruling, chain 78).
+// The "N pinned + M dynamic" splits below count against the 4 pins OJZ had when the
+// clamp was calibrated (pages 0/1/8/9), not today's 5 (STITCHED-ACT-PAGE-ORDER).
+// OJZ is a hard case for a forced-eviction fixture: dedup makes the working set
+// ~= the pool (T7's established conclusion — there is no stable *sustained-churn*
+// regime on OJZ; genuine churn coverage comes from Task 11's stress-uniquify
+// fixture, which manufactures a working set larger than the frame count). So the
+// clamp is a calibration against OJZ's marginal boundary, not a churn generator:
+//   6 (4 pinned + 2 dynamic): livelocked at init pre-watchdog — the fill needs >2
+//       dynamic pages at once, so pages thrashed through 2 frames, fill never
+//       completed (black screen). Retired.
+//   7 (+ 3 dynamic): deterministic, LOUD thrash — used as the working-set-violation
+//       probe (the stall watchdog / AllocFrame assert NAMES it instead of hanging).
+//   8 (+ 4 dynamic): MARGINAL — sits exactly on OJZ's working-set boundary, so it
+//       tips into AllocFrame thrash under small prefetch-timing shifts (e.g. NIT-1's
+//       skip-arm un-suppression raised speculative traffic just enough). Not a
+//       defect: boundary marginality, correctly detected loudly.
+//   9 (+ 5 dynamic): kept as the fixture floor, but NOT a stable churn regime —
+//       clamp 9 still thrashed the diagonal seam. STRUCTURAL finding (overseer,
+//       final): the refcount source is the whole 80x60 Tile_Cache_Nametable window
+//       (multi-screen), and on OJZ's deduped 10-page pool any window references
+//       ~every page, so the cache-window working set == the pool. Refcount-based
+//       eviction therefore cannot sustain churn at ANY clamp < PAGE_FRAMES on a small
+//       deduped act (chain-74's clean run at 8 was traversal luck). The audits stay
+//       clean through every thrash (recount == stored), proving the refs are genuine
+//       window references, not leaks — the AllocFrame assert correctly REFUSES to
+//       evict displayed art. This is the design being right: streaming exists for acts
+//       whose windows CAN'T span the pool; OJZ is not one. So on OJZ this fixture
+//       serves as a loud thrash-CANARY (zero silent corruption), not a churn generator.
+//       Sustained-churn coverage = Task 11's stress-uniquify fixture (window << pool).
+// If a working set ever exceeds the dynamic frames, the stall watchdog
+// (Tile_Cache_Fill, DEBUG) NAMES it instead of hanging.
+pub const STRESS_EVICT_FRAMES = 9
+pub const PAGE_FRAMES_CLAMP   = PAGE_FRAMES - STRESS_EVICT * (PAGE_FRAMES - STRESS_EVICT_FRAMES)
+ensure(PAGE_FRAMES_CLAMP >= 1 && PAGE_FRAMES_CLAMP <= PAGE_FRAMES,
+       "PAGE_FRAMES_CLAMP must be in [1, PAGE_FRAMES] (check STRESS_EVICT_FRAMES)")
+
+// Demand-stall watchdog (Task 7, DEBUG). If the tile-cache fill's demand stall
+// (Cache_Art_Stall) persists unresolved for this many consecutive frames, the engine
+// raise_errors instead of hanging on a silent black screen — a livelock where the
+// working set exceeds the available dynamic frames must be LOUD (the plan's soak gate
+// requires "no deadlock in the demand-stall path"). ~5 seconds at 60 Hz.
+pub const STALL_WATCHDOG_FRAMES = 300
+
+// VRAM fixed-region byte addresses + plane geometry.
+pub const VRAM_SPRITE_TABLE = $B800         // relocated from $D800 to free plane rows 48-63
+pub const VRAM_HSCROLL_TABLE = $BC00        // relocated from $DC00 (was inside Plane A 64x64 nametable)
+pub const VRAM_PLANE_B_BYTES = $E000        // Plane B nametable VRAM byte address (bg/plane_buffer/section)
+pub const PLANE_H_CELLS     = 64
+
+// VDP sprite-table geometry.
+pub const MAX_VDP_SPRITES     = 80
+pub const VDP_SPRITE_X_OFFSET = 128         // VDP adds 128 to sprite X
+pub const VDP_SPRITE_Y_OFFSET = 128         // VDP adds 128 to sprite Y
+
+// Sprite priority-band + scanline budgeting geometry.
+pub const PRIORITY_BANDS        = 8
+pub const SPRITES_PER_BAND      = 32
+pub const SCANLINE_BANDS        = 7         // 224 / 32 = 7 bands of 32 scanlines
+pub const SCANLINE_SPRITE_LIMIT = 24        // max sprite pieces per band
+
+// Visible screen dimensions in pixels.
+pub const SCREEN_WIDTH  = 320
+pub const SCREEN_HEIGHT = 224
+
+// Half-screen camera offsets (screen centre = camera lock point; consumed by
+// camera + ojz_scroll_test). = SCREEN_WIDTH/2 and (SCREEN_HEIGHT-visible-strip)/2.
+pub const CAM_SCREEN_HALF_W = 160
+pub const CAM_SCREEN_HALF_H = 112
+
+// Visible screen extent in 8px tiles (camera/tile-cache edge math).
+pub const SCREEN_TILES_W = SCREEN_WIDTH >> 3    // 40
+pub const SCREEN_TILES_H = SCREEN_HEIGHT >> 3   // 28
+
+// --- Art-streaming camera soft-clamp (P2c Task 10) ---
+// When a demand-stalled tile-cache fill leaves not-yet-resident art within
+// CLAMP_MARGIN_TILES tiles of the visible screen edge on an axis, that axis is
+// HELD (max step 0) until the stall resolves — the honorable S3K-gate
+// degradation (the camera waits; player logic runs untouched). tile_cache.emp
+// sets the per-axis bits at its two demand-stall sites, camera.emp consumes them,
+// and the fill re-derives the whole word fresh each pass so it clears the frame
+// the stall resolves. On OJZ the demand-stall path fires only transiently (the
+// cache working set == the pool), so in normal play the word stays 0 and the
+// camera never holds; the fixture (STRESS_EVICT/STRESS_ART) is where it engages.
+pub const CLAMP_MARGIN_TILES = 4                // edge slack (tiles) before a hold engages
+pub const ART_HOLD_X_BIT     = 0                // Camera_Art_Hold: X axis held
+pub const ART_HOLD_Y_BIT     = 1                // Camera_Art_Hold: Y axis held
+
+// Sprite-frame precomputed bbox byte offsets + first-piece offset (mirror
+// this file; FRAME_PIECE_COUNT above completes the header layout).
+pub const FRAME_BBOX_X_MIN = 0              // signed byte — leftmost piece pixel
+pub const FRAME_BBOX_X_MAX = 1              // signed byte — rightmost piece pixel
+pub const FRAME_BBOX_Y_MIN = 2              // signed byte — topmost piece pixel
+pub const FRAME_BBOX_Y_MAX = 3              // signed byte — bottommost piece pixel
+pub const FRAME_PIECES     = 6              // byte offset to first piece datum
+
+// -----------------------------------------------
+// Hardware addresses (memory-mapped MD peripherals).
+// -----------------------------------------------
+pub const Z80_RAM         = $A00000
+pub const Z80_RAM_END     = $A02000     // 8 KB
+pub const Z80_BUS_REQUEST = $A11100
+pub const Z80_RESET       = $A11200
+
+pub const VDP_DATA        = $C00000     // VDP data port
+pub const VDP_CTRL        = $C00004     // VDP control port
+
+// Reg $0C's BOOT value, named because two modules depend on it and neither could say so.
+// engine/system/boot_data.emp writes it into the positional VDP register table; the raster
+// DSL's reg_sh_on()/reg_sh_off() build their register writes on top of it, since
+// Shadow/Highlight is bit 3 of the same register that selects H40. A resolution change here
+// silently changes what every raster band edge writes, and that dependency used to live in a
+// COMMENT claiming a pin it did not have (2026-08-18 substrate sweep, Tier 4).
+//
+// IT LIVES HERE, not in boot_data, deliberately. boot_data EMITS BYTES, so importing it from
+// raster_dsl drags a data module into every isolated *_port harness that compiles the DSL —
+// which is exactly how the first spelling of this pin broke four port tests that build.sh
+// cannot see. A register default is a constant, and constants.emp is already every port
+// harness's dependency.
+pub const VDP_REG_0C_BOOT = $81         // $0C: H40 (320px), no interlace
+pub const VDP_HV_COUNTER  = $C00008
+pub const PSG_PORT        = $C00011
+
+pub const HW_VERSION            = $A10001
+pub const HW_PORT_EXP_DATA      = $A10007
+pub const HW_PORT_1_CTRL        = $A10009
+pub const HW_PORT_2_CTRL        = $A1000B
+pub const HW_EXPANSION_CTRL     = $A1000D
+pub const HW_PORT_A_CTRL_FULL   = $A10008
+pub const HW_EXPANSION_CTRL_FULL = $A1000C
+
+pub const TMSS_REGISTER   = $A14000
+
+pub const YM2612_A0       = $A04000
+pub const YM2612_D0       = $A04001
+pub const YM2612_A1       = $A04002
+pub const YM2612_D1       = $A04003
+
+// -----------------------------------------------
+// VDP access-type bit patterns (feed the AS `vdpComm` `(type & rwd)` derivation
+// and engine.vdp's target_bits / op_bits mappers — the .emp-native vocabulary).
+// -----------------------------------------------
+pub const VRAM  = %100001
+pub const CRAM  = %101011
+pub const VSRAM = %100101
+pub const READ  = %001100
+pub const WRITE = %000111
+pub const DMA   = %100111
+
+// -----------------------------------------------
+// System.
+// -----------------------------------------------
+pub const SYSTEM_STACK = $FFFFFF00      // initial SP (grows down from RAM top)
+
+// -----------------------------------------------
+// VRAM fixed byte addresses + plane geometry.
+// -----------------------------------------------
+pub const VRAM_PLANE_A     = $C000      // Plane A nametable (tile $600)
+pub const VRAM_PLANE_B     = $E000      // Plane B nametable (tile $700)
+pub const VRAM_WINDOW      = $F000
+pub const PLANE_V_CELLS    = 64
+// Shared BG tile region: reserved permanent VRAM slot range for zone-wide BG
+// tile art, loaded once at level init between the FG section pools and the Plane
+// A nametable. The PHYSICAL run is $8000..$B7FF = 448 slots (the SAT sits at
+// $B800); BG_TILE_CAPACITY is what the BG arena is DECLARED to own inside it, and
+// since EFFECTS-W1 item 9d that is 400 — the top 48 slots (1424..1471) are the
+// `waterline_strips` region in games/sonic4/vram.toml. The two numbers being
+// different is the point: bg.emp's blob-copy clamp must use the CAPACITY, not the
+// physical run, or a maximal BG blob sprays over the waterline strips.
+// BG_TILE_CAPACITY gates the build tools; engine code reads it only for that clamp.
+// It is ENGINE-WIDE: both games' vram.toml carry an `engine-tiles:BG_TILE_CAPACITY`
+// authority line, so the two maps cannot disagree — see games/demo/vram.toml's
+// bg_region comment for why demo's map moved for a sonic4 feature.
+pub const BG_TILE_BASE_VRAM = $8000              // byte address (slot 1024)
+pub const BG_TILE_BASE_SLOT = BG_TILE_BASE_VRAM / 32   // 1024 — nametable index remap
+pub const BG_TILE_CAPACITY  = 376
+// The Hydrocity waterline's fixed VRAM run (EFFECTS-W1 item 9d) — the 48 slots directly
+// above the BG arena and directly below the SAT, filled by Waterline_Art_Update's single
+// DMA (engine/level/bg_anim.emp). Byte address, like VRAM_SPRITE_TABLE: slot 1424 * 32.
+// Both games' vram.toml carry `engine-bytebase:VRAM_WATERLINE_STRIPS` against this, so the
+// declaration and the constant cannot drift. See games/sonic4/vram.toml's own region
+// comment for where the 48 came from and why the DERIVED need at today's H is 8 of them.
+pub const VRAM_WATERLINE_STRIPS = BG_TILE_BASE_VRAM + BG_TILE_CAPACITY * 32   // $B200 (slot 1424)
+ensure(VRAM_WATERLINE_STRIPS + 48 * 32 <= VRAM_SPRITE_TABLE,
+       "the waterline strips ({VRAM_WATERLINE_STRIPS} .. {VRAM_WATERLINE_STRIPS + 48 * 32}) run into the sprite attribute table at {VRAM_SPRITE_TABLE} — the BG arena and the strips together must fit under it, and the strips are what a too-large BG_TILE_CAPACITY now pushes over the edge")
+
+// -----------------------------------------------
+// Controller button masks (complete the d-pad/face-button set above).
+// -----------------------------------------------
+pub const BUTTON_B     = 1 << 4         // $10
+pub const BUTTON_B_BIT = 4              // for `btst #BUTTON_B_BIT` (debug-fly toggle poll)
+pub const BUTTON_START = 1 << 7         // $80
+pub const BUTTON_START_BIT = 7          // for `btst #BUTTON_START_BIT` (replay exit poll)
+
+// -----------------------------------------------
+// Replay / input-source (engine/system/replay.emp — spec 2026-08-02).
+// The input seam demultiplexes into live / playback / record; the stream is an
+// RLE byte stream with an $FF escape (impossible as a held byte — the SOCD guard
+// kills U+D+L+R) carrying an end/checkpoint opcode.
+// -----------------------------------------------
+pub const INPUT_LIVE       = 0
+pub const INPUT_PLAYBACK   = 1
+pub const INPUT_RECORD     = 2          // DEBUG builds only
+pub const REPLAY_ESCAPE    = $FF        // impossible as a held byte (SOCD guard)
+pub const REPLAY_OP_END    = $00
+pub const REPLAY_OP_CHECK  = $01        // + u32 hash payload
+pub const REPLAY_CHECK_MASK   = 63      // checkpoint every 64 ticks (record side)
+pub const REPLAY_RECORD_TICKS = 8192    // 8 KB ring (DEBUG)
+pub const REPLAY_HEADER_LEN   = 20      // magic4+flags1+pad1+ticks4+corehash4+seed4+reserved2
+
+// -----------------------------------------------
+// Game state IDs.
+// -----------------------------------------------
+pub const GS_BOOT = 0
+pub const GS_IDLE = 1
+
+// -----------------------------------------------
+// DMA-queue VBlank budgets — the per-frame WINDOW capacity in DMA-byte-equiv.
+// Seeded into DMA_Budget_Remaining at the TOP of VInt_Level; the frame's big
+// window riders (plane drain, Critical DMA) then CHARGE it as they run, so the
+// Important/Deferrable drain sees the TRUE headroom left in the blanking window.
+//
+// Derivation (oracle cycle model, hardware-verified):
+//   blanking window ≈ 488.6 68k cyc/line ×
+//       NTSC 38 blank lines ≈ 18,565 cyc   |   PAL 72 blank lines ≈ 35,179 cyc
+//   blanking DMA ≈ 2.7 cyc/byte  →  raw capacity  NTSC 6876 / PAL 13029 bytes
+//   × ~0.89 safety margin for the uncharged non-DMA VInt tail (Flush_VDP_Shadow /
+//     Enqueue_Dirty_Buffers / Vscroll_Write / Read_Controllers / sound brackets)
+//     and the plane drain's CPU-write rate running above 2.7 cyc/byte:
+//       NTSC 6876 × 0.89 ≈ 6144   |   PAL 13029 × 0.89 ≈ 11648
+// On calm frames the charged riders are small, so the residual budget stays far
+// above realistic Important/Deferrable demand and never binds (behaviorally
+// identical). On an overloaded frame the riders draw it down to the real window
+// headroom, capping the drain instead of overrunning into active display.
+// -----------------------------------------------
+pub const DMA_BUDGET_NTSC = 6144
+pub const DMA_BUDGET_PAL  = 11648
+
+// -----------------------------------------------
+// Enqueue-side DMA byte cap (Vectorman dual cap, Art-streaming P2c Task 8). The
+// three QueueDMA_* classes share a per-frame running byte total
+// (DMA_Enq_Bytes_Frame, reset in VInt_Level beside DMA_Budget_Remaining); an
+// enqueue whose bytes would push the total over this cap is REJECTED exactly like
+// a full queue (carry set — callers already retry next frame). Set ABOVE the drain
+// window budgets so it only catches a runaway enqueue STORM (a producer flooding
+// the queue faster than the window can drain), never normal traffic. The entry-
+// count cap (the queue slots) is the first half of the dual cap; this is the byte
+// half. A per-tier admission cap on ONE resource (DMA bytes), NOT a unified arbiter
+// (D2) — it builds no shared cost ledger.
+// -----------------------------------------------
+pub const DMA_ENQ_BYTE_CAP = 12288
+
+// -----------------------------------------------
+// Decompression / art staging.
+// -----------------------------------------------
+pub const TILE_SIZE = 32                          // bytes per 8x8 4bpp tile
+pub const ART_POOL_PAGE_BYTES = ART_POOL_PAGE_TILES * TILE_SIZE       // 2048 — one page's VRAM bytes
+pub const ART_STAGING_BUFFER_SIZE = ART_POOL_PAGE_BYTES              // 2048 — one decompressed pool page
+// PageIn_Process derives a page's VRAM dest as page_id << ART_POOL_PAGE_BYTES_SHIFT
+// (== page_id * ART_POOL_PAGE_BYTES) — the ensure keeps the shift honest against
+// the byte size so a page-size change can't leave the shift stale (tripwire 2).
+pub const ART_POOL_PAGE_BYTES_SHIFT = 11
+ensure((1 << ART_POOL_PAGE_BYTES_SHIFT) == ART_POOL_PAGE_BYTES,
+       "ART_POOL_PAGE_BYTES_SHIFT must equal log2(ART_POOL_PAGE_BYTES)")
+
+// Blanked-init page-load DMA window (Art-streaming P2a/P2b). Level init streams
+// the act pool through the SAME page-in path gameplay uses, landing each decoded
+// page via an Important-priority staging->VRAM DMA. A 64-tile page is 2048 B, so
+// several pages' landings can drain per display-off frame; Level_LoadArt runs
+// display-OFF, where DMA runs at the full per-line rate on every line, so it
+// raises the window budget to this value for the bulk load (headroom for several
+// page landings + a normal frame's other charges) and restores the active-display
+// budget before display-on.
+pub const DMA_BUDGET_BLANKED_INIT = ART_STAGING_BUFFER_SIZE + DMA_BUDGET_NTSC   // 8192 (2048 page + 6144 NTSC window)
+
+// -----------------------------------------------
+// SST layout constants (the ObjDef-copied template block + custom span).
+// -----------------------------------------------
+pub const SST_CUSTOM_SIZE   = 34        // bytes in sst_custom ($2E-$4F)
+pub const SST_TEMPLATE_START = $0A      // first byte of the ObjDef-copied template block
+pub const SST_TEMPLATE_SIZE = 24        // template bytes copied at spawn ($0A-$21; $20-$21 re-inited)
+
+// -----------------------------------------------
+// Terrain solidity classes (SolidityTable values — generator contract).
+// -----------------------------------------------
+pub const SOLID_NONE = 0
+pub const SOLID_TOP  = 1
+pub const SOLID_LRB  = 2
+pub const SOLID_ALL  = 3
+
+// -----------------------------------------------
+// Parallax (§4.6).
+// -----------------------------------------------
+// RAISED 8 -> 16 on 2026-08-27. Three facts make the raise affordable and one makes it
+// possible; all four are measurements, not estimates (docs/DEFERRED_WORK.md's band-ceiling
+// row carries the full derivation):
+//   * COST TO A SCENE THAT DOES NOT USE THE EXTRA BANDS IS ZERO CYCLES. Every per-frame
+//     parallax walk is bounded by `pcfg_band_count`, never by this constant — the only
+//     O(MAX) loop in engine/level/parallax.emp is `Parallax_Init`'s one-time state wipe.
+//   * A SCENE THAT DOES use sixteen pays 4664 + 15 x 854 = 17,474 cyc = 13.7% of the
+//     128,000-cycle NTSC frame (SB_WALK_BAND_PERLINE_X100, scene_dsl.emp).
+//   * RAM: Parallax_State costs `4 * PARALLAX_STATE_LONGS` (engine/level/parallax.emp),
+//     which is a ceiling-independent head plus a CAPABILITY-SIZED per-band term — so the
+//     price of the raise is 8 x that per-band term and it moves with the capability set,
+//     not with this constant. This bullet used to state "100 + 20 x MAX + 4 -> 328 B at 8,
+//     552 B at 16 (+224)"; that formula did not even produce its own two numbers (it gives
+//     264 and 424), and by 2026-09-07 the drift and remap capabilities had taken the real
+//     per-band term to 44 B. MEASURED 2026-09-07 off s4.lst (Parallax_State $FFFF88A0 ..
+//     Parallax_State_End $FFFF8BD4): 820 B at MAX 16 against 468 B at MAX 8 — the raise
+//     cost 352 B, not 224. Re-derive from PARALLAX_STATE_LONGS rather than from this line.
+//   * `pcfg_layer_mask` HAD TO BECOME A u16 (engine/structs.emp). At a u8 every band from
+//     index 8 up read a structurally-zero bit, took `.band_disabled`, and inherited the
+//     band above it: a build that is green and a picture that is silently wrong.
+// A RAISE IS NOT A ONE-LINE EDIT. Whatever moves this number must also move: the
+// `ensure(MAX_PARALLAX_BANDS == N)` pin and the inlined literals it guards in
+// engine/level/scene_dsl.emp (an imported constant named inside a comptime body a GAME
+// module elaborates resolves to NOTHING, silently — see EMP_PITFALLS), the SceneCfgN /
+// lowerN shape set in games/sonic4/data/effects/scene_registry.emp (derived and named by
+// tools/test_scene_band_shape_coverage.py), tools/effects_gen.py's pinned mirror, every
+// `scene()` call site's fixed-size pad array, and the anchored-at-ceiling poison
+// (games/sonic4/test/poison/poison_scene_capacity.emp + tools/emp_expect_fail.py, whose
+// count pin now fails LOUDLY and names this constant instead of going quietly vacuous).
+pub const MAX_PARALLAX_BANDS    = 16
+// pcfg_anchor_ch sentinel: this config has NO world-anchored deform overlay (Parcel W).
+// $FF and not 0, because 0 is a legal patch channel — the same reason RASTER_ARM_PARK is
+// a value no real arm can take rather than a zero.
+pub const PARALLAX_ANCHOR_NONE  = $FF
+pub const PARALLAX_TRANS_DEFAULT = 16   // default boundary lerp duration (frames)
+// Per-frame BG vscroll transition lerp: current += (target - current) >> 4.
+// CONVERGENCE (the exponential-lerp table in CODING_CONVENTIONS §2.6): each frame
+// retains 15/16 of the gap, so after the PARALLAX_TRANS_DEFAULT window of 16
+// frames (15/16)^16 ~= 36% of the gap is STILL outstanding — ~95% convergence
+// needs ~46 frames at this shift, ~99% needs ~71. That residual is not a bug: the
+// promote frame in Parallax_Step5_Vscroll takes the `.v_snap` path (transition
+// counter is 0), so the last ~36% lands as a single-frame snap. The per-band
+// HORIZONTAL scroll does NOT use this shift — it uses an exact
+// gap/frames_remaining ramp (parallax.emp Step 4) and converges on the last
+// window frame with no residual.
+pub const PARALLAX_LERP_SHIFT   = 4
+
+// ---- The sine table's encoding (engine/system/math.emp `Sine_Table`, engine/data/sine.bin) ----
+//
+// The two numbers that module's header has always stated in prose, as constants, so that a
+// CONSUMER can DERIVE a bound from them instead of re-typing 256 twice.
+//
+//   SINE_AMPLITUDE      sin(90 deg) = $100. A reader takes a table entry and shifts it
+//                       RIGHT to scale it, so this is the numerator of every amplitude
+//                       ladder built on the table: peak = SINE_AMPLITUDE >> shift, and the
+//                       largest shift that still yields a nonzero peak is 8.
+//   SINE_CYCLE_ENTRIES  $100 entries is ONE FULL CYCLE. The blob is $280 BYTES = 320
+//                       WORDS: the cycle plus the $40-entry quarter overlap GetSineCosine
+//                       reads for cosine. A consumer that wants the cycle and not the
+//                       overlap masks its index to this count.
+//
+// The two are numerically equal and are NOT the same fact — one is a range, the other a
+// length — so they are two constants.
+//
+// HERE AND NOT IN math.emp BESIDE THE TABLE, for a mechanical reason worth knowing before
+// the next constant is placed: math.emp opens a ROM section, so it is not a sigil
+// COMPTIME_HELPERS module, so its `pub const`s are not glob-injected and a `use
+// engine.math.{SINE_AMPLITUDE}` yields a LINK EXTERN — a Label — that fails arithmetic at
+// the consumer with a message naming neither module. Measured 2026-08-30. This module is a
+// helper, so both names reach every module with no `use` line at all.
+//
+// HELD TO THE BLOB by tools/test_vertical_bob.py (build.sh's pytest lane), which
+// re-derives both from engine/data/sine.bin — the peak magnitude for the amplitude, the
+// smallest repeating period for the cycle length — and fails naming these two constants.
+// That gate is not decoration: every `ensure` in engine/level/parallax.emp's bob ladder
+// compares this constant against itself one indirection removed, so a table swapped for
+// one of a different amplitude would leave the whole engine green while every authored
+// bob_shift silently came to mean a different number of pixels.
+pub const SINE_AMPLITUDE        = $100
+pub const SINE_CYCLE_ENTRIES    = $100
+
+// -----------------------------------------------
+// Act art-pool VRAM ceiling + per-act section grid cap.
+// -----------------------------------------------
+// The pool no longer runs to the top of the FG art window: two deliberate cuts
+// have been taken out of it, both of them page-quantised (ART_POOL_PAGE_TILES).
+//   960 -> 896  the top page surrendered to the dust/sparkle/insta-shield
+//               windows (the 2026-08-11 dust carve).
+//   896 -> 768  two more pages surrendered to `spare_nametable`, the one
+//               $2000-aligned run in the map — a legal Plane A / Plane B /
+//               Window base register value, which every other free run in VRAM
+//               is not (EFFECTS-W1 item 0, Option P, 2026-09-03).
+// WHAT IS ABOVE THE CEILING IS NOT LISTED HERE. It changes, this comment does
+// not, and the tree already has one authority for it: games/sonic4/vram.toml,
+// via docs/generated/vram-map-<game>.md. That file's generated block cross-checks
+// THIS constant by name, so the two cannot silently disagree.
+// AFFORDABLE because the pool is over-provisioned: OJZ act 1 needs
+// OJZ_ACT_POOL_PAGES pages, well inside PAGE_FRAMES, so it stays fully resident
+// (the §9.7 degenerate path — see PAGE_FRAMES_CLAMP and Level_LoadArt's latch).
+// SAFE because of the 2026-08-11 prep parcel: the RAM arrays are
+// PAGE_FRAMES_MAX-sized (a resize moves no RAM) and the replay hash is
+// layout-proof. What a cut DOES cost is page-frames, i.e. headroom for future
+// acts — and there is a FLOOR: not below 640 tiles / 10 frames until C4-3 (the
+// famine capacity fix) lands, because the STRESS_EVICT famine is measured
+// evidence that tight-cache mode has an open defect.
+pub const POOL_TILE_CEILING = 768       // the pool loads to tiles 0..N-1; everything at or above N belongs to vram.toml
+pub const MAX_ACT_SECTIONS  = 48        // flat id = sec_y*grid_w + sec_x; build asserts grid_w*grid_h <= this
+
+// -----------------------------------------------
+// Plane-update ring buffer.
+// -----------------------------------------------
+pub const PLANE_BUFFER_SIZE = 1536      // bytes (~11 FG column entries per frame; a BG
+                                        // column entry is 132 B since the NEW-5 64-row
+                                        // widening — worst realistic frame ~800 B)
+
+// -----------------------------------------------
+// 2D tile-cache collision geometry + 16x16 block format (§4.7). The COLL_* /
+// BLOCK_* derivatives fold from TILE_CACHE_ROWS/COLS and BLOCK_TILE_SIZE.
+// -----------------------------------------------
+pub const TILE_CACHE_COLL_ROWS   = TILE_CACHE_ROWS / 2                    // 30 collision rows (16px cells)
+pub const TILE_CACHE_COLL_SIZE   = TILE_CACHE_COLS * TILE_CACHE_COLL_ROWS // 2400 bytes per plane
+pub const TILE_CACHE_COLL_PLANES = 2                                      // path A (index 0) + path B (index 1)
+pub const TILE_CACHE_MARGIN_H    = 20                                     // horizontal margin (columns each side)
+pub const TILE_CACHE_MARGIN_V    = 16                                     // vertical margin (rows each side)
+
+// THE ROW COUNT MUST BE EVEN (2026-09-12, the C1b-3 follow-up). Placed here, beside the
+// one declaration that already assumes it (`TILE_CACHE_ROWS / 2` above is a floor
+// division), and in a constants file because this module has no `section {}` for a
+// top-level ensure to trail. Cache_Origin_Row stays even only by parity preservation:
+// every store to it, enumerated by address and not by name, is the boot Work-RAM clear
+// (0), Tile_Cache_Init (`clr.w`, 0), TileCache_VSlide (+ the step, wrap - ROWS) and
+// TileCache_VSlideUp (- the step, wrap + ROWS), and both VSlide calls pass `moveq #2`.
+// Without this pin, 59 rows built GREEN in all four shapes (measured 2026-09-12).
+ensure(TILE_CACHE_ROWS % 2 == 0,
+       "TILE_CACHE_ROWS ({TILE_CACHE_ROWS}) must be EVEN. Cache_Origin_Row is kept even only because every writer preserves parity: the boot Work-RAM clear and Tile_Cache_Init store 0, and TileCache_VSlide / TileCache_VSlideUp step it by the 2 their only call sites pass (`moveq #2` in Tile_Cache_Fill) and wrap it by TILE_CACHE_ROWS. With an odd row count the first wrap leaves the origin ODD, and then (1) engine/level/collision_lookup.emp Collision_GetType, which adds the origin BEFORE halving (lens row C1b-3: floor((L+O)/2) in place of floor(L/2)+O/2, equal only for an even O), returns the neighbouring collision cell for half the rows; (2) TileCache_CopyBlockColumn's physical row no longer keeps the logical row's parity, so its collision halving writes the wrong cell; (3) TILE_CACHE_COLL_ROWS = TILE_CACHE_ROWS / 2 floors, so the last tile row has no collision row. WHAT THIS PIN DOES NOT COVER: the `moveq #2` eviction step itself, a hand-spelled literal no ensure can see; an odd step breaks the same premise with an even row count")
+
+// -----------------------------------------------
+// STREAMING REACH — the fill window's far edge, and the guards that hold it
+// against the viewport. Added 2026-08-27 by the fg-left-edge derivation (see
+// docs/DEFERRED_WORK.md, "FOREGROUND: the two leftmost plane-A columns"). The
+// two literals below used to be bare `327` / `231` inline in section.emp's and
+// tile_cache.emp's `addi.w`s, so the claim "the fill window covers the whole
+// viewport" was a claim about four hand-copied magic numbers and nothing checked
+// it. Naming them changes no byte (327 == 320+7, 231 == 224+7) and makes the
+// ensures below real.
+//
+// THE NEAR EDGE HAS NO CONSTANT, AND THAT IS THE POINT. Both fills take their
+// near edge as `Camera >> 3` with nothing subtracted and nothing masked off —
+// the camera word IS the viewport's left/top pixel, so the first column the fill
+// covers is the column that contains screen x = 0. There is no left margin to be
+// wrong. Any future edit that introduces one (a block-align mask, a `subq`, a
+// margin term) breaks a property no ensure here can see, because an absent term
+// cannot be asserted; it can only be documented, and this is where.
+//
+// THE FAR EDGE, DERIVED. The last visible pixel is Camera + SCREEN_* - 1. Adding
+// one further tile (+8) and truncating gives `(Camera + REACH) >> 3` == (the
+// column holding the last visible pixel) + 1 — one column of deliberate
+// conservative overdraw, on both axes. With Camera's sub-tile fraction f in
+// 0..7 the reach in WHOLE COLUMNS above the camera's own column is therefore
+// (7 + REACH) >> 3, which is what the *_COLS_MAX / *_ROWS_MAX pair names: 41
+// columns and 29 rows.
+pub const SECTION_H_REACH_PX = SCREEN_WIDTH  + 7    // 327 — camera-relative far edge, X
+pub const SECTION_V_REACH_PX = SCREEN_HEIGHT + 7    // 231 — camera-relative far edge, Y
+pub const SECTION_H_REACH_COLS_MAX = (7 + SECTION_H_REACH_PX) >> 3   // 41
+pub const SECTION_V_REACH_ROWS_MAX = (7 + SECTION_V_REACH_PX) >> 3   // 29
+// The viewport's own far column/row, camera-relative, same worst-case fraction.
+pub const SCREEN_LAST_COL_MAX = (7 + SCREEN_WIDTH  - 1) >> 3         // 40
+pub const SCREEN_LAST_ROW_MAX = (7 + SCREEN_HEIGHT - 1) >> 3         // 28 — (7+223)>>3, NOT 27
+// ^ that comment read 27 until 2026-09-02 and it was wrong. The expression is 230 >> 3 =
+// 28, and the constant has always been 28 in every build; only the comment lied. It is
+// worth a note rather than a silent fix because the canopy-instrument parcel derived a
+// sweep bound from the comment, got 27, and only caught it by decoding the emitted
+// `subi.w` immediate out of the ROM. A wrong number in a constants file survives every
+// gate in this tree: the value is right, so nothing fails, and the next reader inherits
+// the mistake. Nothing else changes here — the ROMs are byte-identical across this edit.
+
+// (1) The fill must reach at least the viewport's far edge. Paired with the
+//     absent near margin documented above, this IS "the fill window covers the
+//     full visible viewport" — the property the fg-left-edge booking doubted.
+ensure(SECTION_H_REACH_COLS_MAX >= SCREEN_LAST_COL_MAX,
+       "the column fill's far reach ({SECTION_H_REACH_COLS_MAX} cols past the camera's own column) no longer covers the viewport's last partially-visible column ({SCREEN_LAST_COL_MAX}) — the right edge of the screen would stream one or more columns short and show whatever the plane ring last left there")
+ensure(SECTION_V_REACH_ROWS_MAX >= SCREEN_LAST_ROW_MAX,
+       "the row fill's far reach ({SECTION_V_REACH_ROWS_MAX} rows past the camera's own row) no longer covers the viewport's last partially-visible row ({SCREEN_LAST_ROW_MAX}) — the bottom of the screen would stream short")
+
+// (2) The streamed window must FIT THE PLANE RING measured from the viewport's
+//     own near column/row. Section_UpdateColumns clamps its far tracker to
+//     `visible_near + PLANE_*_CELLS - 1` precisely so the far edge can never lap
+//     the ring and overwrite the NEAR edge with the wrap twin (the world content
+//     PLANE_*_CELLS away). If the reach ever exceeded that clamp, the clamp —
+//     not the reach — would decide the far edge, and the fill would silently
+//     stop covering the viewport. 41 <= 63 and 29 <= 63 today: 22 and 34 columns
+//     of slack, which is the number the derivation needed and could not find
+//     written down anywhere.
+ensure(SECTION_H_REACH_COLS_MAX <= PLANE_H_CELLS - 1,
+       "the column fill reaches {SECTION_H_REACH_COLS_MAX} columns past the camera's own column, but the plane ring is only {PLANE_H_CELLS} cells wide — Section_UpdateColumns' wrap clamp (visible_left + {PLANE_H_CELLS}-1) would now bind before the reach does, so the far edge stops short AND the leftmost visible column risks being rewritten with the wrap twin")
+ensure(SECTION_V_REACH_ROWS_MAX <= PLANE_V_CELLS - 1,
+       "the row fill reaches {SECTION_V_REACH_ROWS_MAX} rows past the camera's own row, but the plane ring is only {PLANE_V_CELLS} cells tall — the vertical wrap clamp would bind before the reach does")
+
+// (3) The tile cache must be able to hold the whole streamed window PLUS its
+//     margin, or Tile_Cache_Fill's `desired_right = min(camera + reach + margin,
+//     desired_left + COLS-1)` clamp binds and Cache_Head_Col never reaches the
+//     column the plane fill wants — Draw_TileColumn's cache-range gate then drops
+//     the write and the far edge shows stale ring content.
+ensure(TILE_CACHE_COLS >= TILE_CACHE_MARGIN_H + SECTION_H_REACH_COLS_MAX + 1,
+       "TILE_CACHE_COLS ({TILE_CACHE_COLS}) cannot span the left margin ({TILE_CACHE_MARGIN_H}) plus the column fill's reach ({SECTION_H_REACH_COLS_MAX}) plus the camera's own column — Cache_Head_Col can never reach the plane fill's right edge and Draw_TileColumn drops those columns")
+ensure(TILE_CACHE_ROWS >= TILE_CACHE_MARGIN_V + SECTION_V_REACH_ROWS_MAX + 1,
+       "TILE_CACHE_ROWS ({TILE_CACHE_ROWS}) cannot span the top margin ({TILE_CACHE_MARGIN_V}) plus the row fill's reach ({SECTION_V_REACH_ROWS_MAX}) plus the camera's own row — Cache_Bottom_Row can never reach the plane fill's bottom edge")
+
+// --- Canopy-gap capture instrument: the fire codes (DEBUG only). ---
+// The instrument records which DISAGREEMENT it saw; it does not judge it. See
+// Canopy_Probe (engine/level/section.emp) for the derivation of each predicate and
+// engine/ram.emp's "Canopy-gap capture instrument" block for what each fire records.
+// Kept here rather than in either owner module because the writer (plane_buffer) and the
+// sweep (section) both spell them, and a code that means one thing at the fire and
+// another at the reader is the failure this whole parcel exists to avoid.
+pub const CANOPY_C1 = 1   // a visible plane COLUMN holds the wrong world column (or was never written)
+pub const CANOPY_C4 = 4   // a row write is about to impose an anchor that does not cover the visible columns
+//
+// 2 AND 3 ARE DELIBERATELY UNASSIGNED, and the reason is a finding rather than a gap.
+// Both were written, and both are UNSOUND as cheap sweep predicates:
+//
+//   * (2) "a visible plane column's Cache_Top_Row anchor no longer covers the visible
+//     rows". A column write maps its 64 plane rows from the Cache_Top_Row it read, so a
+//     column drawn long ago does carry a stale row mapping — but the ROW writer
+//     legitimately repairs exactly those cells, across every column at once. Telling a
+//     stale-and-unrepaired column from a stale-and-repaired one needs per-cell
+//     attribution the sweep cannot afford (64x64), and without it the predicate fires
+//     on ~120 px of ordinary vertical camera travel.
+//   * (3) "a visible plane row's stored anchor no longer covers the visible columns".
+//     Same shape mirrored: `Canopy_RowR[Q]` is never rewritten by the COLUMN writes that
+//     repair that row cell by cell, so after ~24 columns of ordinary rightward scroll the
+//     predicate fires on every row and never stops.
+//
+// Both questions survive in the CAPTURE — `Canopy_ColTop`, `Canopy_ColFrame`,
+// `Canopy_RowR` and `Canopy_RowFrame` are all snapshotted at a fire — so a reader can
+// answer them offline against a real record, with the per-cell attribution the sweep
+// could not pay for. What is not shipped is a predicate that would have latched on
+// ordinary play and masked the sighting.
+
+// How many consecutive sweeps a C1 disagreement must survive before it is latched. The
+// reported symptom is a hole that STAYS (docs/DEFERRED_WORK.md, "CANOPY GAP"); a streamer
+// that fell one column behind for a frame — a full plane buffer, a partial fill, a
+// leading-edge draw the same frame's loop declined — is not that, resolves within a frame
+// or two, and would otherwise claim the first-fire latch and mask the real sighting.
+// 8 frames is 133 ms: far past any transient, far under anything a player would call a
+// sighting. Not tuned against a real sighting, because there has never been one to tune
+// against — if the record ever comes back empty while the owner saw a gap, this number is
+// the first thing to suspect.
+pub const CANOPY_PERSIST_FRAMES = 8
+
+// Raw block layout: [512B nametable][128B collision plane A][128B collision plane B].
+pub const BLOCK_TILE_SIZE       = 16    // 16x16 tiles per block
+pub const BLOCK_TILE_SHIFT      = 4     // lsr #4 = / 16
+// The size and the shift are one fact written twice, and roughly ten sites
+// consume the shift rather than the size. Changing the block geometry without
+// moving both would divide by the wrong power of two everywhere at once.
+ensure(1 << BLOCK_TILE_SHIFT == BLOCK_TILE_SIZE,
+       "BLOCK_TILE_SHIFT ({BLOCK_TILE_SHIFT}) and BLOCK_TILE_SIZE ({BLOCK_TILE_SIZE}) disagree — every `lsr #BLOCK_TILE_SHIFT` divides by the wrong power of two. WHAT SATISFYING THIS PIN DOES NOT COVER, said here because it was measured: bringing the shift back into step with the size builds GREEN while fifteen HAND-SPELLED block-tile literals in engine/level/tile_cache.emp still align on the old grid (lens-sweep row LS-8, controller run 2026-09-06). Those are pinned at the head of that file and fire alongside this one — a block-geometry change is that whole edit list, not this line")
+pub const BLOCK_NT_SIZE         = BLOCK_TILE_SIZE * BLOCK_TILE_SIZE * 2   // 512 bytes
+pub const BLOCK_COLL_ROWS       = BLOCK_TILE_SIZE / 2                     // 8 collision rows per block
+pub const BLOCK_COLL_COLS       = BLOCK_TILE_SIZE                         // 16 collision cells per row
+pub const BLOCK_COLL_PLANE_SIZE = BLOCK_COLL_COLS * BLOCK_COLL_ROWS       // 128 bytes per plane
+// THE WORLD-PIXEL FOOTPRINT OF ONE COLLISION CELL — the granularity at which the byte
+// Collision_GetType returns can change, and therefore the granularity any per-cell
+// EDGE TRIGGER has to quantise position to. Derived from the block format above rather
+// than restated: a block is BLOCK_TILE_SIZE tiles (× 8 px per tile) square and carries
+// BLOCK_COLL_COLS cells across and BLOCK_COLL_ROWS down, so a cell is one TILE column
+// wide and TWO tile rows tall — the same 8/16 split Collision_GetType performs as
+// `lsr.w #3` on X and `lsr.w #3` then `lsr.w #1` on Y.
+//
+// The Y halving is relative to Cache_Top_Row, so these are the ABSOLUTE cell bounds
+// only because Cache_Top_Row is kept EVEN (TileCache_CopyBlockColumn's note,
+// engine/level/tile_cache.emp). If that invariant ever went, this pair would stop
+// describing the partition and every consumer of it would be quietly off by 8 px.
+pub const COLL_CELL_W           = BLOCK_TILE_SIZE * 8 / BLOCK_COLL_COLS   // 8 px
+pub const COLL_CELL_H           = BLOCK_TILE_SIZE * 8 / BLOCK_COLL_ROWS   // 16 px
+pub const BLOCK_COLL_SIZE       = BLOCK_COLL_PLANE_SIZE * TILE_CACHE_COLL_PLANES  // 256 bytes (A+B)
+pub const BLOCK_RAW_SIZE        = BLOCK_NT_SIZE + BLOCK_COLL_SIZE         // 768 bytes
+pub const BLOCK_STAGE_SLOTS     = 16    // staged decompressed blocks (round-robin evict)
+pub const BLOCK_DECOMP_BUDGET   = 6     // max block decompresses per frame (columns + rows share)
+// Rows filled per frame cap. Must be >= CAM_MAX_Y_STEP/8 — build-asserted at the
+// CAM_MAX_Y_STEP definition below. 2 exactly MATCHES the 16 px/frame camera cap
+// (2*8 == 16): the fill keeps up with the worst case but has ZERO catch-up
+// headroom, so a frame the fill misses is only recovered by the 16-row cache
+// margin, never by filling faster. (The 2026-06-10 vertical-streaming plan sized
+// this at 4 for catch-up; the shipped value is 2. Raising it is a budget
+// decision — BLOCK_DECOMP_BUDGET is shared with the column fill — not a
+// comment fix, so the value is left alone here.)
+pub const VFILL_ROWS_PER_FRAME  = 2
+pub const H_PFX_HYST            = 16    // net opposite-motion px before the horizontal prefetch latch flips
+pub const BLOCKS_PER_SECTION_AXIS = 16  // 16 blocks across, 16 down
+pub const BLOCKS_PER_SECTION_SHIFT = 4  // lsr #4 = / BLOCKS_PER_SECTION_AXIS
+// Blocks-per-section is a DIFFERENT quantity from tiles-per-block; they are both
+// 16 today, so a site that divides a block count by the wrong one is invisible.
+ensure(1 << BLOCKS_PER_SECTION_SHIFT == BLOCKS_PER_SECTION_AXIS,
+       "BLOCKS_PER_SECTION_SHIFT ({BLOCKS_PER_SECTION_SHIFT}) and BLOCKS_PER_SECTION_AXIS ({BLOCKS_PER_SECTION_AXIS}) disagree — the world-block to section decompose divides by the wrong power of two. WHAT SATISFYING THIS PIN DOES NOT COVER: twelve HAND-SPELLED `andi.w #$F` / `lsl.w #4` sites still decompose on a 16-block section — six in engine/level/tile_cache.emp (decompose_block, TileCache_FillAll) and six in engine/level/page_cache.emp (PageCache_Prefetch_Strips) — plus the ten `lsr.w #8` / `lsl.w #8` world-tile-to-section shifts across those two files and engine/level/section.emp. All are pinned in their own modules and fire alongside this one (lens-sweep row LS-8)")
+pub const BLOCK_INDEX_ENTRIES   = BLOCKS_PER_SECTION_AXIS * BLOCKS_PER_SECTION_AXIS  // 256
+pub const BLOCK_INDEX_SIZE      = BLOCK_INDEX_ENTRIES * 4                 // 1024 bytes (ROM)
+
+// Staging probe index (streaming fix F4). TileCache_FindStagedBlock hashes a
+// staged block's key to a bucket instead of linear-scanning all BLOCK_STAGE_SLOTS
+// keys. The hash IS the block index, which the probe already holds in d2, so it
+// costs zero instructions — which is only possible while there is one bucket per
+// representable block index. Shrinking this below BLOCK_INDEX_ENTRIES would need
+// a mask in the probe's hot path; the equality makes that a build error rather
+// than a silently slower probe.
+pub const BLOCK_STAGE_BUCKETS   = BLOCK_INDEX_ENTRIES                     // 256 buckets, one per block_index
+ensure(BLOCK_STAGE_BUCKETS == BLOCK_INDEX_ENTRIES,
+       "BLOCK_STAGE_BUCKETS must stay one-per-block-index — TileCache_FindStagedBlock indexes the bucket table with the RAW block index and masks nothing")
+// The bucket/chain cells hold a slot's BYTE OFFSET into the stride-4 key table
+// (slot * 4), with $FF as the end-of-chain sentinel, so the probe carries one
+// index register for Keys/Ptrs/Maps/Chain alike. $FF must stay unrepresentable
+// as a real offset.
+ensure(BLOCK_STAGE_SLOTS * 4 < $FF,
+       "BLOCK_STAGE_SLOTS * 4 reached the staging index's $FF end-of-chain sentinel — widen Block_Stage_Bucket/Chain to words first")
+
+// The prefetch-scan memo's eviction test (streaming fix F2) builds a 16-bit mask
+// of the slots the scan covered and rotates a `rol.w` window of newly-claimed
+// slots across it. The rotate width IS the slot count; at any other
+// BLOCK_STAGE_SLOTS the mask and the rotate stop describing the same set.
+ensure(BLOCK_STAGE_SLOTS == 16,
+       "the prefetch memo's covered-slot mask is a WORD and its eviction window is a `rol.w` — both are exactly 16 slots wide; widen them together with BLOCK_STAGE_SLOTS")
+
+// Collision cell shift (pixel -> 16px cell).
+pub const COLLISION_CELL_SHIFT  = 4
+
+// -----------------------------------------------
+// Camera (§4.7 streaming contract; CAM_MAX_Y_STEP <= VFILL_ROWS_PER_FRAME*8).
+// -----------------------------------------------
+pub const CAM_LOOKAHEAD_THRESHOLD = $0600  // ground speed for pan enable
+pub const CAM_PAN_SPEED = 2                // pixels/frame pan rate
+pub const CAM_PAN_LIMIT = 64               // max pan pixels
+pub const CAM_MAX_Y_STEP = 16              // max camera Y movement px/frame
+
+// The §4.7 streaming contract, as a build guard (conventions §1.6). The vertical
+// tile-cache fill may only advance VFILL_ROWS_PER_FRAME rows (8 px each) per
+// frame; if the camera can outrun that, the cache trails the view and the top/
+// bottom margin drains until the fill visibly lags. Currently at EXACT equality
+// (16 == 2*8, zero slack) — raising CAM_MAX_Y_STEP without raising
+// VFILL_ROWS_PER_FRAME (or vice versa) is a silent streaming regression, so the
+// relation is asserted rather than left to the comment above.
+ensure(CAM_MAX_Y_STEP <= VFILL_ROWS_PER_FRAME * 8,
+       "camera Y step outruns the vertical tile-cache fill rate (CAM_MAX_Y_STEP > VFILL_ROWS_PER_FRAME*8)")
+
+// --- Speculation residency guard (streaming fix F2a) -------------------------
+// Placed after the camera block because it is DERIVED from the camera cap, not
+// tuned: the block prefetch stages the block strip one block beyond the cache
+// edge, the edge advances CAM_MAX_Y_STEP/8 = 2 tiles per logic tick at the cap
+// (its X twin CAM_MAX_X_STEP is file-local to engine/level/camera.emp and equal),
+// and a strip is BLOCK_TILE_SIZE = 16 tiles, so the staged block is CONSUMED
+// BLOCK_SPEC_LEAD_TICKS ticks later. Meanwhile eviction is strict round-robin, so
+// a staged block survives exactly BLOCK_STAGE_SLOTS further CLAIMS. Speculation
+// can only land while
+//
+//     claims over the next LEAD ticks  <=  BLOCK_STAGE_SLOTS
+//
+// and the guard estimates the left side by the claims over the LAST LEAD ticks
+// (Cache_Spec_Gen_Ring in engine.ram). MEASURED at sustained max-diagonal before
+// the guard, by tools/staging_lifetime_timeline.py: 4.13 claims/tick = 33 claims
+// per 8 ticks against 16 slots, speculation residency 3.64 ticks against the
+// 8-tick lead, 59% of evicted speculations never used. The same tool measures
+// `right` and `down` at 0.48/0.61 claims/tick with ZERO dead speculations — which
+// is why this is a guard and not a deletion.
+//
+// This is a LEAD FLOOR, not the lead: below the camera cap the edge advances
+// slower, so the real lead is LONGER and a fixed 8-tick window under-counts the
+// claims that will occur over it. The product (claim rate x lead) is roughly
+// speed-invariant — both scale with camera speed — so the error is second-order,
+// and it errs toward PERMITTING speculation, which is the safe direction for the
+// single-axis states where the prefetch does all the work. Documented rather than
+// corrected: correcting it needs a divide, and this engine does not divide.
+pub const BLOCK_SPEC_LEAD_TICKS = BLOCK_TILE_SIZE / (CAM_MAX_Y_STEP / 8)  // 16 / 2 = 8
+// The ring is indexed by Logic_Tick & (LEAD-1) — a power of two is not a tuning
+// choice here, it is what makes the index a mask instead of a modulo.
+ensure(BLOCK_SPEC_LEAD_TICKS > 0 && (BLOCK_SPEC_LEAD_TICKS & (BLOCK_SPEC_LEAD_TICKS - 1)) == 0,
+       "BLOCK_SPEC_LEAD_TICKS must be a power of two — Tile_Cache_Fill indexes Cache_Spec_Gen_Ring with `andi.w #LEAD-1`")
+// Schmitt re-arm. Tripping and re-arming on the SAME threshold oscillates by
+// construction: suppressing speculation lowers the claim rate, which re-arms it,
+// which raises it again — the packet's bistability, re-entered once per window.
+// Re-arming only at half the slot count leaves room for the speculation stream
+// the re-arm is about to start. Measured: at max-diagonal the demand-only rate is
+// 1.5-2.2 claims/tick = 12-18 per 8 ticks, ABOVE this line, so the guard stays
+// down; at `right`/`down` the total rate is 4-5 per 8 ticks, below it, so the
+// guard never trips and those axes keep every speculation they have today.
+pub const BLOCK_SPEC_REARM      = BLOCK_STAGE_SLOTS / 2
+ensure(BLOCK_SPEC_REARM < BLOCK_STAGE_SLOTS,
+       "the speculation guard's re-arm threshold must be STRICTLY below its trip threshold or the latch is not a Schmitt trigger and will oscillate")
+
+// Sprite-cull margin (px) added to all four sides of the visibility box in
+// Update_Sprite_Visibility. Sprite culling runs inside RunObjects, which the
+// game shell calls BEFORE Camera_Update, so the cull tests against LAST frame's
+// camera while positioning uses the post-update value. An object within one
+// frame of camera motion of a screen edge therefore culls one frame late or
+// early -> edge pop-in. The margin absorbs that skew without perturbing update
+// order (reordering Camera_Update ahead of RunObjects would shift
+// gameplay-visible timing). Must be >= max(CAM_MAX_X_STEP, CAM_MAX_Y_STEP);
+// 32 = 2x the 16 px/frame worst case on both axes.
+pub const SPRITE_CULL_MARGIN = 32
+
+// -----------------------------------------------
+// Entity window scan (§4.9 — camera-driven sliding window).
+// -----------------------------------------------
+pub const MAX_TRACKED_SECTIONS    = 4       // camera-envelope 2x2
+pub const ENTITY_LOAD_BUFFER      = $180    // px ahead/behind camera to load entities
+pub const ENTITY_DESPAWN_BUFFER   = $200    // px beyond load buffer to despawn (hysteresis)
+pub const ENTITY_LOAD_BUFFER_Y    = $100    // px above/below camera to load entities
+pub const ENTITY_DESPAWN_BUFFER_Y = $180    // Y despawn distance (> load = hysteresis)
+pub const ENTITY_LOADED_SLOT_SIZE = 32      // per-entry loaded bitmask: 16B rings + 16B objects
+pub const ENTITY_LOADED_OBJ_OFFSET = 16     // object bits start mid-slot
+pub const ENTITY_RESCAN_COARSE_MASK = $FF80 // camY coarse-row mask (128px rows)
+pub const ENTITY_RESCAN_ROW_SIZE  = $10000 - ENTITY_RESCAN_COARSE_MASK   // 128 — coarse row height
+
+// 3x3 rolling collected/killed bitmask geometry.
+pub const COLLECTED_BITMASK_OFFSET = 2      // ring collected bitmask starts 2 bytes into slot
+pub const KILLED_BITMASK_OFFSET   = 18      // object killed bitmask starts after ring bitmask
+pub const COLLECTED_EMPTY_TAG     = $FF     // slot not owned by any section
+pub const COLLECTED_MASK_BYTES    = KILLED_BITMASK_OFFSET - COLLECTED_BITMASK_OFFSET  // 16 — one bitmask
+pub const MAX_LIST_ENTRIES        = 128     // collected/killed bitmask capacity per section
+// Slot STRIDE — an engine-owned FORMAT, not a game knob (review item 30/G). It
+// is the sum of the field offsets above, so it is derived, not restated; the
+// game knob is the slot COUNT (COLLECTED_WINDOW_SLOTS, a per-profile `-D`).
+// Was duplicated byte-identically in every game config with `ensure(extern(..))`
+// guards in ram.emp + entity_window.emp; homed here, both go away.
+pub const COLLECTED_SLOT_SIZE     = KILLED_BITMASK_OFFSET + COLLECTED_MASK_BYTES  // 34 — tag + pad + ring mask + killed mask
+
+// Slot tag (SST_slot_tag) — which quadrant entry (0-3) spawned an object.
+pub const SLOT_TAG_LEFT    = 0              // upper-left
+pub const SLOT_TAG_RIGHT   = 1              // upper-right
+pub const SLOT_TAG_LOWER_L = 2              // lower-left
+pub const SLOT_TAG_LOWER_R = 3              // lower-right
+
+// Object placement entry (ROM, 6 bytes): dc.w x, y, flags|type|subtype.
+pub const OEF_ANY_Y        = 15            // spawn regardless of camera Y
+pub const OEF_YFLIP        = 14            // rol.w #4 in Load_Object -> RF_YFLIP
+pub const OEF_XFLIP        = 13            // rol.w #4 in Load_Object -> RF_XFLIP
+pub const OEF_TYPE_SHIFT   = 8             // bits 12-8: type (0-31)
+pub const OEF_TYPE_MASK    = $1F
+pub const OEF_SUBTYPE_MASK = $FF           // bits 7-0
+pub const OBJ_ENTRY_SIZE   = 6
+
+// VDP shadow-table length: 19 shadowed registers, $00-$12. The AS-side
+// `VDP_Shadow_len` symbol is owned by the struct-offset harvest (engine.structs'
+// VdpShadow), so it is EXCLUDED from this module's constant harvest to keep a
+// single injector. This named immediate is the `.emp`-side value the flush code
+// reads; a wrong value changes the emitted `moveq`, so byte-identity checks it.
+pub const VDP_Shadow_len = 19
+
+// VDP reg $10, the plane size, as engine/system/boot_data.emp's BootData_VDPRegs writes it.
+// The HARDWARE half of the plane-wrap family (lens-sweep B1-2 / LS-8a). The engine-side pins
+// in engine/level/section.emp and engine/level/plane_buffer.emp hold the hand-spelled sites to
+// PLANE_H_CELLS / PLANE_V_CELLS, but it is this byte that makes the VDP wrap there, and an
+// ensure over the two constants alone cannot see it. A named literal (the VDP_REG_0C_BOOT
+// shape) pinned to the encoding of the two constants: VSZ in bits 5:4, HSZ in bits 1:0, each
+// 0 = 32 cells, 1 = 64, 3 = 128 (n/64 + n/128 over those three sizes).
+// Declared HERE rather than in boot_data.emp, and at the END of this file, on measurement:
+// the same const and ensure appended to the end of boot_data.emp (after their `dc.b` use)
+// made the sonic4 DEBUG placement overlap two unrelated sections (ojz_scroll_test against
+// replay_fixture, 6 bytes), mechanism not established (2026-09-11, parcel/lens-pins-0911);
+// declaring it above the use instead would have moved lines that live prose cites by number.
+// It is evaluated in the RAM-harvest pass, so it stops the build before the four family pins at
+// the end of section.emp / plane_buffer.emp are reached; its message says so (measured).
+pub const VDP_REG_PLANE_SIZE = $11
+ensure((PLANE_H_CELLS == 32 || PLANE_H_CELLS == 64 || PLANE_H_CELLS == 128) && (PLANE_V_CELLS == 32 || PLANE_V_CELLS == 64 || PLANE_V_CELLS == 128) && VDP_REG_PLANE_SIZE == (((PLANE_V_CELLS / 64 + PLANE_V_CELLS / 128) << 4) | (PLANE_H_CELLS / 64 + PLANE_H_CELLS / 128)),
+       "BootData_VDPRegs writes reg $10 = VDP_REG_PLANE_SIZE = {VDP_REG_PLANE_SIZE}, but engine.constants says the planes are PLANE_H_CELLS x PLANE_V_CELLS = {PLANE_H_CELLS} x {PLANE_V_CELLS}, which encodes as {((PLANE_V_CELLS / 64 + PLANE_V_CELLS / 128) << 4) | (PLANE_H_CELLS / 64 + PLANE_H_CELLS / 128)} (VSZ bits 5:4, HSZ bits 1:0; 0 = 32, 1 = 64, 3 = 128; each size must be one of those three). If they disagree the VDP wraps the nametable at one size while the engine masks, strides and clamps at the other. THIS PIN RUNS FIRST AND HIDES THE REST: it is evaluated in the RAM-harvest pass, which stops the build before engine/level/section.emp and engine/level/plane_buffer.emp are reached, so after a plane-size change this is the only message you will see, and re-encoding VDP_REG_PLANE_SIZE as it asks is NOT the whole edit: the four plane-wrap family pins at the end of those two files, and the three at the end of engine/level/bg.emp, fire on the next build and list the 33 hand-spelled sites plus bg.emp's 4 (measured 2026-09-11). WHAT THIS PIN DOES NOT COVER: the VDP's own limit on the product of the two sizes (the combinations above 64 x 64 of area are not all legal, and nothing here checks which); the VRAM span a larger plane occupies (Plane A at VRAM_PLANE_A and Plane B at VRAM_PLANE_B must not overlap each other, the window, the SAT or the HScroll table, and no pin checks that); and the 33 hand-spelled engine sites, pinned per axis in engine/level/section.emp and engine/level/plane_buffer.emp, plus engine/level/bg.emp's own 4 sites, pinned at the end of that file (per axis, and its layout size on its own)")
