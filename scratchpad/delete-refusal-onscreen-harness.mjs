@@ -20,6 +20,38 @@
 //      always-visible `right={...}` header; its `<Hint>` reason sits in the
 //      `SectionBody`, and the section is `defaultCollapsed`.
 //
+// ── ⚠ ITEM 3 WAS FOUND HERE, AND IS NOW FIXED — WHAT THESE ROWS MEASURE ───
+//
+// Card DISABLED-CONTROL-REASON-BEHIND-DISCLOSURE (2026-09-18) closed
+// `reason-in-header`: the refusal's SHORT form is painted under the header row
+// whether the section is open or shut, and the FULL sentence stays in the body.
+// Both lengths come from ONE derivation (src/core/formats/effects/
+// delete-refusal.ts), so the header and the body cannot name different
+// bindings.
+//
+// So rows [p3]/[s3] no longer measure the defect, because it is gone. They now
+// measure the STATE THAT REPLACED IT, on the same arrival conditions
+// (localStorage cleared, reloaded) and with the same strictness:
+//
+//   [p3]/[s3]   AS IT ARRIVES: the greyed Delete AND its short reason are both
+//               painted, hit-testable, and in the same collapsed section.
+//   [p3b]/[s3b] AS IT ARRIVES the FULL sentence is still not in the DOM. The
+//               body is still shut, so this is not "the fix opened the
+//               section"; the header line is carrying the whole of it.
+//   [p4]/[s4]   AFTER EXPANDING: the full sentence is painted in the body.
+//   [p4b]/[s4b] ...and the header line is STILL there, with the full sentence
+//               on its own `title`.
+//   [p2]/[s2]   THE FLOOR, now stronger: a document nothing binds has an
+//               ENABLED Delete, no refusal text anywhere, and ZERO header
+//               refusal lines by the app's own marker.
+//
+// ⚠ THE EXPECTED SHORT FORM IS DERIVED FROM THE EXPECTED FULL ONE, never typed
+// beside it (`shortOf` below). The full one is already held by the anti-drift
+// gate [dp]/[ds] against the provider's own literals, so the short one inherits
+// that gate instead of being a third copy of the sentence. If the app ever
+// composed its short form some other way, these rows go red — which is the
+// whole point of deriving it here the way the provider derives it there.
+//
 // The ~10,190-row node suite proves the DERIVATIONS produce those sentences.
 // It cannot see React, cannot see a canvas and cannot see a running app, so it
 // cannot prove the app painted any of it. That is this file's whole subject.
@@ -33,11 +65,15 @@
 //     {!collapsed && children}
 //
 // so a shut section has NO BODY IN THE DOM AT ALL. There is no element to ask
-// `checkVisibility()` of. Rows [p3]/[s3] therefore measure BOTH halves and
+// `checkVisibility()` of. Rows [p3b]/[s3b] therefore measure BOTH halves and
 // print both: `domNodes` (elements whose *textContent* — hidden text included —
 // contains the sentence; 0 means not even in the document) AND the painted-leaf
 // report (`leaf: false`). A row that only asked `checkVisibility()` would have
 // thrown on a null element and been read as a harness bug.
+//
+// That reading is unchanged by the fix and is still exactly what [p3b]/[s3b]
+// assert — the BODY is still shut on arrival. What changed is that the header
+// now carries the short form, which is [p3]/[s3]'s subject.
 //
 // ── WHAT WOULD MAKE THIS GO GREEN WITHOUT THE PROPERTY HOLDING ────────────
 //
@@ -52,11 +88,12 @@
 //     `elementFromPoint` hit at the leaf's own centre (`hit === leaf ||
 //     leaf.contains(hit)` — an ancestor catching the point is NOT a pass), and
 //     document order relative to the control it is about.
-//   • [p3]/[s3] ARE ABSENCE-SHAPED, which is what a broken build, an unopened
-//     project and a crashed renderer all produce. So each of them asserts, in
-//     the SAME read, that the Delete button IS painted and hit-testable and
-//     reports the app's own `data-section-collapsed`; and [p4]/[s4] then make
-//     the same sentence appear after one click, which no absence can do.
+//   • [p3b]/[s3b] ARE ABSENCE-SHAPED, which is what a broken build, an
+//     unopened project and a crashed renderer all produce. So each of them runs
+//     beside a presence row over the same section in the same state ([p3]/[s3],
+//     which require the short reason PAINTED and the button hit-testable), and
+//     [p4]/[s4] then make the long sentence appear after one click, which no
+//     absence can do.
 //   • THE HARNESS TYPED THE SENTENCE IT WANTED TO SEE. The expected sentences
 //     are composed here from ids DERIVED FROM THE FIXTURE, and rows [dp]/[ds]
 //     are the anti-drift gate: every string literal in the provider's own
@@ -246,6 +283,21 @@ const CONTROL_REPORT = (selectorExpr) => String.raw`
  * The rest is the painted leaf: the innermost element carrying the text, its
  * boxes, `checkVisibility`, a STRICT hit test at its own centre, and its
  * document position relative to the control it is about.
+ *
+ * ⚠ THE HIT TEST IS ON A LINE BOX, NOT ON THE UNION BOX (ported from
+ * scratchpad/region-mode-advice-onscreen-harness.mjs, whose author hit this and
+ * wrote it down). A sentence in a ~300px column can be an INLINE element
+ * wrapped over several line boxes, and `getBoundingClientRect` returns their
+ * UNION — a rectangle the element does not paint, whose centre can legitimately
+ * land in the leading between two lines and hit the PARENT. Testing the widest
+ * `getClientRects()` entry tests a point the element really occupies. It is no
+ * weaker: the hit must still be the leaf or something inside it. This file used
+ * the union box until 2026-09-18; its rows happened to sit on block elements,
+ * so it never went red over it, and that is luck rather than a property.
+ *
+ * `sectionOfLeaf` and `testid` are what let a row say WHERE the words are
+ * rather than only that they exist: a sentence painted in the right panel but
+ * in the wrong section would otherwise pass a pure text search.
  */
 const SENTENCE_REPORT = (needle, anchorExpr) => String.raw`
 (() => {
@@ -259,9 +311,14 @@ const SENTENCE_REPORT = (needle, anchorExpr) => String.raw`
   const anchor = ${anchorExpr};
   leaf.scrollIntoView({ block: 'center' });
   const b = leaf.getBoundingClientRect();
+  const boxes = [...leaf.getClientRects()];
+  const widest = boxes.length === 0 ? b
+    : boxes.reduce((w, r) => (r.width * r.height > w.width * w.height ? r : w), boxes[0]);
   const hit = document.elementFromPoint(
-    Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2));
+    Math.round(widest.left + widest.width / 2), Math.round(widest.top + widest.height / 2));
   const text = (leaf.textContent || '').trim();
+  const section = leaf.closest('[data-section]');
+  const tagged = leaf.closest('[data-testid]');
   return {
     domNodes: all.length, leaf: true, leaves: leaves.length,
     exact: text === needle,
@@ -272,9 +329,29 @@ const SENTENCE_REPORT = (needle, anchorExpr) => String.raw`
     hitIsLeaf: !!(hit && (hit === leaf || leaf.contains(hit))),
     hitTag: hit ? hit.tagName : null,
     afterControl: (anchor.compareDocumentPosition(leaf) & 4) === 4,
+    sectionOfLeaf: section ? section.getAttribute('data-section') : null,
+    testid: tagged ? tagged.getAttribute('data-testid') : null,
+    hitBox: { x: Math.round(widest.x), y: Math.round(widest.y), w: Math.round(widest.width), h: Math.round(widest.height) },
     rect: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) },
   };
 })()`;
+
+/**
+ * HOW MANY header-refusal lines this testid has on screen, and their text.
+ *
+ * The floor rows need to say "no reason is painted in the header", and a text
+ * search cannot say that: the sentence they would search for is the one that
+ * does not exist. This asks the app's own marker instead, so an ENABLED Delete
+ * with a stray refusal line beside it fails rather than passing for want of a
+ * needle.
+ */
+const HEADER_NOTES = (testid) => String.raw`
+(() => [...document.querySelectorAll(${JSON.stringify(`[data-testid="${testid}"]`)})]
+  .map((e) => ({
+    text: (e.textContent || '').trim().slice(0, 200),
+    rects: e.getClientRects().length,
+    title: (e.getAttribute('title') || '').slice(0, 400),
+  })))()`;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CDP plumbing (the shape every harness in this directory uses)
@@ -392,6 +469,25 @@ async function main() {
     `Region ${regionId} binds "${docId}". Deleting it would leave that binding naming a `
     + 'document that does not exist, and aeon\'s build refuses that by name. Select that region '
     + `in the Regions panel and use "revert to inherited" on its ${row} row, under Bindings, first.`;
+
+  /**
+   * THE SHORT FORM, DERIVED FROM THE LONG ONE RATHER THAN TYPED BESIDE IT.
+   *
+   * `delete-refusal.ts` builds both lengths from one `lead` per clause: the
+   * short form is the lead plus a full stop, and the full one is the lead, a
+   * joiner and the rest. For the one-region arm the joiner is `'. '`, so the
+   * lead is everything up to the first sentence break — which is what this
+   * takes. A second literal here would be a third copy of the sentence and the
+   * exact drift the card was about.
+   */
+  const shortOf = (full) => {
+    const end = full.indexOf('. ');
+    if (end < 0) {
+      throw new Error('CANNOT MEASURE: the expected full sentence has no sentence break, so the '
+        + 'short form cannot be derived from it and would have to be typed.');
+    }
+    return full.slice(0, end + 1);
+  };
 
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
@@ -511,6 +607,13 @@ async function main() {
 
     const PRESET_SENTENCE = oneRegionSentence(boundPreset.region, boundPreset.id, RASTER_ROW);
     const SCENE_SENTENCE = oneRegionSentence(boundScene.region, boundScene.id, SCENE_ROW);
+    const PRESET_SHORT = shortOf(PRESET_SENTENCE);
+    const SCENE_SHORT = shortOf(SCENE_SENTENCE);
+    note('the two lengths this run expects',
+      `preset short (${PRESET_SHORT.length} chars): ${JSON.stringify(PRESET_SHORT)}\n        `
+      + `preset full  (${PRESET_SENTENCE.length} chars)\n        `
+      + `scene  short (${SCENE_SHORT.length} chars): ${JSON.stringify(SCENE_SHORT)}\n        `
+      + `scene  full  (${SCENE_SENTENCE.length} chars)`);
 
     // ── [dp]/[ds] THE ANTI-DRIFT GATE ─────────────────────────────────────
     const missingP = presetLiterals.filter((f) => !PRESET_SENTENCE.includes(f));
@@ -549,20 +652,42 @@ async function main() {
       `region ${boundPreset.region} binds "${boundPreset.id}" (derived from ${REGIONS_REL}); `
       + `${JSON.stringify(pCtl)}`);
 
-    // ── [p3] THE TAGGED FINDING, BOTH PACKETS ─────────────────────────────
-    const pHidden = await c.json(SENTENCE_REPORT(PRESET_SENTENCE, BUTTON_BY_LABEL(pLabel)));
-    check('p3', 'AS IT ARRIVES: the greyed Delete is on screen and its REASON IS NOT — not even in the DOM',
-      pCollapsedBefore === 'true' && pHidden.leaf === false && pHidden.domNodes === 0
-      && pCtl.rects > 0 && pCtl.hitIsControl === true,
+    // ── [p3] THE STATE THAT REPLACED THE TAGGED FINDING ───────────────────
+    //
+    // The short reason, PAINTED, while the section is still shut. Everything
+    // the old row demanded of the control is still demanded here, in the same
+    // read, because an absence-shaped claim needs a positive beside it: a
+    // crashed renderer would also fail to paint a sentence.
+    const pShort = await c.json(SENTENCE_REPORT(PRESET_SHORT, BUTTON_BY_LABEL(pLabel)));
+    check('p3', 'AS IT ARRIVES: the greyed Delete AND its short reason are both painted, in the SHUT section',
+      pCollapsedBefore === 'true'
+      && pShort.leaf === true && pShort.exact === true && pShort.rects > 0
+      && pShort.visible === true && pShort.hitIsLeaf === true
+      && pShort.sectionOfLeaf === PRESET_SECTION
+      && pCtl.disabled === true && pCtl.rects > 0 && pCtl.hitIsControl === true,
       `[data-section="${PRESET_SECTION}"] data-section-collapsed=${JSON.stringify(pCollapsedBefore)}; `
-      + `sentence: ${JSON.stringify(pHidden)}\n        `
-      + 'domNodes counts elements whose TEXTCONTENT (hidden text included) holds the sentence. '
-      + '0 is STRONGER than the packets\' "no client rects": CollapsibleSection renders '
-      + '`{!collapsed && children}`, so there is no element to ask checkVisibility() of. '
-      + 'An author meets a greyed button with NO reason beside it.');
+      + `short: ${JSON.stringify(pShort)}\n        `
+      + `EXPECTED (derived from the full sentence, not typed): ${JSON.stringify(PRESET_SHORT)}\n        `
+      + `it names the region the LIVE ${REGIONS_REL} says binds this document: `
+      + `${JSON.stringify(boundPreset.region)} → ${PRESET_SHORT.includes(boundPreset.region)}`);
 
-    // THE PICTURE OF THE FINDING, taken BEFORE the click that reveals the
-    // reason: a greyed Delete with nothing beside it is what an author meets.
+    // ── [p3b] ...AND THE SECTION IS STILL SHUT ────────────────────────────
+    //
+    // Without this the row above is also true of a fix that simply expanded the
+    // section, which is the option the card REJECTED (auto-expand). The full
+    // sentence is still not in the DOM, so the header line is carrying the
+    // whole of what an author meets on arrival.
+    const pHidden = await c.json(SENTENCE_REPORT(PRESET_SENTENCE, BUTTON_BY_LABEL(pLabel)));
+    check('p3b', 'AS IT ARRIVES: the BODY is still shut — the long sentence is not in the DOM, the header line carries it',
+      pCollapsedBefore === 'true' && pHidden.leaf === false && pHidden.domNodes === 0,
+      `sentence: ${JSON.stringify(pHidden)}\n        `
+      + 'domNodes counts elements whose TEXTCONTENT (hidden text included) holds the long '
+      + 'sentence. 0 means CollapsibleSection is still rendering `{!collapsed && children}` over '
+      + 'an unexpanded section, so nothing here opened itself: the short form in the header is '
+      + 'what the author is being shown.');
+
+    // THE PICTURE OF THE ARRIVAL STATE, taken before any click: a greyed Delete
+    // with its reason beside it is what an author now meets.
     await shot(c, 'preset-AS-IT-ARRIVES-collapsed');
 
     // ── [p4] one click, and the same sentence is painted ──────────────────
@@ -574,6 +699,21 @@ async function main() {
       && pShown.visible === true && pShown.hitIsLeaf === true && pShown.afterControl === true,
       `section open → ${pOpened}; ${JSON.stringify(pShown)}\n        `
       + `EXPECTED: ${JSON.stringify(PRESET_SENTENCE)}`);
+
+    // ── [p4b] THE HEADER LINE SURVIVES THE EXPANSION ──────────────────────
+    //
+    // It is not a stand-in that disappears once the body is reachable: the
+    // control is in the header in both states, so its reason is too. The
+    // `title` is the third length-free reading of the SAME derivation, for a
+    // mouse; it is a bonus and never the only place the sentence lives, which
+    // is why the card rejected `tooltip-on-control`.
+    const pNotes = await c.json(HEADER_NOTES('effects-preset-delete-refusal-short'));
+    check('p4b', 'AFTER EXPANDING: the header line is still painted, and carries the FULL sentence on its title',
+      pNotes.length === 1 && pNotes[0].text === PRESET_SHORT && pNotes[0].rects > 0
+      && pNotes[0].title === PRESET_SENTENCE,
+      `${JSON.stringify(pNotes)}\n        `
+      + `EXPECTED text ${JSON.stringify(PRESET_SHORT)} and title = the full sentence `
+      + `(${PRESET_SENTENCE.length} chars)`);
 
     // THE PICTURE OF THE SENTENCE, taken BEFORE the floor selects another
     // document: the shot that used to sit at the end of this block showed the
@@ -589,12 +729,19 @@ async function main() {
     const fLabel = `Delete preset ${freePreset.id}`;
     const fCtl = await c.json(CONTROL_REPORT(BUTTON_BY_LABEL(fLabel)));
     const fHint = await c.json(SENTENCE_REPORT('Deleting it would leave', BUTTON_BY_LABEL(fLabel)));
-    check('p2', 'ANTI-VACUOUS FLOOR: the SAME control for a preset NO region binds is ENABLED, with no reason painted',
+    // ⚠ THE APP'S OWN MARKER AS WELL AS A TEXT SEARCH. "No reason is painted"
+    // cannot be asserted by searching for a sentence that does not exist — the
+    // needle would be the thing under test. This counts the header-refusal
+    // lines the app itself tags, so a stray one beside an ENABLED Delete fails
+    // here instead of passing for want of a needle.
+    const fNotes = await c.json(HEADER_NOTES('effects-preset-delete-refusal-short'));
+    check('p2', 'ANTI-VACUOUS FLOOR: the SAME control for a preset NO region binds is ENABLED, with no reason painted in the header OR the body',
       fCtl.disabled === false && fCtl.rects > 0 && fCtl.visible !== false && fCtl.hitIsControl === true
-      && fHint.leaf === false,
+      && fHint.leaf === false && fNotes.length === 0,
       `"${freePreset.id}" is bound by no region and by no sidecar; ${JSON.stringify(fCtl)}\n        `
-      + `refusal text present? ${JSON.stringify(fHint)} — NOT CLICKED: an enabled Delete on the `
-      + 'live aeon tree is never pressed by this run');
+      + `refusal text present? ${JSON.stringify(fHint)}\n        `
+      + `header refusal lines by testid: ${fNotes.length} ${JSON.stringify(fNotes)} — `
+      + 'NOT CLICKED: an enabled Delete on the live aeon tree is never pressed by this run');
 
     await shot(c, 'preset-FLOOR-enabled');
 
@@ -614,12 +761,24 @@ async function main() {
       `region ${boundScene.region} binds "${boundScene.id}" (derived from ${REGIONS_REL}); `
       + `${JSON.stringify(sCtl)}`);
 
-    const sHidden = await c.json(SENTENCE_REPORT(SCENE_SENTENCE, BUTTON_BY_LABEL(sLabel)));
-    check('s3', 'AS IT ARRIVES: the greyed Delete is on screen and its REASON IS NOT — not even in the DOM',
-      sCollapsedBefore === 'true' && sHidden.leaf === false && sHidden.domNodes === 0
-      && sCtl.rects > 0 && sCtl.hitIsControl === true,
+    // ── [s3]/[s3b] THE SAME PAIR ON THE SCENE PANEL ───────────────────────
+    const sShort = await c.json(SENTENCE_REPORT(SCENE_SHORT, BUTTON_BY_LABEL(sLabel)));
+    check('s3', 'AS IT ARRIVES: the greyed Delete AND its short reason are both painted, in the SHUT section',
+      sCollapsedBefore === 'true'
+      && sShort.leaf === true && sShort.exact === true && sShort.rects > 0
+      && sShort.visible === true && sShort.hitIsLeaf === true
+      && sShort.sectionOfLeaf === SCENE_SECTION
+      && sCtl.disabled === true && sCtl.rects > 0 && sCtl.hitIsControl === true,
       `[data-section="${SCENE_SECTION}"] data-section-collapsed=${JSON.stringify(sCollapsedBefore)}; `
-      + `sentence: ${JSON.stringify(sHidden)}`);
+      + `short: ${JSON.stringify(sShort)}\n        `
+      + `EXPECTED (derived from the full sentence, not typed): ${JSON.stringify(SCENE_SHORT)}\n        `
+      + `it names the region the LIVE ${REGIONS_REL} says binds this document: `
+      + `${JSON.stringify(boundScene.region)} → ${SCENE_SHORT.includes(boundScene.region)}`);
+
+    const sHidden = await c.json(SENTENCE_REPORT(SCENE_SENTENCE, BUTTON_BY_LABEL(sLabel)));
+    check('s3b', 'AS IT ARRIVES: the BODY is still shut — the long sentence is not in the DOM, the header line carries it',
+      sCollapsedBefore === 'true' && sHidden.leaf === false && sHidden.domNodes === 0,
+      `sentence: ${JSON.stringify(sHidden)}`);
 
     await shot(c, 'scene-AS-IT-ARRIVES-collapsed');
 
@@ -631,6 +790,14 @@ async function main() {
       && sShown.visible === true && sShown.hitIsLeaf === true && sShown.afterControl === true,
       `section open → ${sOpened}; ${JSON.stringify(sShown)}\n        `
       + `EXPECTED: ${JSON.stringify(SCENE_SENTENCE)}`);
+
+    const sNotes = await c.json(HEADER_NOTES('effects-scene-delete-refusal-short'));
+    check('s4b', 'AFTER EXPANDING: the header line is still painted, and carries the FULL sentence on its title',
+      sNotes.length === 1 && sNotes[0].text === SCENE_SHORT && sNotes[0].rects > 0
+      && sNotes[0].title === SCENE_SENTENCE,
+      `${JSON.stringify(sNotes)}\n        `
+      + `EXPECTED text ${JSON.stringify(SCENE_SHORT)} and title = the full sentence `
+      + `(${SCENE_SENTENCE.length} chars)`);
 
     await shot(c, 'scene-EXPANDED-refusal');
 
@@ -685,10 +852,12 @@ async function main() {
     const bLabel = `Delete scene ${BORN_SCENE}`;
     const bCtl = await c.json(CONTROL_REPORT(BUTTON_BY_LABEL(bLabel)));
     const bHint = await c.json(SENTENCE_REPORT('Deleting it would leave', BUTTON_BY_LABEL(bLabel)));
-    check('s2', 'ANTI-VACUOUS FLOOR: the SAME control for a scene NO region binds is ENABLED, with no reason painted',
+    const bNotes = await c.json(HEADER_NOTES('effects-scene-delete-refusal-short'));
+    check('s2', 'ANTI-VACUOUS FLOOR: the SAME control for a scene NO region binds is ENABLED, with no reason painted in the header OR the body',
       bCtl.disabled === false && bCtl.rects > 0 && bCtl.visible !== false && bCtl.hitIsControl === true
-      && bHint.leaf === false,
-      `${JSON.stringify(bCtl)}\n        refusal text present? ${JSON.stringify(bHint)} — `
+      && bHint.leaf === false && bNotes.length === 0,
+      `${JSON.stringify(bCtl)}\n        refusal text present? ${JSON.stringify(bHint)}\n        `
+      + `header refusal lines by testid: ${bNotes.length} ${JSON.stringify(bNotes)} — `
       + 'NOT CLICKED, and never saved');
 
     await shot(c, 'scene-FLOOR-enabled');
