@@ -27,10 +27,18 @@ export interface ClearCallSiteCensus {
   files: number | null;
   dir: string;
   why?: string;
+  /** Paths under `dir` the walk declined to enter: outside it, or unresolvable.
+   *  Present whenever a census was taken at all, and named in the sentence, so
+   *  a count over a subset cannot render as a count over the whole. */
+  declined?: number;
 }
 
+/** The source kinds the census reads. */
+export declare const CENSUS_EXTS: readonly string[];
+
 /** Every source file under `dir` is read and its comments stripped before the
- *  call sites in it are counted. Defaults to this repo's `scratchpad/`. */
+ *  call sites in it are counted. Defaults to this repo's `scratchpad/`. The
+ *  walk cannot leave `dir`: see `repo-walk.mjs` and ROADMAP row 205. */
 export declare function clearCallSiteCensus(dir?: string): ClearCallSiteCensus;
 
 /** The one sentence a refusal pastes in, with its units and method named. */

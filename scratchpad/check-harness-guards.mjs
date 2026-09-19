@@ -535,6 +535,33 @@ const exemptions = [];
  */
 const alwaysFatal = new Set();
 
+/**
+ * `git ls-files scratchpad`, scratchpad-relative, asked ONCE.
+ *
+ * Two rules need it and they used to be one: the tracked/untracked split at the
+ * bottom, and W1 below, which must know whether an escaping symlink is
+ * something this repo CARRIES. Same question, same answer, one subprocess.
+ *
+ * CANNOT ASK IS NOT A PASS. On failure the reason is reported UNMEASURABLE
+ * once, and every caller reads the null as "treat it as tracked" — the rule
+ * this file already applied at the bottom, stated here so both readers share
+ * it.
+ */
+let trackedMemo;
+function trackedScratchpad() {
+  if (trackedMemo === undefined) {
+    try {
+      trackedMemo = new Set(
+        execFileSync('git', ['ls-files', 'scratchpad'], { encoding: 'utf8' })
+          .split('\n').filter(Boolean).map((f) => f.replace(/^scratchpad\//, '')));
+    } catch (e) {
+      trackedMemo = null;
+      unmeasurable.push(`git ls-files failed (${e.message}); every failure treated as tracked`);
+    }
+  }
+  return trackedMemo;
+}
+
 // ══ THE WALK, AND EVERY ENTRY IT DECLINED TO ENTER ═════════════════════════
 //
 // ONE walk for both passes, contained by `lib/repo-walk.mjs` to this repo. It
@@ -564,7 +591,13 @@ for (const { link, target } of walked.escaped) {
   const msg = `W1 ${rel}: symlink resolves to ${target}, outside ${walked.root}. NOT WALKED and NOT READ — `
     + "a gate whose verdict depends on a tree this repo does not own is reporting somebody else's work "
     + '(ROADMAP row 205: this one entered 181 GB and exhausted the heap).';
-  declined.push({ rel, msg, fatal: hasStandingOver(rel) });
+  // ⚠ AND `fixtures/` DOES NOT EXCUSE A LINK THE REPO CARRIES. Only
+  // `scratchpad/fixtures/aeon-build-pin/` and its named siblings are
+  // gitignored; `scratchpad/fixtures/` itself is NOT, and it has a tracked file
+  // in it today. So the out-of-scope judgement covers what a vendored copy
+  // drags in, never what somebody commits.
+  const tracked = trackedScratchpad();
+  declined.push({ rel, msg, fatal: hasStandingOver(rel) || tracked === null || tracked.has(rel) });
 }
 for (const { path: p, code } of walked.unreadable) {
   const rel = relative(DIR, p);
@@ -1445,10 +1478,9 @@ let trackedFails = fails;
 }
 
 let untrackedFails = [];
-try {
-  const tracked = new Set(
-    execFileSync('git', ['ls-files', 'scratchpad'], { encoding: 'utf8' })
-      .split('\n').filter(Boolean).map((f) => f.replace(/^scratchpad\//, '')));
+const trackedAtTheEnd = trackedScratchpad();
+if (trackedAtTheEnd) {
+  const tracked = trackedAtTheEnd;
   // `[GS]` — the shell rules use S-codes, and leaving this as `G\d+` would have
   // filed every shell failure under "tracked" by accident (the rule id would
   // stay in the key and never match a path), making an untracked .sh fatal.
@@ -1461,11 +1493,10 @@ try {
   untrackedFails = fails.filter((f) => !alwaysFatal.has(f)
     && !tracked.has(String(f).replace(/^\s*[GS]\d+ /, '').split(':')[0]));
   trackedFails = fails.filter((f) => !untrackedFails.includes(f));
-} catch (e) {
-  // Cannot ask git -> cannot split -> treat every failure as fatal. Never the
-  // other way: an unanswerable question does not become a pass.
-  unmeasurable.push(`git ls-files failed (${e.message}); every failure treated as tracked`);
 }
+// Cannot ask git -> cannot split -> treat every failure as fatal, `trackedFails`
+// keeping its `= fails` initialiser. Never the other way: an unanswerable
+// question does not become a pass. The reason is reported once, by the helper.
 
 if (untrackedFails.length) {
   console.log(`\nUNGUARDED BUT UNTRACKED (${untrackedFails.length}) — present in THIS working tree only.`);

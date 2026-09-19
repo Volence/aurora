@@ -256,6 +256,7 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { walkContained } from './repo-walk.mjs';
 
 /** Both paths the app publishes its Aether port to. The owner's app writes
  *  these too — that is the whole problem. */
@@ -1577,28 +1578,48 @@ export function stripCommentsForCensus(src) {
  * than that. Reading the directory costs a few milliseconds and is only paid on
  * the path that renders a refusal.
  */
+/** The source kinds the census reads. */
+export const CENSUS_EXTS = ['.mjs', '.cjs', '.js', '.ts', '.tsx'];
+
 export function clearCallSiteCensus(dir = INSTRUMENT_DIR) {
-  let entries;
-  try { entries = readdirSync(dir, { withFileTypes: true, recursive: true }); }
-  catch (e) { return { sites: null, files: null, dir, why: `${dir} could not be read (${e.code ?? e.message})` }; }
+  // ⚠ THIS WALK USED TO BE `readdirSync(dir, { recursive: true })`, AND THAT
+  // FOLLOWS DIRECTORY SYMLINKS. Measured on node v24.15.0 against a link
+  // planted in a temp tree: the file behind it came back in the entry list.
+  // So this census had ROADMAP row 205's defect too, one directory over from
+  // the gate that was blamed for it, and `harness-guard-profile.test.ts` was
+  // not dying of the gate's walk but of its own. A census of "this directory"
+  // that silently counts another repository is not a census of this directory,
+  // whatever it survives.
+  //
+  // The root is `dir` itself, not the repo: the sentence this feeds says
+  // "under <dir>", and now that is true rather than nearly true.
+  const walked = walkContained(dir, CENSUS_EXTS, { root: dir });
+  const startFailed = walked.unreadable.find((u) => u.path === dir);
+  if (startFailed) return { sites: null, files: null, dir, why: `${dir} could not be read (${startFailed.code})` };
   let sites = 0, files = 0;
-  for (const e of entries) {
-    if (!e.isFile() || !/\.(mjs|cjs|js|ts|tsx)$/.test(e.name)) continue;
+  for (const p of walked.files) {
     let src;
-    try { src = readFileSync(join(e.parentPath ?? e.path ?? dir, e.name), 'utf8'); } catch { continue; }
+    try { src = readFileSync(p, 'utf8'); } catch { continue; }
     const n = (stripCommentsForCensus(src).match(CLEAR_CALL_RE) ?? []).length;
     if (n > 0) { sites += n; files++; }
   }
-  return { sites, files, dir };
+  // ⚠ DECLINED IS NOT ZERO, AND THE SENTENCE SAYS SO. An entry that left the
+  // directory, or could not be resolved, is a hole in this count; rendering the
+  // count alone would be the same silent-subset defect the walk exists to end.
+  const declined = walked.escaped.length + walked.unreadable.length + walked.revisited.length;
+  return { sites, files, dir, declined };
 }
 
 /** One sentence a refusal can paste in, with the units named. */
 export function describeClearCensus(c = clearCallSiteCensus()) {
+  const aside = c.declined
+    ? ` (${c.declined} path(s) under it were NOT walked: outside ${c.dir}, or unresolvable)`
+    : '';
   return c.sites === null
     ? `the call-site census could not be taken: ${c.why}`
     : `${c.sites} call site(s) across ${c.files} source file(s) (.mjs/.cjs/.js/.ts/.tsx, comments `
-      + `stripped) under ${c.dir} call localStorage.clear() — derived at the moment this message `
-      + 'was rendered, never typed';
+      + `stripped) under ${c.dir} call localStorage.clear()${aside} — derived at the moment this `
+      + 'message was rendered, never typed';
 }
 
 /** Where every private harness profile is rooted. One directory so a sweep of
