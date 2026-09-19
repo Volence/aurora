@@ -46,11 +46,15 @@
 //     happened to sit. A link planted anywhere else under `scratchpad/` would
 //     walk straight back out.
 //
-// CYCLES. A link that resolves INSIDE the root is followed, so a link to an
-// ancestor is a loop the containment rule cannot see. Every directory is
-// entered at most once, keyed by its resolved path, and a second arrival is
-// returned in `revisited`. Without this the rule above would trade an
-// out-of-repo runaway for an in-repo one.
+// CYCLES, AND THE SPELLING OF A PATH. A link that resolves INSIDE the root is
+// followed, so a link to an ancestor is a loop the containment rule cannot see.
+// Two rules keep the answer stable: a link into the WALKED TREE ITSELF is never
+// descended, because everything behind it is already reached by its real path
+// and a second spelling is not the one `git ls-files` knows; and no directory is
+// entered twice, keyed by its resolved path. Either way the link is returned in
+// `revisited` rather than dropped. Without the first rule a walk's population
+// depends on which of two names `readdir` sorts first, which is how the row
+// that found this went red.
 //
 // UNREADABLE IS NOT EMPTY. An entry that cannot be stat'ed or resolved goes in
 // `unreadable` with its errno. `scratchpad/fixtures/aeon-build-pin/aeon-current`
@@ -107,7 +111,7 @@ export function contains(root, p) {
  *
  *   files      absolute paths, in `readdir` sort order, depth first
  *   escaped    `{ link, target }` for each symlink resolving outside `root`
- *   revisited  `{ link, target }` for each directory reached a second time
+ *   revisited  `{ link, target }` for each directory reachable a second way
  *   unreadable `{ path, code }` for each entry that could not be resolved
  *
  * THE LAST THREE ARE THE POINT OF THE RETURN SHAPE. A walker that answered with
@@ -152,7 +156,18 @@ export function walkContained(dir, exts, { root } = {}) {
         try { resolved = statSync(p); } catch (e) { unreadable.push({ path: p, code: e.code ?? e.message }); continue; }
         if (resolved.isDirectory()) {
           if (name === 'node_modules') continue;
-          if (seen.has(target)) { revisited.push({ link: p, target }); continue; }
+          // ⚠ A LINK INTO THE WALKED TREE ITSELF IS NOT DESCENDED, AND THE
+          // REASON IS THE PATH, NOT THE COST. Everything behind it is reached
+          // anyway, by its real path; descending would collect the same file a
+          // second time under a spelling that is not the one `git ls-files`
+          // knows, and the caller keys its tracked/untracked split on exactly
+          // that spelling. FOUND BY A ROW GOING RED: `readdir` sort put
+          // `link-to-inside-dir` ahead of `sub`, so the link won and the real
+          // path vanished from the population. A walk's answer must not depend
+          // on which of two names sorts first.
+          //
+          // It is also what makes a link to an ancestor terminate.
+          if (contains(startReal, target) || seen.has(target)) { revisited.push({ link: p, target }); continue; }
           seen.add(target);
           walk(p, target);
           continue;
