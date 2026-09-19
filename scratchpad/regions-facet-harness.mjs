@@ -696,9 +696,47 @@ async function main() {
     check('7a', 'ANTI-VACUOUS: the status line renders rows at all',
       status.length >= 3, JSON.stringify(status.map((r) => r.id)));
     const minSpan = status.find((r) => r.id === 'min-span');
-    check('7b', 'rule 4 is on screen as NOT CHECKED — unmeasurable is never drawn as a pass',
-      !!minSpan && /NOT CHECKED/.test(minSpan.text) && /REGION_MIN_SPAN/.test(minSpan.text),
-      minSpan ? minSpan.text.slice(0, 140) : 'no min-span row');
+    // ⚠ THIS ROW PINNED THE OPPOSITE UNTIL ROADMAP 201 — it asserted rule 4 is
+    // drawn as NOT CHECKED, which was true while Aurora could not resolve the
+    // act's geometry constants. It now can, so the row asserts the CHECKED arm.
+    // It was the only harness row the 201 parcel moved, and it was found by the
+    // overseer's own run rather than by the parcel, whose node suite went fully
+    // green with this row still pinning the retired behaviour: bar 1 exactly —
+    // the node suite cannot see the panel, so a vitest test and its CDP twin can
+    // be updated one at a time and nothing says so.
+    //
+    // THE BANDS ARE DERIVED HERE, NEVER COPIED from the panel's own sentence:
+    // ACT_W = gridWidth << SECTION_SIZE_SHIFT, CENTRE_X_MIN = CAM_SCREEN_HALF_W,
+    // CENTRE_X_MAX = ACT_W - SCREEN_WIDTH + CAM_SCREEN_HALF_W (engine constants
+    // 160 / 320 / 224 / 112, vendored at test/fixtures/regions/act-constants/).
+    // A row reading the numbers back out of the string it is checking would pass
+    // against any arithmetic the resolver happened to do.
+    const actW = st.gridWidth * 2048;
+    const actH = st.gridHeight * 2048;
+    const bandX = `[${160}, ${actW - 320 + 160}]`;
+    const bandY = `[${112}, ${actH - 224 + 112}]`;
+    check('7b', 'rule 4 is CHECKED on screen, and the bands it names are the DERIVED ones',
+      !!minSpan && /Rule 4 passes/.test(minSpan.text)
+        && !/NOT CHECKED/.test(minSpan.text)
+        && minSpan.text.includes(bandX) && minSpan.text.includes(bandY)
+        && /minimum span 32 px/.test(minSpan.text),
+      minSpan ? `${minSpan.text.slice(0, 160)} || derived x ${bandX} y ${bandY}`
+        : 'no min-span row');
+    // ⚠ THIS ROW FIRST ASKED FOR `minSpan.tone`, WHICH `STATUS_ROWS` DOES NOT
+    // EXPOSE — it reads the DOM and carries `color`, never the provider's tone
+    // enum. `tone` came back `undefined`, so the row was red on the clean tree
+    // AND red under the mutation meant to prove it, which is bar 2b: the guard
+    // was aimed at an observable that does not exist, and a mutation cannot
+    // reveal that because the row never touches the subject. Caught only by
+    // re-running the restored baseline, which is the step that distinguishes
+    // "this went red because of my mutation" from "this was never green".
+    // The tone is therefore compared the way its siblings 7f3/7i do it: against
+    // the colour of a row known to be ok IN THIS SAME LIST, never a hex typed
+    // here, so a theme change cannot turn this row green or red on its own.
+    const okSibling = status.find((r) => r.id === 'unassigned');
+    check('7b2', 'and it is drawn in the PASSING tone, taken from another ok row in this same list',
+      !!minSpan && !!okSibling && minSpan.color === okSibling.color && minSpan.rects > 0,
+      `min-span ${minSpan?.color} vs unassigned(ok) ${okSibling?.color}, rects=${minSpan?.rects}`);
     const cover = status.find((r) => r.id === 'unassigned');
     check('7c', 'CONTROL: the exactly-tiling fixture reports coverage satisfied',
       !!cover && /Every pixel of the act is assigned/.test(cover.text),
