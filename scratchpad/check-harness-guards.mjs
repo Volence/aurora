@@ -109,7 +109,8 @@
 // defect as a guard that asserts nothing: it goes green over the case it could
 // not see.
 
-import { readdirSync, readFileSync, statSync, lstatSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { walkContained, hasStandingOver } from './lib/repo-walk.mjs';
 import { execFileSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 
@@ -486,32 +487,28 @@ const looksLikeAurora = (t) =>
   && (/xvfb-run/.test(t) || /dist\/main\/index\.mjs/.test(t) || /\bELECTRON\b/.test(t)
       || /electron/i.test(t));
 
-/** Entries this walk could not classify. NEVER silently dropped: an unreadable
- *  path is UNMEASURABLE, and a gate that cannot see a file must say so rather
- *  than report a clean count over the subset it managed to stat. Found the hard
- *  way -- scratchpad/fixtures/aeon-build-pin/aeon-current is a self-referential
- *  symlink (an untracked fixture, absent from a fresh worktree), and statSync
- *  threw ELOOP, so the gate CRASHED in the main tree while passing in every
- *  worktree it was developed in. */
-export const unreadable = [];
+/**
+ * THE WALK LIVES IN `lib/repo-walk.mjs` NOW, AND IT CANNOT LEAVE THIS REPO.
+ *
+ * ROADMAP row 205: the `listFiles` that used to sit here followed a symlink
+ * whenever `statSync` said the target was a directory, and
+ * `scratchpad/fixtures/aeon-build-pin/` carries four that point at `sigil` and
+ * `skdisasm`. Untracked and gitignored, so they exist in the owner's checkout
+ * and in no worktree, which is why this gate passed everywhere it was
+ * developed. The walk entered 181 GB across 670,684 files, reached 8,184 MB
+ * under `--max-old-space-size=8192` and died, so `npm test` never reached
+ * vitest; the run that first went red had no commit on either side of it, only
+ * a peer lane building. A GREEN HERE WAS NOT A FACT ABOUT THIS REPOSITORY.
+ *
+ * The rule, the two rules rejected, and the cycle guard are argued in that
+ * module. What belongs HERE is the policy: where an escape is fatal.
+ */
 
-function listFiles(dir, exts, acc = []) {
-  for (const name of readdirSync(dir).sort()) {
-    const p = join(dir, name);
-    let st;
-    // lstat, not stat: a symlink is classified by the LINK, so a loop or a
-    // dangling target is a fact about this entry rather than an exception.
-    try { st = lstatSync(p); } catch (e) { unreadable.push(`${p} (${e.code})`); continue; }
-    if (st.isSymbolicLink()) {
-      // Follow it only far enough to know if it is a directory; a loop is not.
-      try { if (statSync(p).isDirectory()) { if (name !== 'node_modules') listFiles(p, exts, acc); continue; } }
-      catch (e) { unreadable.push(`${p} (${e.code})`); continue; }
-    } else if (st.isDirectory()) { if (name !== 'node_modules') listFiles(p, exts, acc); continue; }
-    if (exts.some((e) => name.endsWith(e))) acc.push(p);
-  }
-  return acc;
-}
-
+/** Entries the walk could not classify, or declined to enter. NEVER silently
+ *  dropped, and that is not a restatement of the old comment: the array that
+ *  used to sit here was WRITE ONLY. Three code paths pushed into it and nothing
+ *  read it, printed it or gated on it, so every claim it made about being loud
+ *  was made by prose. The census below is what the prose said. */
 // ── the run ────────────────────────────────────────────────────────────────
 
 const fails = [];
@@ -537,6 +534,88 @@ const exemptions = [];
  * lists, not about a file the repo may or may not carry.
  */
 const alwaysFatal = new Set();
+
+/**
+ * `git ls-files scratchpad`, scratchpad-relative, asked ONCE.
+ *
+ * Two rules need it and they used to be one: the tracked/untracked split at the
+ * bottom, and W1 below, which must know whether an escaping symlink is
+ * something this repo CARRIES. Same question, same answer, one subprocess.
+ *
+ * CANNOT ASK IS NOT A PASS. On failure the reason is reported UNMEASURABLE
+ * once, and every caller reads the null as "treat it as tracked" — the rule
+ * this file already applied at the bottom, stated here so both readers share
+ * it.
+ */
+let trackedMemo;
+function trackedScratchpad() {
+  if (trackedMemo === undefined) {
+    try {
+      trackedMemo = new Set(
+        execFileSync('git', ['ls-files', 'scratchpad'], { encoding: 'utf8' })
+          .split('\n').filter(Boolean).map((f) => f.replace(/^scratchpad\//, '')));
+    } catch (e) {
+      trackedMemo = null;
+      unmeasurable.push(`git ls-files failed (${e.message}); every failure treated as tracked`);
+    }
+  }
+  return trackedMemo;
+}
+
+// ══ THE WALK, AND EVERY ENTRY IT DECLINED TO ENTER ═════════════════════════
+//
+// ONE walk for both passes, contained by `lib/repo-walk.mjs` to this repo. It
+// used to be two walks that could each leave it; see the note above the run.
+//
+// ⚠ THE CENSUS PRINTS ON EVERY RUN, INCLUDING THE RUN WHERE IT IS EMPTY, and
+// that is the whole difference between this and the array it replaces. A thing
+// not looked at must never render as a clean result, so what was declined is
+// stated beside the count of what was seen, in the same breath, whether or not
+// anybody remembered to look.
+//
+// WHERE IT IS FATAL: everywhere this gate has standing (`hasStandingOver`).
+// Under `fixtures/` it is reported and survived, for the same reason the shell
+// pass has skipped `fixtures/` since O23 — those are vendored copies of other
+// repos and their contents are not this repo's business. So a symlink that
+// leaves this repository from anywhere ELSE under scratchpad/ turns this gate
+// RED, which is the ratchet: today's four links live in a fixture and the next
+// one will not be able to.
+const ROOT = join(DIR, '..');
+const walked = walkContained(DIR, ['.mjs', '.sh'], { root: ROOT });
+const mjsFiles = walked.files.filter((f) => f.endsWith('.mjs'));
+const shFiles = walked.files.filter((f) => f.endsWith('.sh'));
+
+const declined = [];
+for (const { link, target } of walked.escaped) {
+  const rel = relative(DIR, link);
+  const msg = `W1 ${rel}: symlink resolves to ${target}, outside ${walked.root}. NOT WALKED and NOT READ — `
+    + "a gate whose verdict depends on a tree this repo does not own is reporting somebody else's work "
+    + '(ROADMAP row 205: this one entered 181 GB and exhausted the heap).';
+  // ⚠ AND `fixtures/` DOES NOT EXCUSE A LINK THE REPO CARRIES. Only
+  // `scratchpad/fixtures/aeon-build-pin/` and its named siblings are
+  // gitignored; `scratchpad/fixtures/` itself is NOT, and it has a tracked file
+  // in it today. So the out-of-scope judgement covers what a vendored copy
+  // drags in, never what somebody commits.
+  const tracked = trackedScratchpad();
+  declined.push({ rel, msg, fatal: hasStandingOver(rel) || tracked === null || tracked.has(rel) });
+}
+for (const { path: p, code } of walked.unreadable) {
+  const rel = relative(DIR, p);
+  const msg = `W2 ${rel}: could not be resolved (${code}). An entry this walk cannot classify is `
+    + 'UNMEASURABLE, and the count printed below is over the subset it managed to stat.';
+  declined.push({ rel, msg, fatal: hasStandingOver(rel) });
+}
+for (const { link, target } of walked.revisited) {
+  declined.push({ rel: relative(DIR, link), fatal: false,
+    msg: `W3 ${relative(DIR, link)}: already walked as ${target}; entered once, so its files are counted once.` });
+}
+for (const d of declined) {
+  if (!d.fatal) continue;
+  unmeasurable.push(d.msg);
+}
+console.log(`\nWALK  ${walked.files.length} file(s) under ${relative(ROOT, DIR)}/ (${mjsFiles.length} .mjs + ${shFiles.length} .sh)`
+  + ` · ${walked.escaped.length} escaping symlink(s) · ${walked.revisited.length} already-walked · ${walked.unreadable.length} unreadable`);
+for (const d of declined) console.log(`    ${d.fatal ? 'FATAL  ' : 'no standing  '}${d.msg}`);
 
 // G4 first: if the module is wrong, everything below is meaningless.
 let guardSrc = null;
@@ -571,7 +650,7 @@ if (guardSrc) {
 /** basename -> kind, filled by the .mjs pass and read by the .sh pass (S2). */
 const mjsKind = new Map();
 
-for (const path of listFiles(DIR, ['.mjs'])) {
+for (const path of mjsFiles) {
   const rel = relative(DIR, path);
   if (rel.startsWith('_o16')) continue;            // this parcel's own scaffolding
   const isGuardModule = path === GUARD_ABS;
@@ -872,8 +951,10 @@ for (const path of listFiles(DIR, ['.mjs'])) {
 // ══ THE SHELL PASS ═════════════════════════════════════════════════════════
 //
 // O23. Everything above reads `.mjs` and nothing else, so the shell scripts
-// sitting in the same directory were invisible to it — `listFiles(DIR,
-// ['.mjs'])`, one line, and a whole file class outside the gate.
+// sitting in the same directory were invisible to it — one walk asking for
+// `.mjs` and nothing else, and a whole file class outside the gate. (Both
+// extensions come out of a single contained walk now; the line that used to
+// spell this is gone, the fact it records is not.)
 //
 // ⚠ WIDENING THE FILE SET IS NOT THE SAME AS WIDENING THE CHECK, AND DOING
 // ONLY THE FIRST IS HOW YOU GET A GATE THAT SCANS MORE AND ASSERTS LESS.
@@ -928,7 +1009,7 @@ function stripShComments(src) {
 }
 
 const shRows = [];
-for (const path of listFiles(DIR, ['.sh'])) {
+for (const path of shFiles) {
   const rel = relative(DIR, path);
   // scratchpad/fixtures/ holds whole checked-out copies of OTHER repos, pinned
   // as test data. Their build scripts are not this repo's launchers and this
@@ -1397,10 +1478,9 @@ let trackedFails = fails;
 }
 
 let untrackedFails = [];
-try {
-  const tracked = new Set(
-    execFileSync('git', ['ls-files', 'scratchpad'], { encoding: 'utf8' })
-      .split('\n').filter(Boolean).map((f) => f.replace(/^scratchpad\//, '')));
+const trackedAtTheEnd = trackedScratchpad();
+if (trackedAtTheEnd) {
+  const tracked = trackedAtTheEnd;
   // `[GS]` — the shell rules use S-codes, and leaving this as `G\d+` would have
   // filed every shell failure under "tracked" by accident (the rule id would
   // stay in the key and never match a path), making an untracked .sh fatal.
@@ -1413,11 +1493,10 @@ try {
   untrackedFails = fails.filter((f) => !alwaysFatal.has(f)
     && !tracked.has(String(f).replace(/^\s*[GS]\d+ /, '').split(':')[0]));
   trackedFails = fails.filter((f) => !untrackedFails.includes(f));
-} catch (e) {
-  // Cannot ask git -> cannot split -> treat every failure as fatal. Never the
-  // other way: an unanswerable question does not become a pass.
-  unmeasurable.push(`git ls-files failed (${e.message}); every failure treated as tracked`);
 }
+// Cannot ask git -> cannot split -> treat every failure as fatal, `trackedFails`
+// keeping its `= fails` initialiser. Never the other way: an unanswerable
+// question does not become a pass. The reason is reported once, by the helper.
 
 if (untrackedFails.length) {
   console.log(`\nUNGUARDED BUT UNTRACKED (${untrackedFails.length}) — present in THIS working tree only.`);
