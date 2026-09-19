@@ -6,6 +6,7 @@ import type { SectionRasterWiring } from '../formats/effects/section-wiring';
 import type { BgOverrideState } from '../formats/bg-override/bg-override-io';
 import type { BgLibraryUnresolvedEntry } from '../formats/bg-library';
 import type { ActRegionsState } from '../formats/regions/act-regions';
+import type { RegionRuleResolution } from '../formats/regions/act-constants';
 
 export const SECTION_TILES_WIDE = 256;
 export const SECTION_TILES_HIGH = 256;
@@ -472,6 +473,27 @@ export interface Act {
    * advisories say "could not read", never "not allowed".
    */
   rasterWiring: SectionRasterWiring;
+  /**
+   * REGIONS RULE 4's CONSTANTS for this act, resolved from aeon's own files at
+   * load time, or every reason they could not be.
+   *
+   * Rule 4 is the 32 px minimum span and the reachable-edge family, and until
+   * ROADMAP row 201 the panel rendered it `unmeasurable` on every act because
+   * nothing in Aurora read the numbers. It is a CHAIN across two aeon files:
+   * the act descriptor derives `CENTRE_X_MAX = ACT_W - SCREEN_WIDTH +
+   * CAM_SCREEN_HALF_W`, and the leaves live in `engine/system/constants.emp`.
+   * See `core/formats/regions/act-constants.ts` for the whole derivation and
+   * for why `ACT_W`/`ACT_H` are seeded from this act's own grid instead.
+   *
+   * REQUIRED, on the same rule `regions` and `rasterWiring` state: an optional
+   * field reads downstream as "this act's rules are fine", which is a different
+   * claim from "nobody could read them", and those two lead a panel to opposite
+   * sentences. A hand-built act says so with `regionRulesNotRead(...)`.
+   *
+   * ⚠ READ-ONLY, AND NEVER SAVED. Aurora does not write aeon's descriptor or
+   * its engine constants; this is a view of them.
+   */
+  regionRules: RegionRuleResolution;
   /**
    * THIS ACT'S PAINTED REGIONS — `{dataPath}regions.json` — and the load's
    * verdict about the file they came from. See `ActRegionsState`, which carries

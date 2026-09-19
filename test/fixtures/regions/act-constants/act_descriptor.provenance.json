@@ -1,0 +1,29 @@
+{
+  "$what": "Provenance of act_descriptor.emp — aeon's OJZ act 1 level descriptor, vendored VERBATIM at a named aeon revision so that Aurora's rule-4 constant reader is exercised against aeon's real text and not against a hand-written sample. The five per-row `ensure` predicates inside `ojz_region(...)` are rule 4 of the regions contract, and the constants they name (REGION_MIN_SPAN, CENTRE_X_MIN/MAX, CENTRE_Y_MIN/MAX) are DERIVED here, in a chain whose leaves live in engine/system/constants.emp — vendored beside this file as engine_constants.emp at a revision that agrees.",
+  "$why_the_whole_file_and_not_the_20_lines_that_matter": "A trimmed fixture is a hand-written one, and it would certify the reader against a text no build ever sees. The whole file carries what actually makes this parsing hard: `const` inside prose comments, `if DEBUG == 1 { … } else { … }` initializers, two different widths (ACT_W and OJZ_AUTHORED_ACT_W), and names declared far from where they are used. Reading it whole is the only way a green row means the reader survives aeon's bytes.",
+  "$not_the_same_file_as": "test/fixtures/effects/raster-owners/section-mode/act_descriptor.emp, which is an older trimmed copy with no provenance sidecar, kept for the raster-owners rows. That one is NOT pinned and must not be used to answer a question about aeon's current text.",
+  "aeon": {
+    "repo": "git@github.com:Volence/aeon.git",
+    "path": "games/sonic4/data/levels/ojz/act1/act_descriptor.emp",
+    "branch_that_answers_currency": "origin/master",
+    "revision": "4518b7f5115684b9c183409b47fc440be68eb2ed",
+    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log --oneline e0317db8 -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` names 4518b7f5 as the newest. Measured 2026-09-18 with aeon origin/master = e0317db84f302d4bca2c6719a0eccef227ce7f04 (local remote-tracking ref, no fetch run), which is the revision the parcel brief named and at which every constant resolution in this lane's report was measured. The blob is the same at both, which is what makes the two spellings interchangeable here.",
+    "blob": "1fe5960ffd68783ed99416bdae4f11f342cfc7ae",
+    "last_changed_by": "4518b7f5 S2-COMPRESSED-ACT parcel 9: the clip act is FIVE sections wide, not three",
+    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> <AEON_DIR> <path> 4518b7f5 — bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
+    "revision_published": "4518b7f5 is an ancestor of aeon origin/master (e0317db8), checked with `git merge-base --is-ancestor` (exit 0); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run."
+  },
+  "fixture": {
+    "path": "test/fixtures/regions/act-constants/act_descriptor.emp",
+    "bytes": 76865,
+    "sha256": "7b7fe492f0959fca5e10fb6213d10f8ce00bcac87c8eb79bfc95f1789cd3a803",
+    "git_blob": "1fe5960ffd68783ed99416bdae4f11f342cfc7ae",
+    "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
+  },
+  "paired_with": {
+    "fixture": "test/fixtures/regions/act-constants/engine_constants.emp",
+    "why": "The chain LEAVES this file. CENTRE_X_MAX is written here as `ACT_W - SCREEN_WIDTH + CAM_SCREEN_HALF_W`, and SCREEN_WIDTH and CAM_SCREEN_HALF_W are not declared here at all: line 96 of this file is `use engine.constants.{SCREEN_WIDTH, SCREEN_HEIGHT, CAM_SCREEN_HALF_W, CAM_SCREEN_HALF_H, CAM_MAX_Y_STEP}`. A test that vendored only this half could not resolve a single one of the five rule-4 constants, so the pair is vendored together and re-vendored together.",
+    "what_a_mismatched_pair_would_certify": "Nothing. A derivation read from one aeon commit evaluated over leaves read from another is a number no build ever computed."
+  },
+  "re_vendor": "node scripts/revendor.mjs test/fixtures/regions/act-constants/act_descriptor.emp test/fixtures/regions/act-constants/act_descriptor.provenance.json <AEON_DIR> games/sonic4/data/levels/ojz/act1/act_descriptor.emp <the commit that last touched the path, from `git log origin/master -- <path>`> — then update `last_changed_by` and `revision_is` here, re-vendor engine_constants.emp at a revision that agrees, and re-run the full suite. ⚠ In zsh, brace the revision variable (`${REV}:<path>`) or the `:c` parameter modifier eats a character AND the `>` redirect has already truncated the fixture."
+}
