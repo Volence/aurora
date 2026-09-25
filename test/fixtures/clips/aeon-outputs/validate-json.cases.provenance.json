@@ -6,10 +6,21 @@
     "branch_that_answers_currency": "origin/master",
     "revision": "64ab0221c67d302529818a6aeac58ad4e0a65574",
     "revision_is": "the ONE pin of ROADMAP row 218 (REVENDOR-AEON-S2CLIP-TUNNEL, branch revendor-aeon-s2clip-0925b), named by the overseer and verified an ancestor of aeon origin/master on 2026-09-25; origin/master had moved to c29b0ac4 (a log file only; no clip tool, clip manifest or donor path differs) and was NOT chased. At the pin tools/clip_manifest.py is blob 8c658fa1 (last changed at 479b6637, S2CLIP-ADOPT-SHORT-TUNNEL: a docstring paragraph about crossing_overrides, no code) and tools/clip_act_bake.py is blob 232798dc (unchanged since row 216's capture). Previous capture: c838a30f (row 216), blobs 232798dc (bake) and 82e1bea3 (manifest).",
-    "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob and revision here (and in the sibling markers of test/fixtures/clips/aeon-outputs/)",
+    "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, or any inputs[].path's blob differs from its inputs[].blob, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob, inputs[].blob and revision here (and in the sibling markers of test/fixtures/clips/aeon-outputs/)",
     "materialised_by": "git -C <aeon> archive 64ab0221 | tar -x into a scratch directory (never ../aeon, a peer's live tree); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run with EMPYREAN_SUITE_ROOT=<suite> exported as well: without it the tools' import of suite_paths raises SuiteRootNotFound, because a /tmp copy has no suite above it.",
     "tool_path": "tools/clip_manifest.py",
-    "tool_blob": "8c658fa1ce439f60f88a5a4768e169f5c70f60ff"
+    "tool_blob": "8c658fa1ce439f60f88a5a4768e169f5c70f60ff",
+    "inputs_are": "the manifests the generator reads (the bases of its `plan`; the currency row requires every one of them here). The tool itself is tool_blob above.",
+    "inputs": [
+      {
+        "path": "games/sonic4/data/clips/s2_ehz_cpz/clips.json",
+        "blob": "c3c9beb82ca672241d8983e0a8f8ed45f2a5d853"
+      },
+      {
+        "path": "games/sonic4/data/clips/s2_two_clip/clips.json",
+        "blob": "2ff33b48aff412945e1e57777ff01cac29008403"
+      }
+    ]
   },
   "fixture": {
     "path": "test/fixtures/clips/aeon-outputs/validate-json.cases.json",
