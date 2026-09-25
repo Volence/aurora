@@ -153,6 +153,10 @@ export const FACET_CAPABILITIES = [
   // viewport, like collision and parallax; aeon-only, because `regions.json`
   // lives under an aeon act's `dataPath` and classic has no such document.
   'parallax', 'regions', 'events', 'preview',
+  // The donor-level page (S2-DONOR-PAGE): a converted donor zone and the clip act
+  // it is pasted into. It SWAPS the canvas (a donor zone is not the open act), so
+  // it is ordered after `art`; aeon-only, because the trees it reads are aeon's.
+  'donors',
 ] as const;
 export type FacetCapability = (typeof FACET_CAPABILITIES)[number];
 

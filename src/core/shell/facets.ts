@@ -62,6 +62,10 @@ const BUILTIN_FACETS: FacetDescriptor[] = [
   { id: 'palette', label: 'Palette', order: 40 },
   // The canvas swap. Last on purpose — see the rule above.
   { id: 'art', label: 'Art', order: 50 },
+  // A SECOND canvas swap, so it goes after `art` by the same rule: the donor
+  // page draws a converted donor zone and the clip act it pastes into, neither
+  // of which is the open act (S2-DONOR-PAGE).
+  { id: 'donors', label: 'Donors', order: 60 },
 ];
 
 /** Idempotent: multiple entry points (renderer boot, tests) may call it. */

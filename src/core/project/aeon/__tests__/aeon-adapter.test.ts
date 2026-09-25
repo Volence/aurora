@@ -217,7 +217,7 @@ describe('aeonAdapter.open', () => {
     // and s1's are the place that difference is visible.
     expect(handle.capabilities.facets)
       .toEqual(['layout', 'art', 'objects', 'rings', 'collision', 'palette', 'parallax',
-        'regions']);
+        'regions', 'donors']);
     // Aeon's ladder has no 16px middle tier and its chunk tier is flattened on
     // stamp, so `shared: false` (spec §2.1 / §3.0.2).
     expect(handle.capabilities.artTiers).toEqual([

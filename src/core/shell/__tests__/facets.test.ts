@@ -9,13 +9,13 @@ describe('facets', () => {
 
   // A VOCABULARY, NOT A FIXTURE — the same rule adapter-contract.test.ts states.
   // `regions` (the painted-identity lens, editor spec §3.1) joined on 2026-09-16.
-  it('registers the eight built-in facets', () => {
+  it('registers the nine built-in facets', () => {
     expect(facetRegistry.list().map((f) => f.id)).toEqual([
-      'layout', 'objects', 'parallax', 'rings', 'collision', 'regions', 'palette', 'art',
+      'layout', 'objects', 'parallax', 'rings', 'collision', 'regions', 'palette', 'art', 'donors',
     ]);
   });
 
-  it('puts the canvas-SWAPPING facet last, behind the seven that share the map', () => {
+  it('puts the canvas-SWAPPING facets last, behind the seven that share the map', () => {
     // The ordering rule, asserted rather than left to the docblock (see
     // BUILTIN_FACETS). Five facets are lenses over one map viewport and `art`
     // replaces the canvas with a composer, so `art` last is what makes a pill
@@ -37,13 +37,17 @@ describe('facets', () => {
     // before the last position shares the canvas, and the last position is the
     // swap. Written as a partition rather than a literal sequence so reordering
     // WITHIN the map group (which is free) does not fail this.
-    expect(byOrder[byOrder.length - 1]).toBe('art');
-    expect(byOrder.slice(0, -1).sort()).toEqual([...MAP_FACETS].sort());
+    // `donors` joined on 2026-09-25 as a SECOND swap (a converted donor zone and
+    // the clip act it pastes into, neither of them the open act), so the swaps
+    // are now a tail of two, `art` first because it was there first.
+    const SWAP_FACETS = ['art', 'donors'];
+    expect(byOrder.slice(-SWAP_FACETS.length)).toEqual(SWAP_FACETS);
+    expect(byOrder.slice(0, -SWAP_FACETS.length).sort()).toEqual([...MAP_FACETS].sort());
   });
 
   it('registerBuiltinFacets is idempotent (safe to call from multiple entry points)', () => {
     registerBuiltinFacets();
-    expect(facetRegistry.list()).toHaveLength(8);
+    expect(facetRegistry.list()).toHaveLength(9);
   });
 
   it('facetsFor returns only capability-granted facets, in order', () => {

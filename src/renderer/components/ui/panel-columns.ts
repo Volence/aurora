@@ -109,6 +109,11 @@ export const PANEL_COLUMNS = {
     label: 'Regions (aeon)', owner: 'components/regions/RegionsPanel.tsx',
     reach: { kind: 'aeon-facet', facet: 'regions' },
   },
+  'aeon-donors': {
+    // The call site is the PANEL, not the facet module, as with Regions.
+    label: 'Donors (aeon)', owner: 'components/donors/DonorsPanel.tsx',
+    reach: { kind: 'aeon-facet', facet: 'donors' },
+  },
   's1-layout': {
     label: 'Layout (classic)', owner: 'workspace/facets/s1-facets.tsx',
     reach: { kind: 's1-facet', facet: 'layout' },

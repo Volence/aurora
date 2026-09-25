@@ -18,7 +18,7 @@ describe('adapter contract additions (stage 3)', () => {
   it('FACET_CAPABILITIES enumerates the full declared facet vocabulary in order', () => {
     expect(FACET_CAPABILITIES).toEqual([
       'layout', 'art', 'objects', 'rings', 'collision', 'palette',
-      'parallax', 'regions', 'events', 'preview',
+      'parallax', 'regions', 'events', 'preview', 'donors',
     ]);
   });
 

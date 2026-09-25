@@ -4,8 +4,8 @@ Queue row S2-DONOR-PAGE, project REGIONS. Branch `parcel/s2-donor-page`, cut fro
 `c276f527`. Aeon read at `origin/master` **`f4f1a32e40b6377d557f4f67fd8cec9278d5df5a`**, through
 git objects only (`git -C <aeon> show origin/master:<path>`), after a fetch.
 
-The owner's words (aeon session 2026-09-17T16:00:34Z, transcribed in aeon
-`docs/DEFERRED_WORK.md` under `S2-COMPRESSED-ACT`): *"we convert the levels to our format, but
+The owner's words (aeon session 2026-09-17T16:00:34Z, transcribed in
+aeon `docs/DEFERRED_WORK.md` under `S2-COMPRESSED-ACT`): *"we convert the levels to our format, but
 then I load them on a page and can marquee parts of it, copy it over to our layout, and paste it
 in as a region or something."* First cut: level art and collision only.
 
@@ -144,7 +144,7 @@ paste (see S3).
 
 ### S3: paste
 
-- `src/core/formats/donors/clip-manifest-doc.ts`, pure: parse (region_id absent or present,
+- `clip-manifest-doc.ts` (beside the donor reader), pure: parse (region_id absent or present,
   corridors and unknown optional keys preserved), serialise (two-space JSON, one trailing
   newline), `withClip` (append), default clip id and default destination, the R12-preserving
   destination snap.
@@ -171,7 +171,7 @@ are NOT in `clipact.json` (the pool is act-wide); said on the page, booked for a
 
 ## 4. Proof beyond the node suite
 
-- **Fidelity rig** `test/live/donor-fidelity.test.ts`, opt-in (`AURORA_DONOR_FIDELITY=1`,
+- **Fidelity rig** `donor-fidelity.test.ts` (under test/live), opt-in (`AURORA_DONOR_FIDELITY=1`,
   otherwise `ctx.skip` naming the command and the path): materialise aeon at `origin/master`
   with `git archive` into a run-unique scratch dir (never the live tree; a revision rather than
   a working tree, so the result names what it measured), run the converter there, load the real
@@ -179,7 +179,7 @@ are NOT in `clipact.json` (the pool is act-wide); said on the page, booked for a
   distinct tiles, sha256 of every file); build a manifest with Aurora's writer, validate it with
   aeon's loader, bake it, and compare the baked dst words and both planes to the donor's src
   cells byte for byte. Delete the dir after.
-- **CDP harness** `scratchpad/donor-page-harness.mjs`, `npm run harness:donor-page`: open,
+- **CDP harness** `donor-page-harness.mjs` (scratchpad), `npm run harness:donor-page`: open,
   marquee and paste with real `Input.dispatch*` events on a run-unique copy with a converted
   tree; rows read the donor pane's pixels (not blank), the marquee readout, `clips.json` bytes
   from disk after the paste, and the composed dst cells from the bake's files.
