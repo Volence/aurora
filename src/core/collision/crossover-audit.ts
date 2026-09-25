@@ -28,9 +28,14 @@
 // exercised by content rather than only by fixtures.
 //
 // What is NOT shipped, stated so a later reader does not infer coverage from
-// the above: zero self-marks and zero reserved 3s. R2 being unimplemented in
-// aeon's bake therefore ships nothing wrong TODAY — it is an unguarded door,
-// not a leak. Six of the eight plane-A cells are $8000: a mark with no geometry
+// the above: zero self-marks and zero reserved 3s. (This paragraph used to add
+// "R2 being unimplemented in aeon's bake therefore ships nothing wrong TODAY".
+// That was one layer too shallow: `bake_plane_cell` has no R2, but aeon's
+// `tools/ojz_strip_gen.py` `apply_editor_collision_overlay` has refused a
+// self-mark since 8a4313b5 (2026-09-02), the same commit that taught the baker
+// R1. Re-read at aeon origin/master a0c63764, 2026-09-25, ROADMAP row 212:
+// `grep -n "SELF-MARKS ARE REFUSED HERE" tools/ojz_strip_gen.py`.)
+// Six of the eight plane-A cells are $8000: a mark with no geometry
 // at all (shape 0, SOL_NONE), which is exactly the ungated-by-solidity case
 // aeon's `bake_plane_cell` docstring describes, so that path is live content.
 //
@@ -88,6 +93,29 @@ import { CELL_SUBTILE_COLS, CELL_SUBTILE_ROWS, spanForTileCol } from './collisio
 /** How many offending indices each list keeps. A cap, because a corrupt import
  *  could name every cell and the report is meant to be read. */
 export const AUDIT_SAMPLE_CAP = 16;
+
+/**
+ * WHAT HAPPENS DOWNSTREAM TO THE RESERVED CROSSOVER VALUE 3, as `get_collision_region`'s
+ * MCP description tells an agent.
+ *
+ * ⚠ ONE FACT, WRITTEN TWICE, AND ONLY ONE COPY WAS CORRECTED. The `reserved`
+ * field's docblock below was re-pointed on 2026-09-09 when aeon 8a4313b5
+ * (2026-09-02) taught `bake_plane_cell` to raise on 3. The agent-facing copy in
+ * `src/main/editor-methods.ts` kept saying "as of 2026-08-29 the bake does not
+ * read this field, so NOTHING downstream refuses it" until ROADMAP row 212
+ * (2026-09-25), and no test read it. It is a constant now so the sentence that
+ * ships is the one `test/collision/crossover-reserved-bake-claim.test.ts`
+ * re-derives from aeon's published `tools/collision_pipeline.py`.
+ *
+ * The claim's machine-findable spelling is "aeon's bake enforces it" (or, if
+ * aeon ever drops the raise, "aeon's bake does not enforce it"); the test reads
+ * that phrase, derives the truth from aeon's source, and fails when they differ.
+ */
+export const CROSSOVER_RESERVED_BAKE_CLAUSE =
+  'rule R1 makes it a bake hard error, and aeon\'s bake enforces it: tools/collision_pipeline.py '
+  + 'bake_plane_cell raises when a cell word carries XOVER_RESERVED (read at aeon a0c63764, '
+  + '2026-09-25; `grep -n XOVER_RESERVED tools/collision_pipeline.py` at a committed aeon revision '
+  + 'is what refutes it)';
 
 /**
  * THE CROSSOVER AT ONE INDEX, OR NULL WHEN THERE IS NO CELL THERE.
@@ -291,17 +319,22 @@ export interface CrossoverAudit {
   /** Marked on exactly one plane. Legal; see the WARN tier above. */
   oneWay: number;
   /** ILLEGAL: a plane's word telling you to go to the plane you are on.
-   *  Rule R2 SPECIFIES that aeon's bake refuse these, and it STILL DOES NOT —
-   *  so this count remains the only place a self-mark is noticed anywhere.
+   *  Rule R2 SPECIFIES that aeon's bake refuse these, and aeon's LEVEL BAKE
+   *  DOES: `tools/ojz_strip_gen.py` `apply_editor_collision_overlay` raises on
+   *  a self-mark (its docstring: "RULE R2 — SELF-MARKS ARE REFUSED HERE"),
+   *  since 8a4313b5 (2026-09-02). This count is therefore the EARLIER line of
+   *  defence, with a cell coordinate, not the only one.
    *
-   *  ⚠ THE REASON CHANGED, AND IT IS NOW STRUCTURAL RATHER THAN UNFINISHED.
-   *  The 2026-08-29 reason ("`bake_plane_cell` never reads bits 15:14 at all")
-   *  is DEAD — see `reserved` below; it reads them now. R2 is unimplemented
-   *  because `bake_plane_cell(cell_word, profiles, angles, attrset)` takes NO
+   *  ⚠ CORRECTED 2026-09-25 (ROADMAP row 212). This docblock said "it STILL
+   *  DOES NOT — so this count remains the only place a self-mark is noticed
+   *  anywhere", re-checked against aeon bdbf9f5d on 2026-09-09. That check read
+   *  `bake_plane_cell` alone, which is still true of it: the function takes NO
    *  PLANE PARAMETER, so it cannot ask whether a mark points at the plane it is
-   *  baking. A self-mark is not a property of the word; it is a property of the
-   *  word AND the plane, and only one of those is in scope there. Re-checked
-   *  against aeon `origin/master` bdbf9f5d, 2026-09-09. */
+   *  baking. R2 lives one layer up, in the overlay that knows which file a word
+   *  came from, which is also what the `readCrossover` note further down this
+   *  file already said. Re-read at aeon origin/master a0c63764; the command
+   *  that refutes it is `grep -n "SELF-MARKS ARE REFUSED HERE"
+   *  tools/ojz_strip_gen.py` at a committed revision. */
   selfMarks: number;
   /** ILLEGAL: a cell holding the reserved value 3. Rule R1 SPECIFIES a bake
    *  hard error, and ⚠ AS OF AEON 8a4313b5 (2026-09-02) IT NOW RAISES ONE —

@@ -33,6 +33,7 @@ import { BG_WIDTH } from '../core/formats/bg-tiles';
 // that moved the constant.
 import { FG_TILE_LIMIT, FG_PAGE_TILES, FG_PAGE_FRAMES } from '../core/export/vram-coloring';
 import { BG_SECTION_BINDING_LIMIT } from '../core/formats/bg-binding';
+import { CROSSOVER_RESERVED_BAKE_CLAUSE } from '../core/collision/crossover-audit';
 import { RASTER_SECTION_BINDING_LIMIT } from '../core/formats/raster-binding';
 // The layer bound an agent is TOLD about, read from the same vendored schema
 // the validator enforces. It was the literal `1..8` until empyrean `277bc15`
@@ -282,8 +283,9 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + '{word:null, mixed:true, sub:[tl,tr,bl,br]} with NO shape/flip/solidity, never by sampling one of the '
       + 'four, and "mixedCells" counts them (a null in "words" is what paint_collision skips). "word" is all '
       + '16 raw bits, including bits 15:14, the LOOP CROSSOVER, reported by name as "crossover" per cell '
-      + '("none" / "to-a" / "to-b", or "reserved" for the illegal value 3 (rule R1 specifies a bake hard error; as of 2026-08-29 the bake does not read this field, so NOTHING downstream refuses it), '
-      + 'which is reported rather than normalised away). "crossoverCells" counts the cells carrying one and '
+      + '("none" / "to-a" / "to-b", or "reserved" for the illegal value 3 ('
+      + CROSSOVER_RESERVED_BAKE_CLAUSE
+      + '), which is reported rather than normalised away). "crossoverCells" counts the cells carrying one and '
       + '"cellsWithUnownedBits" counts the cells with any bit outside the four picture fields: the same '
       + 'bits, counted from the encoder\'s own mask rather than from the crossover\'s. '
       + '⚠ A CROSSOVER DOES NOT TRAVEL IN "words": paint_collision masks those bits off and keeps the '
