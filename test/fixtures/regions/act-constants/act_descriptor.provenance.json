@@ -6,18 +6,19 @@
     "repo": "git@github.com:Volence/aeon.git",
     "path": "games/sonic4/data/levels/ojz/act1/act_descriptor.emp",
     "branch_that_answers_currency": "origin/master",
-    "revision": "4518b7f5115684b9c183409b47fc440be68eb2ed",
-    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log --oneline e0317db8 -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` names 4518b7f5 as the newest. Measured 2026-09-18 with aeon origin/master = e0317db84f302d4bca2c6719a0eccef227ce7f04 (local remote-tracking ref, no fetch run), which is the revision the parcel brief named and at which every constant resolution in this lane's report was measured. The blob is the same at both, which is what makes the two spellings interchangeable here.",
-    "blob": "1fe5960ffd68783ed99416bdae4f11f342cfc7ae",
-    "last_changed_by": "4518b7f5 S2-COMPRESSED-ACT parcel 9: the clip act is FIVE sections wide, not three",
-    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> <AEON_DIR> <path> 4518b7f5 — bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
-    "revision_published": "4518b7f5 is an ancestor of aeon origin/master (e0317db8), checked with `git merge-base --is-ancestor` (exit 0); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run."
+    "revision": "4802c664a479f0eb3589eb99eb83694119bff5f6",
+    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log -1 origin/master -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` names 4802c664 (a single-parent commit, checked with `rev-list --parents`). Measured 2026-09-25 by the aurora overseer after a fetch, with aeon origin/master = 40c891f57128d18e977fe2131be7d813656acda8.",
+    "blob": "cbf001fb57ccbf5c996fe64a31643e1a2beba888",
+    "last_changed_by": "4802c664 S2 row 7: the clip act's bytes move to entity_data.emp; effects_gen's drift gate was right (the series from 58ee5dbf: a clip act owns its region table)",
+    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> ../aeon <path> 4802c664a479f0eb3589eb99eb83694119bff5f6 — bytes from `git show <rev>:<path>`, re-hashed on this side and compared to aeon's blob before the sidecar was written. Never the sibling working tree.",
+    "revision_published": "4802c664 is reachable from aeon origin/master (40c891f57128d18e977fe2131be7d813656acda8); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run.",
+    "what_changed_at_this_pin": "`act_regions` now binds through `ojz_clip_act_regions(hand: OJZ_Act1_Regions)` and `act_region_count` through a new `OJZ_ACT_REGION_COUNT` (an `if OJZ_CLIP_ACT == 1` initializer); a new `use games.sonic4.ojz_clip_act_act1.{...}` import and a clip-act table walk were appended. None of the five rule-4 constants (REGION_MIN_SPAN, CENTRE_X_MIN/MAX, CENTRE_Y_MIN/MAX) or their derivations changed in this diff. engine_constants.emp's pin 7d4d0ce6 is still the last commit touching engine/system/constants.emp, so the pair agrees."
   },
   "fixture": {
     "path": "test/fixtures/regions/act-constants/act_descriptor.emp",
-    "bytes": 76865,
-    "sha256": "7b7fe492f0959fca5e10fb6213d10f8ce00bcac87c8eb79bfc95f1789cd3a803",
-    "git_blob": "1fe5960ffd68783ed99416bdae4f11f342cfc7ae",
+    "bytes": 80546,
+    "sha256": "d786cb2c6e9927212fb7091296745448714f7ea2c1dde6f0ac7b257fe3f3eb94",
+    "git_blob": "cbf001fb57ccbf5c996fe64a31643e1a2beba888",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
   },
   "paired_with": {
