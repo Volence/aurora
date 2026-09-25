@@ -206,7 +206,10 @@ to 10:03:57Z), exit 0. Every pre-gate passed, including `check-cited-paths OK` a
 0 unmeasurable` (the same G9 probe row 209 reported). Vitest reported
 **Test Files 660 passed | 3 skipped (663); Tests 10355 passed | 9 skipped (10364)**. The skip-report
 line was "OK. Every skip named its reason", and failure-class reported no failures across 663
-modules. Log: `docs/captures/2026-09-25-art-options-bar-height/logs/npmtest1.log`.
+modules. Log: `docs/captures/2026-09-25-art-options-bar-height/logs/npmtest1.log`. Run again at
+`c25ee5fe` (this packet, the logs and the ROADMAP row committed, so the docs gates judged them),
+10:06:29Z to 10:07:48Z, exit 0, `check-doc-citations: OK`, the same totals:
+`docs/captures/2026-09-25-art-options-bar-height/logs/npmtest2.log`.
 
 ## 7. Calls I made, and where the brief and the tree differed
 
