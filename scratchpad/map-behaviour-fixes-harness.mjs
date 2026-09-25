@@ -39,6 +39,19 @@
 //            and 4 must still carry the pressed word. ABW.b, ABW.c, ABW.d
 //            are controls; ABW.a is the discriminating row. See
 //            docs/reviews/2026-09-25-art-brush-word-latch.md.
+//   abl ABL.* ART-BRUSH-LATCH-REST (hub ruling, empyrean OVERSEER-LOG
+//            2026-09-25T07:43:58Z: "a stroke's inputs latch when it
+//            starts"): the Art facet's TILE STAMP keeps the flips it was
+//            pressed with. A chunk is opened in the composer by a real
+//            double-click (as PART abw), the Tile stamp tool is armed by a
+//            real click, a real X arms the H flip, a stroke is pressed on the
+//            composer canvas and HELD across tiles 1 and 2, a real Y key
+//            toggles the stamp's pending V flip (ComposerCanvas's window
+//            keydown), and tiles 3 and 4 must still carry the flips of the
+//            press. ABL.b and ABL.c are controls; ABL.a is the discriminating
+//            row; ABL.d (the NEXT press carries the toggled flip) is what
+//            shows the Y key fired at all.
+//            See docs/reviews/2026-09-25-art-brush-latch-rest.md.
 //   m6  M6.*  a real stamp press under a still pointer names the placement it
 //            made, in the store and in the Chunk links readout, with no move.
 //
@@ -106,7 +119,7 @@ assertDebugBuild(RUN);
 const ELECTRON = RUN.electron;
 const MAIN = RUN.main;
 const PORT = Number(process.env.PORT ?? 9433);
-const ALL_PARTS = ['m1', 'm2', 'm4', 'bw', 'abw', 'm6'];
+const ALL_PARTS = ['m1', 'm2', 'm4', 'bw', 'abw', 'abl', 'm6'];
 const PARTS = (process.env.PART ?? 'all') === 'all' ? ALL_PARTS : String(process.env.PART).split(',');
 for (const p of PARTS) if (!ALL_PARTS.includes(p)) throw new Error(`PART ${p} is not one of ${ALL_PARTS.join(', ')}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -387,7 +400,7 @@ async function main() {
     await setup(d, A);
     const st0 = await d.strays();
     if (st0.length) check('SETUP.STRAY', 'no mouse event reached the page at a position this harness never sent', 'UNMEASURABLE', J(st0.slice(0, 10)));
-    const parts = { m1: m1Part, m2: m2Part, m4: m4Part, bw: bwPart, abw: abwPart, m6: m6Part };
+    const parts = { m1: m1Part, m2: m2Part, m4: m4Part, bw: bwPart, abw: abwPart, abl: ablPart, m6: m6Part };
     for (const p of ALL_PARTS) {
       if (!PARTS.includes(p)) continue;
       console.log(`\n════════ PART ${p} ════════`);
@@ -943,9 +956,11 @@ async function bwPart(d, O) {
 const COMPOSER_CANVAS = String.raw`([...document.querySelectorAll('canvas')].find((k) =>
   k.parentElement && k.parentElement.style.margin === 'auto'
   && k.parentElement.style.padding === '24px' && k.offsetParent !== null) || null)`;
-async function abwPart(d, O) {
+/** The composer's document for PARTs abw and abl. Returns
+ *  `{ hitOk, chunk, gridCells }`: hitOk means the chunk the real double-click
+ *  aimed at is the one now open in the Art facet. */
+async function openArtChunk(d) {
   const { c } = d;
-  await neutral(d);
   // The document: a chunk with art, at least 8 tiles wide (four 16px cells in a
   // row), opened by a REAL double-click on its Chunks grid thumbnail
   // (ChunkGrid's onDoubleClick -> chunk-grid-aeon `openChunkInComposer`, which
@@ -977,7 +992,13 @@ async function abwPart(d, O) {
     await dbl(X.aim.x, X.aim.y);
     await sleep(1200);
   }
-  const facet = { hitOk: (await c.json('window.__dbg.aeon.artChunkOpen()'))?.chunkId === X?.id && !!X, chunk: X, gridCells: nCells };
+  return { hitOk: (await c.json('window.__dbg.aeon.artChunkOpen()'))?.chunkId === X?.id && !!X, chunk: X, gridCells: nCells };
+}
+
+async function abwPart(d, O) {
+  const { c } = d;
+  await neutral(d);
+  const facet = await openArtChunk(d);
   const tool = await d.realClick('document.querySelector(\'button[aria-label="Collision paint"]\')');
   await sleep(600);
   const doc = await c.json('window.__dbg.aeon.artChunkOpen()');
@@ -1087,6 +1108,182 @@ async function abwPart(d, O) {
   await sleep(300);
   const w5 = await words();
   note('ABW.cleanup', `after the control's Ctrl+Z the four cells ${same(w5, w0) ? 'match' : 'DIFFER FROM'} the start`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PART abl. ART-BRUSH-LATCH-REST: the Art facet's TILE STAMP keeps the inputs
+// it was pressed with. Driven here: the flips, the stamp inputs a real key
+// changes with the stroke held (ComposerCanvas's window keydown toggles
+// `flipRef` whenever the art tool is the tile stamp and focus is not a text
+// field; a composer press leaves focus on <body>, PART abw's O4). The Y flip is
+// the one changed mid-stroke; the X flip is armed BEFORE the press so that a
+// stamped cell differs from the chunk's own (the premise requires the five
+// tiles to hold no flip before). The other inputs (tile, line, priority,
+// palette-apply line, the collision plane) are node rows:
+// composer-brush-latch-rest-mounted.test.ts, which also covers X and Y.
+// Expected cells come from source: `stampTile` (core/art/composer-buffer.ts)
+// writes `atlasTile: spec.tile`, `hf: spec.hf`, `vf: spec.vf`; the spec's tile
+// is the armed `brushTile` (read with `artChunkOpen`, which writes nothing),
+// and the flips start `{ hf: false, vf: false }` because ComposerCanvas resets
+// `flipRef` to that whenever the open document changes, and this part opens a
+// fresh one: after its one X, the press-time flips are hf true, vf false.
+// ═══════════════════════════════════════════════════════════════════════════
+async function ablPart(d, O) {
+  const { c } = d;
+  await neutral(d);
+  // A chunk already open in the composer (PART abw leaves its document open and
+  // DIRTY: final1 found that a double-click on a chunk then asks whether to
+  // discard it, and the facet never switched) is reached by a real click on the
+  // Art facet instead. Otherwise the real double-click of PART abw opens one.
+  const already = await c.json('window.__dbg.aeon.artChunkOpen()');
+  let facet;
+  if (already && already.chunkId !== null) {
+    const art = await d.realClick(d.FACET('Art'));
+    await sleep(800);
+    facet = { hitOk: !!art?.hitOk && (await c.json('window.__dbg.aeon.artChunkOpen()'))?.chunkId === already.chunkId, route: 'Art facet click, document already open', already, art };
+  } else {
+    facet = { ...(await openArtChunk(d)), route: 'double-click on the Chunks grid' };
+  }
+  const tool = await d.realClick('document.querySelector(\'button[aria-label="Tile stamp"]\')');
+  await sleep(600);
+  const doc = await c.json('window.__dbg.aeon.artChunkOpen()');
+  const measure = () => c.json(String.raw`(() => { const cv = ${COMPOSER_CANVAS}; if (!cv) return null; const b = cv.getBoundingClientRect();
+    return { x: b.left, y: b.top, w: b.width, h: b.height, cw: cv.width, ch: cv.height, dpr: window.devicePixelRatio }; })()`);
+  let G = await measure();
+  const setupOk = !!facet?.hitOk && !!tool?.hitOk && !!doc && doc.chunkId !== null && doc.tool === 'tile-stamp' && !!G;
+  const zoom = G && doc ? G.cw / (doc.widthTiles * 8) : null;
+  const T = doc ? doc.brushTile : null;
+  /** What `stampTile` writes into a cell, in the three fields read. */
+  const stamped = (hf, vf) => ({ t: T, hf, vf });
+  const pickOne = (q) => (q ? { t: q.atlasTile, hf: q.hf, vf: q.vf } : null);
+  const pick = (cs) => cs.map(pickOne);
+  /** Integer aim at the centre of composer TILE (tx, ty), the tile derived back
+   *  from that integer, and whether the point is on the composer canvas. */
+  const aimTile = async (tx, ty) => {
+    const x = Math.round(G.x + (tx * 8 + 4) * zoom); const y = Math.round(G.y + (ty * 8 + 4) * zoom);
+    const back = { tx: Math.floor((x - G.x) / zoom / 8), ty: Math.floor((y - G.y) / zoom / 8) };
+    const on = await c.evalExpr(`document.elementFromPoint(${x}, ${y}) === ${COMPOSER_CANVAS}`);
+    return { x, y, back, on };
+  };
+  const cellAt = (tx, ty) => c.json(`window.__dbg.aeon.artDocCellAt(${tx}, ${ty})`);
+  // WARM-UP. The first write to a clean chunk document adds "unsaved" to the
+  // Art status bar above the canvas, which moved the canvas 42px down under a
+  // held stroke in dev runs 1 to 3 (booked in the packet). So one real click
+  // stamps a tile of the LOWEST row on screen first (one that the stamp
+  // changes, so the document really goes dirty), the canvas is measured again,
+  // and the stroke is aimed afterwards, off that row. The warm-up is its own
+  // undo step, taken back at the end.
+  let warm = null;
+  if (setupOk && Number.isInteger(zoom) && zoom >= 1 && doc.heightTiles >= 2) {
+    for (let wy = doc.heightTiles - 1; wy >= 1 && !warm; wy--) for (let wx = 0; wx < doc.widthTiles && !warm; wx++) {
+      const before = pickOne(await cellAt(wx, wy));
+      if (same(before, stamped(false, false))) continue;
+      const p = await aimTile(wx, wy);
+      if (!p.on || p.back.tx !== wx || p.back.ty !== wy) continue;
+      await d.clickAt(p);
+      warm = { tx: wx, ty: wy, aim: p, before, after: pickOne(await cellAt(wx, wy)) };
+    }
+    await sleep(300);
+    G = await measure();
+  }
+  const dirtyAfterWarm = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.dirty;
+  let tiles = null; let aims = null; let c0 = null;
+  if (setupOk && warm && dirtyAfterWarm && Number.isInteger(zoom) && zoom >= 1 && doc.widthTiles >= 5) {
+    // Five tiles in a row, off the warm-up row, each aimed back to itself, where
+    // the stamp visibly changes tiles 1, 2 (to the press-time flips) and 5 (to
+    // the flips after the Y key): so a stamped tile is told apart from an
+    // untouched one.
+    for (let ty = 0; ty < doc.heightTiles && !tiles; ty++) {
+      if (ty === warm.ty) continue;
+      for (let tx = 0; tx + 5 <= doc.widthTiles && !tiles; tx++) {
+        const pre = [];
+        for (let k = 0; k < 5; k++) pre.push(pickOne(await cellAt(tx + k, ty)));
+        if (same(pre[0], stamped(true, false)) || same(pre[1], stamped(true, false)) || same(pre[4], stamped(true, true))) continue;
+        const a = [];
+        for (let k = 0; k < 5; k++) a.push(await aimTile(tx + k, ty));
+        if (a.every((p, k) => p.on && p.back.tx === tx + k && p.back.ty === ty)) { tiles = [0, 1, 2, 3, 4].map((k) => ({ tx: tx + k, ty })); aims = a; }
+      }
+    }
+  }
+  if (!tiles) {
+    check('ABL.0', 'PREMISE: the Art facet and the Tile stamp tool armed by real clicks on a chunk document, a warm-up stamp that made it dirty, and five tiles in a row on the composer canvas, each aimed at an integer client pixel on that tile', 'UNMEASURABLE',
+      `facet ${J(facet)}; tool ${J(tool)}; doc ${J(doc)}; canvas ${J(G)} zoom ${zoom}; warm-up ${J(warm)} dirty ${dirtyAfterWarm}`);
+    return;
+  }
+  const cells = () => c.json(String.raw`(() => { const a = window.__dbg.aeon; return ${J(tiles)}.map((t) => a.artDocCellAt(t.tx, t.ty)); })()`);
+  const rect = () => c.json(String.raw`(() => { const cv = ${COMPOSER_CANVAS}; if (!cv) return null; const b = cv.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; })()`);
+  const sameRect = (r) => !!r && Math.abs(r.x - G.x) < 0.01 && Math.abs(r.y - G.y) < 0.01 && Math.abs(r.w - G.w) < 0.01 && Math.abs(r.h - G.h) < 0.01;
+  c0 = await cells();
+  // Before the stroke: a real X turns the stamp's H flip ON (focus on <body>,
+  // not a text field), so the stroke's cells carry flips the warm-up's do not.
+  await d.blur();
+  await d.clicksDrain();
+  const fPre = await d.active();
+  await d.chord('x');
+  const preClicks = await d.clicksDrain();
+  const Gpre = await rect();
+  // The stroke: tiles 1..4 (tile 5 is left for the next press).
+  await d.mouse('mouseMoved', aims[0].x, aims[0].y);
+  await d.mouse('mousePressed', aims[0].x, aims[0].y, 'left', 1); await sleep(80);
+  await d.mouse('mouseMoved', aims[1].x, aims[1].y, 'left', 1); await sleep(150);
+  const c1 = await cells();
+  const Gpress = await rect();
+  const fHeld = await d.active();
+  await d.chord('y');   // the stamp's Y flip, with the stroke held
+  const keyClicks = await d.clicksDrain();
+  const G1 = await rect();
+  const unmoved = sameRect(Gpre) && sameRect(Gpress) && sameRect(G1);
+  const toolAfter = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.tool;
+  const premise = unmoved && !!fPre && fPre.isBody && preClicks.length === 0 && !!fHeld && fHeld.isBody && keyClicks.length === 0
+    && toolAfter === 'tile-stamp' && same(pick(c1).slice(0, 2), [stamped(true, false), stamped(true, false)]);
+  check('ABL.0', 'PREMISE: on the composer\'s chunk document with the Tile stamp armed, a warm-up stamp made it dirty (so the status bar above the canvas no longer grows under the stroke); a real X before the stroke armed H; the stroke is HELD (tiles 1 and 2 stamped with the armed tile, hf true, vf false: the flips at the press); focus is on <body> both times (not a text field, so the composer\'s X/Y handler runs); a real Y was sent and clicked nothing; the tool is still the stamp; the canvas did not move',
+    premise, `dpr ${G.dpr}; document reached by ${facet.route}; canvas ${J(G)} zoom ${zoom}; warm-up ${J(warm)} dirty ${dirtyAfterWarm}; before X ${J(Gpre)}, after the press ${J(Gpress)}, after Y ${J(G1)}; doc ${J(doc)}; tiles ${J(tiles)}; aims ${J(aims)}; `
+    + `focus before X ${J(fPre)}, while held ${J(fHeld)}; clicks by X ${J(preClicks)}, by Y ${J(keyClicks)}; tool after ${toolAfter}; brushTile ${T}; `
+    + `tiles 1..5 before ${J(pick(c0))}; tiles 1,2 after the press ${J(pick(c1).slice(0, 2))}`);
+  await d.mouse('mouseMoved', aims[2].x, aims[2].y, 'left', 1); await sleep(150);
+  await d.mouse('mouseMoved', aims[3].x, aims[3].y, 'left', 1); await sleep(150);
+  await d.mouse('mouseReleased', aims[3].x, aims[3].y, 'left', 0); await sleep(400);
+  const c2 = await cells();
+  const pressFlips = [stamped(true, false), stamped(true, false), stamped(true, false), stamped(true, false)];
+  if (premise) {
+    check('ABL.a', 'the Y flip toggled MID-DRAG does not change the composer stroke: tiles 3 and 4, stamped AFTER the Y key, carry the flips LATCHED at the press (hf true, vf false) like tiles 1 and 2',
+      same(pick(c2).slice(0, 4), pressFlips),
+      `tiles 1..4 ${J(pick(c2).slice(0, 4))}; the press-time flips stamp ${J(stamped(true, false))}; the live flips would stamp ${J(stamped(true, true))}`);
+    check('ABL.b', 'CONTROL (green with or without the latch): tiles 1 and 2, stamped BEFORE the Y key, carry the press-time flips, and tile 5, never entered, is unchanged',
+      same(pick(c2).slice(0, 2), pressFlips.slice(0, 2)) && same(c2[4], c0[4]),
+      `tiles 1,2 ${J(pick(c2).slice(0, 2))}; tile 5 ${J(c2[4])}, before ${J(c0[4])}`);
+  }
+  await d.blur();
+  await d.chord('z', CTRL);
+  await sleep(300);
+  const c3 = await cells();
+  if (premise) {
+    check('ABL.c', 'CONTROL: the stroke is ONE undo step: one Ctrl+Z puts the five tiles back exactly',
+      same(c3, c0), `after one Ctrl+Z ${J(c3)}; before ${J(c0)}`);
+  }
+  await d.mouse('mouseMoved', aims[4].x, aims[4].y);
+  await d.mouse('mousePressed', aims[4].x, aims[4].y, 'left', 1); await sleep(80);
+  await d.mouse('mouseReleased', aims[4].x, aims[4].y, 'left', 0); await sleep(400);
+  const c4 = await cells();
+  if (premise) {
+    check('ABL.d', 'CONTROL, and the proof the Y key fired: the NEXT press takes the flips as they stand after the last stroke: a click on tile 5 stamps it hf true, vf true, and tiles 1 to 4 stay as they were',
+      same(pick(c4)[4], stamped(true, true)) && same(c4.slice(0, 4), c0.slice(0, 4)),
+      `tile 5 ${J(c4[4])}; the toggled flips stamp ${J(stamped(true, true))}; tiles 1..4 ${J(pick(c4).slice(0, 4))}, before ${J(pick(c0).slice(0, 4))}`);
+  }
+  await d.blur();
+  await d.chord('z', CTRL);
+  await sleep(300);
+  await d.chord('z', CTRL);
+  await sleep(300);
+  const c5 = await cells();
+  const w5 = pickOne(await cellAt(warm.tx, warm.ty));
+  note('ABL.cleanup', `after the control's Ctrl+Z and the warm-up's, the five tiles ${same(c5, c0) ? 'match' : 'DIFFER FROM'} the start, and the warm-up tile ${same(w5, warm.before) ? 'matches' : 'DIFFERS FROM'} its start`);
+  // Leave the composer as PART abw leaves it for m6: both flips back off (real
+  // X and Y keys) and the Collision paint tool armed (a real click).
+  await d.chord('x');
+  await d.chord('y');
+  await d.realClick('document.querySelector(\'button[aria-label="Collision paint"]\')');
+  await sleep(300);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

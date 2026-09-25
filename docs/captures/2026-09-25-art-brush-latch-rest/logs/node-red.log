@@ -1,0 +1,455 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a98503da5364e6ca4
+
+ ❯ src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts (8 tests | 8 failed) 197ms
+     × ART-BRUSH-LATCH-REST: 'the stamp tile (a tileset pick, setBr…' changed mid-drag leaves the stroke on the pressed value, and the next press takes it 153ms
+     × ART-BRUSH-LATCH-REST: 'the stamp palette line (setPaletteLin…' changed mid-drag leaves the stroke on the pressed value, and the next press takes it 6ms
+     × ART-BRUSH-LATCH-REST: 'the stamp priority (setStampPriority)' changed mid-drag leaves the stroke on the pressed value, and the next press takes it 11ms
+     × ART-BRUSH-LATCH-REST: 'the stamp X flip (the X key)' changed mid-drag leaves the stroke on the pressed value, and the next press takes it 6ms
+     × ART-BRUSH-LATCH-REST: 'the stamp Y flip (the Y key)' changed mid-drag leaves the stroke on the pressed value, and the next press takes it 6ms
+     × ART-BRUSH-LATCH-REST: 'the palette-apply line (setPaletteLin…' changed mid-drag leaves the stroke on the pressed value, and the next press takes it 6ms
+     × ART-BRUSH-LATCH-REST: Plane B picked mid-drag leaves the stroke on plane A, and the next press paints B 3ms
+     × ART-BRUSH-LATCH-REST: a tile-stamp stroke switched to collision mid-drag paints the word selected at ITS press, not an earlier collision stroke's 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts > ART-BRUSH-LATCH-REST: the composer's tile-stamp and palette-apply inputs are latched at the press (O2) > ART-BRUSH-LATCH-REST: 'the stamp tile (a tileset pick, setBr…' changed mid-drag leaves the stroke on the pressed value, and the next press takes it
+AssertionError: the stamp tile (a tileset pick, setBrushTile) changed mid-drag changed the rest of the stroke: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal [ { atlasTile: 1, …(5) }, …(7) ]
+
+- Expected
++ Received
+
+@@ -6,35 +6,35 @@
+      "pal": 1,
+      "pri": true,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 2,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+      "pri": true,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 2,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+      "pri": true,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 2,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+      "pri": true,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 2,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+      "pri": true,
+      "vf": false,
+
+ ❯ src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts:217:8
+    215|     host().move(at(4), EV);
+    216|     expect(row0(doc), `${name} changed mid-drag changed the rest of th…
+    217|       .toEqual([...pressed.slice(0, 5), ...untouched.slice(5)]);
+       |        ^
+    218|     host().up(null, EV);
+    219|     host().down(at(6), EV);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts > ART-BRUSH-LATCH-REST: the composer's tile-stamp and palette-apply inputs are latched at the press (O2) > ART-BRUSH-LATCH-REST: 'the stamp palette line (setPaletteLin…' changed mid-drag leaves the stroke on the pressed value, and the next press takes it
+AssertionError: the stamp palette line (setPaletteLine) changed mid-drag changed the rest of the stroke: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal [ { atlasTile: 1, …(5) }, …(7) ]
+
+- Expected
++ Received
+
+@@ -9,35 +9,35 @@
+    },
+    {
+      "atlasTile": 1,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
++     "pal": 2,
+      "pri": true,
+      "vf": false,
+    },
+    {
+      "atlasTile": 1,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
++     "pal": 2,
+      "pri": true,
+      "vf": false,
+    },
+    {
+      "atlasTile": 1,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
++     "pal": 2,
+      "pri": true,
+      "vf": false,
+    },
+    {
+      "atlasTile": 1,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
++     "pal": 2,
+      "pri": true,
+      "vf": false,
+    },
+    {
+      "atlasTile": 7,
+
+ ❯ src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts:217:8
+    215|     host().move(at(4), EV);
+    216|     expect(row0(doc), `${name} changed mid-drag changed the rest of th…
+    217|       .toEqual([...pressed.slice(0, 5), ...untouched.slice(5)]);
+       |        ^
+    218|     host().up(null, EV);
+    219|     host().down(at(6), EV);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts > ART-BRUSH-LATCH-REST: the composer's tile-stamp and palette-apply inputs are latched at the press (O2) > ART-BRUSH-LATCH-REST: 'the stamp priority (setStampPriority)' changed mid-drag leaves the stroke on the pressed value, and the next press takes it
+AssertionError: the stamp priority (setStampPriority) changed mid-drag changed the rest of the stroke: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal [ { atlasTile: 1, …(5) }, …(7) ]
+
+- Expected
++ Received
+
+@@ -10,35 +10,35 @@
+    {
+      "atlasTile": 1,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+-     "pri": true,
++     "pri": false,
+      "vf": false,
+    },
+    {
+      "atlasTile": 1,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+-     "pri": true,
++     "pri": false,
+      "vf": false,
+    },
+    {
+      "atlasTile": 1,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+-     "pri": true,
++     "pri": false,
+      "vf": false,
+    },
+    {
+      "atlasTile": 1,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+-     "pri": true,
++     "pri": false,
+      "vf": false,
+    },
+    {
+      "atlasTile": 7,
+      "hf": false,
+
+ ❯ src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts:217:8
+    215|     host().move(at(4), EV);
+    216|     expect(row0(doc), `${name} changed mid-drag changed the rest of th…
+    217|       .toEqual([...pressed.slice(0, 5), ...untouched.slice(5)]);
+       |        ^
+    218|     host().up(null, EV);
+    219|     host().down(at(6), EV);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts > ART-BRUSH-LATCH-REST: the composer's tile-stamp and palette-apply inputs are latched at the press (O2) > ART-BRUSH-LATCH-REST: 'the stamp X flip (the X key)' changed mid-drag leaves the stroke on the pressed value, and the next press takes it
+AssertionError: the stamp X flip (the X key) changed mid-drag changed the rest of the stroke: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal [ { atlasTile: 1, …(5) }, …(7) ]
+
+- Expected
++ Received
+
+@@ -7,35 +7,35 @@
+      "pri": true,
+      "vf": false,
+    },
+    {
+      "atlasTile": 1,
+-     "hf": false,
++     "hf": true,
+      "localId": null,
+      "pal": 1,
+      "pri": true,
+      "vf": false,
+    },
+    {
+      "atlasTile": 1,
+-     "hf": false,
++     "hf": true,
+      "localId": null,
+      "pal": 1,
+      "pri": true,
+      "vf": false,
+    },
+    {
+      "atlasTile": 1,
+-     "hf": false,
++     "hf": true,
+      "localId": null,
+      "pal": 1,
+      "pri": true,
+      "vf": false,
+    },
+    {
+      "atlasTile": 1,
+-     "hf": false,
++     "hf": true,
+      "localId": null,
+      "pal": 1,
+      "pri": true,
+      "vf": false,
+    },
+
+ ❯ src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts:217:8
+    215|     host().move(at(4), EV);
+    216|     expect(row0(doc), `${name} changed mid-drag changed the rest of th…
+    217|       .toEqual([...pressed.slice(0, 5), ...untouched.slice(5)]);
+       |        ^
+    218|     host().up(null, EV);
+    219|     host().down(at(6), EV);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts > ART-BRUSH-LATCH-REST: the composer's tile-stamp and palette-apply inputs are latched at the press (O2) > ART-BRUSH-LATCH-REST: 'the stamp Y flip (the Y key)' changed mid-drag leaves the stroke on the pressed value, and the next press takes it
+AssertionError: the stamp Y flip (the Y key) changed mid-drag changed the rest of the stroke: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal [ { atlasTile: 1, …(5) }, …(7) ]
+
+- Expected
++ Received
+
+@@ -11,35 +11,35 @@
+      "atlasTile": 1,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+      "pri": true,
+-     "vf": false,
++     "vf": true,
+    },
+    {
+      "atlasTile": 1,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+      "pri": true,
+-     "vf": false,
++     "vf": true,
+    },
+    {
+      "atlasTile": 1,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+      "pri": true,
+-     "vf": false,
++     "vf": true,
+    },
+    {
+      "atlasTile": 1,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+      "pri": true,
+-     "vf": false,
++     "vf": true,
+    },
+    {
+      "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+
+ ❯ src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts:217:8
+    215|     host().move(at(4), EV);
+    216|     expect(row0(doc), `${name} changed mid-drag changed the rest of th…
+    217|       .toEqual([...pressed.slice(0, 5), ...untouched.slice(5)]);
+       |        ^
+    218|     host().up(null, EV);
+    219|     host().down(at(6), EV);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts > ART-BRUSH-LATCH-REST: the composer's tile-stamp and palette-apply inputs are latched at the press (O2) > ART-BRUSH-LATCH-REST: 'the palette-apply line (setPaletteLin…' changed mid-drag leaves the stroke on the pressed value, and the next press takes it
+AssertionError: the palette-apply line (setPaletteLine) changed mid-drag changed the rest of the stroke: expected [ { atlasTile: 7, …(5) }, …(7) ] to deeply equal [ { atlasTile: 7, …(5) }, …(7) ]
+
+- Expected
++ Received
+
+@@ -9,35 +9,35 @@
+    },
+    {
+      "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
++     "pal": 2,
+      "pri": false,
+      "vf": false,
+    },
+    {
+      "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
++     "pal": 2,
+      "pri": false,
+      "vf": false,
+    },
+    {
+      "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
++     "pal": 2,
+      "pri": false,
+      "vf": false,
+    },
+    {
+      "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
++     "pal": 2,
+      "pri": false,
+      "vf": false,
+    },
+    {
+      "atlasTile": 7,
+
+ ❯ src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts:217:8
+    215|     host().move(at(4), EV);
+    216|     expect(row0(doc), `${name} changed mid-drag changed the rest of th…
+    217|       .toEqual([...pressed.slice(0, 5), ...untouched.slice(5)]);
+       |        ^
+    218|     host().up(null, EV);
+    219|     host().down(at(6), EV);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts > ART-BRUSH-LATCH-REST: the composer's collision plane is latched at the press (O1) > ART-BRUSH-LATCH-REST: Plane B picked mid-drag leaves the stroke on plane A, and the next press paints B
+AssertionError: Plane B picked mid-drag moved the rest of the stroke off plane A: expected [ 12297, 12293, 12293, 12293 ] to deeply equal [ 12297, 12297, 12297, 12293 ]
+
+- Expected
++ Received
+
+  [
+    12297,
+-   12297,
+-   12297,
++   12293,
++   12293,
+    12293,
+  ]
+
+ ❯ src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts:240:101
+    238|     host().move(at(4), EV);
+    239|     const p = collisionPaintWord(w, FILL);
+    240|     expect([...doc.collisionA], 'Plane B picked mid-drag moved the res…
+       |                                                                                                     ^
+    241|     expect([...doc.collisionB], 'Plane B picked mid-drag painted plane…
+    242|     host().up(null, EV);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts > ART-BRUSH-LATCH-REST: a stroke switched to the collision tool under the held button paints its own press's word (O3) > ART-BRUSH-LATCH-REST: a tile-stamp stroke switched to collision mid-drag paints the word selected at ITS press, not an earlier collision stroke's
+AssertionError: the switched stroke painted a latch left over from an earlier collision stroke: expected [ 12297, 12297, 12297, 12297 ] to deeply equal [ 12298, 12298, 12298, 12297 ]
+
+- Expected
++ Received
+
+  [
+-   12298,
+-   12298,
+-   12298,
++   12297,
++   12297,
++   12297,
+    12297,
+  ]
+
+ ❯ src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts:274:8
+    272|     const p1 = collisionPaintWord(w1, FILL);
+    273|     expect([...doc.collisionA], 'the switched stroke painted a latch l…
+    274|       .toEqual([p1, p1, p1, collisionPaintWord(w0, FILL)]);
+       |        ^
+    275|   });
+    276| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed (8)
+   Start at  04:23:08
+   Duration  1.26s (transform 833ms, setup 829ms, import 88ms, tests 197ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 8 failure record(s) in 1 file(s) (8 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        8   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts
+    [ASSERTION] ART-BRUSH-LATCH-REST: the composer's tile-stamp and palette-apply inputs are latched at the press (O2) > ART-BRUSH-LATCH-REST: 'the stamp tile (a tileset pick, setBr…' changed mid-drag leaves the stroke on the pressed value, and the next press takes it
+        AssertionError: the stamp tile (a tileset pick, setBrushTile) changed mid-drag changed the rest of the stroke: expected [ { atlasTile: 1, …(5) }, …(7) ] to…
+        why this bucket: name is AssertionError
+    [ASSERTION] ART-BRUSH-LATCH-REST: the composer's tile-stamp and palette-apply inputs are latched at the press (O2) > ART-BRUSH-LATCH-REST: 'the stamp palette line (setPaletteLin…' changed mid-drag leaves the stroke on the pressed value, and the next press takes it
+        AssertionError: the stamp palette line (setPaletteLine) changed mid-drag changed the rest of the stroke: expected [ { atlasTile: 1, …(5) }, …(7) ] to deepl…
+        why this bucket: name is AssertionError
+    [ASSERTION] ART-BRUSH-LATCH-REST: the composer's tile-stamp and palette-apply inputs are latched at the press (O2) > ART-BRUSH-LATCH-REST: 'the stamp priority (setStampPriority)' changed mid-drag leaves the stroke on the pressed value, and the next press takes it
+        AssertionError: the stamp priority (setStampPriority) changed mid-drag changed the rest of the stroke: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply …
+        why this bucket: name is AssertionError
+    [ASSERTION] ART-BRUSH-LATCH-REST: the composer's tile-stamp and palette-apply inputs are latched at the press (O2) > ART-BRUSH-LATCH-REST: 'the stamp X flip (the X key)' changed mid-drag leaves the stroke on the pressed value, and the next press takes it
+        AssertionError: the stamp X flip (the X key) changed mid-drag changed the rest of the stroke: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal [ {…
+        why this bucket: name is AssertionError
+    [ASSERTION] ART-BRUSH-LATCH-REST: the composer's tile-stamp and palette-apply inputs are latched at the press (O2) > ART-BRUSH-LATCH-REST: 'the stamp Y flip (the Y key)' changed mid-drag leaves the stroke on the pressed value, and the next press takes it
+        AssertionError: the stamp Y flip (the Y key) changed mid-drag changed the rest of the stroke: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal [ {…
+        why this bucket: name is AssertionError
+    [ASSERTION] ART-BRUSH-LATCH-REST: the composer's tile-stamp and palette-apply inputs are latched at the press (O2) > ART-BRUSH-LATCH-REST: 'the palette-apply line (setPaletteLin…' changed mid-drag leaves the stroke on the pressed value, and the next press takes it
+        AssertionError: the palette-apply line (setPaletteLine) changed mid-drag changed the rest of the stroke: expected [ { atlasTile: 7, …(5) }, …(7) ] to deepl…
+        why this bucket: name is AssertionError
+    [ASSERTION] ART-BRUSH-LATCH-REST: the composer's collision plane is latched at the press (O1) > ART-BRUSH-LATCH-REST: Plane B picked mid-drag leaves the stroke on plane A, and the next press paints B
+        AssertionError: Plane B picked mid-drag moved the rest of the stroke off plane A: expected [ 12297, 12293, 12293, 12293 ] to deeply equal [ 12297, 12297, 1…
+        why this bucket: name is AssertionError
+    [ASSERTION] ART-BRUSH-LATCH-REST: a stroke switched to the collision tool under the held button paints its own press's word (O3) > ART-BRUSH-LATCH-REST: a tile-stamp stroke switched to collision mid-drag paints the word selected at ITS press, not an earlier collision stroke's
+        AssertionError: the switched stroke painted a latch left over from an earlier collision stroke: expected [ 12297, 12297, 12297, 12297 ] to deeply equal [ 1…
+        why this bucket: name is AssertionError
+
+failure-class: 8 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.

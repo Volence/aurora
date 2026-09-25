@@ -23,6 +23,7 @@ import type { ComposerSnapshot } from '../../../core/editing/composer-history';
 import { paintDocCollision, applyClipboardCollisionToDoc } from '../../../core/art/composer-collision';
 import { copyChunkToClipboard, pasteFit, pasteRefusal } from '../../../core/editing/map-clipboard';
 import { selectedCollisionWord } from '../../../core/collision/collision-cell-word';
+import type { BrushPriority } from '../../../core/editing/brush-word';
 import {
   createBuffer, flipH, flipV, rotate90, wrapShift,
 } from '../../../core/art/pixel-ops';
@@ -52,6 +53,19 @@ import {
 
 interface Write { x: number; y: number; value: number; }
 interface SelRect { x: number; y: number; w: number; h: number; }
+
+/** Every input a tile-space stroke paints with, as latched at its press (see
+ *  `strokeLatch`). `word` and `plane` feed the collision brush; `tile`, `pal`,
+ *  `hf`, `vf` and `pri` the tile stamp; `pal` the palette-apply brush. */
+interface StrokeInputs {
+  word: number;
+  plane: 'a' | 'b';
+  tile: number;
+  pal: number;
+  hf: boolean;
+  vf: boolean;
+  pri: BrushPriority;
+}
 
 /** Bresenham point list (inclusive) — interpolates tile-space brush drags. */
 function linePoints(x0: number, y0: number, x1: number, y1: number): Array<{ x: number; y: number }> {
@@ -138,17 +152,24 @@ export default function ComposerCanvas() {
   const hoverRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   /** Last cell touched by a tile-space drag (Bresenham fill between samples). */
   const lastTileCellRef = useRef<{ cx: number; cy: number } | null>(null);
-  /** The collision brush WORD (shape, the picked entry's mirror flag, Flip H,
-   *  Flip V and the floor type, packed by `selectedCollisionWord`), latched at
-   *  the collision press (hub ruling ART-BRUSH-WORD-LATCH, empyrean
-   *  OVERSEER-LOG 2026-09-12T18:49:16Z, applying BRUSH-WORD-LATCH (a) of
-   *  09:39:48Z: "the word latches at the press, as size does"). It used to be
-   *  built from the store per cell, so a shape, flip or floor type picked
-   *  mid-drag (Space on a focused palette button) painted the rest of the
-   *  stroke with another word. The map's twin is MapViewport's
-   *  `paintBrushWord`. `null` means no collision press has latched one on this
-   *  mount: see `applyTileCell`. */
-  const paintBrushWord = useRef<number | null>(null);
+  /** EVERY input of a tile-space stroke, latched at the press: a stroke's
+   *  inputs latch when it starts (hub ruling ART-BRUSH-LATCH-REST, empyrean
+   *  OVERSEER-LOG 2026-09-25T07:43:58Z, on BRUSH-WORD-LATCH (a)'s ground). The
+   *  collision brush WORD (shape, the picked entry's mirror flag, Flip H, Flip V
+   *  and the floor type, packed by `selectedCollisionWord`) was latched first
+   *  (ART-BRUSH-WORD-LATCH, 2026-09-12T18:49:16Z); the collision PLANE, the
+   *  stamp's tile, palette line, priority and X/Y flips, and the palette-apply
+   *  line joined it here. Each used to be read from the store per cell, so a
+   *  change made mid-drag (a palette button, a tileset pick, an X/Y key) painted
+   *  the rest of the stroke with another value. The map's twin of the word is
+   *  MapViewport's `paintBrushWord`.
+   *
+   *  Set at EVERY press, whatever the tool, and cleared at `up` and when the
+   *  document changes: it describes THIS stroke and nothing else, so a stroke
+   *  whose tool is switched under the held button paints with the inputs of its
+   *  own press, never with a latch left over from an earlier stroke (O3 of the
+   *  word-latch packet). `null` means no stroke is held: see `applyTileCell`. */
+  const strokeLatch = useRef<StrokeInputs | null>(null);
   const [selection, setSelection] = useState<SelRect | null>(null);
   const selectionRef = useRef<SelRect | null>(null);
   selectionRef.current = selection;
@@ -404,15 +425,24 @@ export default function ComposerCanvas() {
     useArtStore.getState().bumpDoc();
   }
 
-  /** The collision brush word the palette selects NOW. Called by the collision
-   *  press, which latches it (`paintBrushWord`), and by `applyTileCell`'s
-   *  no-press fallback. */
-  function brushWordNow(): number {
+  /** Every tile-space brush input as the store and the flip keys hold it NOW.
+   *  Called by the press, which latches it (`strokeLatch`), and by
+   *  `applyTileCell`'s no-stroke fallback. */
+  function strokeInputsNow(): StrokeInputs {
     const est = useEditorStore.getState();
-    return selectedCollisionWord({
-      shape: est.selectedCollisionProfile, entryFlipX: est.selectedCollisionEntryFlipX,
-      userXFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
-    });
+    const s = useArtStore.getState();
+    return {
+      word: selectedCollisionWord({
+        shape: est.selectedCollisionProfile, entryFlipX: est.selectedCollisionEntryFlipX,
+        userXFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
+      }),
+      plane: est.collisionPaintPlane,
+      tile: s.brushTile,
+      pal: s.paletteLine,
+      hf: flipRef.current.hf,
+      vf: flipRef.current.vf,
+      pri: s.stampPriority,
+    };
   }
 
   /** Apply one tile-space tool action to a doc cell (stamp / collision /
@@ -422,8 +452,16 @@ export default function ComposerCanvas() {
     if (!o) return;
     const doc = o.doc;
     if (cx < 0 || cx >= doc.widthTiles || cy < 0 || cy >= doc.heightTiles) return;
+    // The inputs LATCHED at this stroke's press (`strokeLatch`), not the
+    // store's live values: a tile, line, priority, flip, shape, floor type or
+    // plane picked mid-drag waits for the next stroke. The corner HUD chip still
+    // reads the live values, because it describes the NEXT press. The fallback
+    // answers only a cell painted with no stroke held, which the pointer hook
+    // below never does (`move` needs `lastTileCellRef`, set by the same press
+    // that sets the latch and cleared beside it): the live values, as every cell
+    // took before the latch, never a made-up word that would erase.
+    const inp = strokeLatch.current ?? strokeInputsNow();
     if (t === 'tile-stamp') {
-      const s = useArtStore.getState();
       // Read the cell out before the stamp overwrites it — `stampTile` REPLACES
       // the cell object unconditionally, so "did this change anything" cannot be
       // asked afterwards. It is asked at all only so that a stamp landing on a
@@ -431,10 +469,10 @@ export default function ComposerCanvas() {
       // put a do-nothing step on the undo stack.
       const before = { ...cellAt(doc, cx, cy) };
       stampTile(doc, cx, cy, {
-        tile: s.brushTile,
-        pal: s.paletteLine,
-        hf: flipRef.current.hf,
-        vf: flipRef.current.vf,
+        tile: inp.tile,
+        pal: inp.pal,
+        hf: inp.hf,
+        vf: inp.vf,
         // THE ARMED TRI-STATE (ROADMAP O17), no longer a hard-coded `keep`.
         //
         // It was a hard `false` until O12 — the composer's docs are seeded from
@@ -447,28 +485,23 @@ export default function ComposerCanvas() {
         //
         // The store field is the composer's OWN brush, not the map's — see
         // artStore.stampPriority for why they are separate and what they share.
-        pri: s.stampPriority,
+        pri: inp.pri,
       });
       if (sameComposerCell(before, cellAt(doc, cx, cy))) return;
     } else if (t === 'palette-apply') {
       // Re-line an already-placed cell: same palette-line source as tile
-      // placement (artStore.paletteLine). Empty cells are a no-op; unchanged
-      // cells skip the dirty/repaint below.
-      if (!applyPaletteLineToDocCell(doc, cx, cy, useArtStore.getState().paletteLine)) return;
+      // placement (artStore.paletteLine, latched at the press). Empty cells are
+      // a no-op; unchanged cells skip the dirty/repaint below.
+      if (!applyPaletteLineToDocCell(doc, cx, cy, inp.pal)) return;
     } else {
-      // Same packed-word pattern as MapViewport.paintCollisionCell — one palette
+      // Same packed-word pattern as MapViewport.paintCollisionCell: one palette
       // drives both surfaces via selectedCollisionWord, and on both the word is
-      // the one LATCHED at the press (`paintBrushWord`, ART-BRUSH-WORD-LATCH),
-      // not the store's live selection: a shape, flip or floor type picked
-      // mid-drag waits for the next stroke. The corner HUD chip still reads the
-      // live selection, because it describes the NEXT press. `?? brushWordNow()`
-      // answers only a drag this mount never pressed with the collision tool (a
-      // tile-space stroke whose tool changed under the held button): it paints
-      // the live selection, as every cell did before the latch, never a made-up
-      // air word that would erase. The PLANE is still read per cell: it is not
-      // part of the word, and the ruling latches the word.
-      const word = paintBrushWord.current ?? brushWordNow();
-      if (!paintDocCollision(doc, useEditorStore.getState().collisionPaintPlane, cx, cy, word)) return;
+      // the one latched at the press. The PLANE is latched here too
+      // (ART-BRUSH-LATCH-REST). The map keeps its plane live on purpose, because
+      // a mid-drag plane change there flushes into a second undo command through
+      // `recordPaint`; the composer has no `recordPaint` (one snapshot per
+      // gesture), so that reason has no subject here.
+      if (!paintDocCollision(doc, inp.plane, cx, cy, inp.word)) return;
     }
     // Past every early return, so the write LANDED: bank the drag's pre-gesture
     // snapshot as one undo step. `commitTileGestureStep` is idempotent within a
@@ -602,7 +635,7 @@ export default function ComposerCanvas() {
           return;
         }
         const cx = p.x >> 3, cy = p.y >> 3;
-        if (t === 'collision') paintBrushWord.current = brushWordNow(); // shape, flip, floor type (ART-BRUSH-WORD-LATCH)
+        strokeLatch.current = strokeInputsNow(); // every input of the stroke (ART-BRUSH-LATCH-REST)
         beginTileGesture();
         applyTileCell(t, cx, cy);
         lastTileCellRef.current = { cx, cy };
@@ -615,7 +648,7 @@ export default function ComposerCanvas() {
         for (const pt of linePoints(last.cx, last.cy, cx, cy).slice(1)) applyTileCell(t, pt.x, pt.y);
         lastTileCellRef.current = { cx, cy };
       },
-      up() { lastTileCellRef.current = null; endTileGesture(); },
+      up() { lastTileCellRef.current = null; strokeLatch.current = null; endTileGesture(); },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tileTools, tool]);
@@ -954,6 +987,7 @@ export default function ComposerCanvas() {
     sharedEditHintRef.current = false;
     flipRef.current = { hf: false, vf: false };
     lastTileCellRef.current = null;
+    strokeLatch.current = null;
   }, [open?.doc]);
 
   if (!open) return null;
