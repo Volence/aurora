@@ -85,15 +85,24 @@ for (let line = 0; line < 3; line++) {
 const words = new Uint16Array(COLS * ROWS);
 const planeA = new Uint16Array(COLS * ROWS);
 const planeB = new Uint16Array(COLS * ROWS);
+// TWO TRAPS FROM REAL DONOR DATA ARE PLANTED ON PURPOSE, because a fixture that
+// lacks them cannot tell the right instrument from a wrong one (aeon measured
+// both on Emerald Hill, clip-act-own-grid.md section 1):
+//   * BLANK SKY CARRIES A PALETTE LINE. A tile-0 word with line bits set is NOT
+//     painted; counting non-zero WORDS instead of non-zero tile INDICES counts it.
+//   * AN EMPTY COLLISION CELL CAN CARRY AN X-FLIP. A flip with no solidity bits
+//     is not solid; counting non-zero words counts it.
 for (let r = CROP[2]; r < CROP[3]; r++) {
   for (let c = CROP[0]; c < CROP[1]; c++) {
     const n = Math.floor(r / ST) * GW + Math.floor(c / ST);
     const mark = (r + c) % 9 === 0;
+    const sky = !mark && (r * 7 + c) % 13 === 0;
     const t = mark ? 5 : 1 + (n % 4);
     const pal = 1 + (n % 3);
     const hflip = mark && (r & 1) ? 0x0800 : 0;
-    words[r * COLS + c] = t | hflip | (pal << 13);
+    words[r * COLS + c] = sky ? (2 << 13) : t | hflip | (pal << 13);
     if (r >= 320) planeA[r * COLS + c] = 255 | (3 << 12);
+    else if ((r + 3 * c) % 11 === 0) planeA[r * COLS + c] = 0x0400;
     if (r >= 200 && r < 204) planeB[r * COLS + c] = 1 | (1 << 12);
   }
 }
