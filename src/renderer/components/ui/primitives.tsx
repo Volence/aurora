@@ -360,8 +360,44 @@ export function Divider() {
  * `align-items: center` STAYS. It is right for the resting bar (chips of unequal
  * height on one line), and once the bar grows to fit there is nothing left to
  * centre outside of.
+ *
+ * `singleRow` (OPT-IN; aeon's Art facet only, ROADMAP row 210) is the other
+ * answer to the same defect, for a bar whose CONTENT changes under the author's
+ * hands: the Art bar's controls change with the tool, so the growing bar changed
+ * height with the tool (37 to 116px at 1400x872) and slid the composer canvas
+ * under a held stroke. With it nothing wraps (`white-space: nowrap`, so no item
+ * shrinks below its text), the height is fixed, and whatever does not fit the
+ * width SCROLLS inside the bar (`overflow-x: auto`, a visible thin scrollbar):
+ * still nothing is truncated, it is one scroll away instead of one line down.
+ *
+ * The chips sit in an inner row of the ordinary bar's 30px content height, at
+ * the top, and SCROLL_BAND is reserved under it for the scrollbar. So the bar is
+ * the same height whether or not this tool's controls overflow, and the chips
+ * do not jump up when the scrollbar comes (centring in the outer box would move
+ * them by half its band). Measured at dpr 1: the thin scrollbar is 10px, the
+ * tallest Art item 28px; the band keeps 2px spare for another scale factor.
+ * `min-width: 100%` keeps a trailing `margin-left: auto` item (the zoom
+ * control) at the right edge when the row is narrower than the bar.
  */
-export function OptionBar({ children }: { children: React.ReactNode }) {
+const SINGLE_ROW_H = 30;
+const SCROLL_BAND = 12;
+export function OptionBar({ children, singleRow = false }: { children: React.ReactNode; singleRow?: boolean }) {
+  if (singleRow) {
+    return (
+      <div style={{
+        minHeight: 32, height: 1 + SINGLE_ROW_H + SCROLL_BAND + 1,
+        boxSizing: 'border-box', padding: `1px ${T.s4} 0`,
+        background: T.surface, borderBottom: `1px solid ${T.border}`, color: T.textLo,
+        fontSize: T.tXs, flexShrink: 0, whiteSpace: 'nowrap',
+        overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: T.s4,
+          height: SINGLE_ROW_H, width: 'max-content', minWidth: '100%',
+        }}>{children}</div>
+      </div>
+    );
+  }
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: T.s4, minHeight: 32,

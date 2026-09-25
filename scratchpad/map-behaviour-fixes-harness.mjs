@@ -76,6 +76,18 @@
 //            document must read clean again (the store's flag, and the
 //            "unsaved" badge no longer visible). See
 //            docs/reviews/2026-09-25-art-stroke-followups.md.
+//   aob AOB.* ART-OPTIONS-BAR-HEIGHT (ROADMAP row 210; the aurora overseer's
+//            look ruling, 2026-09-25): the Art facet's tool-options bar is
+//            one row at a fixed height. AOB.0/AOB.a: every rail tool (HEAD's
+//            ArtToolDock table) armed by a real click, the store's tool read
+//            back, and the bar's height and the canvas rect the same under
+//            each; AOB.b: nothing cut (content fits or the bar scrolls it).
+//            AOB.N.*: the same census in a 1100px-wide window. AOB.t: the
+//            shared-tile warning's full sentence (HEAD's SharedTileWarning) on
+//            title and aria-label. AOB.w: the first write to a clean chunk
+//            moves neither. AOB.s: the warning APPEARING on a first write to
+//            an all-zero chunk and going on the undo moves neither (O3).
+//            See docs/reviews/2026-09-25-art-options-bar-height.md.
 //   m6  M6.*  a real stamp press under a still pointer names the placement it
 //            made, in the store and in the Chunk links readout, with no move.
 //
@@ -143,7 +155,7 @@ assertDebugBuild(RUN);
 const ELECTRON = RUN.electron;
 const MAIN = RUN.main;
 const PORT = Number(process.env.PORT ?? 9433);
-const ALL_PARTS = ['m1', 'm2', 'm4', 'bw', 'abw', 'abl', 'atl', 'acj', 'm6'];
+const ALL_PARTS = ['m1', 'm2', 'm4', 'bw', 'abw', 'abl', 'atl', 'acj', 'aob', 'm6'];
 const PARTS = (process.env.PART ?? 'all') === 'all' ? ALL_PARTS : String(process.env.PART).split(',');
 for (const p of PARTS) if (!ALL_PARTS.includes(p)) throw new Error(`PART ${p} is not one of ${ALL_PARTS.join(', ')}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -424,7 +436,7 @@ async function main() {
     await setup(d, A);
     const st0 = await d.strays();
     if (st0.length) check('SETUP.STRAY', 'no mouse event reached the page at a position this harness never sent', 'UNMEASURABLE', J(st0.slice(0, 10)));
-    const parts = { m1: m1Part, m2: m2Part, m4: m4Part, bw: bwPart, abw: abwPart, abl: ablPart, atl: atlPart, acj: acjPart, m6: m6Part };
+    const parts = { m1: m1Part, m2: m2Part, m4: m4Part, bw: bwPart, abw: abwPart, abl: ablPart, atl: atlPart, acj: acjPart, aob: aobPart, m6: m6Part };
     for (const p of ALL_PARTS) {
       if (!PARTS.includes(p)) continue;
       console.log(`\n════════ PART ${p} ════════`);
@@ -1544,6 +1556,246 @@ async function acjPart(d) {
     note('ACJ.cleanup', `after one Ctrl+Z the tile ${same(back, hit.before) ? 'matches' : 'DIFFERS FROM'} its start; dirty ${dirty2}`);
   }
   // Leave the composer as PART abl leaves it for m6: the Collision paint tool armed.
+  await d.realClick('document.querySelector(\'button[aria-label="Collision paint"]\')');
+  await sleep(300);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PART aob. ART-OPTIONS-BAR-HEIGHT (ROADMAP row 210; the aurora overseer's look
+// ruling, 2026-09-25): the Art facet's tool-options bar is ONE row at a FIXED
+// height that depends on neither the tool, the dirty state nor the shared-tile
+// warning, so the composer canvas below it never moves. Row 209's packet
+// measured it 88px under the Tile stamp and 37px under Collision paint at
+// 1400x872 (its O1), and read that the warning can appear on a first write (O3).
+//
+// The rail's tools and their labels come from HEAD's ArtToolDock.tsx (its
+// TOOLS table, every row matched); each is armed by a REAL click on its rail
+// button and the store's tool is read back, so a census that switched nothing
+// cannot pass (AOB.0). The warning's full sentence comes from HEAD's
+// components/art/SharedTileWarning.tsx. The narrower width is a real window resize through
+// Browser.setWindowBounds when the target allows it (the fallback, printed, is
+// Emulation.setDeviceMetricsOverride), undone before the part ends.
+// ═══════════════════════════════════════════════════════════════════════════
+const AOB_RAIL = (() => {
+  const src = SRC_HEAD('src/renderer/shell/ArtToolDock.tsx');
+  const body = /const TOOLS[^=]*= \[([\s\S]*?)\n\];/.exec(src);
+  if (!body) throw new Error('ORACLE: no TOOLS table in HEAD:src/renderer/shell/ArtToolDock.tsx');
+  const rows = [...body[1].matchAll(/\['([a-z-]+)', '([^']+)', Icons\.\w+\]/g)].map((m) => ({ id: m[1], label: m[2] }));
+  const lines = body[1].split('\n').filter((l) => l.trim().startsWith('['));
+  if (rows.length < 2 || rows.length !== lines.length) throw new Error(`ORACLE: the TOOLS table has ${lines.length} rows, ${rows.length} parsed`);
+  return rows;
+})();
+const AOB_WARNING = fromHead('src/renderer/components/art/SharedTileWarning.tsx',
+  /export const SHARED_TILE_WARNING = "([^"]+)";/, 'the shared-tile warning sentence')[1];
+/** The bar, found as PARTs atl and acj find it: up from the doc header's New…
+ *  button to the OptionBar (its 32px floor). Everything a row needs about it. */
+const AOB_READ = String.raw`(() => { const cv = ${COMPOSER_CANVAS}; const nb = document.querySelector('button[title^="Close this document"]');
+  let bar = nb; while (bar && bar.parentElement && getComputedStyle(bar).minHeight !== '32px') bar = bar.parentElement;
+  const b = cv ? cv.getBoundingClientRect() : null; const br = bar ? bar.getBoundingClientRect() : null;
+  const warn = bar ? [...bar.querySelectorAll('span')].find((s) => s.children.length === 0 && s.textContent.includes('⚠')) || null : null;
+  const cs = bar ? getComputedStyle(bar) : null;
+  const row = nb && nb.parentElement ? nb.parentElement.parentElement : null;
+  const kids = row ? [...row.children].map((k) => ({ h: k.getBoundingClientRect().height, t: (k.getAttribute('aria-label') || k.textContent || k.tagName).trim().slice(0, 24) })) : [];
+  const tall = kids.reduce((m, k) => (m && m.h >= k.h ? m : k), null);
+  const nr = nb ? nb.getBoundingClientRect() : null;
+  return { tallest: tall, newY: nr ? nr.top : null, canvas: b ? { x: b.left, y: b.top, w: b.width, h: b.height } : null, dpr: window.devicePixelRatio, iw: innerWidth, ih: innerHeight,
+    bar: br ? { y: br.top, h: br.height, sb: bar.offsetHeight - bar.clientHeight, sw: bar.scrollWidth, cw: bar.clientWidth, sh: bar.scrollHeight, ch: bar.clientHeight, ox: cs.overflowX } : null,
+    warn: warn ? { text: warn.textContent.trim(), title: warn.getAttribute('title'), aria: warn.getAttribute('aria-label'), h: warn.getBoundingClientRect().height } : null }; })()`;
+const sameRect = (p, q) => !!p && !!q && ['x', 'y', 'w', 'h'].every((k) => Math.abs(p[k] - q[k]) < 0.01);
+
+async function aobCensus(d, label) {
+  const { c } = d;
+  const rows = [];
+  for (const t of AOB_RAIL) {
+    const hit = await d.realClick(`document.querySelector(${J(`button[aria-label="${t.label}"]`)})`);
+    await sleep(350);
+    const tool = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.tool ?? null;
+    const r = await c.json(AOB_READ);
+    rows.push({ id: t.id, hit: !!hit?.hitOk, tool, newY: r.newY, barH: r.bar?.h ?? null, sb: r.bar?.sb, tallest: r.tallest, canvas: r.canvas, sw: r.bar?.sw, cw: r.bar?.cw, ox: r.bar?.ox, dpr: r.dpr, iw: r.iw, ih: r.ih });
+  }
+  console.log(`   CENSUS [${label}] window ${rows[0]?.iw}x${rows[0]?.ih} dpr ${rows[0]?.dpr}`);
+  for (const r of rows) console.log(`     ${r.id.padEnd(14)} store tool ${String(r.tool).padEnd(14)} bar h ${r.barH} New… y ${r.newY}  canvas ${J(r.canvas)}  bar scroll/client w ${r.sw}/${r.cw} overflow-x ${r.ox} (scrollbar+border ${r.sb})  tallest item ${J(r.tallest)}`);
+  return rows;
+}
+function aobCensusRows(id, label, rows) {
+  const armed = rows.every((r) => r.hit && r.tool === r.id) && new Set(rows.map((r) => r.tool)).size === AOB_RAIL.length;
+  check(`${id}.0`, `PREMISE (${label}): every one of the ${AOB_RAIL.length} rail tools (HEAD's ArtToolDock TOOLS table) was armed by a real click on its rail button, and the store's tool read back after each click is that tool: the census really switched tools`,
+    armed, J(rows.map((r) => `${r.id}${r.hit ? '' : ' (MISS)'} -> ${r.tool}`)));
+  if (!armed) return;
+  const h0 = rows[0].barH; const g0 = rows[0].canvas;
+  check(`${id}.a`, `(${label}) the options bar's height, the composer canvas rect and the bar's own New… button (its items do not jump inside it) are the SAME under every rail tool`,
+    rows.every((r) => r.barH !== null && Math.abs(r.barH - h0) < 0.01 && sameRect(r.canvas, g0) && r.newY !== null && Math.abs(r.newY - rows[0].newY) < 0.01),
+    `bar heights ${J(Object.fromEntries(rows.map((r) => [r.id, r.barH])))}; canvas y ${J(Object.fromEntries(rows.map((r) => [r.id, r.canvas?.y])))}; New… top ${J(Object.fromEntries(rows.map((r) => [r.id, r.newY])))}`);
+  const clipped = rows.filter((r) => r.sw > r.cw && !['auto', 'scroll'].includes(r.ox));
+  const scrolls = rows.filter((r) => r.sw > r.cw).map((r) => `${r.id} ${r.sw}/${r.cw}`);
+  check(`${id}.b`, `CONTROL (${label}): nothing is silently cut: under every tool the bar's content either fits its width or the bar scrolls it (overflow-x auto or scroll)`,
+    clipped.length === 0, `tools whose content is wider than the bar: ${scrolls.length ? scrolls.join(', ') : 'none'}; of those without a scrolling bar: ${J(clipped.map((r) => `${r.id} ${r.ox}`))}`);
+}
+
+async function aobPart(d) {
+  const { c } = d;
+  await neutral(d);
+  const already = await c.json('window.__dbg.aeon.artChunkOpen()');
+  let facet;
+  if (already && already.chunkId !== null) {
+    const art = await d.realClick(d.FACET('Art'));
+    await sleep(800);
+    facet = { hitOk: !!art?.hitOk && (await c.json('window.__dbg.aeon.artChunkOpen()'))?.chunkId === already.chunkId, route: 'Art facet click, document already open', already, art };
+  } else {
+    facet = { ...(await openArtChunk(d)), route: 'double-click on the Chunks grid' };
+  }
+  const doc0 = await c.json('window.__dbg.aeon.artChunkOpen()');
+  console.log(`   rail from HEAD: ${J(AOB_RAIL.map((t) => t.id))}; warning from HEAD: ${J(AOB_WARNING)}; document reached by ${facet.route}: ${J(doc0)}`);
+  if (!facet.hitOk || !doc0 || doc0.chunkId === null) {
+    check('AOB.0', 'PREMISE: a chunk document open in the Art facet', 'UNMEASURABLE', J({ facet, doc0 }));
+    return;
+  }
+
+  // 1. The census at the window as it stands (1400x872).
+  const wide = await aobCensus(d, 'full window');
+  aobCensusRows('AOB', 'full window', wide);
+
+  // 2. The full sentence of the shared-tile warning stays reachable.
+  const r0 = await c.json(AOB_READ);
+  if (!r0.warn) {
+    check('AOB.t', 'the shared-tile warning is on screen (this chunk has atlas tiles), so its full text can be asked for', 'UNMEASURABLE', J(r0));
+  } else {
+    check('AOB.t', 'the shared-tile warning\'s FULL sentence (HEAD\'s SharedTileWarning.tsx) is reachable on hover (title) and by assistive tech (aria-label), whatever the bar shows',
+      r0.warn.title === AOB_WARNING && r0.warn.aria === AOB_WARNING, `warning ${J(r0.warn)}; the sentence ${J(AOB_WARNING)}`);
+  }
+
+  // 3. The first write on a CLEAN chunk document (PART acj's case, with the
+  //    bar's height asked for too).
+  const stamp = await d.realClick(`document.querySelector(${J('button[aria-label="Tile stamp"]')})`);
+  await sleep(500);
+  const doc = await c.json('window.__dbg.aeon.artChunkOpen()');
+  const W0 = await c.json(AOB_READ);
+  const cv = await c.json(`(() => { const k = ${COMPOSER_CANVAS}; return k ? k.width : null; })()`);
+  const zoom = doc && cv ? cv / (doc.widthTiles * 8) : null;
+  const pickOne = (q) => (q ? { t: q.atlasTile, hf: q.hf, vf: q.vf } : null);
+  const cellAt = (tx, ty) => c.json(`window.__dbg.aeon.artDocCellAt(${tx}, ${ty})`);
+  /** The first tile on screen the stamp changes, aimed at an integer client
+   *  pixel that derives back to it and lands on the composer canvas. */
+  const findTarget = async (G, dd) => {
+    for (let ty = 0; ty < dd.heightTiles; ty++) for (let tx = 0; tx < dd.widthTiles; tx++) {
+      const before = pickOne(await cellAt(tx, ty));
+      if (same(before, { t: dd.brushTile, hf: false, vf: false })) continue;
+      const x = Math.round(G.x + (tx * 8 + 4) * zoom); const y = Math.round(G.y + (ty * 8 + 4) * zoom);
+      if (Math.floor((x - G.x) / zoom / 8) !== tx || Math.floor((y - G.y) / zoom / 8) !== ty) continue;
+      if (!(await c.evalExpr(`document.elementFromPoint(${x}, ${y}) === ${COMPOSER_CANVAS}`))) continue;
+      return { tx, ty, x, y, before };
+    }
+    return null;
+  };
+  const setupW = !!stamp?.hitOk && !!doc && doc.tool === 'tile-stamp' && !!W0.canvas && Number.isInteger(zoom) && zoom >= 1;
+  if (setupW && doc.dirty) {
+    check('AOB.w', 'PREMISE: the chunk document is CLEAN, so the next write is its first', 'UNMEASURABLE', J(doc));
+  } else {
+    const hit = setupW ? await findTarget(W0.canvas, doc) : null;
+    if (!hit) {
+      check('AOB.w', 'PREMISE: the Tile stamp armed by a real click and a tile on screen it changes', 'UNMEASURABLE', J({ stamp, doc, W0, zoom }));
+    } else {
+      await d.clickAt(hit);
+      await sleep(300);
+      const W1 = await c.json(AOB_READ);
+      const after = pickOne(await cellAt(hit.tx, hit.ty));
+      const dirty1 = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.dirty;
+      const wrote = dirty1 === true && !same(after, hit.before);
+      check('AOB.w', 'the FIRST write to a clean chunk document (one real Tile stamp click that changed a tile and dirtied the document) moves neither the options bar\'s height nor the composer canvas',
+        wrote && sameRect(W1.canvas, W0.canvas) && Math.abs(W1.bar.h - W0.bar.h) < 0.01,
+        `dpr ${W0.dpr}; tile ${J({ tx: hit.tx, ty: hit.ty })} aim (${hit.x},${hit.y}) ${J(hit.before)} -> ${J(after)}; dirty ${dirty1}; bar h ${W0.bar.h} -> ${W1.bar.h}; canvas ${J(W0.canvas)} -> ${J(W1.canvas)}`);
+      await d.blur();
+      await d.chord('z', CTRL);
+      await sleep(300);
+      note('AOB.w.cleanup', `after one Ctrl+Z the tile ${same(pickOne(await cellAt(hit.tx, hit.ty)), hit.before) ? 'matches' : 'DIFFERS FROM'} its start; dirty ${(await c.json('window.__dbg.aeon.artChunkOpen()'))?.dirty}`);
+    }
+  }
+
+  // 4. The census again at a narrower window.
+  const want = { w: 1100, h: r0.ih };
+  let how = null; let undo = null;
+  try {
+    const { windowId, bounds } = await c.send('Browser.getWindowForTarget');
+    const dw = bounds.width - r0.iw;
+    await c.send('Browser.setWindowBounds', { windowId, bounds: { width: want.w + dw } });
+    await sleep(900);
+    how = `Browser.setWindowBounds (outer ${bounds.width}x${bounds.height} -> width ${want.w + dw})`;
+    undo = async () => { await c.send('Browser.setWindowBounds', { windowId, bounds: { width: bounds.width, height: bounds.height } }); };
+  } catch (e) {
+    await c.send('Emulation.setDeviceMetricsOverride', { width: want.w, height: want.h, deviceScaleFactor: 0, mobile: false });
+    await sleep(900);
+    how = `Emulation.setDeviceMetricsOverride (Browser.setWindowBounds refused: ${e.message})`;
+    undo = async () => { await c.send('Emulation.clearDeviceMetricsOverride'); };
+  }
+  const nowW = await c.evalExpr('innerWidth');
+  console.log(`   narrow window by ${how}: innerWidth ${nowW}`);
+  if (Math.abs(nowW - want.w) > 2) {
+    check('AOB.N.0', `PREMISE: the window is ${want.w}px wide`, 'UNMEASURABLE', `innerWidth ${nowW} by ${how}`);
+  } else {
+    const narrow = await aobCensus(d, `${nowW} wide`);
+    aobCensusRows('AOB.N', `${nowW} wide`, narrow);
+  }
+  await undo();
+  await sleep(900);
+  const back = await c.json(AOB_READ);
+  note('AOB.restore', `window back to ${back.iw}x${back.ih} (was ${r0.iw}x${r0.ih})`);
+
+  // 5. O3: the warning appearing on a first write, and going on the undo. A
+  //    library chunk whose nametable is all zero words opens with no atlas cell,
+  //    so no warning; one stamp gives it one.
+  const blank = await c.json(String.raw`(() => { const a = window.__dbg.aeon; for (const id of a.chunkIds()) { const i = a.chunkInfo(id);
+    if (i && i.nonzeroTiles === 0 && i.widthTiles >= 2) return { id, ...i }; } return null; })()`);
+  if (!blank) {
+    // NOT a row, and said so: in a project with no all-zero library chunk the
+    // warning cannot appear on a first write (every other chunk opens with an
+    // atlas cell, so it is already on screen), and the part does not plant one.
+    const n = await c.evalExpr('window.__dbg.aeon.chunkIds().length');
+    note('AOB.s', `NOT DRIVEN: none of this project's ${n} library chunks has an all-zero nametable, so the shared-tile warning cannot APPEAR on a first write here (O3 is NOT MEASURED by this run, neither green nor red)`);
+  } else {
+    await neutral(d);
+    await d.chord('k');
+    const thumb = `([...document.querySelectorAll('button')].find((b) => (b.title || '').startsWith(${J(`${blank.name}: blank`)}) && b.querySelector(':scope > canvas')) || null)`;
+    const p = await d.aim(thumb, true);
+    if (p && p.hitOk) {
+      SENT.add(`${p.x},${p.y}`);
+      await c.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y, button: 'none', buttons: 0 });
+      for (const n of [1, 2]) {
+        await c.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.x, y: p.y, button: 'left', buttons: 1, clickCount: n });
+        await sleep(30);
+        await c.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.x, y: p.y, button: 'left', buttons: 0, clickCount: n });
+        await sleep(60);
+      }
+      await sleep(1200);
+    }
+    const st2 = await d.realClick(`document.querySelector(${J('button[aria-label="Tile stamp"]')})`);
+    await sleep(500);
+    const bdoc = await c.json('window.__dbg.aeon.artChunkOpen()');
+    const S0 = await c.json(AOB_READ);
+    const opened = !!p?.hitOk && !!st2?.hitOk && !!bdoc && bdoc.chunkId === blank.id && !bdoc.dirty && bdoc.tool === 'tile-stamp' && !S0.warn;
+    const hit = opened ? await findTarget(S0.canvas, bdoc) : null;
+    if (!hit) {
+      check('AOB.s', 'PREMISE: the all-zero chunk opened by a real double-click on its thumbnail, clean, Tile stamp armed, NO warning on screen, and a tile the stamp changes', 'UNMEASURABLE',
+        J({ blank, thumb: p, stamp: st2, bdoc, warn: S0.warn, zoom }));
+    } else {
+      await d.clickAt(hit);
+      await sleep(300);
+      const S1 = await c.json(AOB_READ);
+      await d.blur();
+      await d.chord('z', CTRL);
+      await sleep(300);
+      const S2 = await c.json(AOB_READ);
+      const dirty2 = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.dirty;
+      const toggled = !S0.warn && !!S1.warn && !S2.warn;
+      check('AOB.s.0', 'PREMISE (O3): the shared-tile warning was absent on the clean all-zero chunk, APPEARED on the first stamp and went again on one real Ctrl+Z',
+        toggled, `dpr ${S0.dpr}; chunk ${J(blank)}; tile ${J({ tx: hit.tx, ty: hit.ty })} aim (${hit.x},${hit.y}); warning ${J(S0.warn)} -> ${J(S1.warn)} -> ${J(S2.warn)}; dirty after Ctrl+Z ${dirty2}`);
+      if (toggled) {
+        check('AOB.s', 'the shared-tile warning appearing (first write) and disappearing (undo) moves neither the options bar\'s height nor the composer canvas',
+          sameRect(S1.canvas, S0.canvas) && sameRect(S2.canvas, S0.canvas) && Math.abs(S1.bar.h - S0.bar.h) < 0.01 && Math.abs(S2.bar.h - S0.bar.h) < 0.01,
+          `bar h ${S0.bar.h} -> ${S1.bar.h} -> ${S2.bar.h}; canvas ${J(S0.canvas)} -> ${J(S1.canvas)} -> ${J(S2.canvas)}`);
+      }
+    }
+  }
+  // Leave the composer as PART acj leaves it for m6: the Collision paint tool armed.
   await d.realClick('document.querySelector(\'button[aria-label="Collision paint"]\')');
   await sleep(300);
 }
