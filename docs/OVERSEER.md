@@ -287,11 +287,10 @@ paraphrased, and nothing about it looked wrong. Ask for the quote.
 ### Say when you need a CONTEXT CLEAR — RELAYED 2026-09-09, sibling of the report-when-you-stop rule
 
 **Relayed by the hub, transcribed:** *"Remind the agents to let us know when they need a clear."*
-⚠ **RELAY, not yet in the committed record.** Checked at `origin/main:docs/OVERSEER.md` when it
-arrived (tip `1530dd3`) and it is not there; the hub was asked to commit it. Acted on anyway
-because it costs nothing and asks for disclosure rather than for work — **but a successor must
-not read this as an owner directive witnessed here.** Same class as the entry above it, and
-this file's own rule: name the granting act.
+**Now in the committed record** (found by the row 212 census, re-read 2026-09-25 by the overseer):
+empyrean `origin/main:docs/OVERSEER.md`, grep `let us know when they need a clear`, heads it
+*"Owner, verbatim, 2026-09-09T14:2xZ"*. The granting act is that transcription, not the relay this
+entry was first written from; it said "RELAY, not yet in the committed record" until 2026-09-25.
 
 **What it asks:** do not silently run down to a compaction or drift through one. When a clear
 would help, **say so in the message to the hub AND in `lane-status.json`'s `awaiting`**.
