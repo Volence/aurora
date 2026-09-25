@@ -178,6 +178,29 @@ const clickByText = (re, tag = 'button') => String.raw`
 })()`;
 
 /**
+ * A REAL CLICK: CDP `Input.dispatchMouseEvent` moved / pressed / released at an
+ * INTEGER client pixel (ROADMAP row 214). Until 2026-09-25 rows 3 and 4 used
+ * `el.click()`, a synthetic `click` with no pointerdown/mousedown/mouseup, no
+ * hit test and no coordinates — so it reached a handler that a covering
+ * element, a pointer-events rule or a mousedown-driven control would have kept
+ * a person from reaching. The browser now routes this one through its own hit
+ * test, the way a person's does. The caller computes the pixel from the
+ * element's rect (and prints dpr, rect and aim beside the row): Xvfb's scale
+ * factor varies between runs here, and a fractional aim is delivered to the
+ * neighbouring device pixel (docs/OVERSEER-REFERENCE.md "Instruments").
+ */
+async function realClick(c, x, y) {
+  if (!Number.isInteger(x) || !Number.isInteger(y)) {
+    throw new Error(`realClick aimed at a non-integer client pixel (${x}, ${y})`);
+  }
+  await c.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'none', buttons: 0 });
+  await c.send('Input.dispatchMouseEvent',
+    { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
+  await c.send('Input.dispatchMouseEvent',
+    { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
+}
+
+/**
  * THE COLD READER'S OWN SEARCH, verbatim from §a1 of the walkthrough: any
  * element whose text, `title` or `aria-label` matches help|guide|docs|manual|
  * tutorial|?. It returned ZERO on master, over the whole application.
@@ -315,7 +338,9 @@ async function main() {
       before === false, `guide pane present at start = ${before}`);
 
     // ---- 3. ONE CLICK OPENS IT, AT THE RIGHT PARAGRAPH. ------------------
-    await c.evalExpr(String.raw`(() => { const b = ${GUIDE_BUTTON}; b.click(); return 'ok'; })()`);
+    // A REAL CLICK at the integer centre row 2b just hit-tested (btn.aim), in
+    // the same session, with nothing moved in between — not `b.click()`.
+    await realClick(c, btn.aim.x, btn.aim.y);
     await sleep(1400);
 
     const pane = await c.json(String.raw`(() => {
@@ -393,24 +418,45 @@ async function main() {
     // A rail that renders and does nothing is chrome. This clicks the LAST
     // entry and requires the scroll position to move AND that heading to be in
     // view — two facts, because either alone can be true by accident.
-    const railed = await c.json(String.raw`(() => {
+    //
+    // ⚠ A REAL CLICK SINCE ROW 214 (2026-09-25): the aim is the integer centre
+    // of the link's rect, hit-tested before dispatch (the row requires the hit
+    // to be the link), and the click is CDP Input at that pixel — so the page
+    // moves only if the browser's own hit test delivered the click to the rail.
+    const aimed = await c.json(String.raw`(() => {
       const p = ${GUIDE_PANE};
       const links = [...p.querySelectorAll('nav a')];
       if (links.length === 0) return { links: 0 };
-      const before = Math.round(p.scrollTop);
       const last = links[links.length - 1];
-      const want = (last.getAttribute('href') || '').slice(1);
-      last.click();
-      const h = p.querySelector('#' + CSS.escape(want));
+      last.scrollIntoView({ block: 'nearest' });
+      const r = last.getBoundingClientRect();
+      const x = Math.round(r.left + r.width / 2), y = Math.round(r.top + r.height / 2);
+      const hit = document.elementFromPoint(x, y);
+      return {
+        links: links.length, label: (last.textContent || '').trim(),
+        want: (last.getAttribute('href') || '').slice(1),
+        dpr: window.devicePixelRatio, rect: r.toJSON(), aim: { x, y },
+        hitIsLink: !!(hit && (hit === last || last.contains(hit))),
+        before: Math.round(p.scrollTop),
+      };
+    })()`);
+    if (aimed.links > 0) {
+      await realClick(c, aimed.aim.x, aimed.aim.y);
+      await sleep(300);
+    }
+    const landed = aimed.links === 0 ? {} : await c.json(String.raw`(() => {
+      const p = ${GUIDE_PANE};
+      const h = p.querySelector('#' + CSS.escape(${JSON.stringify(aimed.want ?? '')}));
       const hb = h ? h.getBoundingClientRect() : null, pb = p.getBoundingClientRect();
       return {
-        links: links.length, label: (last.textContent || '').trim(), want,
-        before, after: Math.round(p.scrollTop),
+        after: Math.round(p.scrollTop),
         inView: !!(hb && hb.top >= pb.top - 2 && hb.bottom <= pb.bottom + 40),
       };
     })()`);
-    check('4a', 'the contents rail lists the sections and clicking one MOVES the page to it',
-      railed.links >= 6 && railed.after !== railed.before && railed.inView === true,
+    const railed = { ...aimed, ...landed };
+    check('4a', 'the contents rail lists the sections and a REAL click on one MOVES the page to it',
+      railed.links >= 6 && railed.hitIsLink === true
+      && railed.after !== railed.before && railed.inView === true,
       JSON.stringify(railed));
 
     // ---- 5. OVERSEER ADDITIONS, 2026-09-05. --------------------------------
