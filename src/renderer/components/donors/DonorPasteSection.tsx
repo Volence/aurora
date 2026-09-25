@@ -360,7 +360,7 @@ function PoolRowsView({ clipact }: { clipact: Record<string, unknown> }): React.
         display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) repeat(4, auto)', columnGap: T.s2,
         border: `1px solid ${T.border}`, borderRadius: T.rSm, padding: T.s1,
       }}>
-        <div role="columnheader" style={cell}>pool cost</div>
+        <div role="columnheader" style={{ ...cell, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>pool cost</div>
         {POOL_COLUMNS.map((c) => (
           <div key={c.field} role="columnheader" title={pr.fields[c.field]} data-donors-pool-head={c.field}
                style={{ ...cell, ...NUM, textDecoration: 'underline dotted', cursor: 'help' }}>{c.label}</div>
