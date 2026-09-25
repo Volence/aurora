@@ -89,7 +89,7 @@ and B4 plants the sentence only in a `title`.
 
 `npm test` (`VITEST_MAX_WORKERS=4`):
 - on base `da936133`: 2 failed | 10484 passed | 18 skipped (10504);
-- on the tip: see the ROADMAP row.
+- on `d38817db` (the harness commits plus these docs, before this totals line was written): 2 failed | 10484 passed | 18 skipped (10504), 675 of 675 modules complete. The same two rows fail, and this parcel adds no red.
 
 The 2 failures on the base are the known aeon currency rows (row 218):
 - `aeon-fixture-currency` for `clips/s2_ehz_cpz.clips.json`;
