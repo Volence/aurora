@@ -8,6 +8,7 @@ import {
   SHIP_SILENT_OBLIGATIONS,
   SHIP_SILENT_EXCHANGE,
 } from '../bg-anim-aeon';
+import { peerRepo, resolveRev, readAtRev } from '../../../../test/support/peer-repo';
 import { documentBands } from '../../../core/formats/bg-override/bg-anim-band';
 import {
   BGANIM_PHASE_BANKS,
@@ -327,6 +328,54 @@ describe('the author-facing copy says the shipped-behaviour fact FIRST', () => {
     // And it says what the two conditions DO decide, which is the only reason to
     // go on stating them at all.
     expect(SHIP_SILENT_OBLIGATIONS).toMatch(/twins are emitted/i);
+  });
+});
+
+/**
+ * "THEY NO LONGER REFUSE THE BUILD", READ AGAINST aeon (ROADMAP row 212).
+ *
+ * The row above pins the ABSENCE of the old wording. That keeps the retired
+ * sentence out; it cannot tell whether the present one is still true, because
+ * "no longer refuse" is a claim about aeon's `tools/inject_editor_bg.py`, which
+ * moved once (01a45ede, 2026-09-06, "the twins decline out loud instead of
+ * vetoing what the act ships") and can move back. This row derives it from aeon
+ * origin/master through git objects: the decline message is RETURNED with status
+ * 0, and no `raise AssertionError` about the view twins remains. The control is
+ * 01a45ede's parent, where both conditions raised.
+ */
+describe('SHIP_SILENT_OBLIGATIONS: "no longer refuse the build", against aeon origin/master', () => {
+  const EMITTER = 'tools/inject_editor_bg.py';
+  const DECLINE_LANDED = '01a45ede';
+  function twinsVerdict(src: string): { declines: boolean; refuses: boolean } {
+    return {
+      declines: /return\s+0,\s*\(\s*\n\s*f'NO DEBUG BG-ANIMATION VIEW TWINS FOR THIS ACT/.test(src),
+      // Adjacent string literals split the phrase ("debug view '" / "'twins"), so the gap may hold quotes.
+      refuses: /raise AssertionError\([\s\S]{0,400}?view['"\sf]*twins/i.test(src),
+    };
+  }
+  function read(ctx: { skip: (why: string) => void }, rev: string): string | null {
+    const repo = peerRepo('aeon');
+    if (repo === null) { ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo'); return null; }
+    if (resolveRev(repo, rev) === null) { ctx.skip(`SKIPPED, NOT PASSED: ${rev} does not resolve in aeon`); return null; }
+    const b = readAtRev(repo, rev, EMITTER);
+    expect(b.ok, b.ok ? '' : b.why).toBe(true);
+    return (b as { ok: true; text: string }).text;
+  }
+
+  it('the claim matches what aeon\'s emitter does', (ctx) => {
+    const src = read(ctx, 'origin/master'); if (src === null) return;
+    const v = twinsVerdict(src);
+    const claimsNoRefusal = /They no longer refuse the build/.test(SHIP_SILENT_OBLIGATIONS);
+    expect(claimsNoRefusal, 'SHIP_SILENT_OBLIGATIONS no longer states whether the build refuses, so there is no claim to read').toBe(true);
+    expect(v.declines && !v.refuses,
+      `aeon origin/master ${EMITTER}: declines-with-status-0=${v.declines}, raises-about-view-twins=${v.refuses}. `
+      + 'SHIP_SILENT_OBLIGATIONS says the conditions no longer refuse the build; re-read aeon and re-point it.')
+      .toBe(claimsNoRefusal);
+  });
+
+  it('control: the detector sees the refusal at the parent of the commit that retired it', (ctx) => {
+    const src = read(ctx, `${DECLINE_LANDED}^`); if (src === null) return;
+    expect(twinsVerdict(src)).toEqual({ declines: false, refuses: true });
   });
 });
 
