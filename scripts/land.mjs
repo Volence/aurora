@@ -122,7 +122,40 @@
 // against when it was pushed, so writing and committing the entry as one act
 // (which is its own separate rule) still satisfies it.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+// ============================================================================
+// COMPLETENESS (ROADMAP row 204): A GREEN EXIT IS NOT A WHOLE SUITE
+// ============================================================================
+//
+// A zero exit says nothing failed; it does not say everything RAN. This box's
+// earlyoom prefers `node` and `electron`, i.e. this lane's runner. Measured
+// 2026-09-25 (vitest 4.1.4): every reap producible here exited non-zero, but a
+// reaped WORKER is red only because vitest's pool raises an unhandled error; a
+// module lost without one reads as a pass (see the header of
+// scripts/run-completeness-reporter.mjs, and the control row in
+// test/config/run-completeness-reporter.test.ts, which exits 0 with a file
+// never finished). So after a zero exit this script asks two more things:
+//
+//   1. THE RUN'S OWN END MARKER. The run-completeness reporter writes a record
+//      to the path passed in AURORA_RUN_COMPLETENESS_FILE at the end of the run.
+//      No record means the run never reached its end, and that refuses.
+//   2. A DERIVED EXPECTATION. `vitest list --filesOnly`, asked again here, is
+//      what the configured suite selects. The record's selection must equal it
+//      and every file must have finished. The reporter alone judges a run by
+//      what IT selected (so subsets are not red for being subsets); this is the
+//      half that catches a subset standing in for the suite, e.g. a `--shard`
+//      or a path filter slipped into the `test` script.
+//
+// ⚠ IMPORTED, unlike the failure-class prefix further down, and on purpose:
+// that one is a cosmetic pointer that must never break a landing; this is a
+// gate, and a landing that cannot load its gate must not proceed.
+//
+// `--dry-run` runs everything above the push (clean tree, suite, completeness,
+// HEAD check) and stops without asking or touching any remote. It exists so the
+// gate can be exercised on a branch that must not be pushed.
+import { RECORD_ENV, verifyRecordAgainstExpected } from './run-completeness-reporter.mjs';
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 const say = (s) => console.log(`land: ${s}`);
@@ -139,17 +172,22 @@ if (dirty) {
     + dirty.split('\n').map((l) => `    ${l}`).join('\n'));
 }
 
+const dryRun = process.argv.includes('--dry-run');
 const before = git('rev-parse', 'HEAD');
-const remoteBefore = git('ls-remote', 'origin', `refs/heads/${branch}`).split('\t')[0] || '(none)';
-say(`branch ${branch}, HEAD ${before.slice(0, 8)}, origin ${remoteBefore.slice(0, 8)}`);
-if (remoteBefore === before) {
+const remoteBefore = dryRun
+  ? '(dry run: not asked)'
+  : git('ls-remote', 'origin', `refs/heads/${branch}`).split('\t')[0] || '(none)';
+say(`branch ${branch}, HEAD ${before.slice(0, 8)}, origin ${dryRun ? remoteBefore : remoteBefore.slice(0, 8)}`);
+if (!dryRun && remoteBefore === before) {
   say('origin already has this exact commit. Nothing to land; the suite is not re-run.');
   process.exit(0);
 }
 
 say('running the full suite on THIS tree, the one that will be pushed...');
+const recordDir = mkdtempSync(join(tmpdir(), 'aurora-land-'));
+const recordPath = join(recordDir, 'run-completeness.json');
 try {
-  execFileSync('npm', ['test'], { stdio: 'inherit' });
+  execFileSync('npm', ['test'], { stdio: 'inherit', env: { ...process.env, [RECORD_ENV]: recordPath } });
 } catch {
   // ⚠ THE POINTER BELOW IS THE ONLY CHANGE THIS PARCEL MAKES TO THIS SCRIPT, and
   // it is a string inside an existing refusal: no control flow, no new refusal,
@@ -177,12 +215,44 @@ try {
     + '    UNCLASSIFIED   no signature the reporter recognises. Read it yourself.');
 }
 
+// Completeness: the run's own end marker, against an expectation derived now.
+let record = null;
+try {
+  record = JSON.parse(readFileSync(recordPath, 'utf8'));
+} catch (e) {
+  die('the suite exited 0 but left no run-completeness record, so nothing says the run reached\n'
+    + `  its end (${e.code === 'ENOENT' ? 'no file was written' : e.message}). A pass that cannot say\n`
+    + '  it is complete is not certified. Is scripts/run-completeness-reporter.mjs still in\n'
+    + '  vitest.config.ts `reporters`? Nothing was pushed.');
+} finally {
+  rmSync(recordDir, { recursive: true, force: true });
+}
+let expected;
+try {
+  expected = JSON.parse(execFileSync('npx', ['vitest', 'list', '--filesOnly', '--json'], {
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], timeout: 120_000,
+  })).map((e) => e.file);
+} catch (e) {
+  die('COULD NOT MEASURE completeness: `vitest list --filesOnly --json` failed, so there is no\n'
+    + `  expected file list to hold the run against (${String(e.message).split('\n')[0]}). Nothing was pushed.`);
+}
+const gap = verifyRecordAgainstExpected(record, expected);
+if (gap) {
+  die(`the suite exited 0 but it was NOT the whole suite: ${gap}.\n`
+    + '  Do not quote this run\'s totals as the suite. Nothing was pushed.');
+}
+say(`run complete: ${record.finished} of the ${expected.length} module(s) \`vitest list --filesOnly\` selects finished`);
+
 // HEAD must not have moved under the run: a parallel session or an auto-commit
 // daemon can land a commit the suite never saw.
 const after = git('rev-parse', 'HEAD');
 if (after !== before) {
   die(`HEAD moved while the suite ran, ${before.slice(0, 8)} to ${after.slice(0, 8)}.\n`
     + `  The suite certified the earlier tree. Re-run this.`);
+}
+if (dryRun) {
+  say(`dry run: suite green and complete on ${before.slice(0, 8)}; stopping before the push.`);
+  process.exit(0);
 }
 
 // Push the TESTED SHA by name, never the branch tip, so a tip that moved after
