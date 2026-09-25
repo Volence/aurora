@@ -23,6 +23,7 @@ import { Panel, CollapsibleSection, T } from '../../components/ui';
 import ArtToolDock from '../../shell/ArtToolDock';
 import ArtToolOptions from '../../shell/ArtToolOptions';
 import ArtStatusBar from '../../shell/ArtStatusBar';
+import SharedTileWarning from '../../components/art/SharedTileWarning';
 import ComposerCanvas from '../../components/art/ComposerCanvas';
 import TilesetPanel from '../../components/art/TilesetPanel';
 import PaletteEditor from '../../components/art/PaletteEditor';
@@ -190,14 +191,13 @@ function ArtOptions() {
           wrapped one more time and the bar grew under the author's first
           stroke, moving the composer canvas 42px down (measured at 1400x872,
           docs/reviews/2026-09-25-art-stroke-followups.md). `visibility: hidden`
-          keeps the box and removes it from the accessibility tree. */}
+          keeps the box and removes it from the accessibility tree. The bar is
+          now one fixed-height row (`singleRow` below, row 210), so the badge
+          can no longer move the canvas; keeping its box still stops the Save
+          and New… buttons sliding right on the first write. */}
       <span style={{ ...styles.dirtyBadge, ...(open.dirty ? {} : styles.dirtyBadgeHidden) }}
         aria-hidden={!open.dirty}>unsaved</span>
-      {hasSharedTiles && (
-        <span style={styles.sharedWarning}>
-          ⚠ pixel edits to existing tiles propagate everywhere they're used
-        </span>
-      )}
+      {hasSharedTiles && <SharedTileWarning />}
       {showSave && (
         <button
           style={{ ...styles.saveButton, ...(open.dirty ? {} : styles.saveDisabled) }}
@@ -221,7 +221,15 @@ function ArtOptions() {
     </span>
   ) : null;
 
-  return <ArtToolOptions before={docHeader} />;
+  // ONE ROW, FIXED HEIGHT (ROADMAP row 210, the aurora overseer's look ruling
+  // 2026-09-25). The shared OptionBar grows to fit a wrapped line, and here the
+  // tool-dependent controls plus this header wrapped differently per tool: 37px
+  // under Collision paint, 88px under the Tile stamp, 116px under Dither and
+  // Palette line at 1400x872, so the composer canvas slid up to 79px on a tool
+  // switch, mid-stroke included (row 209 latches the tool, so the stroke keeps
+  // painting). `singleRow` pins the height and scrolls what does not fit; the
+  // header's long warning is compact (SharedTileWarning) so it rarely has to.
+  return <ArtToolOptions before={docHeader} singleRow />;
 }
 
 function ArtPanels() {
@@ -277,10 +285,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: T.tSm,
     color: T.textHi,
     fontWeight: T.wMedium,
-  },
-  sharedWarning: {
-    fontSize: T.t2xs,
-    color: T.warning,
   },
   dirtyBadge: {
     fontSize: T.t2xs,

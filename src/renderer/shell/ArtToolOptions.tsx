@@ -209,8 +209,12 @@ export const CLASSIC_SURFACE_CAPS: ArtOptionCaps = {
  * one OptionBar.
  *
  * `caps` says which controls the HOST can act on — see ArtOptionCaps.
+ *
+ * `singleRow` is passed through to OptionBar (see its docblock): aeon's Art
+ * facet asks for it so its bar's height does not change with the tool. Classic's
+ * hosts leave it off and keep the growing bar.
  */
-export default function ArtToolOptions({ before, caps = FULL_CAPS }: { before?: React.ReactNode; caps?: ArtOptionCaps }) {
+export default function ArtToolOptions({ before, caps = FULL_CAPS, singleRow = false }: { before?: React.ReactNode; caps?: ArtOptionCaps; singleRow?: boolean }) {
   const tool = useArtStore((s) => s.tool);
   const brushSpace = useArtStore((s) => s.brushSpace);
   const setBrushSpace = useArtStore((s) => s.setBrushSpace);
@@ -244,7 +248,7 @@ export default function ArtToolOptions({ before, caps = FULL_CAPS }: { before?: 
   const setOverlay = useViewStore((s) => s.setOverlay);
 
   return (
-    <OptionBar>
+    <OptionBar singleRow={singleRow}>
       {before}
 
       {/* Brush space tabs */}

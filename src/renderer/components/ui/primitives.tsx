@@ -360,14 +360,33 @@ export function Divider() {
  * `align-items: center` STAYS. It is right for the resting bar (chips of unequal
  * height on one line), and once the bar grows to fit there is nothing left to
  * centre outside of.
+ *
+ * `singleRow` (OPT-IN; aeon's Art facet only, ROADMAP row 210) is the other
+ * answer to the same defect, for a bar whose CONTENT changes under the author's
+ * hands: the Art bar's controls change with the tool, so a growing bar changed
+ * height with the tool and slid the composer canvas under a held stroke. With
+ * it, nothing wraps (`white-space: nowrap`, so a flex item cannot shrink below
+ * its text), the height is pinned at SINGLE_ROW_H, and whatever does not fit
+ * the width SCROLLS inside the bar (`overflow-x: auto`, a visible thin
+ * scrollbar) — still nothing is truncated, it is one scroll away instead of one
+ * line down. SINGLE_ROW_H is the growing bar's own one-line height for the Art
+ * controls (measured 37px at 1400x872: its tallest item is 34px) plus the thin
+ * scrollbar's band, so the bar does not change height when the scrollbar comes
+ * and goes and no item is cut vertically by it. Every other facet keeps the
+ * growing bar above.
  */
-export function OptionBar({ children }: { children: React.ReactNode }) {
+const SINGLE_ROW_H = 48;
+export function OptionBar({ children, singleRow = false }: { children: React.ReactNode; singleRow?: boolean }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: T.s4, minHeight: 32,
       boxSizing: 'border-box', padding: `1px ${T.s4}`,
       background: T.surface, borderBottom: `1px solid ${T.border}`, color: T.textLo,
       fontSize: T.tXs, flexShrink: 0,
+      ...(singleRow ? {
+        height: SINGLE_ROW_H, whiteSpace: 'nowrap' as const,
+        overflowX: 'auto' as const, overflowY: 'hidden' as const, scrollbarWidth: 'thin' as const,
+      } : {}),
     }}>{children}</div>
   );
 }

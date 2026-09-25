@@ -83,7 +83,7 @@
 //            back, and the bar's height and the canvas rect the same under
 //            each; AOB.b: nothing cut (content fits or the bar scrolls it).
 //            AOB.N.*: the same census in a 1100px-wide window. AOB.t: the
-//            shared-tile warning's full sentence (HEAD's art-facet.tsx) on
+//            shared-tile warning's full sentence (HEAD's SharedTileWarning) on
 //            title and aria-label. AOB.w: the first write to a clean chunk
 //            moves neither. AOB.s: the warning APPEARING on a first write to
 //            an all-zero chunk and going on the undo moves neither (O3).
@@ -1572,7 +1572,7 @@ async function acjPart(d) {
 // TOOLS table, every row matched); each is armed by a REAL click on its rail
 // button and the store's tool is read back, so a census that switched nothing
 // cannot pass (AOB.0). The warning's full sentence comes from HEAD's
-// art-facet.tsx. The narrower width is a real window resize through
+// components/art/SharedTileWarning.tsx. The narrower width is a real window resize through
 // Browser.setWindowBounds when the target allows it (the fallback, printed, is
 // Emulation.setDeviceMetricsOverride), undone before the part ends.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1585,8 +1585,8 @@ const AOB_RAIL = (() => {
   if (rows.length < 2 || rows.length !== lines.length) throw new Error(`ORACLE: the TOOLS table has ${lines.length} rows, ${rows.length} parsed`);
   return rows;
 })();
-const AOB_WARNING = fromHead('src/renderer/workspace/facets/art-facet.tsx',
-  /(pixel edits to existing tiles propagate everywhere they're used)/, 'the shared-tile warning sentence')[1];
+const AOB_WARNING = fromHead('src/renderer/components/art/SharedTileWarning.tsx',
+  /export const SHARED_TILE_WARNING = "([^"]+)";/, 'the shared-tile warning sentence')[1];
 /** The bar, found as PARTs atl and acj find it: up from the doc header's New…
  *  button to the OptionBar (its 32px floor). Everything a row needs about it. */
 const AOB_READ = String.raw`(() => { const cv = ${COMPOSER_CANVAS}; const nb = document.querySelector('button[title^="Close this document"]');
@@ -1597,7 +1597,7 @@ const AOB_READ = String.raw`(() => { const cv = ${COMPOSER_CANVAS}; const nb = d
   const kids = bar ? [...bar.children].map((k) => ({ h: k.getBoundingClientRect().height, t: (k.getAttribute('aria-label') || k.textContent || k.tagName).trim().slice(0, 24) })) : [];
   const tall = kids.reduce((m, k) => (m && m.h >= k.h ? m : k), null);
   return { tallest: tall, canvas: b ? { x: b.left, y: b.top, w: b.width, h: b.height } : null, dpr: window.devicePixelRatio, iw: innerWidth, ih: innerHeight,
-    bar: br ? { y: br.top, h: br.height, sw: bar.scrollWidth, cw: bar.clientWidth, sh: bar.scrollHeight, ch: bar.clientHeight, ox: cs.overflowX } : null,
+    bar: br ? { y: br.top, h: br.height, sb: bar.offsetHeight - bar.clientHeight, sw: bar.scrollWidth, cw: bar.clientWidth, sh: bar.scrollHeight, ch: bar.clientHeight, ox: cs.overflowX } : null,
     warn: warn ? { text: warn.textContent.trim(), title: warn.getAttribute('title'), aria: warn.getAttribute('aria-label'), h: warn.getBoundingClientRect().height } : null }; })()`;
 const sameRect = (p, q) => !!p && !!q && ['x', 'y', 'w', 'h'].every((k) => Math.abs(p[k] - q[k]) < 0.01);
 
@@ -1609,10 +1609,10 @@ async function aobCensus(d, label) {
     await sleep(350);
     const tool = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.tool ?? null;
     const r = await c.json(AOB_READ);
-    rows.push({ id: t.id, hit: !!hit?.hitOk, tool, barH: r.bar?.h ?? null, tallest: r.tallest, canvas: r.canvas, sw: r.bar?.sw, cw: r.bar?.cw, ox: r.bar?.ox, dpr: r.dpr, iw: r.iw, ih: r.ih });
+    rows.push({ id: t.id, hit: !!hit?.hitOk, tool, barH: r.bar?.h ?? null, sb: r.bar?.sb, tallest: r.tallest, canvas: r.canvas, sw: r.bar?.sw, cw: r.bar?.cw, ox: r.bar?.ox, dpr: r.dpr, iw: r.iw, ih: r.ih });
   }
   console.log(`   CENSUS [${label}] window ${rows[0]?.iw}x${rows[0]?.ih} dpr ${rows[0]?.dpr}`);
-  for (const r of rows) console.log(`     ${r.id.padEnd(14)} store tool ${String(r.tool).padEnd(14)} bar h ${r.barH}  canvas ${J(r.canvas)}  bar scroll/client w ${r.sw}/${r.cw} overflow-x ${r.ox}  tallest item ${J(r.tallest)}`);
+  for (const r of rows) console.log(`     ${r.id.padEnd(14)} store tool ${String(r.tool).padEnd(14)} bar h ${r.barH}  canvas ${J(r.canvas)}  bar scroll/client w ${r.sw}/${r.cw} overflow-x ${r.ox} (scrollbar+border ${r.sb})  tallest item ${J(r.tallest)}`);
   return rows;
 }
 function aobCensusRows(id, label, rows) {
@@ -1658,7 +1658,7 @@ async function aobPart(d) {
   if (!r0.warn) {
     check('AOB.t', 'the shared-tile warning is on screen (this chunk has atlas tiles), so its full text can be asked for', 'UNMEASURABLE', J(r0));
   } else {
-    check('AOB.t', 'the shared-tile warning\'s FULL sentence (HEAD\'s art-facet.tsx) is reachable on hover (title) and by assistive tech (aria-label), whatever the bar shows',
+    check('AOB.t', 'the shared-tile warning\'s FULL sentence (HEAD\'s SharedTileWarning.tsx) is reachable on hover (title) and by assistive tech (aria-label), whatever the bar shows',
       r0.warn.title === AOB_WARNING && r0.warn.aria === AOB_WARNING, `warning ${J(r0.warn)}; the sentence ${J(AOB_WARNING)}`);
   }
 
