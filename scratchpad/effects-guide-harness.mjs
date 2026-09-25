@@ -73,12 +73,44 @@ import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
-import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
+import { build as esbuildBuild } from 'esbuild';
 
 const PORT = Number(process.env.PORT ?? 9451);
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 95);
 const ROOT = AURORA_DIR;
 const RUN = announceRunRoot(runTarget(ROOT));
+// Row 1b compares the app against a value bundled from THIS tree's src/ (below),
+// which means nothing against a dist/ older than that src/.
+assertFreshBuild(RUN);
+
+/**
+ * THE EFFECTS FACET, AS THE APP DEFINES IT (ROADMAP row 215). Row 1b used to
+ * find the pill by a typed `/^Effects$/` and call `el.click()`, then pass on
+ * "an element was found". Now the descriptor comes from the source the bar
+ * renders (`FacetBar` paints `f.label` and calls `switchFacet(tabId, f.id)`
+ * from `onClick`): its label is what the row aims at and its id is what the
+ * row reads back through `__dbg.parallaxPreview().facet`, which is the
+ * workspace store's `facetFor(activeId)`, the value the bar highlights.
+ * Keyed by the id `parallax`, the Effects lens's capability id: that is the
+ * value the workspace store holds, and the label is presentation that follows
+ * it. esbuild bundles `src/core/shell/facets.ts` into memory, as
+ * band-preset-harness does for its provider.
+ */
+const FACETS_SRC = `${ROOT}/src/core/shell/facets.ts`;
+const EFFECTS_FACET = await (async () => {
+  const out = await esbuildBuild({
+    entryPoints: [FACETS_SRC], bundle: true, format: 'esm', platform: 'node',
+    write: false, logLevel: 'error',
+  });
+  const m = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
+  m.registerBuiltinFacets();
+  return m.facetRegistry.get('parallax');
+})();
+if (!EFFECTS_FACET || typeof EFFECTS_FACET.label !== 'string' || EFFECTS_FACET.label.length < 3) {
+  throw new Error(`CANNOT MEASURE: ${FACETS_SRC} registers no \`parallax\` facet with a label `
+    + `(got ${JSON.stringify(EFFECTS_FACET)}) — row 1b would have nothing to aim at.`);
+}
 const ELECTRON = RUN.electron;
 const MAIN = RUN.main;
 const AEONDIR = checkoutOverride('aeon')?.value;
@@ -167,19 +199,11 @@ function check(id, name, ok, detail) {
   if (!ok) fails.push(`[${id}] ${name}`);
 }
 
-const clickByText = (re, tag = 'button') => String.raw`
-(() => {
-  const el = [...document.querySelectorAll(${JSON.stringify(tag)})]
-    .find((e) => ${re}.test(((e.textContent || '') + ' ' + (e.getAttribute('aria-label') || '')).trim()));
-  if (!el) return false;
-  if (el.disabled) return 'disabled';
-  el.click();
-  return true;
-})()`;
 
 /**
  * A REAL CLICK: CDP `Input.dispatchMouseEvent` moved / pressed / released at an
- * INTEGER client pixel (ROADMAP row 214). Until 2026-09-25 rows 3 and 4 used
+ * INTEGER client pixel (ROADMAP row 214; row 1b's facet switch too since row
+ * 215). Until 2026-09-25 rows 1b, 3 and 4 used
  * `el.click()`, a synthetic `click` with no pointerdown/mousedown/mouseup, no
  * hit test and no coordinates — so it reached a handler that a covering
  * element, a pointer-events rule or a mousedown-driven control would have kept
@@ -293,9 +317,46 @@ async function main() {
     if (!st || !st.open) throw new Error('project did not open — nothing below can be measured');
     await sleep(2500);
 
-    const toEffects = await c.evalExpr(clickByText('/^Effects$/'));
-    check('1b', 'the Effects facet mounts', toEffects === true, `click → ${toEffects}`);
-    await sleep(1400);
+    // ⚠ ROW 1b CLICKED WITH `el.click()` UNTIL ROW 215 (2026-09-25) and passed
+    // on "a button whose text matched was found": no hit test, no pointer
+    // events, and nothing read back. Now: the pill `FacetBar` renders for the
+    // source's Effects descriptor (exactly one, inside the Facets group), hit-
+    // tested at its integer centre, clicked with REAL input there, and the
+    // facet the workspace store holds for the active tab read back — before
+    // (must not already be Effects, or the read-back proves nothing) and after.
+    // FacetBar binds `onClick` (not onMouseDown/onPointerDown), which the
+    // pressed+released pair of `realClick` fires through the browser's own hit
+    // test, the way a person's click does.
+    const FACET_NOW = 'window.__dbg.parallaxPreview().facet';
+    const facetBefore = await c.evalExpr(FACET_NOW);
+    const pill = await c.json(String.raw`(() => {
+      const want = ${JSON.stringify(EFFECTS_FACET.label)};
+      const bar = document.querySelector('[role="group"][aria-label="Facets"]');
+      if (!bar) return { found: false, why: 'no Facets group' };
+      const all = [...bar.querySelectorAll('button')].filter((b) => (b.textContent || '').trim() === want);
+      if (all.length !== 1) return { found: false, why: all.length + ' pills labelled ' + want };
+      const b = all[0];
+      b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const r = b.getBoundingClientRect();
+      const x = Math.round(r.left + r.width / 2), y = Math.round(r.top + r.height / 2);
+      const hit = document.elementFromPoint(x, y);
+      return {
+        found: true, dpr: window.devicePixelRatio, rect: r.toJSON(), aim: { x, y },
+        hitIsPill: !!(hit && (hit === b || b.contains(hit))),
+        hit: hit ? hit.tagName.toLowerCase() + ':' + (hit.textContent || '').trim().slice(0, 30) : null,
+      };
+    })()`);
+    if (pill.found && pill.hitIsPill) {
+      await realClick(c, pill.aim.x, pill.aim.y);
+      await sleep(1400);
+    }
+    const facetAfter = await c.evalExpr(FACET_NOW);
+    check('1b', `a REAL click on the "${EFFECTS_FACET.label}" pill switches the tab to the `
+      + `\`${EFFECTS_FACET.id}\` facet`,
+      pill.found === true && pill.hitIsPill === true
+      && facetBefore !== EFFECTS_FACET.id && facetAfter === EFFECTS_FACET.id,
+      `pill ${JSON.stringify(pill)}; facet before ${JSON.stringify(facetBefore)}, `
+      + `after ${JSON.stringify(facetAfter)} (want ${JSON.stringify(EFFECTS_FACET.id)})`);
 
     // ---- 2. THE COLD READER'S SEARCH NOW FINDS SOMETHING. ----------------
     //

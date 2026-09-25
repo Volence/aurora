@@ -208,6 +208,14 @@ const SOURCE_DEBUG_CHORD = SOURCE_LIMITS.find((l) => l.key === 'debug_chord');
 const SOURCE_UNCHECKED = SOURCE_LIMITS.find((l) => l.key === 'unchecked_visibility');
 const SOURCE_NO_PREVIEW_SHORT = PROVIDER.NO_PREVIEW_SHORT;
 const SOURCE_NO_PREVIEW = PROVIDER.NO_PREVIEW;
+// ROW 215: 3d is derived the same way. `LimitBlock` paints `{PRESET_HEADLINE}`
+// whole, as the block's one child div with no `title`, so the row compares that
+// element's painted text with the imported constant.
+const SOURCE_HEADLINE = PROVIDER.PRESET_HEADLINE;
+if (typeof SOURCE_HEADLINE !== 'string' || SOURCE_HEADLINE.length < 30) {
+  throw new Error(`CANNOT MEASURE: ${PRESET_PROVIDER_SRC} did not export PRESET_HEADLINE as a `
+    + `non-trivial string (got ${typeof SOURCE_HEADLINE}) — row 3d would pass vacuously.`);
+}
 for (const [row, l] of [['3b', SOURCE_DEBUG_CHORD], ['3c', SOURCE_UNCHECKED]]) {
   if (!l || l.body.length < 80 || l.full.length < 100 || l.title.length < 8) {
     throw new Error(`CANNOT MEASURE: ${PRESET_PROVIDER_SRC} did not yield the limit row ${row} reads `
@@ -604,6 +612,18 @@ async function main() {
           }));
       })()`;
     const parts = await c.json(LIMIT_PARTS);
+    /** Row 3d's element: the block's child DIVs with NO `title` — `LimitBlock`
+     *  renders exactly one, the headline. Every one is returned, so a second
+     *  untitled div (or none) shows up in 3d's detail instead of being chosen
+     *  around. */
+    const headlines = await c.json(String.raw`
+      (() => {
+        const box = ${LIMIT_BLOCK};
+        if (!box) return [];
+        return [...box.children]
+          .filter((el) => el.tagName === 'DIV' && !el.hasAttribute('title'))
+          .map((el) => el.innerText);
+      })()`);
     /** The lead-ins `PRESET_LIMITS` supplies, in the order the panel renders them.
      *  IMPORTED, not typed (row 197): `LimitBlock` paints `<span>{l.title}.</span>`. */
     const LEADS = SOURCE_LIMITS.map((l) => `${l.title}.`);
@@ -716,18 +736,27 @@ async function main() {
       unchecked.text === paintedWantOf(SOURCE_UNCHECKED)
       && unchecked.title === SOURCE_UNCHECKED.full,
       limitDetail(unchecked, SOURCE_UNCHECKED));
+    // ⚠ ROW 3d MATCHED TWO PHRASES COPIED OUT OF `PRESET_HEADLINE` UNTIL ROW 215
+    // (2026-09-25), the shape row 214 removed from 3b/3c/3e: a true rewrite of the
+    // headline would have redded it, and a panel painting the phrases inside some
+    // other sentence would have passed it. It now compares the headline element's
+    // painted `innerText` EXACTLY with the provider's constant, imported at the top
+    // of this file. `innerText`, so a headline moved into a tooltip reads absent.
+    const headline = headlines.length === 1 ? headlines[0] : null;
     check('3d', "the ACCURATE headline is visible, not the inaccurate one",
-      /An author can author a raster band/.test(panelText)
-      && /programmer wires it up in one line/.test(panelText)
+      headline === SOURCE_HEADLINE
       // ⚠ THE NEGATIVE IS TAKEN OVER `allProse`, NOT `panelText` — O77. The
       // sentence aeon's page exists to prevent must not appear ANYWHERE the
       // panel can put it in front of an author, and after `b8d16256` most of
       // this block's prose is in a `title`, which `panelText` does not see. A
       // negative asserted over the string that lost 88% of the words is a
-      // negative that mostly stopped looking.
+      // negative that mostly stopped looking. It stays a typed literal: it is
+      // what the SOURCE must never say, so it cannot be derived from the source.
       && !/no longer needs a programmer/i.test(allProse),
-      `headline=${/An author can author a raster band/.test(panelText)} `
-      + `wiresItUp=${/programmer wires it up in one line/.test(panelText)} `
+      `${headlines.length} untitled div(s) in the block; `
+      + (headline === null ? `NO SINGLE HEADLINE ELEMENT (${JSON.stringify(headlines)}); `
+        : `painted(${headline.length}B vs source ${SOURCE_HEADLINE.length}B): `
+          + `${firstDiff(headline, SOURCE_HEADLINE)}; `)
       + `forbiddenSentenceAbsent=${!/no longer needs a programmer/i.test(allProse)} `
       + `(searched ${allProse.length}B: ${panelText.length}B painted + ${allProse.length - panelText.length - 4}B hovered)`);
     // ⚠ MATCHER MOVED 2026-08-30 (O64), then DERIVED 2026-09-25 (row 214). It
