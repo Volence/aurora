@@ -24,9 +24,8 @@
 // harness-only.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { chunkDocSyncKey, syncChunkDocFromLibrary } from '../chunk-doc-commit';
+import { composerSyncReport } from './helpers/sync-effect-site';
 import { useArtStore } from '../artStore';
 import { useProjectStore, getActiveLevel } from '../projectStore';
 import { useSessionStore } from '../sessionStore';
@@ -130,12 +129,19 @@ describe('the key that decides when a chunk document may be rebuilt from its chu
     // SOURCE, not behaviour: node cannot mount the component. This catches the
     // call site being deleted or re-keyed, which is exactly how the defect
     // arrived, and nothing subtler.
-    const src = readFileSync(
-      join(process.cwd(), 'src/renderer/components/art/ComposerCanvas.tsx'), 'utf8');
-    const calls = src.match(/syncChunkDocFromLibrary\(\)/g) ?? [];
-    expect(calls).toHaveLength(1);
-    expect(src).toContain(
-      'useEffect(() => { syncChunkDocFromLibrary(); }, chunkDocSyncKey(historyVersion, open));');
+    //
+    // READ FROM THE SYNTAX TREE, NOT COPIED (ROADMAP row 195). It used to
+    // `toContain` the whole corrected line, so a reformat or an extracted
+    // `const` went red while the key stayed right. Every call of the re-sync must
+    // now be in an effect whose deps RESOLVE to `chunkDocSyncKey(<the history
+    // clock>, <the art store's open document>)`; the defect's `[historyVersion,
+    // open]` is an array literal and fails that. All names are derived from the
+    // modules the component imports (helpers/sync-effect-site.ts).
+    const r = composerSyncReport();
+    expect(r.unmeasurable, 'the source read could not judge the call site').toEqual([]);
+    expect(r.sites.length).toBeGreaterThan(0);
+    expect(r.sites.flatMap((s) => [...s.effect, ...s.key].map((p) => `ComposerCanvas.tsx:${s.line}: ${p}`)))
+      .toEqual([]);
   });
 
   it('[K1] marking the open document dirty does NOT change the key', () => {

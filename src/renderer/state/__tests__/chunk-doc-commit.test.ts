@@ -43,6 +43,7 @@ import { join } from 'node:path';
 import {
   commitChunkDocStep, isChunkDocument, syncChunkDocFromLibrary,
 } from '../chunk-doc-commit';
+import { composerSyncReport } from './helpers/sync-effect-site';
 import { useArtStore, isPureDocLocal } from '../artStore';
 import type { OpenDocument } from '../artStore';
 import { useProjectStore, getActiveLevel, getCurrentZone } from '../projectStore';
@@ -586,17 +587,19 @@ describe('the call sites still exist in ComposerCanvas (source read)', () => {
     expect(calls.length).toBe(4);
   });
 
-  it('[F2] the re-sync effect is present and keyed on the history clock', () => {
-    // RE-AIMED 2026-09-12, and the old shape is the defect rather than the
-    // baseline: `[historyVersion, open]` re-ran the effect on every
-    // `markOpenDirty()` — which REPLACES the `open` wrapper — so it fired
-    // between a tile-space write and the `up` that commits it, saw the document
-    // ahead of its chunk, and rebuilt the document from the chunk, discarding
-    // the stroke. `chunkDocSyncKey` states the rule and is measured in
-    // state/__tests__/chunk-doc-sync-key.test.ts; the history clock, which is
-    // what this row is about, is still the first half of that key.
-    // docs/reviews/2026-09-12-chunklinks-row9-regression.md.
-    expect(code()).toMatch(
-      /useEffect\(\(\) => \{ syncChunkDocFromLibrary\(\); \}, chunkDocSyncKey\(historyVersion, open\)\)/);
+  it('[F2] the re-sync is present, and only ever called from inside an effect with a dependency list', () => {
+    // READ FROM THE SYNTAX TREE, NOT COPIED (ROADMAP row 195). Until 2026-09-12
+    // this row copied the BROKEN line (`[historyVersion, open]`) as its regex, so
+    // it was green because of the defect and went red on the fix; the fix re-aimed
+    // the copy at the corrected line, the same shape, which any reformat or
+    // extracted `const` also turned red. It now asks what the call must hold:
+    // it exists, and every call sits in a `useEffect` callback that has deps.
+    // WHICH deps (the key, on the history clock and the open document) is [K0]'s
+    // claim in state/__tests__/chunk-doc-sync-key.test.ts, where the key lives.
+    // docs/reviews/2026-09-12-chunklinks-row9-regression.md for the defect.
+    const r = composerSyncReport();
+    expect(r.unmeasurable, 'the source read could not judge the call site').toEqual([]);
+    expect(r.sites.length).toBeGreaterThan(0);
+    expect(r.sites.flatMap((s) => s.effect.map((p) => `ComposerCanvas.tsx:${s.line}: ${p}`))).toEqual([]);
   });
 });
