@@ -4614,6 +4614,39 @@ describe('a collision stroke whose plane changes mid-drag lands one command per 
     expect(planes(), 'one undo did not take the whole stroke back').toEqual({ a: [], b: [] });
     expect(focusedHistory()!.canUndo, 'a one-plane stroke left more than one entry').toBe(false);
   });
+
+  it('M3: a BOTH-PLANES stroke whose aimed plane changes is two commands, and each undo puts back each plane\'s OWN words', async () => {
+    // Hub ruling M3 (docs/reviews/2026-09-12-rulings-asked.md): "M3 leave it".
+    // map-coverage-6 O1 measured the split: with A+B armed the set of planes
+    // written never changes, yet the aimed-plane change still flushes. What
+    // the split protects is a VALUE, not a count. A stroke's `entries` are
+    // the AIMED plane's and `otherEntries` the other's, so after the switch
+    // the aimed plane is B. Filed under the plane-A stroke (the `sameRun`
+    // plane clause gone), cells 3 and 4 would undo with plane B's old words
+    // on A and plane A's on B: both planes wrong, and the same undo count a
+    // merge would be meant to give. Plane fills differ (shape 1 on A, 2 on B),
+    // so that swap shows as cells still off each plane's fill.
+    useEditorStore.getState().setCollisionPaintBothPlanes(true);
+    const s = await mountMap();
+    const plane = renderPalette();
+    s.on().onMouseDown(collCell(1, CR));
+    s.on().onMouseMove(collCell(2, CR));
+    plane.B();                                   // Tab to B, Space: the drag is still held
+    expect(useEditorStore.getState().collisionPaintPlane,
+      'ANTI-VACUOUS: the palette\'s B button did not move the aimed plane').toBe('b');
+    s.on().onMouseMove(collCell(3, CR));
+    s.on().onMouseMove(collCell(4, CR));
+    const all = cells(1, 2, 3, 4);
+    expect(planes(), 'ANTI-VACUOUS: the both-planes stroke did not paint all four cells on both planes')
+      .toEqual({ a: all, b: all });
+    win!.dispatch('mouseup', {});
+    focusedHistory()!.undo();
+    expect(planes(), 'the first undo did not put back cells 3 and 4 on each plane with that plane\'s own words')
+      .toEqual({ a: cells(1, 2), b: cells(1, 2) });
+    focusedHistory()!.undo();
+    expect(planes(), 'the second undo did not put back cells 1 and 2 on both planes').toEqual({ a: [], b: [] });
+    expect(focusedHistory()!.canUndo, 'the stroke left more than two entries').toBe(false);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
