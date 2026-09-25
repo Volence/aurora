@@ -458,14 +458,22 @@ export const EDITOR_METHODS: EditorMethod[] = [
           + 'must equal the id parameter. Validated against the contract schema; an invalid document is '
           + 'refused with the specific issues and nothing is written.'),
     },
+    // ⚠ ROADMAP row 212, 2026-09-25: this description said binding "installs
+    // nothing yet" and then appended RASTER_SECTION_BINDING_LIMIT, which says a
+    // binding DOES install on a wired owner ({sec5, sec6} at aeon c7ebe7a1).
+    // The "yet" had lapsed by aeon c9a462be (2026-08-30, section 5 bound and
+    // threaded, "the first effect that reaches a frame") with no reader. The
+    // install question is now answered only by the constant, whose reading is
+    // re-derived by core/formats/__tests__/raster-binding-threaded-set.test.ts.
     description: 'Create, replace or delete one raster band preset. Takes the WHOLE document, not a field '
       + 'patch: read the current one with get_effects_preset, change what you want, send it back. Fields '
       + 'this editor does not expose survive because nothing enumerates them. One undo step. A document is '
       + 'at least one band, each band being {top, bot, sh, on} with EXACTLY ONE ON arm (cram or pal_region). '
       + 'Two arms would be two writes and therefore two restores, which is two bands. No numeric value is '
       + 'range-checked or clamped on this side, on purpose: the engine refuses out-of-budget bands with the '
-      + 'measurement behind the rule. ⚠ Saving does NOT install the preset: binding it to a section is a '
-      + 'separate call (assign_section_preset), and even that installs nothing yet: '
+      + 'measurement behind the rule. ⚠ Binding is a separate call (assign_section_preset, or a '
+      + 'region row\'s rasterRef in the Regions panel), and whether a binding installs anything is '
+      + 'aeon\'s fact, re-derived below: '
       + RASTER_SECTION_BINDING_LIMIT },
 
   // THE FOURTH TOOL, and it was absent on purpose until 2026-08-30: there was no
