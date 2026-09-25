@@ -13,8 +13,11 @@
 // Each change is made through the setter (or, for the flips, the X/Y key
 // handler) its control calls, between two cells of one held stroke. One more
 // row covers O3 of that packet: a stroke whose tool is switched to collision
-// under the held button paints with the word selected at ITS press, not with a
-// latch left over from an earlier collision stroke.
+// under the held button never paints a latch left over from an earlier
+// collision stroke. Since ART-STROKE-FOLLOWUPS (a) latched the TOOL too (hub
+// ruling 2026-09-25T08:55:30Z), that stroke stays a tile-stamp stroke to its end
+// and paints no collision at all; the tool's own rows are
+// composer-tool-latch-mounted.test.ts.
 //
 // These rows mount the real `ComposerCanvas` with the no-DOM harness
 // (`src/test/render-hooked.ts`) and drive the `hostPointer` it hands to
@@ -247,8 +250,8 @@ describe('ART-BRUSH-LATCH-REST: the composer\'s collision plane is latched at th
   });
 });
 
-describe('ART-BRUSH-LATCH-REST: a stroke switched to the collision tool under the held button paints its own press\'s word (O3)', () => {
-  it('ART-BRUSH-LATCH-REST: a tile-stamp stroke switched to collision mid-drag paints the word selected at ITS press, not an earlier collision stroke\'s', async () => {
+describe('ART-BRUSH-LATCH-REST: a stroke switched to the collision tool under the held button paints no earlier stroke\'s word (O3)', () => {
+  it('ART-BRUSH-LATCH-REST: a tile-stamp stroke switched to collision mid-drag paints no collision word, neither an earlier collision stroke\'s nor its own press\'s (the tool is latched)', async () => {
     useArtStore.getState().setTool('collision');
     const doc = openDoc();
     await mountComposer();
@@ -263,14 +266,15 @@ describe('ART-BRUSH-LATCH-REST: a stroke switched to the collision tool under th
     expect(collisionPaintWord(w1, FILL), 'ANTI-VACUOUS: W0 and W1 paint the same cell word').not.toBe(collisionPaintWord(w0, FILL));
     useArtStore.getState().setTool('tile-stamp');
     host().down(at(0), EV);
-    // The tool is switched under the held button; PixelViewport routes the rest of
-    // the drag to the collision tool's hook.
+    // The tool is switched under the held button. The tool is latched at the
+    // press (ART-STROKE-FOLLOWUPS (a)), so the rest of the drag stays a stamp.
     useArtStore.getState().setTool('collision');
     host().move(at(2), EV);
     host().move(at(4), EV);
     host().up(null, EV);
-    const p1 = collisionPaintWord(w1, FILL);
-    expect([...doc.collisionA], 'the switched stroke painted a latch left over from an earlier collision stroke')
-      .toEqual([p1, p1, p1, collisionPaintWord(w0, FILL)]);
+    expect([...doc.collisionA], 'the switched stroke painted collision (a latch left over from an earlier collision stroke, or its own word)')
+      .toEqual([FILL, FILL, FILL, collisionPaintWord(w0, FILL)]);
+    expect(doc.cells.slice(0, 5).map((c) => c.atlasTile), 'the switched stroke did not stamp to its end')
+      .toEqual([1, 1, 1, 1, 1]);
   });
 });
