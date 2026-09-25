@@ -52,6 +52,16 @@
 //            row; ABL.d (the NEXT press carries the toggled flip) is what
 //            shows the Y key fired at all.
 //            See docs/reviews/2026-09-25-art-brush-latch-rest.md.
+//   atl ATL.* ART-STROKE-FOLLOWUPS (a), TOOL-LATCH (hub ruling, empyrean
+//            OVERSEER-LOG 2026-09-25T08:55:30Z: "the tool is a stroke input,
+//            so it latches at the press"): a Tile stamp stroke is pressed on
+//            the composer canvas and HELD across tiles 1 and 2, real Tabs move
+//            focus to the tool rail's Collision paint button and a real Space
+//            presses it (the store's tool is now collision), and tiles 3 and 4
+//            must still be STAMPED, with no collision cell under them painted
+//            (a shape is armed first by real clicks, so the collision brush
+//            has a word that would paint).
+//            ATL.b, ATL.c, ATL.d are controls; ATL.a is the discriminating row.
 //   acj ACJ.* ART-STROKE-FOLLOWUPS (b), CANVAS-JUMP: the first write to a
 //            CLEAN chunk document does not move the composer canvas. The
 //            document open in the composer is reached by a real Art facet
@@ -61,7 +71,10 @@
 //            after (row 207's dev runs measured it 42px lower: the options
 //            bar's "unsaved" badge made the doc header wrap, and the bar
 //            grows to fit). A document that is already dirty cannot show a
-//            FIRST write: UNMEASURABLE. See
+//            FIRST write: UNMEASURABLE. ACJ.c is ART-STROKE-FOLLOWUPS (c),
+//            UNDO-DIRTY: one real Ctrl+Z takes that first write back, and the
+//            document must read clean again (the store's flag, and the
+//            "unsaved" badge no longer visible). See
 //            docs/reviews/2026-09-25-art-stroke-followups.md.
 //   m6  M6.*  a real stamp press under a still pointer names the placement it
 //            made, in the store and in the Chunk links readout, with no move.
@@ -130,7 +143,7 @@ assertDebugBuild(RUN);
 const ELECTRON = RUN.electron;
 const MAIN = RUN.main;
 const PORT = Number(process.env.PORT ?? 9433);
-const ALL_PARTS = ['m1', 'm2', 'm4', 'bw', 'abw', 'abl', 'acj', 'm6'];
+const ALL_PARTS = ['m1', 'm2', 'm4', 'bw', 'abw', 'abl', 'atl', 'acj', 'm6'];
 const PARTS = (process.env.PART ?? 'all') === 'all' ? ALL_PARTS : String(process.env.PART).split(',');
 for (const p of PARTS) if (!ALL_PARTS.includes(p)) throw new Error(`PART ${p} is not one of ${ALL_PARTS.join(', ')}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -411,7 +424,7 @@ async function main() {
     await setup(d, A);
     const st0 = await d.strays();
     if (st0.length) check('SETUP.STRAY', 'no mouse event reached the page at a position this harness never sent', 'UNMEASURABLE', J(st0.slice(0, 10)));
-    const parts = { m1: m1Part, m2: m2Part, m4: m4Part, bw: bwPart, abw: abwPart, abl: ablPart, acj: acjPart, m6: m6Part };
+    const parts = { m1: m1Part, m2: m2Part, m4: m4Part, bw: bwPart, abw: abwPart, abl: ablPart, atl: atlPart, acj: acjPart, m6: m6Part };
     for (const p of ALL_PARTS) {
       if (!PARTS.includes(p)) continue;
       console.log(`\n════════ PART ${p} ════════`);
@@ -1278,6 +1291,168 @@ async function ablPart(d, O) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PART atl. ART-STROKE-FOLLOWUPS (a), TOOL-LATCH. A tool picked on the rail
+// while a composer stroke is held must not change what the rest of the stroke
+// does. The rail has no tool keys in the Art facet (ArtToolDock: buttons
+// only), and a second pointer press cannot be sent with the button held, so the
+// route is the keyboard one PART abw uses for a shape button: real Tabs until
+// focus is on the rail's Collision paint button, then a real Space. Expected
+// cells come from source: `stampTile` writes `atlasTile: spec.tile` with the
+// flips ComposerCanvas holds (both off: a fresh document starts so, and PART abl
+// turns both back off), and the collision brush would write
+// `collisionPaintWord(word, old)` (the oracle's `paintWord`) on the plane
+// `armCollisionBrush({})` reports.
+// ═══════════════════════════════════════════════════════════════════════════
+async function atlPart(d, O) {
+  const { c } = d;
+  await neutral(d);
+  const already = await c.json('window.__dbg.aeon.artChunkOpen()');
+  let facet;
+  if (already && already.chunkId !== null) {
+    const art = await d.realClick(d.FACET('Art'));
+    await sleep(800);
+    facet = { hitOk: !!art?.hitOk && (await c.json('window.__dbg.aeon.artChunkOpen()'))?.chunkId === already.chunkId, route: 'Art facet click, document already open', already, art };
+  } else {
+    facet = { ...(await openArtChunk(d)), route: 'double-click on the Chunks grid' };
+  }
+  // A collision word to switch TO: the Collision paint tool shows the palette,
+  // and a real click on a shape button arms a word (as PART abw does), then a
+  // real click arms the Tile stamp the stroke is pressed with.
+  const collTool = await d.realClick('document.querySelector(\'button[aria-label="Collision paint"]\')');
+  await sleep(400);
+  const shape = await d.realClick(SHAPE_N(3), { scroll: true });
+  await sleep(200);
+  const tool = await d.realClick('document.querySelector(\'button[aria-label="Tile stamp"]\')');
+  await sleep(600);
+  const doc = await c.json('window.__dbg.aeon.artChunkOpen()');
+  const rect = () => c.json(String.raw`(() => { const cv = ${COMPOSER_CANVAS}; if (!cv) return null; const b = cv.getBoundingClientRect();
+    const nb = document.querySelector('button[title^="Close this document"]'); let bar = nb; while (bar && bar.parentElement && getComputedStyle(bar).minHeight !== '32px') bar = bar.parentElement;
+    const br = bar ? bar.getBoundingClientRect() : null;
+    return { x: b.left, y: b.top, w: b.width, h: b.height, cw: cv.width, dpr: window.devicePixelRatio, barH: br ? br.height : null }; })()`);
+  let G = await rect();
+  const setupOk = !!facet?.hitOk && !!collTool?.hitOk && !!shape?.hitOk && !!tool?.hitOk && !!doc && doc.chunkId !== null && doc.tool === 'tile-stamp' && !!G;
+  const zoom = G && doc ? G.cw / (doc.widthTiles * 8) : null;
+  const T = doc ? doc.brushTile : null;
+  const brush = await brushRead(d);
+  const cellsW = doc ? doc.widthTiles >> 1 : 0;
+  const stamped = { t: T, hf: false, vf: false };
+  const pickOne = (q) => (q ? { t: q.atlasTile, hf: q.hf, vf: q.vf } : null);
+  const cellAt = (tx, ty) => c.json(`window.__dbg.aeon.artDocCellAt(${tx}, ${ty})`);
+  const collAt = (plane, tx, ty) => c.json(`window.__dbg.aeon.artDocCollisionAt(${J(plane)}, ${(ty >> 1) * cellsW + (tx >> 1)})`);
+  const aimTile = async (tx, ty) => {
+    const x = Math.round(G.x + (tx * 8 + 4) * zoom); const y = Math.round(G.y + (ty * 8 + 4) * zoom);
+    const back = { tx: Math.floor((x - G.x) / zoom / 8), ty: Math.floor((y - G.y) / zoom / 8) };
+    const on = await c.evalExpr(`document.elementFromPoint(${x}, ${y}) === ${COMPOSER_CANVAS}`);
+    return { x, y, back, on };
+  };
+  // Five tiles in a row, each aimed back to itself, where the stamp changes
+  // tiles 1 to 4 and the collision brush would change the collision cell under
+  // tile 3 or 4 (ANTI-VACUOUS both ways: a stamped tile and a collision-painted
+  // one are told apart from an untouched one).
+  let tiles = null; let aims = null;
+  if (setupOk && Number.isInteger(zoom) && zoom >= 1 && doc.widthTiles >= 5 && brush && brush.word !== 0) {
+    for (let ty = 0; ty < doc.heightTiles && !tiles; ty++) {
+      for (let tx = 0; tx + 5 <= doc.widthTiles && !tiles; tx++) {
+        const pre = [];
+        for (let k = 0; k < 5; k++) pre.push(pickOne(await cellAt(tx + k, ty)));
+        if (pre.slice(0, 4).some((q) => same(q, stamped))) continue;
+        const w3 = await collAt(brush.plane, tx + 2, ty); const w4 = await collAt(brush.plane, tx + 3, ty);
+        if (O.paintWord(brush.word, w3) === w3 && O.paintWord(brush.word, w4) === w4) continue;
+        const a = [];
+        for (let k = 0; k < 5; k++) a.push(await aimTile(tx + k, ty));
+        if (a.every((p, k) => p.on && p.back.tx === tx + k && p.back.ty === ty)) { tiles = [0, 1, 2, 3, 4].map((k) => ({ tx: tx + k, ty })); aims = a; }
+      }
+    }
+  }
+  if (!tiles) {
+    check('ATL.0', 'PREMISE: the Art facet and the Tile stamp armed by real clicks on a chunk document, and five tiles in a row on the composer canvas, each aimed at an integer client pixel on that tile, where the stamp and the collision brush would each paint differently', 'UNMEASURABLE',
+      `facet ${J(facet)}; collision tool ${J(collTool)}; shape ${J(shape)}; tool ${J(tool)}; doc ${J(doc)}; canvas ${J(G)} zoom ${zoom}; brush ${J(brush)}`);
+    return;
+  }
+  const state = () => c.json(String.raw`(() => { const a = window.__dbg.aeon; const ts = ${J(tiles)}; const W = ${cellsW};
+    const ix = ts.map((t) => (t.ty >> 1) * W + (t.tx >> 1));
+    return { cells: ts.map((t) => a.artDocCellAt(t.tx, t.ty)), a: ix.map((i) => a.artDocCollisionAt('a', i)), b: ix.map((i) => a.artDocCollisionAt('b', i)) }; })()`);
+  const s0 = await state();
+  const railFocus = () => c.json(String.raw`(() => { const a = document.activeElement; const t = document.querySelector('button[aria-label="Collision paint"]');
+    return { body: a === document.body, onRail: !!t && a === t, tag: a && a.tagName, label: a && a.getAttribute ? a.getAttribute('aria-label') : null }; })()`);
+  await d.blur();
+  await d.clicksDrain();
+  // The stroke: pressed on tile 1 with the Tile stamp, held across tile 2.
+  await d.mouse('mouseMoved', aims[0].x, aims[0].y);
+  await d.mouse('mousePressed', aims[0].x, aims[0].y, 'left', 1); await sleep(80);
+  await d.mouse('mouseMoved', aims[1].x, aims[1].y, 'left', 1); await sleep(150);
+  const s1 = await state();
+  const fHeld = await railFocus();
+  await d.clicksDrain();
+  const hops = [];
+  let f = fHeld;
+  // Bounded; every hop is recorded (summarised: the count, and the last ten).
+  // The Space is sent only once focus is on the rail's Collision paint button,
+  // so a route that never got there presses nothing.
+  for (let n = 0; n < 400 && !f.onRail; n++) {
+    await d.tab();
+    f = await railFocus();
+    hops.push(f.body ? 'BODY' : `${f.tag}:${f.label ?? ''}`);
+  }
+  const tabClicks = await d.clicksDrain();
+  if (f.onRail) await d.space();
+  const spaceClicks = await d.clicksDrain();
+  const toolMid = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.tool;
+  // The options bar is tool-dependent, so arming another tool can move the
+  // canvas (dev run 4: y 186 to 135, booked in the packet). The rest of the
+  // stroke is aimed from the rect measured NOW, each aim derived back to its
+  // tile, so tiles 3 to 5 are the tiles the part names whatever the layout did.
+  const G0 = G;
+  const G1 = await rect();
+  G = G1;
+  const reaim = [];
+  if (G1) for (let k = 2; k < 5; k++) reaim.push(await aimTile(tiles[k].tx, tiles[k].ty));
+  const reaimOk = reaim.length === 3 && reaim.every((p, k) => p.on && p.back.tx === tiles[k + 2].tx && p.back.ty === tiles[k + 2].ty);
+  if (reaimOk) for (let k = 2; k < 5; k++) aims[k] = reaim[k - 2];
+  const premise = reaimOk && f.onRail && tabClicks.length === 0 && spaceClicks.length > 0
+    && toolMid === 'collision' && same(s1.cells.slice(0, 2).map(pickOne), [stamped, stamped]);
+  check('ATL.0', 'PREMISE: on the composer\'s chunk document, a Tile stamp stroke is HELD (tiles 1 and 2 stamped); real Tabs moved focus to the rail\'s Collision paint button (no Tab clicked anything) and a real Space pressed it (a click reached the page), so the store\'s tool is now collision; tiles 3 to 5 re-aimed on the canvas as it stands after the switch',
+    premise, `dpr ${G.dpr}; document reached by ${facet.route}; canvas ${J(G)} zoom ${zoom}; doc ${J(doc)}; brush ${J(brush)}; tiles ${J(tiles)}; aims ${J(aims)}; `
+    + `focus while held ${J(fHeld)}; Tab hops ${hops.length}, the last ten ${J(hops.slice(-10))}; final ${J(f)}; clicks during Tabs ${J(tabClicks)}; clicks the Space produced ${J(spaceClicks)}; tool after ${toolMid}; `
+    + `tiles 1,2 after the press ${J(s1.cells.slice(0, 2).map(pickOne))}; canvas before the switch ${J(G0)}, after ${J(G1)}; tiles 3..5 re-aimed ${J(reaim)}`);
+  await d.mouse('mouseMoved', aims[2].x, aims[2].y, 'left', 1); await sleep(150);
+  await d.mouse('mouseMoved', aims[3].x, aims[3].y, 'left', 1); await sleep(150);
+  await d.mouse('mouseReleased', aims[3].x, aims[3].y, 'left', 0); await sleep(400);
+  const s2 = await state();
+  if (premise) {
+    check('ATL.a', 'the tool picked MID-DRAG does not change the composer stroke: tiles 3 and 4, entered AFTER the Space, are STAMPED like tiles 1 and 2, and no collision cell under the five tiles changed on either plane',
+      same(s2.cells.slice(0, 4).map(pickOne), [stamped, stamped, stamped, stamped]) && same(s2.a, s0.a) && same(s2.b, s0.b),
+      `tiles 1..4 ${J(s2.cells.slice(0, 4).map(pickOne))}, the stamp writes ${J(stamped)}; collision A ${J(s2.a)} (before ${J(s0.a)}), B ${J(s2.b)} (before ${J(s0.b)}); the collision brush is ${J(brush)}`);
+    check('ATL.b', 'CONTROL (green with or without the latch): tiles 1 and 2, stamped BEFORE the Space, carry the stamp, and tile 5, never entered, is unchanged',
+      same(s2.cells.slice(0, 2).map(pickOne), [stamped, stamped]) && same(s2.cells[4], s0.cells[4]),
+      `tiles 1,2 ${J(s2.cells.slice(0, 2).map(pickOne))}; tile 5 ${J(s2.cells[4])}, before ${J(s0.cells[4])}`);
+  }
+  await d.blur();
+  await d.chord('z', CTRL);
+  await sleep(300);
+  const s3 = await state();
+  if (premise) {
+    check('ATL.c', 'CONTROL: the stroke is ONE undo step: one Ctrl+Z puts the five tiles and their collision cells back exactly',
+      same(s3, s0), `after one Ctrl+Z ${J(s3)}; before ${J(s0)}`);
+  }
+  // The NEXT press takes the tool picked during the last stroke: a click on
+  // tile 5 paints collision there and stamps nothing.
+  await d.mouse('mouseMoved', aims[4].x, aims[4].y);
+  await d.mouse('mousePressed', aims[4].x, aims[4].y, 'left', 1); await sleep(80);
+  await d.mouse('mouseReleased', aims[4].x, aims[4].y, 'left', 0); await sleep(400);
+  const s4 = await state();
+  const w5 = s0[brush.plane][4];
+  if (premise) {
+    check('ATL.d', 'CONTROL: the NEXT press takes the tool picked during the last stroke: a click on tile 5 leaves the five nametable cells alone, and writes the brush word into the collision cell under tile 5',
+      same(s4.cells, s0.cells) && s4[brush.plane][4] === O.paintWord(brush.word, w5),
+      `tile 5 ${J(s4.cells[4])} (before ${J(s0.cells[4])}); collision under tile 5 on plane ${brush.plane}: ${s4[brush.plane][4]}, before ${w5}, the brush writes ${O.paintWord(brush.word, w5)}`);
+  }
+  if (!same(s4, s0)) { await d.blur(); await d.chord('z', CTRL); await sleep(300); }
+  const s5 = await state();
+  note('ATL.cleanup', `the five tiles and their collision cells ${same(s5, s0) ? 'match' : 'DIFFER FROM'} the start; dirty ${(await c.json('window.__dbg.aeon.artChunkOpen()'))?.dirty}; the Collision paint tool is left armed (as PART abl leaves it)`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // PART acj. ART-STROKE-FOLLOWUPS (b), CANVAS-JUMP. The first write to a clean
 // chunk document must not move the composer canvas. Row 207's dev runs 1 to 3
 // measured the canvas 42px lower after the first stamp: the tool-options bar's
@@ -1351,12 +1526,23 @@ async function acjPart(d) {
     check('ACJ.a', 'the first write to a clean chunk document does not move the composer canvas: its rect is the same before the press and after the release',
       !moved, `canvas before ${J({ x: G.x, y: G.y, w: G.w, h: G.h })} after ${J({ x: G1.x, y: G1.y, w: G1.w, h: G1.h })} (dy ${G1 ? (G1.y - G.y).toFixed(2) : '?'}); options bar before ${J(G.bar)} after ${J(G1?.bar)}`);
   }
+  const badge = () => c.json(String.raw`(() => { const nb = document.querySelector('button[title^="Close this document"]'); if (!nb) return null;
+    const b = [...nb.parentElement.querySelectorAll('span')].find((x) => x.textContent.trim() === 'unsaved'); if (!b) return { present: false, visible: false };
+    const r = b.getBoundingClientRect(); return { present: true, visible: getComputedStyle(b).visibility === 'visible' && r.width > 0 }; })()`);
+  const badge1 = await badge();
   await d.blur();
   await d.chord('z', CTRL);
   await sleep(300);
   const back = pickOne(await cellAt(hit.tx, hit.ty));
   const dirty2 = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.dirty;
-  note('ACJ.cleanup', `after one Ctrl+Z the tile ${same(back, hit.before) ? 'matches' : 'DIFFERS FROM'} its start; dirty ${dirty2}`);
+  const badge2 = await badge();
+  if (premise) {
+    check('ACJ.c', 'UNDO-DIRTY: one real Ctrl+Z takes the first write back (the tile matches its start) and the document reads CLEAN again: the store\'s flag is false and the "unsaved" badge, visible after the write, is not visible',
+      same(back, hit.before) && dirty2 === false && !!badge1?.visible && !badge2?.visible,
+      `tile after Ctrl+Z ${J(back)}, start ${J(hit.before)}; dirty after the write ${dirty1}, after Ctrl+Z ${dirty2}; badge after the write ${J(badge1)}, after Ctrl+Z ${J(badge2)}`);
+  } else {
+    note('ACJ.cleanup', `after one Ctrl+Z the tile ${same(back, hit.before) ? 'matches' : 'DIFFERS FROM'} its start; dirty ${dirty2}`);
+  }
   // Leave the composer as PART abl leaves it for m6: the Collision paint tool armed.
   await d.realClick('document.querySelector(\'button[aria-label="Collision paint"]\')');
   await sleep(300);
