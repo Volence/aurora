@@ -92,6 +92,24 @@ const PLANT = process.env.PLANT ?? '';
 
 /** The guide on disk — the same bytes the app is supposed to be rendering. */
 const GUIDE_MD = readFileSync(`${ROOT}/docs/guides/effects-first-run.md`, 'utf8');
+/**
+ * The first line of plain prose under `## <n>.` in GUIDE_MD: at least 40
+ * characters and carrying none of the characters markdown-lite turns into
+ * something else (emphasis, code, links, tables, quotes, headings, escapes), so
+ * the pane's text for it is the line itself. Row [3b]'s probes, derived rather
+ * than typed. Refuses rather than returning nothing: an empty probe is found in
+ * every pane.
+ */
+function GUIDE_PROBE(n) {
+  const lines = GUIDE_MD.split('\n');
+  const at = lines.findIndex((l) => l.startsWith(`## ${n}. `));
+  if (at < 0) throw new Error(`CANNOT MEASURE: the guide has no "## ${n}. " heading — row [3b] would lose a probe`);
+  for (let i = at + 1; i < lines.length && !lines[i].startsWith('## '); i++) {
+    const l = lines[i].trim();
+    if (l.length >= 40 && !/[*_`[\]|<>#\\]/.test(l)) return l;
+  }
+  throw new Error(`CANNOT MEASURE: §${n} of the guide has no plain-prose line of 40+ chars — row [3b] would lose a probe`);
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -321,11 +339,16 @@ async function main() {
 
     // THE PAGE IS THE DOCUMENT, not an empty shell and not a fork of it. Three
     // sentences taken from the markdown ON DISK by this process.
-    const probes = [
-      'A raster band repaints part of the palette for a range of screen lines',
-      'Tile animations are not raster bands',
-      'only if it binds a preset that no other section binds',
-    ];
+    //
+    // ⚠ DERIVED, NOT TYPED (ROADMAP row 198, 2026-09-25). The third probe was
+    // the §6 rule copied out of the guide, `only if it binds a preset that no
+    // other section binds`; aeon keyed the raster chooser on the record, that
+    // rule retired, §6 was rewritten, and the typed probe would have reddened
+    // this row on a true edit of the guide rather than on a pane that failed to
+    // render it. Each probe is now the first line of PLAIN prose in a section
+    // (no markdown syntax on it, so its rendered text is its source text) of
+    // §3, §6 and §8, read off the same bytes the app is meant to be showing.
+    const probes = [3, 6, 8].map((n) => GUIDE_PROBE(n));
     const onDisk = probes.filter((p) => GUIDE_MD.includes(p));
     const rendered = await c.json(String.raw`(() => {
       const p = ${GUIDE_PANE};
@@ -334,7 +357,8 @@ async function main() {
     })()`);
     check('3b', 'the pane renders the DOCUMENT\'S OWN sentences — read off disk by this process',
       onDisk.length === probes.length && rendered.every(Boolean) && pane.textLen > 3000,
-      `on disk ${onDisk.length}/${probes.length}; rendered ${JSON.stringify(rendered)}; `
+      `probes ${JSON.stringify(probes)}; `
+      + `on disk ${onDisk.length}/${probes.length}; rendered ${JSON.stringify(rendered)}; `
       + `pane innerText = ${pane.textLen} chars`);
 
     check('3c', 'the tables and code blocks the markdown carries really rendered as such',
