@@ -1,0 +1,14 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a98503da5364e6ca4
+
+ ✓ src/renderer/components/art/__tests__/composer-brush-latch-rest-mounted.test.ts (8 tests) 172ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  04:23:29
+   Duration  1.35s (transform 901ms, setup 921ms, import 88ms, tests 172ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: no failures in this run (1 module(s) reported).
