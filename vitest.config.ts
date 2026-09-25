@@ -27,6 +27,16 @@ export default defineConfig({
       ...(process.env.AURORA_FAILURE_CLASS_CANARY
         ? ['test/config/fixtures/failure-class-canary.ts']
         : []),
+      // The run-completeness reporter's two subjects, on the same terms
+      // (test/config/run-completeness-reporter.test.ts). One of them KILLS ITS
+      // OWN WORKER, so a main-suite run that collected it would lose a module
+      // by design.
+      ...(process.env.AURORA_RUN_COMPLETENESS_CANARY
+        ? [
+            'test/config/fixtures/run-completeness-canary-pass.ts',
+            'test/config/fixtures/run-completeness-canary-reaped.ts',
+          ]
+        : []),
     ],
     // THE LINE BELOW IS LOAD-BEARING FOR TWO SEPARATE PROPERTIES. Both are
     // invisible when broken — no test fails, the suite stays green, and the
@@ -74,6 +84,11 @@ export default defineConfig({
       'default',
       './scripts/skip-report-reporter.mjs',
       './scripts/failure-class-reporter.mjs',
+      // 4. COMPLETENESS (ROADMAP row 204). Compares what THIS invocation
+      //    selected (onTestRunStart) with what finished (onTestRunEnd) and
+      //    fails the run on a gap; writes the record scripts/land.mjs checks.
+      //    Guarded by test/config/run-completeness-reporter.test.ts.
+      './scripts/run-completeness-reporter.mjs',
     ],
     // Node-env global stubs for renderer modules that construct canvases at
     // import time (see the file header). Guarded to only define missing globals.
