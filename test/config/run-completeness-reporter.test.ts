@@ -26,7 +26,10 @@
  *
  * SUBSET. A child over the passing canary alone must be COMPLETE, 1 of 1, exit
  * 0: the expectation is what the invocation selected, so a subset is not red
- * for being a subset.
+ * for being a subset. SHARD: `--shard=1/2` over two passing canaries must be
+ * COMPLETE, 1 of 1, exit 0. vitest announces BOTH specs to onTestRunStart and
+ * then runs one, so a reporter that trusted the announcement would call every
+ * shard INCOMPLETE (measured before the fix: a `--shard=1/2` suite read 338 of 675).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { spawn } from 'node:child_process';
@@ -46,6 +49,7 @@ import {
 import {
   CANARY_ENV_FLAG,
   PASS_FIXTURE_REL,
+  PASS_2_FIXTURE_REL,
   REAPED_FIXTURE_REL,
 } from './fixtures/run-completeness-markers';
 
@@ -71,7 +75,7 @@ interface Run {
 }
 
 /**
- * One child `vitest run`, async so the three children overlap. The reaped
+ * One child `vitest run`, async so the four children overlap. The reaped
  * worker otherwise costs vitest's teardown timeout (~10s) waiting for a process
  * that is already dead; `--teardownTimeout=500` cuts that to well under 2s.
  */
@@ -102,15 +106,17 @@ describe('run-completeness: a reaped worker is caught by this reporter, not by l
   let control: Run;
   let reaped: Run;
   let subset: Run;
+  let shard: Run;
   let dir: string;
 
   beforeAll(async () => {
     dir = mkdtempSync(join(tmpdir(), 'run-completeness-'));
     try {
-      [control, reaped, subset] = await Promise.all([
+      [control, reaped, subset, shard] = await Promise.all([
         runChild([PASS_FIXTURE_REL, REAPED_FIXTURE_REL], ['--reporter=default', IGNORE], dir, 'control'),
         runChild([PASS_FIXTURE_REL, REAPED_FIXTURE_REL], [IGNORE], dir, 'reaped'),
         runChild([PASS_FIXTURE_REL], [], dir, 'subset'),
+        runChild([PASS_FIXTURE_REL, PASS_2_FIXTURE_REL], ['--shard=1/2'], dir, 'shard'),
       ]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -155,6 +161,16 @@ describe('run-completeness: a reaped worker is caught by this reporter, not by l
     expect(subset.status, subset.output).toBe(0);
     expect(subset.record?.status).toBe(COMPLETE);
     expect(subset.record?.selected).toEqual([PASS_ABS]);
+  });
+
+  it('SHARD: half of two finishing files is COMPLETE, 1 of 1, and exits 0', () => {
+    expect(shard.output, shard.output).toContain(`${PREFIX}: ${COMPLETE}, 1 of 1 module(s)`);
+    expect(shard.status, shard.output).toBe(0);
+    expect(shard.record?.status).toBe(COMPLETE);
+    // And land.mjs's comparison is what refuses a shard standing in for the suite.
+    expect(
+      verifyRecordAgainstExpected(shard.record, [PASS_ABS, resolve(REPO, PASS_2_FIXTURE_REL)]),
+    ).toMatch(/1 expected file\(s\) were never selected/);
   });
 });
 

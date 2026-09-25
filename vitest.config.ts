@@ -34,6 +34,7 @@ export default defineConfig({
       ...(process.env.AURORA_RUN_COMPLETENESS_CANARY
         ? [
             'test/config/fixtures/run-completeness-canary-pass.ts',
+            'test/config/fixtures/run-completeness-canary-pass-2.ts',
             'test/config/fixtures/run-completeness-canary-reaped.ts',
           ]
         : []),

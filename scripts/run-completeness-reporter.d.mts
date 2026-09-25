@@ -44,6 +44,6 @@ export declare function verifyRecordAgainstExpected(
 
 export default class RunCompletenessReporter {
   onInit(vitest: unknown): void;
-  onTestRunStart(specifications: readonly unknown[]): void;
+  onTestRunStart(specifications: readonly unknown[]): Promise<void>;
   onTestRunEnd(testModules: readonly unknown[], unhandledErrors: readonly unknown[], reason: string): void;
 }

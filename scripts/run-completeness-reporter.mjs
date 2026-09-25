@@ -48,8 +48,9 @@
  * SUBSET POLICY
  * -------------
  * The expectation is WHAT THIS INVOCATION SELECTED. `vitest run some/file`,
- * a directory filter, or `-t` is complete when everything it selected finished,
- * so a subset never goes red for being a subset. The cost is that this reporter
+ * a directory filter, `-t`, or a `--shard` is complete when everything it
+ * selected finished, so a subset never goes red for being a subset (the shard
+ * needs asking of vitest's sequencer; see onTestRunStart). The cost is that this reporter
  * alone cannot see a subset that should have been the whole suite (a `--shard`
  * or a filter slipped into the `test` script). That half belongs to the full
  * run, so `scripts/land.mjs` compares this record's selection against
@@ -170,7 +171,11 @@ export default class RunCompletenessReporter {
   /** Captured once, then removed from this process's env (see onInit). */
   #recordFile = process.env[RECORD_ENV] || '';
 
+  /** The Vitest instance, for resolving a `--shard` selection. */
+  #vitest = null;
+
   onInit(vitest) {
+    this.#vitest = vitest ?? null;
     this.#watch = Boolean(vitest?.config?.watch);
     // Several suite files spawn a CHILD `vitest run` of their own. Their
     // workers are forked from this process, so without this delete each child
@@ -181,8 +186,29 @@ export default class RunCompletenessReporter {
     delete process.env[RECORD_ENV];
   }
 
-  onTestRunStart(specifications) {
-    this.#selected = (specifications ?? []).map((spec) => ({
+  async onTestRunStart(specifications) {
+    let specs = [...(specifications ?? [])];
+    // ⚠ `--shard` IS APPLIED AFTER THIS HOOK. Measured: `vitest run --shard=1/2`
+    // announces all 675 specs here and then runs 338, and `TestRun.end` drops
+    // the other 337 because they never got a module. Without this, every shard
+    // reads INCOMPLETE, which breaks the subset policy above. So the shard is
+    // asked of vitest's OWN sequencer, the same class and call the pool makes
+    // (`specs = await sequencer.shard(Array.from(specs))` in cli-api's
+    // createPool), rather than re-implementing its hash. If that cannot be
+    // asked, the selection stays null and the verdict is UNMEASURABLE: a shard
+    // this cannot resolve is not a shard it may call complete.
+    const shard = this.#vitest?.config?.shard;
+    if (shard) {
+      try {
+        const Sequencer = this.#vitest.config.sequence.sequencer;
+        specs = await new Sequencer(this.#vitest).shard(specs);
+      } catch (e) {
+        console.error(`${PREFIX}: could not resolve this run's --shard selection: ${e.message}`);
+        this.#selected = null;
+        return;
+      }
+    }
+    this.#selected = specs.map((spec) => ({
       project: spec.project?.name ?? '',
       moduleId: spec.moduleId,
     }));

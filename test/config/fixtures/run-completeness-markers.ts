@@ -15,6 +15,9 @@ export const CANARY_ENV_FLAG = 'AURORA_RUN_COMPLETENESS_CANARY';
 /** A file whose one test passes. Relative to the repo root. */
 export const PASS_FIXTURE_REL = 'test/config/fixtures/run-completeness-canary-pass.ts';
 
+/** A second passing file, so a `--shard=1/2` child has two to split. */
+export const PASS_2_FIXTURE_REL = 'test/config/fixtures/run-completeness-canary-pass-2.ts';
+
 /**
  * A file whose test sends SIGKILL to the vitest fork running it, which is what
  * earlyoom's last stage does to a worker. Relative to the repo root.
