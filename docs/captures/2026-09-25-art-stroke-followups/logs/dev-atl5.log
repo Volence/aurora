@@ -1,0 +1,72 @@
+run dev-atl5 PART=atl start 09:16:54Z load 16.61
+bundle strokeHeld count: 3
+copy /tmp/claude-1000/-home-volence-sonic-hacks-aurora/fd9f5022-ac5b-40c2-a861-482086de404f/scratchpad/aeon-dev-atl5-3214983-1790327814 (238M)
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c — dist/main/index.mjs is 153s newer than the newest of 1022 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/src/renderer/state/chunk-doc-commit.ts)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-25T09:14:15.868Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-25T09:14:15.868Z), so window.__dbg is in this bundle
+=== map-behaviour-fixes 2026-09-12 harness ===
+    uptime       : 05:16:54 up 1 day, 18:18,  1 user,  load average: 16.61, 22.32, 22.95
+    PARTS        : atl
+    node         : v24.15.0
+    root         : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+    in-tree      : yes (the tree under test is /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c; this file lives in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c)
+    ORACLE_SOCKET: /tmp/mbfix-sock-5wTXEB/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-3221033-528b8ef0
+    PORT         : 9433   DISPLAY: xvfb-run -a (never :0)
+    oracle       : literals from HEAD b1e422feb5ed9034ff5f5e586d2600e2aec3af28; collision-paint, collision-cell, s4-types, collision-word, collision-cell-word bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/src; brush sizes [1,7,15,25]; section 256x256 tiles
+    harness      : blob 435ee02a424c2375e076fa661e39e30ed4ade074 (DIFFERS from HEAD's 2ad3680a9c3d511d290df147327f398bf87ed6ac)
+    src on disk  : identical to HEAD
+    aeon source  : AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/fd9f5022-ac5b-40c2-a861-482086de404f/scratchpad/aeon-dev-atl5-3214983-1790327814   (live sibling /home/volence/sonic_hacks/aeon: refused if equal)
+    copy         : /tmp/mbfix-aeon-nKAg3J   project "Sonic 4"
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 3072542 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 3072542,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 3072542 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 3072542,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-3221033-528b8ef0 — see HAZARD 6
+    X pointer    : PARKED outside the window: display :159 (Xvfb pid 3224146); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed   click log: installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1, by a real click on its Explorer row   [load 15.83/21.96/22.83]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row "Oracle Jungle Zone · act1" aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+════════ PART atl ════════
+PASS  [ATL.0] PREMISE: on the composer's chunk document, a Tile stamp stroke is HELD (tiles 1 and 2 stamped); real Tabs moved focus to the rail's Collision paint button (no Tab clicked anything) and a real Space pressed it (a click reached the page), so the store's tool is now collision; tiles 3 to 5 re-aimed on the canvas as it stands after the switch   [load 18.24/22.06/22.84]
+        dpr 1; document reached by double-click on the Chunks grid; canvas {"x":308,"y":135,"w":1024,"h":1024,"cw":1024,"dpr":1,"barH":37} zoom 8; doc {"chunkId":"OJZ_01","name":"OJZ $01","widthTiles":16,"heightTiles":16,"dirty":false,"tool":"tile-stamp","brushTile":0,"stampPriority":"keep"}; brush {"plane":"a","bothPlanes":false,"crossover":"keep","crossoverSpanMode":"cell","word":12290}; tiles [{"tx":0,"ty":0},{"tx":1,"ty":0},{"tx":2,"ty":0},{"tx":3,"ty":0},{"tx":4,"ty":0}]; aims [{"x":340,"y":218,"back":{"tx":0,"ty":0},"on":true},{"x":404,"y":218,"back":{"tx":1,"ty":0},"on":true},{"x":468,"y":167,"back":{"tx":2,"ty":0},"on":true},{"x":532,"y":167,"back":{"tx":3,"ty":0},"on":true},{"x":596,"y":167,"back":{"tx":4,"ty":0},"on":true}]; focus while held {"body":true,"onRail":false,"tag":"BODY","label":null}; Tab hops 181, the last ten ["BUTTON:Pencil (paint pixels)","BUTTON:Eraser (paint color 0)","BUTTON:Fill (flood fill)","BUTTON:Eyedropper (pick color)","BUTTON:Line","BUTTON:Rectangle","BUTTON:Select (marquee)","BUTTON:Dither brush","BUTTON:Tile stamp","BUTTON:Collision paint"]; final {"body":false,"onRail":true,"tag":"BUTTON","label":"Collision paint"}; clicks during Tabs []; clicks the Space produced [{"target":"BUTTON","text":"","row":"","title":"Collision paint","detail":0}]; tool after collision; tiles 1,2 after the press [{"t":0,"hf":false,"vf":false},{"t":0,"hf":false,"vf":false}]; canvas before the switch {"x":308,"y":186,"w":1024,"h":1024,"cw":1024,"dpr":1,"barH":88}, after {"x":308,"y":135,"w":1024,"h":1024,"cw":1024,"dpr":1,"barH":37}; tiles 3..5 re-aimed [{"x":468,"y":167,"back":{"tx":2,"ty":0},"on":true},{"x":532,"y":167,"back":{"tx":3,"ty":0},"on":true},{"x":596,"y":167,"back":{"tx":4,"ty":0},"on":true}]
+PASS  [ATL.a] the tool picked MID-DRAG does not change the composer stroke: tiles 3 and 4, entered AFTER the Space, are STAMPED like tiles 1 and 2, and no collision cell under the five tiles changed on either plane   [load 18.24/22.06/22.84]
+        tiles 1..4 [{"t":0,"hf":false,"vf":false},{"t":0,"hf":false,"vf":false},{"t":0,"hf":false,"vf":false},{"t":0,"hf":false,"vf":false}], the stamp writes {"t":0,"hf":false,"vf":false}; collision A [0,0,0,0,0] (before [0,0,0,0,0]), B [0,0,0,0,0] (before [0,0,0,0,0]); the collision brush is {"plane":"a","bothPlanes":false,"crossover":"keep","crossoverSpanMode":"cell","word":12290}
+PASS  [ATL.b] CONTROL (green with or without the latch): tiles 1 and 2, stamped BEFORE the Space, carry the stamp, and tile 5, never entered, is unchanged   [load 18.24/22.06/22.84]
+        tiles 1,2 [{"t":0,"hf":false,"vf":false},{"t":0,"hf":false,"vf":false}]; tile 5 {"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}, before {"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}
+PASS  [ATL.c] CONTROL: the stroke is ONE undo step: one Ctrl+Z puts the five tiles and their collision cells back exactly   [load 19.51/22.26/22.90]
+        after one Ctrl+Z {"cells":[{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false},{"atlasTile":null,"localId":null,"pal":0,"hf":false,"vf":false,"pri":false},{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false},{"atlasTile":null,"localId":null,"pal":0,"hf":false,"vf":false,"pri":false},{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}],"a":[0,0,0,0,0],"b":[0,0,0,0,0]}; before {"cells":[{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false},{"atlasTile":null,"localId":null,"pal":0,"hf":false,"vf":false,"pri":false},{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false},{"atlasTile":null,"localId":null,"pal":0,"hf":false,"vf":false,"pri":false},{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}],"a":[0,0,0,0,0],"b":[0,0,0,0,0]}
+PASS  [ATL.d] CONTROL: the NEXT press takes the tool picked during the last stroke: a click on tile 5 leaves the five nametable cells alone, and writes the brush word into the collision cell under tile 5   [load 19.51/22.26/22.90]
+        tile 5 {"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false} (before {"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}); collision under tile 5 on plane a: 12290, before 0, the brush writes 12290
+NOTE  [ATL.cleanup] the five tiles and their collision cells match the start; dirty false; the Collision paint tool is left armed (as PART abl leaves it)
+NOTE  [atl.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 3224068 (11 process(es)):
+           3224068 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           3224146 Xvfb :159 -screen 0 1680x1050x24 -nolisten tcp
+           3254395 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           3254587 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           3254626 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3254627 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3254653 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3256724 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3256767 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3256871 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           3257023 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 106 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 101 ms; teardown 507 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=atl: 6/6 rows PASS · 0 FAIL · 0 UNMEASURABLE · 34.1s ════
+     uptime at end 05:17:28 up 1 day, 18:18,  1 user,  load average: 19.51, 22.26, 22.90
+END-OF-RUN
+harness exit 0
+copy removed: yes
+end 09:17:28Z load 19.51

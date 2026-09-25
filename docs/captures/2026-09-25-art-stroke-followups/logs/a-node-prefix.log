@@ -1,0 +1,278 @@
+08:58:26Z
+18.91 25.38 27.54 12/3825 763320
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+
+ ❯ src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts (4 tests | 4 failed) 114ms
+     × TOOL-LATCH: a tile-stamp stroke switched to 'collision' under the held button stamps to its end 105ms
+     × TOOL-LATCH: a tile-stamp stroke switched to 'palette-apply' under the held button stamps to its end 3ms
+     × TOOL-LATCH: a tile-stamp stroke switched to 'pencil' under the held button stamps to its end 2ms
+     × TOOL-LATCH: a collision stroke switched to tile-stamp under the held button paints collision to its end 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts > ART-STROKE-FOLLOWUPS (a): the tool of a composer tile-space stroke is latched at the press > TOOL-LATCH: a tile-stamp stroke switched to 'collision' under the held button stamps to its end
+AssertionError: a tile-stamp stroke switched to collision mid-drag did not stamp to its end: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal [ { atlasTile: 1, …(5) }, …(7) ]
+
+- Expected
++ Received
+
+@@ -6,39 +6,39 @@
+      "pal": 1,
+      "pri": true,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
+-     "pri": true,
++     "pal": 0,
++     "pri": false,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
+-     "pri": true,
++     "pal": 0,
++     "pri": false,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
+-     "pri": true,
++     "pal": 0,
++     "pri": false,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
+-     "pri": true,
++     "pal": 0,
++     "pri": false,
+      "vf": false,
+    },
+    {
+      "atlasTile": 7,
+      "hf": false,
+
+ ❯ src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts:190:10
+    188|       stroke.up();
+    189|       expect(row0(doc), `a tile-stamp stroke switched to ${to} mid-dra…
+    190|         .toEqual([...stamped.slice(0, 5), ...untouched.slice(5)]);
+       |          ^
+    191|       expect([...doc.collisionA], `a tile-stamp stroke switched to ${t…
+    192|       if (to === 'pencil') {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts > ART-STROKE-FOLLOWUPS (a): the tool of a composer tile-space stroke is latched at the press > TOOL-LATCH: a tile-stamp stroke switched to 'palette-apply' under the held button stamps to its end
+AssertionError: a tile-stamp stroke switched to palette-apply mid-drag did not stamp to its end: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal [ { atlasTile: 1, …(5) }, …(7) ]
+
+- Expected
++ Received
+
+@@ -6,39 +6,39 @@
+      "pal": 1,
+      "pri": true,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+-     "pri": true,
++     "pri": false,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+-     "pri": true,
++     "pri": false,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+-     "pri": true,
++     "pri": false,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+      "pal": 1,
+-     "pri": true,
++     "pri": false,
+      "vf": false,
+    },
+    {
+      "atlasTile": 7,
+      "hf": false,
+
+ ❯ src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts:190:10
+    188|       stroke.up();
+    189|       expect(row0(doc), `a tile-stamp stroke switched to ${to} mid-dra…
+    190|         .toEqual([...stamped.slice(0, 5), ...untouched.slice(5)]);
+       |          ^
+    191|       expect([...doc.collisionA], `a tile-stamp stroke switched to ${t…
+    192|       if (to === 'pencil') {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts > ART-STROKE-FOLLOWUPS (a): the tool of a composer tile-space stroke is latched at the press > TOOL-LATCH: a tile-stamp stroke switched to 'pencil' under the held button stamps to its end
+AssertionError: a tile-stamp stroke switched to pencil mid-drag did not stamp to its end: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal [ { atlasTile: 1, …(5) }, …(7) ]
+
+- Expected
++ Received
+
+@@ -6,39 +6,39 @@
+      "pal": 1,
+      "pri": true,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
+-     "pri": true,
++     "pal": 0,
++     "pri": false,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
+-     "pri": true,
++     "pal": 0,
++     "pri": false,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
+-     "pri": true,
++     "pal": 0,
++     "pri": false,
+      "vf": false,
+    },
+    {
+-     "atlasTile": 1,
++     "atlasTile": 7,
+      "hf": false,
+      "localId": null,
+-     "pal": 1,
+-     "pri": true,
++     "pal": 0,
++     "pri": false,
+      "vf": false,
+    },
+    {
+      "atlasTile": 7,
+      "hf": false,
+
+ ❯ src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts:190:10
+    188|       stroke.up();
+    189|       expect(row0(doc), `a tile-stamp stroke switched to ${to} mid-dra…
+    190|         .toEqual([...stamped.slice(0, 5), ...untouched.slice(5)]);
+       |          ^
+    191|       expect([...doc.collisionA], `a tile-stamp stroke switched to ${t…
+    192|       if (to === 'pencil') {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts > ART-STROKE-FOLLOWUPS (a): the tool of a composer tile-space stroke is latched at the press > TOOL-LATCH: a collision stroke switched to tile-stamp under the held button paints collision to its end
+AssertionError: a collision stroke switched to tile-stamp mid-drag did not paint collision to its end: expected [ 12297, 12293, 12293, 12293 ] to deeply equal [ 12297, 12297, 12297, 12293 ]
+
+- Expected
++ Received
+
+  [
+    12297,
+-   12297,
+-   12297,
++   12293,
++   12293,
+    12293,
+  ]
+
+ ❯ src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts:221:122
+    219|     stroke.move(4);
+    220|     stroke.up();
+    221|     expect([...doc.collisionA], 'a collision stroke switched to tile-s…
+       |                                                                                                                          ^
+    222|     expect(row0(doc), 'a collision stroke switched to tile-stamp mid-d…
+    223|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed (4)
+   Start at  04:58:26
+   Duration  819ms (transform 559ms, setup 546ms, import 76ms, tests 114ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 4 failure record(s) in 1 file(s) (4 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        4   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts
+    [ASSERTION] ART-STROKE-FOLLOWUPS (a): the tool of a composer tile-space stroke is latched at the press > TOOL-LATCH: a tile-stamp stroke switched to 'collision' under the held button stamps to its end
+        AssertionError: a tile-stamp stroke switched to collision mid-drag did not stamp to its end: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal [ { …
+        why this bucket: name is AssertionError
+    [ASSERTION] ART-STROKE-FOLLOWUPS (a): the tool of a composer tile-space stroke is latched at the press > TOOL-LATCH: a tile-stamp stroke switched to 'palette-apply' under the held button stamps to its end
+        AssertionError: a tile-stamp stroke switched to palette-apply mid-drag did not stamp to its end: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal …
+        why this bucket: name is AssertionError
+    [ASSERTION] ART-STROKE-FOLLOWUPS (a): the tool of a composer tile-space stroke is latched at the press > TOOL-LATCH: a tile-stamp stroke switched to 'pencil' under the held button stamps to its end
+        AssertionError: a tile-stamp stroke switched to pencil mid-drag did not stamp to its end: expected [ { atlasTile: 1, …(5) }, …(7) ] to deeply equal [ { atl…
+        why this bucket: name is AssertionError
+    [ASSERTION] ART-STROKE-FOLLOWUPS (a): the tool of a composer tile-space stroke is latched at the press > TOOL-LATCH: a collision stroke switched to tile-stamp under the held button paints collision to its end
+        AssertionError: a collision stroke switched to tile-stamp mid-drag did not paint collision to its end: expected [ 12297, 12293, 12293, 12293 ] to deeply eq…
+        why this bucket: name is AssertionError
+
+failure-class: 4 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+exit 1
+08:58:27Z

@@ -1,0 +1,81 @@
+09:09:55Z
+16.85 16.16 21.33 37/3816 825168
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+
+ ❯ src/renderer/components/art/__tests__/composer-chunk-undo-dirty-mounted.test.ts (3 tests | 2 failed) 96ms
+     × UNDO-DIRTY: one stroke then one Ctrl+Z reads clean, and the discard prompt stops asking; Ctrl+Shift+Z reads dirty again 89ms
+     × UNDO-DIRTY CONTROL: two strokes then one Ctrl+Z is not the saved state, and stays dirty 4ms
+     ✓ UNDO-DIRTY CONTROL: a chunk document OPENED dirty is never computed clean (its opened state is not a saved one) 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-chunk-undo-dirty-mounted.test.ts > ART-STROKE-FOLLOWUPS (c): a chunk document undone back to its saved state reads clean > UNDO-DIRTY: one stroke then one Ctrl+Z reads clean, and the discard prompt stops asking; Ctrl+Shift+Z reads dirty again
+AssertionError: undoing back to the saved state left the chunk document marked dirty: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/renderer/components/art/__tests__/composer-chunk-undo-dirty-mounted.test.ts:160:98
+    158|     undo();
+    159|     expect(cells(open().doc), 'the premise: one Ctrl+Z put the documen…
+    160|     expect(open().dirty, 'undoing back to the saved state left the chu…
+       |                                                                                                  ^
+    161|     expect(planArtDocDiscard(open(), composerSaveState()).kind, 'the d…
+    162|     redo();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-chunk-undo-dirty-mounted.test.ts > ART-STROKE-FOLLOWUPS (c): a chunk document undone back to its saved state reads clean > UNDO-DIRTY CONTROL: two strokes then one Ctrl+Z is not the saved state, and stays dirty
+AssertionError: the second Ctrl+Z, back to the saved state, left it dirty: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/renderer/components/art/__tests__/composer-chunk-undo-dirty-mounted.test.ts:178:87
+    176|     expect(open().dirty, 'a chunk one stroke away from its saved state…
+    177|     undo();
+    178|     expect(open().dirty, 'the second Ctrl+Z, back to the saved state, …
+       |                                                                                       ^
+    179|   });
+    180|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed (3)
+   Start at  05:09:56
+   Duration  849ms (transform 571ms, setup 577ms, import 91ms, tests 96ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 2 failure record(s) in 1 file(s) (2 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        2   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/art/__tests__/composer-chunk-undo-dirty-mounted.test.ts
+    [ASSERTION] ART-STROKE-FOLLOWUPS (c): a chunk document undone back to its saved state reads clean > UNDO-DIRTY: one stroke then one Ctrl+Z reads clean, and the discard prompt stops asking; Ctrl+Shift+Z reads dirty again
+        AssertionError: undoing back to the saved state left the chunk document marked dirty: expected true to be false // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] ART-STROKE-FOLLOWUPS (c): a chunk document undone back to its saved state reads clean > UNDO-DIRTY CONTROL: two strokes then one Ctrl+Z is not the saved state, and stays dirty
+        AssertionError: the second Ctrl+Z, back to the saved state, left it dirty: expected true to be false // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 2 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+exit 1
+09:09:57Z

@@ -1,0 +1,20 @@
+run dev-atl1 PART=atl,acj start 09:14:10Z load 33.41
+bundle strokeHeld count: 3
+copy /tmp/claude-1000/-home-volence-sonic-hacks-aurora/fd9f5022-ac5b-40c2-a861-482086de404f/scratchpad/aeon-dev-atl1-1878127-1790327650 (238M)
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+file:///home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/scratchpad/lib/run-root.mjs:625
+    throw new Error(`dist/ is STALER than src/ in ${f.root} — ${f.newestFile} is `
+          ^
+
+Error: dist/ is STALER than src/ in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c — /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/src/renderer/state/chunk-doc-commit.ts is 350s newer than /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/dist/main/index.mjs. Every row below would measure code that is not in the bundle. Run VITE_AURORA_DEBUG=1 npm run build in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c.
+    at assertFreshBuild (file:///home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/scratchpad/lib/run-root.mjs:625:11)
+    at file:///home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/scratchpad/map-behaviour-fixes-harness.mjs:139:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.15.0
+harness exit 1
+copy removed: yes
+end 09:14:10Z load 33.41

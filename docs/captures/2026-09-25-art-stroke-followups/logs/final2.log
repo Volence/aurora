@@ -1,0 +1,171 @@
+run final2 PART=all start 09:20:57Z load 17.92
+bundle strokeHeld count: 3
+copy /tmp/claude-1000/-home-volence-sonic-hacks-aurora/fd9f5022-ac5b-40c2-a861-482086de404f/scratchpad/aeon-final2-978312-1790328057 (238M)
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c — dist/main/index.mjs is 3s newer than the newest of 1022 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/src/renderer/state/chunk-doc-commit.ts)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-25T09:19:09.383Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-25T09:19:09.383Z), so window.__dbg is in this bundle
+=== map-behaviour-fixes 2026-09-12 harness ===
+    uptime       : 05:20:57 up 1 day, 18:22,  1 user,  load average: 17.92, 23.71, 23.69
+    PARTS        : m1,m2,m4,bw,abw,abl,atl,acj,m6
+    node         : v24.15.0
+    root         : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+    in-tree      : yes (the tree under test is /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c; this file lives in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c)
+    ORACLE_SOCKET: /tmp/mbfix-sock-FLBXTl/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-980136-218b93d3
+    PORT         : 9433   DISPLAY: xvfb-run -a (never :0)
+    oracle       : literals from HEAD c7eb0e0f5e91c5c28c11df089309adb8dbadeed2; collision-paint, collision-cell, s4-types, collision-word, collision-cell-word bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/src; brush sizes [1,7,15,25]; section 256x256 tiles
+    harness      : blob 0b6500df0c499e16958099e9a2d86ebc156e836f (as committed at HEAD)
+    src on disk  : identical to HEAD
+    aeon source  : AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/fd9f5022-ac5b-40c2-a861-482086de404f/scratchpad/aeon-final2-978312-1790328057   (live sibling /home/volence/sonic_hacks/aeon: refused if equal)
+    copy         : /tmp/mbfix-aeon-yMFmPk   project "Sonic 4"
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 3072542 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 3072542,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 3072542 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 3072542,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-980136-218b93d3 — see HAZARD 6
+    X pointer    : PARKED outside the window: display :159 (Xvfb pid 983994); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed   click log: installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1, by a real click on its Explorer row   [load 17.67/23.47/23.61]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row "Oracle Jungle Zone · act1" aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+════════ PART m1 ════════
+   GEOMETRY [m1] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}
+PASS  [M1.0] PREMISE: the Collision facet, the collision brush, Plane A, Keep, Brush 1 and a shape by real clicks; four cells in a row that are air on BOTH planes, each aimed at an integer client pixel that lands on that cell of the map canvas   [load 17.30/23.29/23.55]
+        dpr 1; rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}; hits {"facet":true,"keep":true,"brush1":true,"planeA":true,"shape":true}; brush {"plane":"a","bothPlanes":false,"crossover":"keep","crossoverSpanMode":"cell","word":12290}; cells {"cc":1,"cr":2,"searched":{"c0":1,"r0":2,"c1":26,"r1":22}}; aims [{"x":332,"y":154,"world":{"x":24,"y":40},"cell":{"cc":1,"cr":2},"tile":{"col":3,"row":5},"onMap":true},{"x":364,"y":154,"world":{"x":40,"y":40},"cell":{"cc":2,"cr":2},"tile":{"col":5,"row":5},"onMap":true},{"x":396,"y":154,"world":{"x":56,"y":40},"cell":{"cc":3,"cr":2},"tile":{"col":7,"row":5},"onMap":true},{"x":428,"y":154,"world":{"x":72,"y":40},"cell":{"cc":4,"cr":2},"tile":{"col":9,"row":5},"onMap":true}]
+PASS  [M1.a] a REAL click on Plane B, then one on Plane A: each moves the aimed plane, and after each document.activeElement is <body>, not the button (actAndDropFocus)   [load 17.30/23.29/23.55]
+        B aim {"x":1252,"y":112,"hitOk":true,"dpr":1,"rect":{"x":1239,"y":103,"w":26,"h":18}} -> plane b, activeElement {"tag":"BODY","text":null,"row":null,"isBody":true}; A aim {"x":1222,"y":112,"hitOk":true,"dpr":1,"rect":{"x":1209,"y":103,"w":26,"h":18}} -> plane a, activeElement {"tag":"BODY","text":null,"row":null,"isBody":true}
+PASS  [M1.b] with the stroke HELD (cells 1 and 2 painted on A), a real bare SPACE presses NO Plane button: no click event reaches one, focus is still <body>, and the aimed plane is still A   [load 17.30/23.29/23.55]
+        canvas unmoved true; activeElement while held {"tag":"BODY","text":null,"row":null,"isBody":true}; clicks the Space produced []; plane a; activeElement after {"tag":"BODY","text":null,"row":null,"isBody":true}; A cells 1,2 [[12290,12290,12290,12290],[12290,12290,12290,12290]]
+PASS  [M1.c] CONTROL: the stroke went on on plane A over all four cells, plane B is untouched, and it is ONE undo step: one Ctrl+Z puts both planes back exactly   [load 18.72/23.49/23.61]
+        after release {"a":[[12290,12290,12290,12290],[12290,12290,12290,12290],[12290,12290,12290,12290],[12290,12290,12290,12290]],"b":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]}; after one Ctrl+Z {"a":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]}; before {"a":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]}
+NOTE  [m1.strays] no mouse event reached the page at a position this harness did not send
+
+════════ PART m2 ════════
+   GEOMETRY [m2] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}
+PASS  [M2.0] PREMISE: the press painted cell k on plane A; with the stroke held, Tab reached Plane B and a real Space pressed it (a click reached Plane B) and the aimed plane is B; the canvas did not move; the two aims inside cell k are ONE 16px cell and TWO 8px tiles   [load 20.66/23.81/23.72]
+        dpr 1; rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}; aims {"aIn":{"x":324,"y":146,"world":{"x":20,"y":36},"cell":{"cc":1,"cr":2},"tile":{"col":2,"row":4},"onMap":true},"aIn2":{"x":340,"y":162,"world":{"x":28,"y":44},"cell":{"cc":1,"cr":2},"tile":{"col":3,"row":5},"onMap":true},"aNext":{"x":364,"y":154,"world":{"x":40,"y":40},"cell":{"cc":2,"cr":2},"tile":{"col":5,"row":5},"onMap":true}}; cell k on A after the press [12290,12290,12290,12290]; Tab presses 2; first stops ["BUTTON:A:Plane","BUTTON:B:Plane"]; focus before {"tag":"BODY","text":null,"row":null,"isBody":true}; clicks the Space produced [{"target":"BUTTON","text":"B","row":"Plane","title":null,"detail":0}]; plane b; canvas unmoved true
+NOTE  [M2.focus] the Plane A click left focus on {"tag":"BODY","text":null,"row":null,"isBody":true}; Tab from there reached Plane B in 2 press(es); after the Space-pressed B, document.activeElement is {"tag":"BODY","text":null,"row":null,"isBody":true}
+PASS  [M2.a] after the switch, a move INSIDE THE SAME 16px cell paints that cell on plane B (all four sub-tiles), and plane A keeps it   [load 20.66/23.81/23.72]
+        cell k on B [12290,12290,12290,12290]; on A [12290,12290,12290,12290]; before {"a":[0,0,0,0],"b":[0,0,0,0]}
+PASS  [M2.b] CONTROL (M3, ruled "leave it"): the stroke went on onto the next cell on B, and landed as recordPaint's plane clause says: two commands, the first Ctrl+Z takes back the B run only, the second the A run   [load 20.66/23.81/23.72]
+        after release {"a":[[12290,12290,12290,12290],[0,0,0,0]],"b":[[12290,12290,12290,12290],[12290,12290,12290,12290]]}; after one Ctrl+Z {"a":[[12290,12290,12290,12290],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0]]}; after two {"a":[[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0]]}; before {"a":[[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0]]}
+NOTE  [m2.strays] no mouse event reached the page at a position this harness did not send
+
+════════ PART m4 ════════
+   GEOMETRY [m4] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}
+PASS  [M4.0] PREMISE: a real click on Brush 1 left focus on it (the Brush buttons keep focus; no ruling covers them); with the stroke pressed on cell P, Tab moved focus to Brush 7 and a real Space pressed it: the palette now draws 7 selected   [load 22.27/24.05/23.80]
+        dpr 1; rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}; window top-left {"cc":1,"cr":2,"searched":{"c0":1,"r0":2,"c1":26,"r1":22}} reach 3; P {"x":396,"y":250,"world":{"x":56,"y":88},"cell":{"cc":3,"cr":5},"tile":{"col":7,"row":11},"onMap":true} Q {"x":428,"y":250,"world":{"x":72,"y":88},"cell":{"cc":4,"cr":5},"tile":{"col":9,"row":11},"onMap":true}; focus after the click {"tag":"BUTTON","text":"1","row":"Brush","isBody":false}, drawn {"labels":["1","7","15","25"],"selected":"1"}; after Tab {"tag":"BUTTON","text":"7","row":"Brush","isBody":false}; clicks [{"target":"BUTTON","text":"7","row":"Brush","title":"7×7 block area","detail":0}]; drawn after Space {"labels":["1","7","15","25"],"selected":"7"}; canvas unmoved true
+PASS  [M4.a] the size picked MID-DRAG does not change the stroke: moving on to cell Q paints exactly the 1x1 cells P and Q (collisionPaintTargets at the size LATCHED at the press), not the 7x7 area around Q   [load 22.27/24.05/23.80]
+        changed 8 sub-tiles; latched expects 8, the live size would give 196; first changes [2566,2567,2568,2569,2822,2823,2824,2825]
+PASS  [M4.b] CONTROL: the stroke is ONE undo step: one Ctrl+Z puts the whole window back exactly   [load 22.27/24.05/23.80]
+        after one Ctrl+Z 0 sub-tiles still differ
+PASS  [M4.c] CONTROL: the NEXT stroke is pressed with the new size: a click on Q paints the 7x7 area collisionPaintTargets gives for Q   [load 22.27/24.05/23.80]
+        changed 196 sub-tiles; expected 196
+NOTE  [M4.cleanup] after the control's Ctrl+Z 0 sub-tiles differ from the start
+NOTE  [m4.strays] no mouse event reached the page at a position this harness did not send
+
+════════ PART bw ════════
+   GEOMETRY [bw] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}
+PASS  [BW.0] PREMISE: the shape button the setup clicked keeps focus through the press; with the stroke HELD (cells 1 and 2 painted with the pressed word W1), a real Tab moved focus to ANOTHER shape button and a real Space pressed it (a click reached a shape button), so the store now selects a word W2 that paints differently (ANTI-VACUOUS); the canvas did not move   [load 25.31/24.63/23.99]
+        dpr 1; rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":2}; cells [{"cc":1,"cr":2},{"cc":2,"cr":2},{"cc":3,"cr":2},{"cc":4,"cr":2}]; aims [{"x":332,"y":154,"world":{"x":24,"y":40},"cell":{"cc":1,"cr":2}},{"x":364,"y":154,"world":{"x":40,"y":40},"cell":{"cc":2,"cr":2}},{"x":396,"y":154,"world":{"x":56,"y":40},"cell":{"cc":3,"cr":2}},{"x":428,"y":154,"world":{"x":72,"y":40},"cell":{"cc":4,"cr":2}}]; focus after setup {"body":false,"tag":"BUTTON","title":"#2 · solid · all","shape":true,"index":3}, while held {"body":false,"tag":"BUTTON","title":"#2 · solid · all","shape":true,"index":3}, after Tab {"body":false,"tag":"BUTTON","title":"#3 · solid · all","shape":true,"index":4}; clicks the Space produced [{"target":"BUTTON","text":"--","row":"∅air","title":"#3 · solid · all","detail":0}]; W1 12290 {"shape":2,"xFlip":false,"yFlip":false,"solidity":"all"} -> W2 12291 {"shape":3,"xFlip":false,"yFlip":false,"solidity":"all"} (fields that differ ["shape"]); A cells 1,2 after the press [[12290,12290,12290,12290],[12290,12290,12290,12290]]; canvas unmoved true/true
+PASS  [BW.a] the word picked MID-DRAG does not change the stroke: cells 3 and 4, painted AFTER the Space, carry the word LATCHED at the press (W1) like cells 1 and 2, not W2   [load 25.31/24.63/23.99]
+        A cells 1..4 [[12290,12290,12290,12290],[12290,12290,12290,12290],[12290,12290,12290,12290],[12290,12290,12290,12290]]; W1 paints [12290,12290,12290,12290] per cell; the live word W2 would paint [12291,12291,12291,12291]
+PASS  [BW.b] CONTROL (green with or without the latch): cells 1 and 2, painted BEFORE the Space, carry W1, and plane B is untouched   [load 25.31/24.63/23.99]
+        A cells 1,2 [[12290,12290,12290,12290],[12290,12290,12290,12290]]; B [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]; B before [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]
+PASS  [BW.c] CONTROL: the stroke is ONE undo step: one Ctrl+Z puts both planes back exactly   [load 25.31/24.63/23.99]
+        after one Ctrl+Z {"a":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]}; before {"a":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],"b":[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]}
+PASS  [BW.d] CONTROL: the NEXT press takes the word picked during the last stroke: a click on cell 1 paints it with W2, and cells 2 to 4 stay as they were   [load 25.31/24.63/23.99]
+        A cells 1..4 [[12291,12291,12291,12291],[0,0,0,0],[0,0,0,0],[0,0,0,0]]; W2 paints [12291,12291,12291,12291] on cell 1
+NOTE  [BW.cleanup] after the control's Ctrl+Z the four cells match the start
+NOTE  [bw.strays] no mouse event reached the page at a position this harness did not send
+
+════════ PART abw ════════
+PASS  [ABW.0] PREMISE: on the composer's chunk document, with the stroke HELD (cells 1 and 2 painted with the pressed word W1), real Tabs moved focus to ANOTHER shape button (no Tab clicked anything) and a real Space pressed it (a click reached a shape button), so the store now selects a word W2 that paints differently (ANTI-VACUOUS); the canvas did not move   [load 27.26/25.06/24.13]
+        dpr 1; canvas {"x":308,"y":135,"w":1024,"h":1024,"cw":1024,"ch":1024,"dpr":1} zoom 8; doc {"chunkId":"OJZ_01","name":"OJZ $01","widthTiles":16,"heightTiles":16,"dirty":false,"tool":"collision","brushTile":0,"stampPriority":"keep"}; cells [{"cx":0,"cy":0},{"cx":1,"cy":0},{"cx":2,"cy":0},{"cx":3,"cy":0}] idx [0,1,2,3]; aims [{"x":372,"y":199,"back":{"cx":0,"cy":0},"on":true},{"x":500,"y":199,"back":{"cx":1,"cy":0},"on":true},{"x":628,"y":199,"back":{"cx":2,"cy":0},"on":true},{"x":756,"y":199,"back":{"cx":3,"cy":0},"on":true}]; focus after setup {"body":false,"tag":"BUTTON","title":"#2 · solid · all","shape":true,"index":3}, while held {"body":true,"shape":false,"index":-1}, Tab hops ["BUTTON:","BUTTON:","BUTTON:Single block (hold Alt to propagate to b","BUTTON:7×7 block area","BUTTON:15×15 block area","BUTTON:25×25 block area","BUTTON:Mirror the shape horizontally (the other","BUTTON:Flip the shape vertically (floor ↔ ceili","BUTTON:Solid from every direction (normal groun","BUTTON:One-way platform: only the top stops you","BUTTON:Solid on left/right/bottom but NOT the t","BUTTON:No collision (bakes to air; keeps the sh","BUTTON:","BUTTON:","BUTTON:","BUTTON:","BUTTON:","BUTTON:Erase (air)","shape#0"], final {"body":false,"tag":"BUTTON","title":"#111 · solid · all","shape":true,"index":0}; clicks during Tabs []; clicks the Space produced [{"target":"BUTTON","text":"--","row":"∅air","title":"#111 · solid · all","detail":0}]; W1 12290 {"shape":2,"xFlip":false,"yFlip":false,"solidity":"all"} -> W2 12399 {"shape":111,"xFlip":false,"yFlip":false,"solidity":"all"} (fields that differ ["shape"]); A cells 1,2 after the press [12290,12290] (before [0,0]); canvas unmoved true
+PASS  [ABW.a] the word picked MID-DRAG does not change the composer stroke: cells 3 and 4, painted AFTER the Space, carry the word LATCHED at the press (W1) like cells 1 and 2, not W2   [load 27.26/25.06/24.13]
+        A cells 1..4 [12290,12290,12290,12290]; W1 paints [12290,12290,12290,12290]; the live word W2 would paint [12399,12399,12399,12399]
+PASS  [ABW.b] CONTROL (green with or without the latch): cells 1 and 2, painted BEFORE the Space, carry W1, and plane B is untouched   [load 27.26/25.06/24.13]
+        A cells 1,2 [12290,12290]; B [0,0,0,0]; B before [0,0,0,0]
+PASS  [ABW.c] CONTROL: the stroke is ONE undo step: one Ctrl+Z puts both planes of the four cells back exactly   [load 27.26/25.06/24.13]
+        after one Ctrl+Z {"a":[0,0,0,0],"b":[0,0,0,0]}; before {"a":[0,0,0,0],"b":[0,0,0,0]}
+PASS  [ABW.d] CONTROL: the NEXT press takes the word picked during the last stroke: a click on cell 1 paints it with W2, and cells 2 to 4 stay as they were   [load 27.26/25.06/24.13]
+        A cells 1..4 [12399,0,0,0]; W2 paints 12399 on cell 1; cells 2..4 before [0,0,0]
+NOTE  [ABW.cleanup] after the control's Ctrl+Z the four cells match the start
+NOTE  [abw.strays] no mouse event reached the page at a position this harness did not send
+
+════════ PART abl ════════
+PASS  [ABL.0] PREMISE: on the composer's chunk document with the Tile stamp armed (dirty or not: no warm-up stamp); a real X before the stroke armed H; the stroke is HELD (tiles 1 and 2 stamped with the armed tile, hf true, vf false: the flips at the press); focus is on <body> both times (not a text field, so the composer's X/Y handler runs); a real Y was sent and clicked nothing; the tool is still the stamp; the canvas did not move   [load 31.01/25.93/24.43]
+        dpr 1; document reached by Art facet click, document already open; canvas {"x":308,"y":186,"w":1024,"h":1024,"cw":1024,"ch":1024,"dpr":1} zoom 8; dirty before the stroke false; before X {"x":308,"y":186,"w":1024,"h":1024}, after the press {"x":308,"y":186,"w":1024,"h":1024}, after Y {"x":308,"y":186,"w":1024,"h":1024}; doc {"chunkId":"OJZ_01","name":"OJZ $01","widthTiles":16,"heightTiles":16,"dirty":false,"tool":"tile-stamp","brushTile":0,"stampPriority":"keep"}; tiles [{"tx":0,"ty":0},{"tx":1,"ty":0},{"tx":2,"ty":0},{"tx":3,"ty":0},{"tx":4,"ty":0}]; aims [{"x":340,"y":218,"back":{"tx":0,"ty":0},"on":true},{"x":404,"y":218,"back":{"tx":1,"ty":0},"on":true},{"x":468,"y":218,"back":{"tx":2,"ty":0},"on":true},{"x":532,"y":218,"back":{"tx":3,"ty":0},"on":true},{"x":596,"y":218,"back":{"tx":4,"ty":0},"on":true}]; focus before X {"tag":"BODY","text":null,"row":null,"isBody":true}, while held {"tag":"BODY","text":null,"row":null,"isBody":true}; clicks by X [], by Y []; tool after tile-stamp; brushTile 0; tiles 1..5 before [{"t":0,"hf":false,"vf":true},{"t":null,"hf":false,"vf":false},{"t":0,"hf":false,"vf":true},{"t":null,"hf":false,"vf":false},{"t":0,"hf":false,"vf":true}]; tiles 1,2 after the press [{"t":0,"hf":true,"vf":false},{"t":0,"hf":true,"vf":false}]
+PASS  [ABL.a] the Y flip toggled MID-DRAG does not change the composer stroke: tiles 3 and 4, stamped AFTER the Y key, carry the flips LATCHED at the press (hf true, vf false) like tiles 1 and 2   [load 31.01/25.93/24.43]
+        tiles 1..4 [{"t":0,"hf":true,"vf":false},{"t":0,"hf":true,"vf":false},{"t":0,"hf":true,"vf":false},{"t":0,"hf":true,"vf":false}]; the press-time flips stamp {"t":0,"hf":true,"vf":false}; the live flips would stamp {"t":0,"hf":true,"vf":true}
+PASS  [ABL.b] CONTROL (green with or without the latch): tiles 1 and 2, stamped BEFORE the Y key, carry the press-time flips, and tile 5, never entered, is unchanged   [load 31.01/25.93/24.43]
+        tiles 1,2 [{"t":0,"hf":true,"vf":false},{"t":0,"hf":true,"vf":false}]; tile 5 {"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}, before {"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}
+PASS  [ABL.c] CONTROL: the stroke is ONE undo step: one Ctrl+Z puts the five tiles back exactly   [load 31.01/25.93/24.43]
+        after one Ctrl+Z [{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false},{"atlasTile":null,"localId":null,"pal":0,"hf":false,"vf":false,"pri":false},{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false},{"atlasTile":null,"localId":null,"pal":0,"hf":false,"vf":false,"pri":false},{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}]; before [{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false},{"atlasTile":null,"localId":null,"pal":0,"hf":false,"vf":false,"pri":false},{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false},{"atlasTile":null,"localId":null,"pal":0,"hf":false,"vf":false,"pri":false},{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}]
+PASS  [ABL.d] CONTROL, and the proof the Y key fired: the NEXT press takes the flips as they stand after the last stroke: a click on tile 5 stamps it hf true, vf true, and tiles 1 to 4 stay as they were   [load 31.01/25.93/24.43]
+        tile 5 {"atlasTile":0,"localId":null,"pal":2,"hf":true,"vf":true,"pri":false}; the toggled flips stamp {"t":0,"hf":true,"vf":true}; tiles 1..4 [{"t":0,"hf":false,"vf":true},{"t":null,"hf":false,"vf":false},{"t":0,"hf":false,"vf":true},{"t":null,"hf":false,"vf":false}], before [{"t":0,"hf":false,"vf":true},{"t":null,"hf":false,"vf":false},{"t":0,"hf":false,"vf":true},{"t":null,"hf":false,"vf":false}]
+NOTE  [ABL.cleanup] after the control's Ctrl+Z the five tiles match the start; dirty false
+NOTE  [abl.strays] no mouse event reached the page at a position this harness did not send
+
+════════ PART atl ════════
+PASS  [ATL.0] PREMISE: on the composer's chunk document, a Tile stamp stroke is HELD (tiles 1 and 2 stamped); real Tabs moved focus to the rail's Collision paint button (no Tab clicked anything) and a real Space pressed it (a click reached the page), so the store's tool is now collision; tiles 3 to 5 re-aimed on the canvas as it stands after the switch   [load 33.57/26.85/24.76]
+        dpr 1; document reached by Art facet click, document already open; canvas {"x":308,"y":135,"w":1024,"h":1024,"cw":1024,"dpr":1,"barH":37} zoom 8; doc {"chunkId":"OJZ_01","name":"OJZ $01","widthTiles":16,"heightTiles":16,"dirty":false,"tool":"tile-stamp","brushTile":0,"stampPriority":"keep"}; brush {"plane":"a","bothPlanes":false,"crossover":"keep","crossoverSpanMode":"cell","word":12290}; tiles [{"tx":0,"ty":0},{"tx":1,"ty":0},{"tx":2,"ty":0},{"tx":3,"ty":0},{"tx":4,"ty":0}]; aims [{"x":340,"y":218,"back":{"tx":0,"ty":0},"on":true},{"x":404,"y":218,"back":{"tx":1,"ty":0},"on":true},{"x":468,"y":167,"back":{"tx":2,"ty":0},"on":true},{"x":532,"y":167,"back":{"tx":3,"ty":0},"on":true},{"x":596,"y":167,"back":{"tx":4,"ty":0},"on":true}]; focus while held {"body":true,"onRail":false,"tag":"BODY","label":null}; Tab hops 183, the last ten ["BUTTON:Pencil (paint pixels)","BUTTON:Eraser (paint color 0)","BUTTON:Fill (flood fill)","BUTTON:Eyedropper (pick color)","BUTTON:Line","BUTTON:Rectangle","BUTTON:Select (marquee)","BUTTON:Dither brush","BUTTON:Tile stamp","BUTTON:Collision paint"]; final {"body":false,"onRail":true,"tag":"BUTTON","label":"Collision paint"}; clicks during Tabs []; clicks the Space produced [{"target":"BUTTON","text":"","row":"","title":"Collision paint","detail":0}]; tool after collision; tiles 1,2 after the press [{"t":0,"hf":false,"vf":false},{"t":0,"hf":false,"vf":false}]; canvas before the switch {"x":308,"y":186,"w":1024,"h":1024,"cw":1024,"dpr":1,"barH":88}, after {"x":308,"y":135,"w":1024,"h":1024,"cw":1024,"dpr":1,"barH":37}; tiles 3..5 re-aimed [{"x":468,"y":167,"back":{"tx":2,"ty":0},"on":true},{"x":532,"y":167,"back":{"tx":3,"ty":0},"on":true},{"x":596,"y":167,"back":{"tx":4,"ty":0},"on":true}]
+PASS  [ATL.a] the tool picked MID-DRAG does not change the composer stroke: tiles 3 and 4, entered AFTER the Space, are STAMPED like tiles 1 and 2, and no collision cell under the five tiles changed on either plane   [load 33.52/26.96/24.81]
+        tiles 1..4 [{"t":0,"hf":false,"vf":false},{"t":0,"hf":false,"vf":false},{"t":0,"hf":false,"vf":false},{"t":0,"hf":false,"vf":false}], the stamp writes {"t":0,"hf":false,"vf":false}; collision A [0,0,0,0,0] (before [0,0,0,0,0]), B [0,0,0,0,0] (before [0,0,0,0,0]); the collision brush is {"plane":"a","bothPlanes":false,"crossover":"keep","crossoverSpanMode":"cell","word":12290}
+PASS  [ATL.b] CONTROL (green with or without the latch): tiles 1 and 2, stamped BEFORE the Space, carry the stamp, and tile 5, never entered, is unchanged   [load 33.52/26.96/24.81]
+        tiles 1,2 [{"t":0,"hf":false,"vf":false},{"t":0,"hf":false,"vf":false}]; tile 5 {"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}, before {"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}
+PASS  [ATL.c] CONTROL: the stroke is ONE undo step: one Ctrl+Z puts the five tiles and their collision cells back exactly   [load 33.52/26.96/24.81]
+        after one Ctrl+Z {"cells":[{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false},{"atlasTile":null,"localId":null,"pal":0,"hf":false,"vf":false,"pri":false},{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false},{"atlasTile":null,"localId":null,"pal":0,"hf":false,"vf":false,"pri":false},{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}],"a":[0,0,0,0,0],"b":[0,0,0,0,0]}; before {"cells":[{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false},{"atlasTile":null,"localId":null,"pal":0,"hf":false,"vf":false,"pri":false},{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false},{"atlasTile":null,"localId":null,"pal":0,"hf":false,"vf":false,"pri":false},{"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}],"a":[0,0,0,0,0],"b":[0,0,0,0,0]}
+PASS  [ATL.d] CONTROL: the NEXT press takes the tool picked during the last stroke: a click on tile 5 leaves the five nametable cells alone, and writes the brush word into the collision cell under tile 5   [load 33.52/26.96/24.81]
+        tile 5 {"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false} (before {"atlasTile":0,"localId":null,"pal":0,"hf":false,"vf":true,"pri":false}); collision under tile 5 on plane a: 12290, before 0, the brush writes 12290
+NOTE  [ATL.cleanup] the five tiles and their collision cells match the start; dirty false; the Collision paint tool is left armed (as PART abl leaves it)
+NOTE  [atl.strays] no mouse event reached the page at a position this harness did not send
+
+════════ PART acj ════════
+PASS  [ACJ.0] PREMISE: on the composer's CLEAN chunk document with the Tile stamp armed, one real click stamped a tile it changes, and the document is now dirty (this was its first write)   [load 33.08/26.97/24.83]
+        dpr 1; document reached by Art facet click, document already open; doc {"chunkId":"OJZ_01","name":"OJZ $01","widthTiles":16,"heightTiles":16,"dirty":false,"tool":"tile-stamp","brushTile":0,"stampPriority":"keep"}; zoom 8; tile {"tx":0,"ty":0} aim (340,218) before {"t":0,"hf":false,"vf":true} after {"t":0,"hf":false,"vf":false}; dirty after true
+PASS  [ACJ.a] the first write to a clean chunk document does not move the composer canvas: its rect is the same before the press and after the release   [load 33.08/26.97/24.83]
+        canvas before {"x":308,"y":186,"w":1024,"h":1024} after {"x":308,"y":186,"w":1024,"h":1024} (dy 0.00); options bar before {"y":74,"h":88,"text":"OJZ $01 ⚠ pixel edits to existing tiles propagate everywhere they're used Save New… px tile Priority Keep On Off Priorit"} after {"y":74,"h":88,"text":"OJZ $01 unsaved ⚠ pixel edits to existing tiles propagate everywhere they're used Save New… px tile Priority Keep On Off"}
+PASS  [ACJ.c] UNDO-DIRTY: one real Ctrl+Z takes the first write back (the tile matches its start) and the document reads CLEAN again: the store's flag is false and the "unsaved" badge, visible after the write, is not visible   [load 33.08/26.97/24.83]
+        tile after Ctrl+Z {"t":0,"hf":false,"vf":true}, start {"t":0,"hf":false,"vf":true}; dirty after the write true, after Ctrl+Z false; badge after the write {"present":true,"visible":true}, after Ctrl+Z {"present":true,"visible":false}
+NOTE  [acj.strays] no mouse event reached the page at a position this harness did not send
+
+════════ PART m6 ════════
+   GEOMETRY [m6] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+PASS  [M6.0] PREMISE: the stamp tool armed and chunk X (with art) picked by a real click; the pointer rests, by real moves, on an UNLINKED tile of section 0: the link hover is null and the readout says the no-link text   [load 31.15/26.67/24.74]
+        dpr 1; rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":0,"y":0,"zoom":1}; X {"id":"OJZ_01","info":{"name":"OJZ $01","widthTiles":16,"heightTiles":16,"nonzeroTiles":211}}; spot {"bc":16,"br":16}; aim {"x":480,"y":270} -> tile {"col":24,"row":24} (want {"col":24,"row":24}), on map true; hover null; link null; readout {"text":"Under cursor: no chunk link","w":143.1875,"h":15}
+PASS  [M6.a] a REAL stamp press, the pointer still, names the placement it just made: the link hover is {section 0, the new placement, chunk X}, and the page received exactly a press and a release, no move   [load 31.15/26.67/24.74]
+        page events after the press [["mousedown",480,270,1],["mouseup",480,270,0]]; added [{"id":1,"chunkId":"OJZ_01","baseCol":16,"baseRow":16,"collision":true}]; link at the tile {"id":1,"chunkId":"OJZ_01","baseCol":16,"baseRow":16,"collision":true}; hover {"sectionIndex":0,"placementId":1,"chunkId":"OJZ_01"}; readout {"text":"Under cursor: OJZ $01 (#1)","w":136.59375,"h":15}
+PASS  [M6.b] the Chunk links panel says so without a move: its readout names placement #<id> ("Under cursor: <name> (#<id>)"), not the no-link text, and is laid out   [load 31.15/26.67/24.74]
+        readout before {"text":"Under cursor: no chunk link","w":143.1875,"h":15}; after {"text":"Under cursor: OJZ $01 (#1)","w":136.59375,"h":15}; placement {"id":1,"chunkId":"OJZ_01","baseCol":16,"baseRow":16,"collision":true}
+NOTE  [M6.cleanup] after Ctrl+Z section 0 holds 0 placement(s) (0 before the stamp)
+NOTE  [m6.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 983955 (11 process(es)):
+           983955 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           1017273 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           1017345 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           1017566 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1017584 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           1017780 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           1019936 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1019995 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           1020136 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           1020396 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           983994 Xvfb :159 -screen 0 1680x1050x24 -nolisten tcp
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 350 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=m1,m2,m4,bw,abw,abl,atl,acj,m6: 38/38 rows PASS · 0 FAIL · 0 UNMEASURABLE · 103.6s ════
+     uptime at end 05:22:41 up 1 day, 18:23,  1 user,  load average: 29.46, 26.40, 24.66
+END-OF-RUN
+harness exit 0
+copy removed: yes
+end 09:22:41Z load 29.46
