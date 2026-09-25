@@ -1,0 +1,598 @@
+{
+  "act": {
+    "cells": [
+      1792,
+      768
+    ],
+    "grid_h": 3,
+    "grid_w": 7,
+    "id": "s2_ehz_cpz",
+    "name": "S2-COMPRESSED-ACT row 7: Emerald Hill act 1, a neutral corridor, then the opening of Chemical Plant act 1",
+    "section_px": 2048
+  },
+  "clips": [
+    {
+      "donor": "s2disasm",
+      "dst_rect": {
+        "h": 1024,
+        "w": 10976,
+        "x": 0,
+        "y": 0
+      },
+      "id": "ehz_act1",
+      "region_id": null,
+      "severed_xover_reason": null,
+      "src_rect": {
+        "h": 1024,
+        "w": 10976,
+        "x": 0,
+        "y": 0
+      },
+      "unaligned_dst_reason": null,
+      "zone": "EHZ",
+      "zone_key": 0
+    },
+    {
+      "donor": "s2disasm",
+      "dst_rect": {
+        "h": 2048,
+        "w": 2048,
+        "x": 12288,
+        "y": 256
+      },
+      "id": "cpz_act1",
+      "region_id": null,
+      "severed_xover_reason": null,
+      "src_rect": {
+        "h": 2048,
+        "w": 2048,
+        "x": 0,
+        "y": 0
+      },
+      "unaligned_dst_reason": "Chemical Plant is lowered 256 px so its start floor meets the corridor's. Its own start ground is a full block at y=512 (s2disasm startpos/CPZ_1.bin puts the player at (96, 492), feet at 511); the corridor's floor is at y=768, one collision row above Emerald Hill's ground where its crop ends (x 10960..10975: shape 164, height 12, surface y=772 \u2014 a 4-px step up onto the corridor, inside a floor sensor's reach). 768 - 512 = 256, a multiple of R12's 16-px collision quantum, so the paste moves art and collision together. The price is 256 px of Chemical Plant in the act's second section row (2048..2303), measured at 1,600 B of blocks.",
+      "zone": "CPZ",
+      "zone_key": 1
+    }
+  ],
+  "collision": {
+    "attr_entries": 163,
+    "attr_entries_at_recount": 163,
+    "base_bank": "games/sonic4/data/collision/base_s2",
+    "cap": 255,
+    "format": "aurora per-plane cell word, big-endian u16 (see tools/collision_pipeline.chunk_entry_to_plane_words)",
+    "per_clip": [
+      {
+        "attr_entries_added": 105,
+        "attr_entries_alone": 105,
+        "clip": "ehz_act1",
+        "marks_inside_src": 0,
+        "marks_outside_src": 0,
+        "severed_xover_reason": null,
+        "solid_cells": 37624,
+        "zone": "s2disasm/EHZ"
+      },
+      {
+        "attr_entries_added": 58,
+        "attr_entries_alone": 64,
+        "clip": "cpz_act1",
+        "marks_inside_src": 0,
+        "marks_outside_src": 0,
+        "severed_xover_reason": null,
+        "solid_cells": 8560,
+        "zone": "s2disasm/CPZ"
+      }
+    ],
+    "sections": [
+      {
+        "collattr_sha256": "e47521a124b66ee8349b3d8f5d124889ca5f6825db430579608b0e461f7c7b9d",
+        "collattr_solid_cells": 3924,
+        "collattrb_sha256": "6e9b13f049e21992f7b4f67d0cf47bb25cd3bbc9c9a04da344e94f89f70e43ff",
+        "collattrb_solid_cells": 4036,
+        "n": 0
+      },
+      {
+        "collattr_sha256": "8969eb30fc040fa713bfbe7e2b5a0654cd14f3cef88dddbb8d38aac5dc1468f4",
+        "collattr_solid_cells": 3668,
+        "collattrb_sha256": "de8afc9bbc2cf2fe2822e2ec806bf20de9d44b863573be6233198ae9011ab2d5",
+        "collattrb_solid_cells": 4064,
+        "n": 1
+      },
+      {
+        "collattr_sha256": "130251eb0b595240f93e94839b1afc49e0f4dc15789b2230ee110e7f8ee10fd3",
+        "collattr_solid_cells": 2912,
+        "collattrb_sha256": "c900ddb111f60b573040d4385a786fc26c51fa77aad407fdad9076c16f29eeb4",
+        "collattrb_solid_cells": 3272,
+        "n": 2
+      },
+      {
+        "collattr_sha256": "b3b2356c61dfa73a61e447428008000025129cd196baa71bfca47a2acec1d466",
+        "collattr_solid_cells": 3844,
+        "collattrb_sha256": "39377df4c2063fac3f1e474cc2957b94b9ca3bdafd0e7015889b3e5e4ca198c9",
+        "collattrb_solid_cells": 4144,
+        "n": 3
+      },
+      {
+        "collattr_sha256": "4976330e0fce55ec5f7e35f4f30039cfa4aba27fbc225c1587e684c5526194fa",
+        "collattr_solid_cells": 2552,
+        "collattrb_sha256": "953c09b1e9d68088a80fb37ae7317fe44fc9572a624528964b63e043a20ae790",
+        "collattrb_solid_cells": 3008,
+        "n": 4
+      },
+      {
+        "collattr_sha256": "dd3890ad8c26cf0ed6c81271dcad1ac8b097df4c730638a6af1447331d92de04",
+        "collattr_solid_cells": 6336,
+        "collattrb_sha256": "62f71b203df0cbba9b636c0451f247713664e1e94a0a2f45bcd4109591aac976",
+        "collattrb_solid_cells": 6360,
+        "n": 5
+      },
+      {
+        "collattr_sha256": "0e4cec9d6fa66a44ed564d28a163c3b6231dc311e25ac5189f8d081447043331",
+        "collattr_solid_cells": 4272,
+        "collattrb_sha256": "22da51376b3a24fffba11f0b427a8cd3d8d0e3da65fe3a8b88d32a0f43a249fd",
+        "collattrb_solid_cells": 4288,
+        "n": 6
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 7
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 8
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 9
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 10
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 11
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 12
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 13
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 14
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 15
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 16
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 17
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 18
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 19
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 20
+      }
+    ]
+  },
+  "content": "foreground art + layout only (no collision, objects, rings, regions, background) \u2014 S2-COMPRESSED-ACT staged plan row 3",
+  "corridors": [
+    {
+      "dst_rect": {
+        "h": 1024,
+        "w": 1312,
+        "x": 10976,
+        "y": 0
+      },
+      "floor_y": 768,
+      "id": "ehz_to_cpz"
+    }
+  ],
+  "placement": {
+    "pins": [
+      0
+    ],
+    "rule_pins": [
+      0
+    ],
+    "rung": "shipped",
+    "seconds": 0.02,
+    "stats": {
+      "shipped_worst_pin0": 8
+    }
+  },
+  "pool": {
+    "page_lengths": [
+      64,
+      64,
+      64,
+      64,
+      64,
+      64,
+      64,
+      64,
+      64,
+      64,
+      64,
+      64,
+      64,
+      40
+    ],
+    "page_tiles": 64,
+    "pages": 14,
+    "per_clip": [
+      {
+        "id": "ehz_act1",
+        "index": 0,
+        "pages_exclusive": 7,
+        "pages_touched": 8,
+        "tiles": 479,
+        "tiles_added": 479
+      },
+      {
+        "id": "cpz_act1",
+        "index": 1,
+        "pages_exclusive": 6,
+        "pages_touched": 7,
+        "tiles": 390,
+        "tiles_added": 390
+      }
+    ],
+    "per_clip_fields": {
+      "id": "the clip's (or corridor's) id from clips.json",
+      "index": "its position in clips.json's `clips` (per_clip) or `corridors` (per_corridor) list",
+      "pages_exclusive": "of pages_touched, the pages NO other clip or corridor touches (the pages in this pool only because of this rectangle). Sum over rows <= pool.pages. Not a prediction of what removing it saves: a re-bake re-places the whole pool",
+      "pages_touched": "pool pages holding at least one of this rectangle's `tiles` (the pages that must be resident to draw ALL of it). Shared pages count for every row that touches them, so the sum over rows can exceed pool.pages",
+      "tiles": "distinct pool tiles (post-dedupe canonical tiles, flips folded) this rectangle's cells reference, EXCLUDING the blank tile at pool slot 0, which the act always carries whatever is pasted",
+      "tiles_added": "of `tiles`, those no EARLIER row references; rows are ordered clips (in manifest order) then corridors. sum(tiles_added over per_clip and per_corridor) + 1 (the blank) == pool.tiles"
+    },
+    "per_corridor": [
+      {
+        "id": "ehz_to_cpz",
+        "index": 0,
+        "pages_exclusive": 0,
+        "pages_touched": 1,
+        "tiles": 2,
+        "tiles_added": 2
+      }
+    ],
+    "pool_bin": "pool.bin (pages padded to page_tiles; slot = page*page_tiles + i)",
+    "tiles": 872
+  },
+  "produced_by": "tools/clip_act_bake.py",
+  "schema": 1,
+  "sections": [
+    {
+      "local_map_entries": 253,
+      "n": 0,
+      "painted_cells": 23308,
+      "sx": 0,
+      "sy": 0,
+      "zone_keys": [
+        0
+      ]
+    },
+    {
+      "local_map_entries": 280,
+      "n": 1,
+      "painted_cells": 22434,
+      "sx": 1,
+      "sy": 0,
+      "zone_keys": [
+        0
+      ]
+    },
+    {
+      "local_map_entries": 470,
+      "n": 2,
+      "painted_cells": 21377,
+      "sx": 2,
+      "sy": 0,
+      "zone_keys": [
+        0
+      ]
+    },
+    {
+      "local_map_entries": 339,
+      "n": 3,
+      "painted_cells": 22354,
+      "sx": 3,
+      "sy": 0,
+      "zone_keys": [
+        0
+      ]
+    },
+    {
+      "local_map_entries": 449,
+      "n": 4,
+      "painted_cells": 22013,
+      "sx": 4,
+      "sy": 0,
+      "zone_keys": [
+        0
+      ]
+    },
+    {
+      "local_map_entries": 209,
+      "n": 5,
+      "painted_cells": 12993,
+      "sx": 5,
+      "sy": 0,
+      "zone_keys": [
+        0,
+        2
+      ]
+    },
+    {
+      "local_map_entries": 391,
+      "n": 6,
+      "painted_cells": 8912,
+      "sx": 6,
+      "sy": 0,
+      "zone_keys": [
+        1
+      ]
+    },
+    {
+      "local_map_entries": 1,
+      "n": 7,
+      "painted_cells": 0,
+      "sx": 0,
+      "sy": 1,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 8,
+      "painted_cells": 0,
+      "sx": 1,
+      "sy": 1,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 9,
+      "painted_cells": 0,
+      "sx": 2,
+      "sy": 1,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 10,
+      "painted_cells": 0,
+      "sx": 3,
+      "sy": 1,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 11,
+      "painted_cells": 0,
+      "sx": 4,
+      "sy": 1,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 12,
+      "painted_cells": 0,
+      "sx": 5,
+      "sy": 1,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 13,
+      "painted_cells": 0,
+      "sx": 6,
+      "sy": 1,
+      "zone_keys": [
+        1
+      ]
+    },
+    {
+      "local_map_entries": 1,
+      "n": 14,
+      "painted_cells": 0,
+      "sx": 0,
+      "sy": 2,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 15,
+      "painted_cells": 0,
+      "sx": 1,
+      "sy": 2,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 16,
+      "painted_cells": 0,
+      "sx": 2,
+      "sy": 2,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 17,
+      "painted_cells": 0,
+      "sx": 3,
+      "sy": 2,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 18,
+      "painted_cells": 0,
+      "sx": 4,
+      "sy": 2,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 19,
+      "painted_cells": 0,
+      "sx": 5,
+      "sy": 2,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 20,
+      "painted_cells": 0,
+      "sx": 6,
+      "sy": 2,
+      "zone_keys": []
+    }
+  ],
+  "source_manifest": "games/sonic4/data/clips/s2_ehz_cpz/clips.json",
+  "verdict_at_placement": {
+    "frames": 12,
+    "ok": true,
+    "over": 0,
+    "page_tiles": 64,
+    "window": [
+      80,
+      60
+    ],
+    "windows": 629079,
+    "worst": 8,
+    "worst_camera_px": {
+      "x": 4392,
+      "y": 256
+    },
+    "worst_positions": 6857,
+    "worst_window_tile": {
+      "left": 529,
+      "top": 16
+    }
+  },
+  "verdict_at_recount": {
+    "frames": 12,
+    "ok": true,
+    "over": 0,
+    "page_tiles": 64,
+    "window": [
+      80,
+      60
+    ],
+    "windows": 629079,
+    "worst": 8,
+    "worst_camera_px": {
+      "x": 4392,
+      "y": 256
+    },
+    "worst_positions": 6857,
+    "worst_window_tile": {
+      "left": 529,
+      "top": 16
+    }
+  },
+  "warnings": [],
+  "zone_separation": {
+    "donor_zones": 2,
+    "first_mixed": null,
+    "min_column_gap_cells": 164,
+    "mixed": 0,
+    "window_cells": [
+      80,
+      60
+    ],
+    "windows": 629079
+  },
+  "zone_table": [
+    {
+      "donor": "s2disasm",
+      "key": 0,
+      "palette_sha256": "057f4822cc56eb11b67e7908298341b68ed60ad56a15235bd1d22c37900f15d3",
+      "synthesised": null,
+      "tiles": 914,
+      "tileset_file": "games/sonic4/data/donors/s2disasm/EHZ/tileset.bin",
+      "tileset_sha256": "0bfcbbe482432e3973c4ae3221f72541620f3881a868714bbc84a53791b9e9c2",
+      "tree": "games/sonic4/data/donors/s2disasm/EHZ",
+      "zone": "EHZ"
+    },
+    {
+      "donor": "s2disasm",
+      "key": 1,
+      "palette_sha256": "345f06d4282de86e4d9b1763e766c00012c6d3a1a25100cdbc1db4a81a385b35",
+      "synthesised": null,
+      "tiles": 867,
+      "tileset_file": "games/sonic4/data/donors/s2disasm/CPZ/tileset.bin",
+      "tileset_sha256": "a2054ca8c15e5b8760ba5877410c6d4c61223568f44eaa3295711c9f06272c32",
+      "tree": "games/sonic4/data/donors/s2disasm/CPZ",
+      "zone": "CPZ"
+    },
+    {
+      "donor": "corridor",
+      "key": 2,
+      "palette_sha256": null,
+      "synthesised": "clip_manifest.corridor_sheet()",
+      "tiles": 3,
+      "tileset_file": "../bake_s2_ehz_cpz/corridor_sheet.bin",
+      "tileset_sha256": "e503ad2b9ca2f9a1abcc74e7ff09b7baa6e81d46cac098444ffa6356c8a6c607",
+      "tree": null,
+      "zone": "neutral"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "accept_s2_ehz_cpz": {
+    "exit": 0,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": true,\n  \"refusals\": [],\n  \"schema\": 1,\n  \"warnings\": []\n}\n"
+  },
+  "accept_w3": {
+    "exit": 0,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": true,\n  \"refusals\": [],\n  \"schema\": 1,\n  \"warnings\": [\n    {\n      \"message\": \"W3 act section 0 holds 2 zones: 'ehz_s2' (s2disasm/EHZ), 'cpz_s2' (s2disasm/CPZ). One section carries ONE local tile map \\u2014 a single 11-bit space capped at 2047 entries (ojz_strip_gen.build_section_local_map) \\u2014 and a mixed section needs the sum of both zones' tiles in it. The bake prints the map size per section and refuses past the cap.\",\n      \"rule\": \"W3\",\n      \"subjects\": [\n        {\n          \"id\": \"ehz_s2\",\n          \"index\": 0,\n          \"kind\": \"clip\"\n        },\n        {\n          \"id\": \"cpz_s2\",\n          \"index\": 1,\n          \"kind\": \"clip\"\n        }\n      ]\n    }\n  ]\n}\n"
+  },
+  "crash_missing_path": {
+    "exit": 1,
+    "stderr": "Traceback (most recent call last):\n  File \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/c852bc40-1a5d-4292-9f58-dbbaf8c8a7f8/scratchpad/aeon/tools/clip_manifest.py\", line 1145, in <module>\n    sys.exit(main())\n             ~~~~^^\n  File \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/c852bc40-1a5d-4292-9f58-dbbaf8c8a7f8/scratchpad/aeon/tools/clip_manifest.py\", line 1141, in main\n    return handler(args[1:])\n  File \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/c852bc40-1a5d-4292-9f58-dbbaf8c8a7f8/scratchpad/aeon/tools/clip_manifest.py\", line 1108, in _mode_validate\n    doc, rc = validate_json(path, root)\n              ~~~~~~~~~~~~~^^^^^^^^^^^^\n  File \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/c852bc40-1a5d-4292-9f58-dbbaf8c8a7f8/scratchpad/aeon/tools/clip_manifest.py\", line 1081, in validate_json\n    load(path, donor_root=_root(donor_root), warning_records=warnings)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/c852bc40-1a5d-4292-9f58-dbbaf8c8a7f8/scratchpad/aeon/tools/clip_manifest.py\", line 575, in load\n    with open(path) as fh:\n         ~~~~^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '../vj2/no_such_file.json'\n",
+    "stdout": ""
+  },
+  "crash_not_json": {
+    "exit": 1,
+    "stderr": "Traceback (most recent call last):\n  File \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/c852bc40-1a5d-4292-9f58-dbbaf8c8a7f8/scratchpad/aeon/tools/clip_manifest.py\", line 1145, in <module>\n    sys.exit(main())\n             ~~~~^^\n  File \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/c852bc40-1a5d-4292-9f58-dbbaf8c8a7f8/scratchpad/aeon/tools/clip_manifest.py\", line 1141, in main\n    return handler(args[1:])\n  File \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/c852bc40-1a5d-4292-9f58-dbbaf8c8a7f8/scratchpad/aeon/tools/clip_manifest.py\", line 1108, in _mode_validate\n    doc, rc = validate_json(path, root)\n              ~~~~~~~~~~~~~^^^^^^^^^^^^\n  File \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/c852bc40-1a5d-4292-9f58-dbbaf8c8a7f8/scratchpad/aeon/tools/clip_manifest.py\", line 1081, in validate_json\n    load(path, donor_root=_root(donor_root), warning_records=warnings)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/c852bc40-1a5d-4292-9f58-dbbaf8c8a7f8/scratchpad/aeon/tools/clip_manifest.py\", line 576, in load\n    raw = json.load(fh)\n  File \"/usr/lib/python3.14/json/__init__.py\", line 298, in load\n    return loads(fp.read(),\n        cls=cls, object_hook=object_hook,\n        parse_float=parse_float, parse_int=parse_int,\n        parse_constant=parse_constant, object_pairs_hook=object_pairs_hook, **kw)\n  File \"/usr/lib/python3.14/json/__init__.py\", line 352, in loads\n    return _default_decoder.decode(s)\n           ~~~~~~~~~~~~~~~~~~~~~~~^^^\n  File \"/usr/lib/python3.14/json/decoder.py\", line 345, in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.14/json/decoder.py\", line 361, in raw_decode\n    obj, end = self.scan_once(s, idx)\n               ~~~~~~~~~~~~~~^^^^^^^^\njson.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 3 (char 2)\n",
+    "stdout": ""
+  },
+  "refuse_r10_clip_corridor": {
+    "exit": 1,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": false,\n  \"refusals\": [\n    {\n      \"message\": \"R10 clips 'ehz_act1' (x=0 y=0 w=10976 h=1024) and 'ehz_to_cpz' (x=10960 y=0 w=1312 h=1024) overlap in the act. Whichever the bake wrote second would silently win; say which one you meant.\",\n      \"rule\": \"R10\",\n      \"subjects\": [\n        {\n          \"id\": \"ehz_act1\",\n          \"index\": 0,\n          \"kind\": \"clip\"\n        },\n        {\n          \"id\": \"ehz_to_cpz\",\n          \"index\": 0,\n          \"kind\": \"corridor\"\n        }\n      ]\n    }\n  ],\n  \"schema\": 1,\n  \"warnings\": []\n}\n"
+  },
+  "refuse_r10_pair": {
+    "exit": 1,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": false,\n  \"refusals\": [\n    {\n      \"message\": \"R10 clips 'ehz_s2' (x=0 y=0 w=2048 h=1024) and 'cpz_s2' (x=1024 y=0 w=2048 h=2048) overlap in the act. Whichever the bake wrote second would silently win; say which one you meant.\",\n      \"rule\": \"R10\",\n      \"subjects\": [\n        {\n          \"id\": \"ehz_s2\",\n          \"index\": 0,\n          \"kind\": \"clip\"\n        },\n        {\n          \"id\": \"cpz_s2\",\n          \"index\": 1,\n          \"kind\": \"clip\"\n        }\n      ]\n    }\n  ],\n  \"schema\": 1,\n  \"warnings\": []\n}\n"
+  },
+  "refuse_r12_after_w2": {
+    "exit": 1,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": false,\n  \"refusals\": [\n    {\n      \"message\": \"R12 clip 'cpz_s2': the paste shifts the clip by (-2056, 0) px, and collision is only correct when BOTH axes shift by a multiple of 16. DERIVED, not a convention: a collision cell's height profile is 16 bytes covering a 16-px block, and the runtime picks the column with `andi.w #$F, d0` on the WORLD x (games/sonic4/player/player_sensors.emp probe_core); the row is picked the same way in y (`lsr.w #1` of the tile row, engine/level/collision_lookup.emp). Shift the data by 8 px and every probe reads the wrong half of the profile while the ART, which is one word per 8-px cell, moves correctly \\u2014 so this fails as ground that is 8 px out of place, not as anything that looks broken in a screenshot. Move src_rect or dst_rect so the difference is a multiple of 16 in both axes.\",\n      \"rule\": \"R12\",\n      \"subjects\": [\n        {\n          \"id\": \"cpz_s2\",\n          \"index\": 1,\n          \"kind\": \"clip\"\n        }\n      ]\n    }\n  ],\n  \"schema\": 1,\n  \"warnings\": [\n    {\n      \"message\": \"W2 clip 'ehz_s2': src_rect (x=4096 y=0 w=2048 h=8) does not meet s2disasm@EHZ's painted bounding box (x 0..10976, y 8..1024 px) \\u2014 this clip is entirely blank.\",\n      \"rule\": \"W2\",\n      \"subjects\": [\n        {\n          \"id\": \"ehz_s2\",\n          \"index\": 0,\n          \"kind\": \"clip\"\n        }\n      ]\n    }\n  ]\n}\n"
+  },
+  "refuse_r7": {
+    "exit": 1,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": false,\n  \"refusals\": [\n    {\n      \"message\": \"R7 clip 'cpz_s2': src 2048x2048 != dst 1024x2048. A clip is a paste; nothing in this pipeline rescales nametable cells.\",\n      \"rule\": \"R7\",\n      \"subjects\": [\n        {\n          \"id\": \"cpz_s2\",\n          \"index\": 1,\n          \"kind\": \"clip\"\n        }\n      ]\n    }\n  ],\n  \"schema\": 1,\n  \"warnings\": []\n}\n"
+  },
+  "refuse_untagged_top_list": {
+    "exit": 1,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": false,\n  \"refusals\": [\n    {\n      \"message\": \"../vj2/toplist.clips.json: top level is not an object\",\n      \"rule\": null,\n      \"subjects\": []\n    }\n  ],\n  \"schema\": 1,\n  \"warnings\": []\n}\n"
+  }
+}
