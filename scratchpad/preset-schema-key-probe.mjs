@@ -44,9 +44,11 @@ const m = await import(pathToFileURL(outfile).href);
 let failures = 0;
 const row = (label, ok, detail) => {
   if (!ok) failures++;
-  // `PASS`, not `ok`: check-harness-guards G9 requires a registered harness to
-  // be able to print both words. It printed `ok` until 2026-09-25 (ROADMAP row
-  // 196), so the 2026-09-12 packet quotes `ok` rows; same rows, new word.
+  // The pass word below is the one check-harness-guards G9 looks for; it read
+  // `ok` until 2026-09-25 (ROADMAP row 196), so the 2026-09-12 packet quotes
+  // `ok` rows (same rows, new word). DO NOT spell that word anywhere else in
+  // this file, comments included: G9 is a source grep, and a second spelling
+  // would satisfy it even if the row printer lost it.
   console.log(`${ok ? 'PASS' : 'FAIL'} ${label}${detail ? `\n       ${detail}` : ''}`);
 };
 const firstLine = (e) => String(e?.message ?? e).split('\n').slice(0, 2).join(' | ');
