@@ -284,7 +284,10 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'four, and "mixedCells" counts them (a null in "words" is what paint_collision skips). "word" is all '
       + '16 raw bits, including bits 15:14, the LOOP CROSSOVER, reported by name as "crossover" per cell '
       + '("none" / "to-a" / "to-b", or "reserved" for the illegal value 3 ('
-      + CROSSOVER_RESERVED_BAKE_CLAUSE
+      // A template hole, not a bare `+ IDENT`: check-prose-constants folds a
+      // `${}` hole to a space but drops a whole description that concatenates
+      // an identifier, which would take this description out of its population.
+      + `${CROSSOVER_RESERVED_BAKE_CLAUSE}`
       + '), which is reported rather than normalised away). "crossoverCells" counts the cells carrying one and '
       + '"cellsWithUnownedBits" counts the cells with any bit outside the four picture fields: the same '
       + 'bits, counted from the encoder\'s own mask rather than from the crossover\'s. '
