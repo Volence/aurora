@@ -6,18 +6,18 @@
     "repo": "git@github.com:Volence/aeon.git",
     "path": "engine/system/constants.emp",
     "branch_that_answers_currency": "origin/master",
-    "revision": "7d4d0ce6a777714b727006ba79fc899fc6131a9d",
-    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log --oneline e0317db8 -- engine/system/constants.emp` names 7d4d0ce6 as the newest. Measured 2026-09-18 with aeon origin/master = e0317db84f302d4bca2c6719a0eccef227ce7f04 (local remote-tracking ref, no fetch run), the revision this lane measured every constant resolution at. The blob is the same at both.",
-    "blob": "536d89f544d7664be71ed558cbdcab419f325d4d",
-    "last_changed_by": "7d4d0ce6 tools: the act art pool page size is read from the engine on the bake/verify path (PAGE-SIZE-CONSTANT-ONLY)",
-    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> <AEON_DIR> <path> 7d4d0ce6 — bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
-    "revision_published": "7d4d0ce6 is an ancestor of aeon origin/master (e0317db8), checked with `git merge-base --is-ancestor` (exit 0); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run."
+    "revision": "787a9980a474a344f25d96750b0b5dc5a0967c11",
+    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log --oneline c838a30f -- engine/system/constants.emp` names 787a9980 as the newest. Measured 2026-09-25 with aeon origin/master = c838a30f5b4166af90f791da5b0512ce9494ecff (after `git fetch -q origin`), the one revision this re-vendor pinned for all four stale aeon fixtures. The blob is the same at both. act_descriptor.emp is unchanged at c838a30f (blob cbf001fb, its own pin 4802c664), so the pair still agrees.",
+    "blob": "faa16c4e7a61e1748a91d1d3bee9459efc0916ca",
+    "last_changed_by": "787a9980 perf(page-cache): bounded-direct patch regime for a streaming act's first block (adds PAGECACHE_DIRECT_RESIDENT = $FF and PAGECACHE_DIRECT_BOUNDED = $01 with their comment block; 11 lines added, nothing else changed)",
+    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> <AEON_DIR> <path> 787a9980 — bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
+    "revision_published": "787a9980 is an ancestor of aeon origin/master (c838a30f), checked with `git merge-base --is-ancestor` (exit 0); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run."
   },
   "fixture": {
     "path": "test/fixtures/regions/act-constants/engine_constants.emp",
-    "bytes": 86127,
-    "sha256": "930020d4ce18cb70ac5ff30c66fb00ad87e403a7e065cc019f3bd08fbc38f124",
-    "git_blob": "536d89f544d7664be71ed558cbdcab419f325d4d",
+    "bytes": 86999,
+    "sha256": "d3997e138fa8d466f0944a10d38e514b8aab2aa4f21d277eed13659d3cd26ff9",
+    "git_blob": "faa16c4e7a61e1748a91d1d3bee9459efc0916ca",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
   },
   "paired_with": {
