@@ -29,7 +29,11 @@ const clipact = (name: string) => JSON.parse(readFileSync(resolve(DIR, `${name}.
   clips: { id: string }[]; corridors: { id: string }[];
 };
 const CASES = JSON.parse(readFileSync(resolve(DIR, 'validate-json.cases.json'), 'utf8')) as Record<string, { exit: number; stdout: string; stderr: string }>;
-interface Marker { aeon: { revision: string; tool_path: string; tool_blob: string; re_measure: string }; fixture: { path: string; sha256: string } }
+interface Marker {
+  aeon: { revision: string; tool_path: string; tool_blob: string; re_measure: string; inputs?: { path: string; blob: string }[] };
+  fixture: { path: string; sha256: string; command: string };
+  generator?: { path: string };
+}
 const MARKERS = ['s2_ehz_cpz.clipact', 's2_two_clip.clipact', 'validate-json.cases'].map((stem) =>
   JSON.parse(readFileSync(resolve(DIR, `${stem}.provenance.json`), 'utf8')) as Marker);
 const REAL = ['s2_ehz_cpz', 's2_two_clip'];
@@ -239,6 +243,67 @@ describe('CURRENCY: the tools that produced these fixtures, at aeon origin/maste
       expect(at.blob, 'NOT AN AURORA REGRESSION: aeon\'s clip tool moved since this output was captured.\n'
         + `  pinned ${m.aeon.tool_blob} (aeon ${m.aeon.revision}); origin/master ${tip} has ${at.blob}\n  Re-measure: ${m.aeon.re_measure}`)
         .toBe(m.aeon.tool_blob);
+    });
+  }
+});
+
+/**
+ * ⚠ THE TOOL IS NOT THE ONLY THING AN OUTPUT DEPENDS ON. Until ROADMAP row 218
+ * the row above pinned tool_path alone, so when aeon changed the clips.json a
+ * bake reads and left clip_act_bake.py alone, s2_ehz_cpz.clipact.json went
+ * semantically stale (a 7-section act vendored against an 8-section one) with
+ * every row here green. So each marker also names its INPUTS, and two rows hold
+ * them: the documents the recorded command reads must all be pinned (derived
+ * from the command and the generator's own source, never typed here), and each
+ * pinned input must still be that blob at aeon origin/master.
+ */
+describe('CURRENCY: the INPUTS those tools read, at aeon origin/master', () => {
+  /** Every aeon clip manifest a marker's recorded run reads, derived from its command and its generator's source. */
+  function namedInputs(m: Marker): string[] {
+    const found = new Set<string>();
+    for (const p of m.fixture.command.match(/games\/sonic4\/data\/clips\/[a-z0-9_]+\/clips\.json/g) ?? []) found.add(p);
+    if (m.generator) {
+      const src = readFileSync(resolve(__dirname, '../..', m.generator.path), 'utf8');
+      const tmpl = /open\(f"([^"{]+)\{n\}\/clips\.json"\)/.exec(src);
+      expect(tmpl, `${m.generator.path}: cannot find the manifest path its fx() reads`).not.toBeNull();
+      const plan = /^plan = \[([\s\S]*?)\]$/m.exec(src);
+      expect(plan, `${m.generator.path}: cannot find its plan`).not.toBeNull();
+      for (const b of plan![1].matchAll(/\("[a-z0-9_]+", "([a-z0-9_]+)"/g)) found.add(`${tmpl![1]}${b[1]}/clips.json`);
+    }
+    return [...found].sort();
+  }
+
+  for (const m of MARKERS) {
+    it(`${m.fixture.path}: every manifest its recorded run reads is pinned in aeon.inputs`, () => {
+      const named = namedInputs(m);
+      // Anti-vacuous: every marker here bakes or validates at least one manifest.
+      expect(named.length, `${m.fixture.path}: derived no input from its command or generator`).toBeGreaterThan(0);
+      const pinned = (m.aeon.inputs ?? []).map((i) => i.path);
+      expect(named.filter((p) => !pinned.includes(p)), `${m.fixture.path}: read by the recorded run but NOT pinned`).toEqual([]);
+      for (const i of m.aeon.inputs ?? []) expect(i.blob, `${i.path}`).toMatch(/^[0-9a-f]{40}$/);
+    });
+
+    it(`${m.fixture.path}: each pinned input at aeon origin/master is the blob it was captured from`, (ctx) => {
+      const inputs = m.aeon.inputs ?? [];
+      expect(inputs.length, `${m.fixture.path}: no aeon.inputs`).toBeGreaterThan(0);
+      const aeon = peerRepo('aeon');
+      if (aeon === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR); CANNOT MEASURE the currency of ${m.fixture.path}'s ${inputs.length} inputs`);
+        return;
+      }
+      const tip = resolveRev(aeon, 'origin/master');
+      if (tip === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: origin/master does not resolve in ${aeon}; CANNOT MEASURE ${m.fixture.path}'s inputs`);
+        return;
+      }
+      const moved: string[] = [];
+      for (const i of inputs) {
+        const at = readAtRev(aeon, tip, i.path);
+        if (!at.ok) moved.push(`${i.path}: ${at.why}`);
+        else if (at.blob !== i.blob) moved.push(`${i.path}: pinned ${i.blob}, origin/master ${tip} has ${at.blob}`);
+      }
+      expect(moved, 'NOT AN AURORA REGRESSION: an input this output was captured from moved in aeon.\n'
+        + `  Re-measure: ${m.aeon.re_measure}`).toEqual([]);
     });
   }
 });

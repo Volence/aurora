@@ -1,13 +1,13 @@
 {
   "act": {
     "cells": [
-      1792,
+      2048,
       768
     ],
     "grid_h": 3,
-    "grid_w": 7,
+    "grid_w": 8,
     "id": "s2_ehz_cpz",
-    "name": "S2-COMPRESSED-ACT row 7: Emerald Hill act 1, a neutral corridor, then the opening of Chemical Plant act 1",
+    "name": "S2-COMPRESSED-ACT row 7: Emerald Hill act 1, a 384-px enclosed tunnel, then the opening 4576 px of Chemical Plant act 1",
     "section_px": 2048
   },
   "clips": [
@@ -36,8 +36,8 @@
       "donor": "s2disasm",
       "dst_rect": {
         "h": 2048,
-        "w": 2048,
-        "x": 12288,
+        "w": 4576,
+        "x": 11360,
         "y": 256
       },
       "id": "cpz_act1",
@@ -45,18 +45,18 @@
       "severed_xover_reason": null,
       "src_rect": {
         "h": 2048,
-        "w": 2048,
+        "w": 4576,
         "x": 0,
         "y": 0
       },
-      "unaligned_dst_reason": "Chemical Plant is lowered 256 px so its start floor meets the corridor's. Its own start ground is a full block at y=512 (s2disasm startpos/CPZ_1.bin puts the player at (96, 492), feet at 511); the corridor's floor is at y=768, one collision row above Emerald Hill's ground where its crop ends (x 10960..10975: shape 164, height 12, surface y=772 \u2014 a 4-px step up onto the corridor, inside a floor sensor's reach). 768 - 512 = 256, a multiple of R12's 16-px collision quantum, so the paste moves art and collision together. The price is 256 px of Chemical Plant in the act's second section row (2048..2303), measured at 1,600 B of blocks.",
+      "unaligned_dst_reason": "x: Chemical Plant starts where the 384-px tunnel ends (11360 = 10976 + 384), which is not a section boundary \u2014 act section 5 holds Emerald Hill's crop end, the tunnel and Chemical Plant's first 928 px (W3; the bake refuses a local map past 2047 and did not). y: Chemical Plant is lowered 256 px so its start floor meets the tunnel's. Its own start ground is a full block at y=512 (s2disasm startpos/CPZ_1.bin puts the player at (96, 492), feet at 511); the tunnel's floor is at y=768, one collision row above Emerald Hill's ground where its crop ends (x 10960..10975: shape 164, height 12, surface y=772 \u2014 bridged by the tunnel's seam ramp, clip_manifest K6). 768 - 512 = 256, a multiple of R12's 16-px collision quantum, so the paste moves art and collision together. The price is 256 px of Chemical Plant in the act's second section row (2048..2303), measured at 1,600 B of blocks when the clip was 2048 px wide (not re-measured at 2528 or 4576).",
       "zone": "CPZ",
       "zone_key": 1
     }
   ],
   "collision": {
-    "attr_entries": 163,
-    "attr_entries_at_recount": 163,
+    "attr_entries": 219,
+    "attr_entries_at_recount": 219,
     "base_bank": "games/sonic4/data/collision/base_s2",
     "cap": 255,
     "format": "aurora per-plane cell word, big-endian u16 (see tools/collision_pipeline.chunk_entry_to_plane_words)",
@@ -72,13 +72,13 @@
         "zone": "s2disasm/EHZ"
       },
       {
-        "attr_entries_added": 58,
-        "attr_entries_alone": 64,
+        "attr_entries_added": 113,
+        "attr_entries_alone": 157,
         "clip": "cpz_act1",
         "marks_inside_src": 0,
         "marks_outside_src": 0,
         "severed_xover_reason": null,
-        "solid_cells": 8560,
+        "solid_cells": 47624,
         "zone": "s2disasm/CPZ"
       }
     ],
@@ -119,24 +119,24 @@
         "n": 4
       },
       {
-        "collattr_sha256": "dd3890ad8c26cf0ed6c81271dcad1ac8b097df4c730638a6af1447331d92de04",
-        "collattr_solid_cells": 6336,
-        "collattrb_sha256": "62f71b203df0cbba9b636c0451f247713664e1e94a0a2f45bcd4109591aac976",
-        "collattrb_solid_cells": 6360,
+        "collattr_sha256": "9b62ff703004abcfb04fdb988a0529c57aa701ca659a0952a1d0ad4ce28c87aa",
+        "collattr_solid_cells": 5184,
+        "collattrb_sha256": "437c6ec11b951b5190aa89a1a473f9e0b9021fde146459db348c617bc57ecd49",
+        "collattrb_solid_cells": 5208,
         "n": 5
       },
       {
-        "collattr_sha256": "0e4cec9d6fa66a44ed564d28a163c3b6231dc311e25ac5189f8d081447043331",
-        "collattr_solid_cells": 4272,
-        "collattrb_sha256": "22da51376b3a24fffba11f0b427a8cd3d8d0e3da65fe3a8b88d32a0f43a249fd",
-        "collattrb_solid_cells": 4288,
+        "collattr_sha256": "46f32e2d272d9d8cfec14e767a1d2bd4bc1d792baa31ee69f287f5c93f689dfd",
+        "collattr_solid_cells": 9976,
+        "collattrb_sha256": "c97dc5f1138f9b3e75ff6d7ecc61e0ddcdbd0801e0d5892b84fc44dc50a23dbd",
+        "collattrb_solid_cells": 10136,
         "n": 6
       },
       {
-        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
-        "collattr_solid_cells": 0,
-        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
-        "collattrb_solid_cells": 0,
+        "collattr_sha256": "93df68ad9b2600e9d2bc8081bded4ea6588697a03bf69f3db6922c240b1ae82d",
+        "collattr_solid_cells": 12416,
+        "collattrb_sha256": "e956e1f4ce1dcc339c9f3df861122c9a361d5226413b58ecb91c3bc2fe2bae2e",
+        "collattrb_solid_cells": 11896,
         "n": 7
       },
       {
@@ -229,6 +229,27 @@
         "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
         "collattrb_solid_cells": 0,
         "n": 20
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 21
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 22
+      },
+      {
+        "collattr_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattr_solid_cells": 0,
+        "collattrb_sha256": "fa43239bcee7b97ca62f007cc68487560a39e19f74f3dde7486db3f98df8e471",
+        "collattrb_solid_cells": 0,
+        "n": 23
       }
     ]
   },
@@ -236,13 +257,32 @@
   "corridors": [
     {
       "dst_rect": {
-        "h": 1024,
-        "w": 1312,
+        "h": 512,
+        "w": 384,
         "x": 10976,
-        "y": 0
+        "y": 512
       },
       "floor_y": 768,
-      "id": "ehz_to_cpz"
+      "id": "ehz_to_cpz",
+      "tunnel": {
+        "art": {
+          "back_src": {
+            "h": 32,
+            "w": 32,
+            "x": 512,
+            "y": 896
+          },
+          "donor": "s2disasm",
+          "wall_src": {
+            "h": 32,
+            "w": 32,
+            "x": 768,
+            "y": 784
+          },
+          "zone": "CPZ"
+        },
+        "ceiling_y": 672
+      }
     }
   ],
   "placement": {
@@ -253,9 +293,9 @@
       0
     ],
     "rung": "shipped",
-    "seconds": 0.03,
+    "seconds": 0.121,
     "stats": {
-      "shipped_worst_pin0": 8
+      "shipped_worst_pin0": 11
     }
   },
   "pool": {
@@ -273,10 +313,13 @@
       64,
       64,
       64,
-      40
+      64,
+      64,
+      64,
+      38
     ],
     "page_tiles": 64,
-    "pages": 14,
+    "pages": 17,
     "per_clip": [
       {
         "id": "ehz_act1",
@@ -289,10 +332,10 @@
       {
         "id": "cpz_act1",
         "index": 1,
-        "pages_exclusive": 6,
-        "pages_touched": 7,
-        "tiles": 390,
-        "tiles_added": 390
+        "pages_exclusive": 9,
+        "pages_touched": 10,
+        "tiles": 554,
+        "tiles_added": 554
       }
     ],
     "per_clip_fields": {
@@ -309,12 +352,12 @@
         "index": 0,
         "pages_exclusive": 0,
         "pages_touched": 1,
-        "tiles": 2,
-        "tiles_added": 2
+        "tiles": 28,
+        "tiles_added": 28
       }
     ],
     "pool_bin": "pool.bin (pages padded to page_tiles; slot = page*page_tiles + i)",
-    "tiles": 872
+    "tiles": 1062
   },
   "produced_by": "tools/clip_act_bake.py",
   "schema": 1,
@@ -370,20 +413,21 @@
       ]
     },
     {
-      "local_map_entries": 209,
+      "local_map_entries": 499,
       "n": 5,
-      "painted_cells": 12993,
+      "painted_cells": 14332,
       "sx": 5,
       "sy": 0,
       "zone_keys": [
         0,
+        1,
         2
       ]
     },
     {
-      "local_map_entries": 391,
+      "local_map_entries": 443,
       "n": 6,
-      "painted_cells": 8912,
+      "painted_cells": 16779,
       "sx": 6,
       "sy": 0,
       "zone_keys": [
@@ -391,8 +435,18 @@
       ]
     },
     {
-      "local_map_entries": 1,
+      "local_map_entries": 528,
       "n": 7,
+      "painted_cells": 20121,
+      "sx": 7,
+      "sy": 0,
+      "zone_keys": [
+        1
+      ]
+    },
+    {
+      "local_map_entries": 1,
+      "n": 8,
       "painted_cells": 0,
       "sx": 0,
       "sy": 1,
@@ -400,7 +454,7 @@
     },
     {
       "local_map_entries": 1,
-      "n": 8,
+      "n": 9,
       "painted_cells": 0,
       "sx": 1,
       "sy": 1,
@@ -408,7 +462,7 @@
     },
     {
       "local_map_entries": 1,
-      "n": 9,
+      "n": 10,
       "painted_cells": 0,
       "sx": 2,
       "sy": 1,
@@ -416,7 +470,7 @@
     },
     {
       "local_map_entries": 1,
-      "n": 10,
+      "n": 11,
       "painted_cells": 0,
       "sx": 3,
       "sy": 1,
@@ -424,7 +478,7 @@
     },
     {
       "local_map_entries": 1,
-      "n": 11,
+      "n": 12,
       "painted_cells": 0,
       "sx": 4,
       "sy": 1,
@@ -432,17 +486,9 @@
     },
     {
       "local_map_entries": 1,
-      "n": 12,
-      "painted_cells": 0,
-      "sx": 5,
-      "sy": 1,
-      "zone_keys": []
-    },
-    {
-      "local_map_entries": 1,
       "n": 13,
       "painted_cells": 0,
-      "sx": 6,
+      "sx": 5,
       "sy": 1,
       "zone_keys": [
         1
@@ -452,23 +498,27 @@
       "local_map_entries": 1,
       "n": 14,
       "painted_cells": 0,
-      "sx": 0,
-      "sy": 2,
-      "zone_keys": []
+      "sx": 6,
+      "sy": 1,
+      "zone_keys": [
+        1
+      ]
     },
     {
       "local_map_entries": 1,
       "n": 15,
       "painted_cells": 0,
-      "sx": 1,
-      "sy": 2,
-      "zone_keys": []
+      "sx": 7,
+      "sy": 1,
+      "zone_keys": [
+        1
+      ]
     },
     {
       "local_map_entries": 1,
       "n": 16,
       "painted_cells": 0,
-      "sx": 2,
+      "sx": 0,
       "sy": 2,
       "zone_keys": []
     },
@@ -476,7 +526,7 @@
       "local_map_entries": 1,
       "n": 17,
       "painted_cells": 0,
-      "sx": 3,
+      "sx": 1,
       "sy": 2,
       "zone_keys": []
     },
@@ -484,7 +534,7 @@
       "local_map_entries": 1,
       "n": 18,
       "painted_cells": 0,
-      "sx": 4,
+      "sx": 2,
       "sy": 2,
       "zone_keys": []
     },
@@ -492,7 +542,7 @@
       "local_map_entries": 1,
       "n": 19,
       "painted_cells": 0,
-      "sx": 5,
+      "sx": 3,
       "sy": 2,
       "zone_keys": []
     },
@@ -500,7 +550,31 @@
       "local_map_entries": 1,
       "n": 20,
       "painted_cells": 0,
+      "sx": 4,
+      "sy": 2,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 21,
+      "painted_cells": 0,
+      "sx": 5,
+      "sy": 2,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 22,
+      "painted_cells": 0,
       "sx": 6,
+      "sy": 2,
+      "zone_keys": []
+    },
+    {
+      "local_map_entries": 1,
+      "n": 23,
+      "painted_cells": 0,
+      "sx": 7,
       "sy": 2,
       "zone_keys": []
     }
@@ -515,16 +589,16 @@
       80,
       60
     ],
-    "windows": 629079,
-    "worst": 8,
+    "windows": 722007,
+    "worst": 11,
     "worst_camera_px": {
-      "x": 4392,
-      "y": 256
+      "x": 14856,
+      "y": 880
     },
-    "worst_positions": 6857,
+    "worst_positions": 4631,
     "worst_window_tile": {
-      "left": 529,
-      "top": 16
+      "left": 1837,
+      "top": 94
     }
   },
   "verdict_at_recount": {
@@ -536,29 +610,35 @@
       80,
       60
     ],
-    "windows": 629079,
-    "worst": 8,
+    "windows": 722007,
+    "worst": 11,
     "worst_camera_px": {
-      "x": 4392,
-      "y": 256
+      "x": 14856,
+      "y": 880
     },
-    "worst_positions": 6857,
+    "worst_positions": 4631,
     "worst_window_tile": {
-      "left": 529,
-      "top": 16
+      "left": 1837,
+      "top": 94
     }
   },
-  "warnings": [],
+  "warnings": [
+    "W3 act section 5 holds 2 zones: 'ehz_act1' (s2disasm/EHZ), 'cpz_act1' (s2disasm/CPZ). One section carries ONE local tile map \u2014 a single 11-bit space capped at 2047 entries (ojz_strip_gen.build_section_local_map) \u2014 and a mixed section needs the sum of both zones' tiles in it. The bake prints the map size per section and refuses past the cap."
+  ],
   "zone_separation": {
     "donor_zones": 2,
-    "first_mixed": null,
-    "min_column_gap_cells": 164,
-    "mixed": 0,
+    "first_mixed": {
+      "camera_x_px_approx": 10728,
+      "left_tile": 1341,
+      "top_tile": 0
+    },
+    "min_column_gap_cells": 48,
+    "mixed": 1984,
     "window_cells": [
       80,
       60
     ],
-    "windows": 629079
+    "windows": 722007
   },
   "zone_table": [
     {
@@ -587,10 +667,10 @@
       "donor": "corridor",
       "key": 2,
       "palette_sha256": null,
-      "synthesised": "clip_manifest.corridor_sheet()",
-      "tiles": 3,
+      "synthesised": "clip_manifest.corridor_art()",
+      "tiles": 29,
       "tileset_file": "../bake_s2_ehz_cpz/corridor_sheet.bin",
-      "tileset_sha256": "e503ad2b9ca2f9a1abcc74e7ff09b7baa6e81d46cac098444ffa6356c8a6c607",
+      "tileset_sha256": "bf651b5c8b73c7c529f0e6b5652190d8f3c11367f921d83b0942185838b9cc4c",
       "tree": null,
       "zone": "neutral"
     }
