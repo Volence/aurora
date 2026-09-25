@@ -90,6 +90,13 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild, assertDebugBuild } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9487);
+/**
+ * Optional `SCALE=1.35`: pass `--force-device-scale-factor` so a run can be made at a
+ * FRACTIONAL dpr on demand, rather than waiting for Xvfb to infer one (it has been seen
+ * at both 1 and 1.35 on this host). At 1.35 the canvas rect is fractional, which is the
+ * case the integer aim exists for. Unset = whatever the window gives, printed per row.
+ */
+const SCALE = process.env.SCALE ? Number(process.env.SCALE) : null;
 const ROOT = AURORA_DIR;
 const RUN = announceRunRoot(runTarget(ROOT));
 assertFreshBuild(RUN);
@@ -287,7 +294,8 @@ async function main() {
     const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1', ORACLE_SOCKET: SOCK };
     delete env.DISPLAY;
     delete env.EXODUS_SOCKET;
-    app = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN],
+    app = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON,
+      ...(SCALE !== null ? [`--force-device-scale-factor=${SCALE}`] : []), MAIN],
       { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     app.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[app] ${d}`); });
     app.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[app!] ${d}`); });
@@ -337,7 +345,10 @@ async function main() {
       return { dpr: window.devicePixelRatio, left: r.left, top: r.top, width: r.width, height: r.height }; })()`);
     const cv0 = await canvasInfo();
     if (!cv0 || cv0.width < 200 || cv0.height < 200) abort(`the map canvas is not on screen: ${J(cv0)}`);
-    note('environment', `dpr ${cv0.dpr}; map canvas rect ${J(cv0)}; app act ${st.zone}/${st.act} grid ${st.gridWidth}x${st.gridHeight}; `
+    if (SCALE !== null) {
+      check('2d', `[anti-vacuous] SCALE=${SCALE} took: devicePixelRatio reads ${SCALE}`, Math.abs(cv0.dpr - SCALE) < 1e-6, `dpr ${cv0.dpr}`);
+    }
+    note('environment', `SCALE ${SCALE ?? 'unset (native)'}; dpr ${cv0.dpr}; map canvas rect ${J(cv0)}; app act ${st.zone}/${st.act} grid ${st.gridWidth}x${st.gridHeight}; `
       + `engine clamp edges (${boundRight}, ${boundBottom})`);
 
     const mouse = (type, x, y) => c.send('Input.dispatchMouseEvent', { type, x, y, button: 'none', buttons: 0 });
