@@ -17,7 +17,7 @@ import {
   recordComposerEdit, recordComposerSnapshot, takeComposerSnapshot,
 } from '../../state/composer-history';
 import {
-  chunkDocSyncKey, commitChunkDocStep, isChunkDocument, syncChunkDocFromLibrary,
+  chunkDocSyncKey, commitChunkDocStep, isChunkDocument, reconcileChunkDocDirty, syncChunkDocFromLibrary,
 } from '../../state/chunk-doc-commit';
 import type { ComposerSnapshot } from '../../../core/editing/composer-history';
 import { paintDocCollision, applyClipboardCollisionToDoc } from '../../../core/art/composer-collision';
@@ -54,10 +54,14 @@ import {
 interface Write { x: number; y: number; value: number; }
 interface SelRect { x: number; y: number; w: number; h: number; }
 
+type TileTool = 'tile-stamp' | 'collision' | 'palette-apply';
+
 /** Every input a tile-space stroke paints with, as latched at its press (see
- *  `strokeLatch`). `word` and `plane` feed the collision brush; `tile`, `pal`,
- *  `hf`, `vf` and `pri` the tile stamp; `pal` the palette-apply brush. */
+ *  `strokeLatch`). `tool` picks the brush; `word` and `plane` feed the collision
+ *  brush; `tile`, `pal`, `hf`, `vf` and `pri` the tile stamp; `pal` the
+ *  palette-apply brush. */
 interface StrokeInputs {
+  tool: TileTool;
   word: number;
   plane: 'a' | 'b';
   tile: number;
@@ -168,8 +172,21 @@ export default function ComposerCanvas() {
    *  document changes: it describes THIS stroke and nothing else, so a stroke
    *  whose tool is switched under the held button paints with the inputs of its
    *  own press, never with a latch left over from an earlier stroke (O3 of the
-   *  word-latch packet). `null` means no stroke is held: see `applyTileCell`. */
+   *  word-latch packet). `null` means no stroke is held: see `applyTileCell`.
+   *
+   *  The TOOL is latched too (ART-STROKE-FOLLOWUPS (a), hub ruling 2026-09-25T
+   *  08:55:30Z: "the tool is a stroke input, so it latches at the press"): a
+   *  tool picked on the rail or by its key under the held button waits for the
+   *  next press, like every other input. `strokeHeld` keeps the pointer hook
+   *  handed to PixelViewport until `up`, even when the new tool is a pixel tool,
+   *  so the rest of the stroke and its release still reach this stroke. */
   const strokeLatch = useRef<StrokeInputs | null>(null);
+  /** A tile-space stroke is held (set at a press that latched, cleared at `up`
+   *  and on a document change). State, not a ref, because it decides the
+   *  `hostPointer` PROP: a tool switched to a pixel tool mid-stroke must not
+   *  take the hook away before the release, and must hand the next press to the
+   *  pixel engine once it has come. */
+  const [strokeHeld, setStrokeHeld] = useState(false);
   const [selection, setSelection] = useState<SelRect | null>(null);
   const selectionRef = useRef<SelRect | null>(null);
   selectionRef.current = selection;
@@ -243,6 +260,11 @@ export default function ComposerCanvas() {
    */
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { syncChunkDocFromLibrary(); }, chunkDocSyncKey(historyVersion, open));
+  // ...and on the same key, declared AFTER it so it runs once the document is
+  // rebuilt: an undo back to the saved state reads clean and a redo away from it
+  // reads dirty (ART-STROKE-FOLLOWUPS (c); the rule is at `reconcileChunkDocDirty`).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { reconcileChunkDocDirty(); }, chunkDocSyncKey(historyVersion, open));
 
   // ---------- resolved render inputs ----------
 
@@ -425,13 +447,15 @@ export default function ComposerCanvas() {
     useArtStore.getState().bumpDoc();
   }
 
-  /** Every tile-space brush input as the store and the flip keys hold it NOW.
+  /** Every tile-space brush input as the store and the flip keys hold it NOW,
+   *  with the tool `t` (the armed tile-space tool at a press).
    *  Called by the press, which latches it (`strokeLatch`), and by
    *  `applyTileCell`'s no-stroke fallback. */
-  function strokeInputsNow(): StrokeInputs {
+  function strokeInputsNow(t: TileTool): StrokeInputs {
     const est = useEditorStore.getState();
     const s = useArtStore.getState();
     return {
+      tool: t,
       word: selectedCollisionWord({
         shape: est.selectedCollisionProfile, entryFlipX: est.selectedCollisionEntryFlipX,
         userXFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
@@ -447,7 +471,7 @@ export default function ComposerCanvas() {
 
   /** Apply one tile-space tool action to a doc cell (stamp / collision /
    *  palette-apply). */
-  function applyTileCell(t: 'tile-stamp' | 'collision' | 'palette-apply', cx: number, cy: number) {
+  function applyTileCell(t: TileTool, cx: number, cy: number) {
     const o = useArtStore.getState().open;
     if (!o) return;
     const doc = o.doc;
@@ -460,7 +484,7 @@ export default function ComposerCanvas() {
     // below never does (`move` needs `lastTileCellRef`, set by the same press
     // that sets the latch and cleared beside it): the live values, as every cell
     // took before the latch, never a made-up word that would erase.
-    const inp = strokeLatch.current ?? strokeInputsNow();
+    const inp = strokeLatch.current ?? strokeInputsNow(t);
     if (t === 'tile-stamp') {
       // Read the cell out before the stamp overwrites it — `stampTile` REPLACES
       // the cell object unconditionally, so "did this change anything" cannot be
@@ -614,44 +638,67 @@ export default function ComposerCanvas() {
   useHandPan(scrollerRef, { enabled: levelKeysEnabled });
 
   // Tile-space tools (stamp/collision) are tile-space by nature — route them to
-  // the host hook whenever selected, regardless of the px/tile tab state.
+  // the host hook whenever selected, regardless of the px/tile tab state, AND
+  // for as long as a tile-space stroke is held (`strokeHeld`), whatever tool is
+  // picked meanwhile: the tool is latched at the press (ART-STROKE-FOLLOWUPS
+  // (a)). PixelViewport routes each event to the hook it is rendered with at
+  // that moment, so before this a tool switched mid-stroke either swapped the
+  // hook (another tile-space tool: the rest of the stroke took the new brush) or
+  // dropped it (a pixel tool: the rest of the stroke painted nothing and its
+  // release never reached `up`, so the chunk document's step was not banked).
+  //
+  // ONE hook object for the component's life, forwarding to the handlers of the
+  // latest render (`hostImpl`), so the object PixelViewport holds never changes
+  // under a stroke and the handlers never read a stale render.
   const tileTools = tool === 'tile-stamp' || tool === 'collision' || tool === 'palette-apply';
-  const hostPointer: HostPointer | null = useMemo(() => {
-    if (!tileTools) return null;
-    const t = tool as 'tile-stamp' | 'collision' | 'palette-apply';
-    return {
-      down(p) {
-        const o = useArtStore.getState().open;
-        if (!o) return;
-        // Live-tile docs are a single atlas tile — stamping/collision is
-        // pointless (the chunk nametable carries those). Hint once. A BG
-        // override doc is the same shape: its cells ARE the band's slots.
-        if (o.liveTileIndex !== null || o.bgOverride) {
-          if (!tileHintRef.current) {
-            tileHintRef.current = true;
-            useToastStore.getState().addToast(
-              'Tile-space tools work on chunk/new documents, not single live tiles', 'info');
-          }
-          return;
+  const hostImpl = useRef<HostPointer | null>(null);
+  hostImpl.current = {
+    down(p) {
+      const o = useArtStore.getState().open;
+      if (!o) return;
+      const armed = useArtStore.getState().tool;
+      if (!(armed === 'tile-stamp' || armed === 'collision' || armed === 'palette-apply')) return;
+      // Live-tile docs are a single atlas tile — stamping/collision is
+      // pointless (the chunk nametable carries those). Hint once. A BG
+      // override doc is the same shape: its cells ARE the band's slots.
+      if (o.liveTileIndex !== null || o.bgOverride) {
+        if (!tileHintRef.current) {
+          tileHintRef.current = true;
+          useToastStore.getState().addToast(
+            'Tile-space tools work on chunk/new documents, not single live tiles', 'info');
         }
-        const cx = p.x >> 3, cy = p.y >> 3;
-        strokeLatch.current = strokeInputsNow(); // every input of the stroke (ART-BRUSH-LATCH-REST)
-        beginTileGesture();
-        applyTileCell(t, cx, cy);
-        lastTileCellRef.current = { cx, cy };
-      },
-      move(p) {
-        const last = lastTileCellRef.current;
-        if (!last) return;
-        const cx = p.x >> 3, cy = p.y >> 3;
-        if (cx === last.cx && cy === last.cy) return;
-        for (const pt of linePoints(last.cx, last.cy, cx, cy).slice(1)) applyTileCell(t, pt.x, pt.y);
-        lastTileCellRef.current = { cx, cy };
-      },
-      up() { lastTileCellRef.current = null; strokeLatch.current = null; endTileGesture(); },
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tileTools, tool]);
+        return;
+      }
+      const cx = p.x >> 3, cy = p.y >> 3;
+      // Every input of the stroke, the tool included (ART-BRUSH-LATCH-REST, ART-STROKE-FOLLOWUPS (a)).
+      strokeLatch.current = strokeInputsNow(armed);
+      setStrokeHeld(true);
+      beginTileGesture();
+      applyTileCell(armed, cx, cy);
+      lastTileCellRef.current = { cx, cy };
+    },
+    move(p) {
+      const last = lastTileCellRef.current;
+      const inp = strokeLatch.current;
+      if (!last || !inp) return;
+      const cx = p.x >> 3, cy = p.y >> 3;
+      if (cx === last.cx && cy === last.cy) return;
+      for (const pt of linePoints(last.cx, last.cy, cx, cy).slice(1)) applyTileCell(inp.tool, pt.x, pt.y);
+      lastTileCellRef.current = { cx, cy };
+    },
+    up() {
+      lastTileCellRef.current = null;
+      strokeLatch.current = null;
+      setStrokeHeld(false);
+      endTileGesture();
+    },
+  };
+  const stableHost = useMemo<HostPointer>(() => ({
+    down: (p, e) => hostImpl.current!.down(p, e),
+    move: (p, e) => hostImpl.current!.move(p, e),
+    up: (p, e) => hostImpl.current!.up(p, e),
+  }), []);
+  const hostPointer: HostPointer | null = tileTools || strokeHeld ? stableHost : null;
 
   // ---------- overlay escape hatches (origin-translated by the viewport) ----------
 
@@ -988,6 +1035,7 @@ export default function ComposerCanvas() {
     flipRef.current = { hf: false, vf: false };
     lastTileCellRef.current = null;
     strokeLatch.current = null;
+    setStrokeHeld(false);
   }, [open?.doc]);
 
   if (!open) return null;

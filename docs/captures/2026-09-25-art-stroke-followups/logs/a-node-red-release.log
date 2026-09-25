@@ -1,0 +1,76 @@
+diff --git a/src/renderer/components/art/ComposerCanvas.tsx b/src/renderer/components/art/ComposerCanvas.tsx
+index 0fff5c52..83314f7d 100644
+--- a/src/renderer/components/art/ComposerCanvas.tsx
++++ b/src/renderer/components/art/ComposerCanvas.tsx
+@@ -684,7 +684,6 @@ export default function ComposerCanvas() {
+     up() {
+       lastTileCellRef.current = null;
+       strokeLatch.current = null;
+-      setStrokeHeld(false);
+       endTileGesture();
+     },
+   };
+09:00:26Z
+24.30 25.31 27.24 10/3835 1210031
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+
+ ❯ src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts (4 tests | 1 failed) 104ms
+     ✓ TOOL-LATCH: a tile-stamp stroke switched to 'collision' under the held button stamps to its end 92ms
+     ✓ TOOL-LATCH: a tile-stamp stroke switched to 'palette-apply' under the held button stamps to its end 3ms
+     × TOOL-LATCH: a tile-stamp stroke switched to 'pencil' under the held button stamps to its end 6ms
+     ✓ TOOL-LATCH: a collision stroke switched to tile-stamp under the held button paints collision to its end 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts > ART-STROKE-FOLLOWUPS (a): the tool of a composer tile-space stroke is latched at the press > TOOL-LATCH: a tile-stamp stroke switched to 'pencil' under the held button stamps to its end
+AssertionError: the released stroke still holds the pointer: a pencil press would go to the tile stamp: expected { down: [Function down], …(2) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "down": [Function down],
+  "move": [Function move],
+  "up": [Function up],
+}
+
+ ❯ src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts:193:114
+    191|       expect([...doc.collisionA], `a tile-stamp stroke switched to ${t…
+    192|       if (to === 'pencil') {
+    193|         expect(hook(), 'the released stroke still holds the pointer: a…
+       |                                                                                                                  ^
+    194|       } else {
+    195|         // The NEXT press takes the switched-to tool.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  05:00:26
+   Duration  824ms (transform 550ms, setup 553ms, import 77ms, tests 104ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 1 failure record(s) in 1 file(s) (1 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        1   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/art/__tests__/composer-tool-latch-mounted.test.ts
+    [ASSERTION] ART-STROKE-FOLLOWUPS (a): the tool of a composer tile-space stroke is latched at the press > TOOL-LATCH: a tile-stamp stroke switched to 'pencil' under the held button stamps to its end
+        AssertionError: the released stroke still holds the pointer: a pencil press would go to the tile stamp: expected { down: [Function down], …(2) } to be null
+        why this bucket: name is AssertionError
+
+failure-class: 1 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+exit 1
+09:00:27Z

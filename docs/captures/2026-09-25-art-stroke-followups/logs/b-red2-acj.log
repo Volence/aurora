@@ -1,0 +1,70 @@
+run b-red2-acj PART=acj start 09:26:46Z load 20.10
+bundle strokeHeld count: 3
+copy /tmp/claude-1000/-home-volence-sonic-hacks-aurora/fd9f5022-ac5b-40c2-a861-482086de404f/scratchpad/aeon-b-red2-acj-3272240-1790328406 (238M)
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c — dist/main/index.mjs is 2s newer than the newest of 1022 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/src/renderer/workspace/facets/art-facet.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-25T09:26:44.294Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-25T09:26:44.294Z), so window.__dbg is in this bundle
+=== map-behaviour-fixes 2026-09-12 harness ===
+    uptime       : 05:26:46 up 1 day, 18:28,  1 user,  load average: 20.10, 25.99, 25.21
+    PARTS        : acj
+    node         : v24.15.0
+    root         : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+    in-tree      : yes (the tree under test is /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c; this file lives in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c)
+    ORACLE_SOCKET: /tmp/mbfix-sock-eE8KjX/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-3275229-73251967
+    PORT         : 9433   DISPLAY: xvfb-run -a (never :0)
+    oracle       : literals from HEAD e41e372e180b7fc3be3aa9e2569514aa65c9a6b1; collision-paint, collision-cell, s4-types, collision-word, collision-cell-word bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c/src; brush sizes [1,7,15,25]; section 256x256 tiles
+    harness      : blob 0b6500df0c499e16958099e9a2d86ebc156e836f (as committed at HEAD)
+    src on disk  : DIFFERS FROM HEAD (a mutation?):
+                   M src/renderer/workspace/facets/art-facet.tsx
+    aeon source  : AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/fd9f5022-ac5b-40c2-a861-482086de404f/scratchpad/aeon-b-red2-acj-3272240-1790328406   (live sibling /home/volence/sonic_hacks/aeon: refused if equal)
+    copy         : /tmp/mbfix-aeon-SxXPYX   project "Sonic 4"
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 3072542 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 3072542,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 3072542 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 3072542,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-3275229-73251967 — see HAZARD 6
+    X pointer    : PARKED outside the window: display :159 (Xvfb pid 3279114); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed   click log: installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1, by a real click on its Explorer row   [load 18.46/25.45/25.05]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row "Oracle Jungle Zone · act1" aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+════════ PART acj ════════
+PASS  [ACJ.0] PREMISE: on the composer's CLEAN chunk document with the Tile stamp armed, one real click stamped a tile it changes, and the document is now dirty (this was its first write)   [load 20.03/25.65/25.12]
+        dpr 1; document reached by double-click on the Chunks grid; doc {"chunkId":"OJZ_01","name":"OJZ $01","widthTiles":16,"heightTiles":16,"dirty":false,"tool":"tile-stamp","brushTile":0,"stampPriority":"keep"}; zoom 8; tile {"tx":0,"ty":0} aim (340,176) before {"t":0,"hf":false,"vf":true} after {"t":0,"hf":false,"vf":false}; dirty after true
+FAIL  [ACJ.a] the first write to a clean chunk document does not move the composer canvas: its rect is the same before the press and after the release   [load 20.03/25.65/25.12]
+        canvas before {"x":308,"y":144,"w":1024,"h":1024} after {"x":308,"y":186,"w":1024,"h":1024} (dy 42.00); options bar before {"y":74,"h":46,"text":"OJZ $01 ⚠ pixel edits to existing tiles propagate everywhere they're used Save New… px tile Priority Keep On Off Priorit"} after {"y":74,"h":88,"text":"OJZ $01 unsaved ⚠ pixel edits to existing tiles propagate everywhere they're used Save New… px tile Priority Keep On Off"}
+PASS  [ACJ.c] UNDO-DIRTY: one real Ctrl+Z takes the first write back (the tile matches its start) and the document reads CLEAN again: the store's flag is false and the "unsaved" badge, visible after the write, is not visible   [load 20.03/25.65/25.12]
+        tile after Ctrl+Z {"t":0,"hf":false,"vf":true}, start {"t":0,"hf":false,"vf":true}; dirty after the write true, after Ctrl+Z false; badge after the write {"present":true,"visible":true}, after Ctrl+Z {"present":false,"visible":false}
+NOTE  [acj.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 3279036 (11 process(es)):
+           3279036 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           3279114 Xvfb :159 -screen 0 1680x1050x24 -nolisten tcp
+           3305906 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           3306027 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           3306216 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3306219 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3306261 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3307462 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3307496 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3307513 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           3307542 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 52 ms; then the wrapper group with the X server still up, tree gone in 101 ms; teardown 453 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=acj: 3/4 rows PASS · 1 FAIL · 0 UNMEASURABLE · 18.9s ════
+     uptime at end 05:27:05 up 1 day, 18:28,  1 user,  load average: 20.03, 25.65, 25.12
+FAILING:
+  [ACJ.a] the first write to a clean chunk document does not move the composer canvas: its rect is the same before the press and after the release
+END-OF-RUN
+harness exit 1
+copy removed: yes
+end 09:27:05Z load 20.03

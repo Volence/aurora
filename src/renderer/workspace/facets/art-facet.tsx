@@ -183,7 +183,16 @@ function ArtOptions() {
   const docHeader = open ? (
     <span style={styles.docHeader}>
       <span style={styles.docName}>{open.name}</span>
-      {open.dirty && <span style={styles.dirtyBadge}>unsaved</span>}
+      {/* ALWAYS RENDERED, hidden while clean, so the badge's width is reserved
+          (ART-STROKE-FOLLOWUPS (b)). This header shares one OptionBar with the
+          tool options, and OptionBar grows to fit a line that wraps: when the
+          badge only mounted on the first write, the long shared-tile warning
+          wrapped one more time and the bar grew under the author's first
+          stroke, moving the composer canvas 42px down (measured at 1400x872,
+          docs/reviews/2026-09-25-art-stroke-followups.md). `visibility: hidden`
+          keeps the box and removes it from the accessibility tree. */}
+      <span style={{ ...styles.dirtyBadge, ...(open.dirty ? {} : styles.dirtyBadgeHidden) }}
+        aria-hidden={!open.dirty}>unsaved</span>
       {hasSharedTiles && (
         <span style={styles.sharedWarning}>
           ⚠ pixel edits to existing tiles propagate everywhere they're used
@@ -302,6 +311,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     cursor: 'pointer',
     fontSize: T.tXs,
+  },
+  dirtyBadgeHidden: {
+    visibility: 'hidden',
   },
   saveDisabled: {
     background: T.raised,

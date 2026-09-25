@@ -1,0 +1,70 @@
+diff --git a/src/renderer/state/chunk-doc-commit.ts b/src/renderer/state/chunk-doc-commit.ts
+index ef8289cd..79625ba3 100644
+--- a/src/renderer/state/chunk-doc-commit.ts
++++ b/src/renderer/state/chunk-doc-commit.ts
+@@ -322,7 +322,7 @@ export function reconcileChunkDocDirty(): void {
+   if (!isChunkDocument(o)) return;
+   const saved = savedChunkDocs.get(o!.doc);
+   if (!saved) {
+-    if (!o!.dirty) savedChunkDocs.set(o!.doc, cloneComposerDoc(o!.doc));
++    savedChunkDocs.set(o!.doc, cloneComposerDoc(o!.doc));
+     return;
+   }
+   const atSaved = sameDocContents(o!.doc, saved);
+09:11:38Z
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa10e2a57194db10c
+
+ ❯ src/renderer/components/art/__tests__/composer-chunk-undo-dirty-mounted.test.ts (3 tests | 1 failed) 126ms
+     ✓ UNDO-DIRTY: one stroke then one Ctrl+Z reads clean, and the discard prompt stops asking; Ctrl+Shift+Z reads dirty again 114ms
+     ✓ UNDO-DIRTY CONTROL: two strokes then one Ctrl+Z is not the saved state, and stays dirty 4ms
+     × UNDO-DIRTY CONTROL: a chunk document OPENED dirty is never computed clean (its opened state is not a saved one) 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/art/__tests__/composer-chunk-undo-dirty-mounted.test.ts > ART-STROKE-FOLLOWUPS (c): a chunk document undone back to its saved state reads clean > UNDO-DIRTY CONTROL: a chunk document OPENED dirty is never computed clean (its opened state is not a saved one)
+AssertionError: a document opened dirty read clean after an undo to its opening state: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/art/__tests__/composer-chunk-undo-dirty-mounted.test.ts:188:99
+    186|     undo();
+    187|     expect(cells(open().doc), 'the premise: one Ctrl+Z put the documen…
+    188|     expect(open().dirty, 'a document opened dirty read clean after an …
+       |                                                                                                   ^
+    189|   });
+    190| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  05:11:39
+   Duration  971ms (transform 676ms, setup 651ms, import 102ms, tests 126ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 1 failure record(s) in 1 file(s) (1 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        1   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/art/__tests__/composer-chunk-undo-dirty-mounted.test.ts
+    [ASSERTION] ART-STROKE-FOLLOWUPS (c): a chunk document undone back to its saved state reads clean > UNDO-DIRTY CONTROL: a chunk document OPENED dirty is never computed clean (its opened state is not a saved one)
+        AssertionError: a document opened dirty read clean after an undo to its opening state: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 1 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+exit 1
