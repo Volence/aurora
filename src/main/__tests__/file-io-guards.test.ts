@@ -679,6 +679,8 @@ describe('every channel that takes a project-relative path reaches a guarded pri
     GET_RECENT_PROJECTS: 'no path argument at all',
     ADD_RECENT_PROJECT: 'an absolute project root the user already opened',
     REMOVE_RECENT_PROJECT: 'the same absolute root, by identity',
+    CLIP_TOOL: 'a base, a verb and manifest TEXT: the text goes to a temp file main makes and deletes, and the '
+      + 'two argvs are fixed (main/clip-tool.ts), so nothing names a path under the project',
   };
 
   it('classifies every handler, and each one taking a relative path delegates to a guard', () => {

@@ -16,7 +16,7 @@ import { T } from '../ui/theme';
 import { useDonorStore } from '../../state/donorStore';
 import { useProjectStore } from '../../state/projectStore';
 import { CONVERTER_COMMAND, rectCensus } from '../../../core/formats/donors/donor-tree';
-import { marqueeReadout, onCollisionGrid, COLLISION_QUANTUM_PX } from '../../../core/formats/donors/donor-marquee';
+import { marqueeReadout, onCollisionGrid, COLLISION_QUANTUM_PX, MARQUEE_SNAP_PX } from '../../../core/formats/donors/donor-marquee';
 import DonorPasteSection from './DonorPasteSection';
 
 const CODE: React.CSSProperties = {
@@ -30,6 +30,18 @@ function ConvertCommand({ root }: { root: string }): React.ReactElement {
       <div style={CODE}>{CONVERTER_COMMAND}</div>
       <div style={NOTE}>run in {root}</div>
     </div>
+  );
+}
+
+/** Re-read donors/ (after running the converter, say). Offered in every state. */
+function LookAgain({ root }: { root: string }): React.ReactElement {
+  return (
+    <button type="button" data-donors-refresh
+            onClick={() => { void useDonorStore.getState().refresh(root); }}
+            style={{ font: 'inherit', fontSize: T.tXs, alignSelf: 'flex-start', background: 'none', marginTop: T.s2,
+              border: 'none', color: T.textLo, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+      Look again
+    </button>
   );
 }
 
@@ -57,6 +69,7 @@ function DonorList(): React.ReactElement {
           about a second:
         </Hint>
         <ConvertCommand root={root} />
+        <LookAgain root={root} />
       </div>
     );
   }
@@ -68,6 +81,7 @@ function DonorList(): React.ReactElement {
           {listing.strays.length > 0 && ` Found: ${listing.strays.join(', ')}.`} Re-run the converter:
         </Hint>
         <ConvertCommand root={root} />
+        <LookAgain root={root} />
       </div>
     );
   }
@@ -92,12 +106,7 @@ function DonorList(): React.ReactElement {
           </div>
         </div>
       ))}
-      <button type="button" data-donors-refresh
-              onClick={() => { if (root) void useDonorStore.getState().refresh(root); }}
-              style={{ font: 'inherit', fontSize: T.tXs, alignSelf: 'flex-start', background: 'none',
-                border: 'none', color: T.textLo, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
-        Look again
-      </button>
+      <LookAgain root={root} />
     </div>
   );
 }
@@ -125,7 +134,7 @@ function Selection(): React.ReactElement {
   if (!marquee) {
     return (
       <Hint style={{ marginBottom: 0 }}>
-        Drag on the donor zone to mark a rectangle. It snaps to the 8 px cell grid and stays inside the
+        Drag on the donor zone to mark a rectangle. It snaps to the {MARQUEE_SNAP_PX} px cell grid and stays inside the
         crop (the dimmed area is the converter&apos;s padding, which a paste may not take). Right-drag
         pans, the wheel zooms.
       </Hint>
@@ -143,7 +152,7 @@ function Selection(): React.ReactElement {
         <div data-donor-grid-advisory style={{ ...WARN, marginBottom: 0 }}>
           The origin is not on the {COLLISION_QUANTUM_PX} px collision grid, so this rectangle cannot be
           pasted on a section boundary: aeon refuses a paste that moves collision by anything but a multiple
-          of {COLLISION_QUANTUM_PX} px (R12). Move the marquee by 8 px, or paste it off the grid with a reason.
+          of {COLLISION_QUANTUM_PX} px (R12). Move the marquee by {MARQUEE_SNAP_PX} px, or paste it off the grid with a reason.
         </div>
       )}
     </div>

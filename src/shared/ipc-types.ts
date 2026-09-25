@@ -75,6 +75,11 @@ export const IPC_CHANNELS = {
   // not this channel's business and must never become it — that judgement lives
   // in `core/project/aeon/save.ts`'s `removalsFor`, which derives the set from
   // what the editor LOADED rather than from what is on disk.
+  // ONE SECOND CALLER, on the same principle: the Donors page's undo of a paste
+  // that CREATED a clip manifest (state/donor-paste.ts). The path is the one
+  // file that paste wrote, and the undo refuses unless the file's mtime is still
+  // the one that write produced, so it can only remove bytes Aurora itself put
+  // there and nobody has touched since.
   DELETE_FILE: 'file:delete',
   // Env-guarded paint instrumentation (AURORA_PERF=1). The renderer posts one
   // summary line per act load; main prints it to the launch terminal so we get
@@ -102,7 +107,38 @@ export const IPC_CHANNELS = {
   AETHER_BUILD: 'aether:build',
   /** Main→renderer stream of build output, so the panel fills as it runs. */
   AETHER_BUILD_OUTPUT: 'aether:build-output',
+  // The Donors page asks AEON'S OWN clip tools about a candidate manifest:
+  // `validate` (tools/clip_manifest.py, the R1..R12 refusals) and `bake`
+  // (tools/clip_act_bake.py, the composed act the page draws). Two verbs with
+  // fixed argvs, the candidate in a temp dir main creates and deletes; nothing
+  // is written under the project. See main/clip-tool.ts for the whole surface.
+  CLIP_TOOL: 'clip:tool',
 } as const;
+
+/** One of the two clip-tool verbs (main/clip-tool.ts). */
+export type ClipToolVerb = 'validate' | 'bake';
+
+export interface ClipToolBaked {
+  clipact: string;
+  /** Composed files by name (`section_0.tiles.bin`, ...), bytes as aeon wrote them. */
+  files: Record<string, Uint8Array>;
+}
+
+/**
+ * What one run of an aeon clip tool said. `ok` is "ran and exited 0";
+ * `couldNotRun` means the manifest was NOT judged (no python3, a timeout, a
+ * project without the tool) and must never be shown as aeon refusing it.
+ */
+export interface ClipToolResult {
+  verb: ClipToolVerb;
+  ok: boolean;
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  command: string;
+  couldNotRun?: string;
+  baked?: ClipToolBaked;
+}
 
 export interface AetherBuildResult {
   ok: boolean;

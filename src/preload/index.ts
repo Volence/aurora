@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS, unwrapBinaryRead, unwrapWriteOutcome } from '../shared/ipc-types';
 import type { RecentsState } from '../shared/recents';
-import type { GuardedWriteFile, GuardedWriteResult, ReadManyEntry, DeleteOutcome, DirListing, PathProbe, SourceListing, AetherStatusPayload, AetherWarpResult, AetherBuildResult } from '../shared/ipc-types';
+import type { GuardedWriteFile, GuardedWriteResult, ReadManyEntry, DeleteOutcome, DirListing, PathProbe, SourceListing, AetherStatusPayload, AetherWarpResult, AetherBuildResult, ClipToolResult, ClipToolVerb } from '../shared/ipc-types';
 import { AGENT_REQUEST_CHANNEL, AGENT_RESPONSE_CHANNEL } from '../shared/agent-protocol';
 import type { AgentRequestEnvelope, AgentResponseEnvelope } from '../shared/agent-protocol';
 
@@ -80,6 +80,13 @@ const api = {
 
   writeGuarded: (basePath: string, files: GuardedWriteFile[]): Promise<GuardedWriteResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.WRITE_GUARDED, basePath, files),
+
+  /**
+   * Ask aeon's own clip tools about a candidate manifest (the Donors page).
+   * Two verbs, fixed argvs, nothing written under the project: main/clip-tool.ts.
+   */
+  clipTool: (basePath: string, verb: ClipToolVerb, manifestText: string): Promise<ClipToolResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CLIP_TOOL, basePath, verb, manifestText),
 
   /** Remove ONE project-relative file. See main/file-io.ts deleteProjectFile. */
   deleteFile: (basePath: string, relativePath: string): Promise<DeleteOutcome> =>

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { DONOR_PASTE_DOC_ID } from './donor-paste';
 import type { Solidity } from '../../core/collision/collision-model';
 import type { ToolId } from '../../core/project/adapter';
 // Type-only: the candidate's shape is owned by the verbs module that turns it
@@ -692,6 +693,12 @@ export function focusedDocId(): string | null {
   if (!level) return null;
 
   const facet = useWorkspaceStore.getState().facetFor(activeId);
+  // The Donors facet edits no document of the act: its one write is a clip
+  // manifest (state/donor-paste.ts), whose paste and undo are file writes with a
+  // stack of their own. Routing it here is what makes Ctrl+Z and the header's
+  // Undo take back a PASTE on that facet, instead of reaching past it to the
+  // act's last map edit, which the author is not looking at.
+  if (facet === 'donors') return DONOR_PASTE_DOC_ID;
   if (!ZONE_ART_FACETS.has(facet)) return activeId;
 
   // The art facet's composer can be opened on the BG OVERRIDE (a band slot or

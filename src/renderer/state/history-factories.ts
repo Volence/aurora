@@ -19,6 +19,7 @@ import {
 import { readSpriteSnapshot, writeSpriteSnapshot } from './spriteStore';
 import { makeCanvasHistory } from './canvasStore';
 import { makeComposerHistory } from './composer-history';
+import { DONOR_PASTE_DOC_ID, makeDonorPasteHistory } from './donor-paste';
 import { useProjectStore, getActiveLevel } from './projectStore';
 import { notifyCommandApplied, useEditorStore } from './editorStore';
 
@@ -99,4 +100,9 @@ export function registerHistoryFactories(): void {
   // ON. Which documents get one is `artStore.isPureDocLocal`, and a chunk
   // document deliberately does NOT — see core/editing/composer-history.ts.
   documentHistoryHub.registerFactory('doc:composer:', (docId) => makeComposerHistory(docId));
+
+  // The Donors facet's paste history (state/donor-paste.ts). ONE stack for the
+  // page, not one per clip act: the page shows one target at a time and every
+  // entry names the file it wrote, so an undo can only ever touch that file.
+  documentHistoryHub.registerFactory(DONOR_PASTE_DOC_ID, () => makeDonorPasteHistory());
 }
