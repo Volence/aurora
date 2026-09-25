@@ -24,9 +24,9 @@ function fakeAeon(): string {
 const MANIFEST = JSON.stringify({ schema: 1, units: 'world_px', id: 'fx', act: { grid_w: 2, grid_h: 1 }, clips: [] });
 
 describe('the argv is fixed per verb', () => {
-  it('validate names clip_manifest.py and the project\'s own donor root', () => {
+  it('validate names clip_manifest.py, the project\'s own donor root, and --json AFTER the path (aeon 1d9afb25)', () => {
     expect(clipToolArgv('validate', '/p', '/t/clips.json', '/t/baked')).toEqual(
-      ['python3', 'tools/clip_manifest.py', 'validate', '/t/clips.json', '--donor-root', '/p/games/sonic4/data/donors']);
+      ['python3', 'tools/clip_manifest.py', 'validate', '/t/clips.json', '--donor-root', '/p/games/sonic4/data/donors', '--json']);
   });
   it('bake names clip_act_bake.py and a temp --out, never the project', () => {
     expect(clipToolArgv('bake', '/p', '/t/clips.json', '/t/baked')).toEqual(

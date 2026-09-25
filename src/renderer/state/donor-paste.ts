@@ -10,8 +10,11 @@
 // reads an editor act's section files or a regions.json. So a paste:
 //
 //   1. appends the clip to the manifest (clip-manifest-doc.ts), in memory;
-//   2. asks aeon's LOADER about those exact bytes (clip_manifest.py validate):
-//      a refusal is shown in aeon's words and nothing is written;
+//   2. asks aeon's LOADER about those exact bytes (clip_manifest.py validate
+//      --json): a refusal is shown in aeon's words, naming the rule and the clip
+//      or corridor, and nothing is written. A loader that CRASHED (exit 1 and no
+//      JSON, aeon's traceback case) is its own outcome, never a refusal: the
+//      manifest was not judged (core/formats/donors/clip-validate-json.ts);
 //   3. asks aeon's BAKE to compose them (clip_act_bake.py bake --out <temp>):
 //      a refusal is shown likewise; the composed section files come back, and
 //      the target pane is drawn from them, so the author sees what the ROM bake
@@ -44,6 +47,7 @@ import {
   type ClipManifestDoc, type NewClip,
 } from '../../core/formats/donors/clip-manifest-doc';
 import { saveConflictCauses } from '../../core/project/conflict-message';
+import { readValidateJson, type ClipNote } from '../../core/formats/donors/clip-validate-json';
 
 /** The undo document the Donors facet owns (editorStore.focusedDocId). */
 export const DONOR_PASTE_DOC_ID = 'doc:donor-paste';
@@ -98,8 +102,12 @@ export interface BakedAct {
 }
 
 export type PasteOutcome =
-  | { kind: 'pasted'; clipId: string; path: string; created: boolean; warnings: string[] }
-  | { kind: 'refused'; stage: 'validate' | 'bake'; text: string; command: string }
+  | { kind: 'pasted'; clipId: string; path: string; created: boolean; warnings: ClipNote[] }
+  /** aeon's loader refused: `refusals` as its --json names them; `text` is their messages. */
+  | { kind: 'refused'; stage: 'validate'; refusals: ClipNote[]; warnings: ClipNote[]; text: string; command: string }
+  | { kind: 'refused'; stage: 'bake'; text: string; command: string }
+  /** aeon's loader ran and CRASHED (or answered outside its contract): not judged, not a refusal. */
+  | { kind: 'crashed'; stage: 'validate'; why: string; exitCode: number | null; stdout: string; stderr: string; text: string; command: string }
   | { kind: 'could-not-run'; stage: 'validate' | 'bake'; text: string; command: string }
   | { kind: 'conflict'; text: string }
   | { kind: 'undone' | 'redone'; path: string; removed: boolean }
@@ -146,11 +154,6 @@ const INITIAL = {
 function toolText(r: ClipToolResult): string {
   const body = [r.stdout.trim(), r.stderr.trim()].filter(Boolean).join('\n');
   return r.couldNotRun ? `${r.couldNotRun}${body ? `\n${body}` : ''}` : body;
-}
-
-function warningsOf(r: ClipToolResult): string[] {
-  return r.stdout.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('WARNING:'))
-    .map((l) => l.replace(/^WARNING:\s*/, ''));
 }
 
 function bakedFrom(b: ClipToolBaked, forText: string): BakedAct {
@@ -238,10 +241,25 @@ export const usePasteStore = create<PasteState>((set, get) => {
         const next = withClip(target.doc, clip);
         const text = serializeClipManifest(next);
         const v = await ports.clipTool(root, 'validate', text);
-        if (!v.ok) {
-          const o: PasteOutcome = v.couldNotRun
-            ? { kind: 'could-not-run', stage: 'validate', text: toolText(v), command: v.command }
-            : { kind: 'refused', stage: 'validate', text: toolText(v), command: v.command };
+        if (v.couldNotRun) {
+          const o: PasteOutcome = { kind: 'could-not-run', stage: 'validate', text: toolText(v), command: v.command };
+          set({ outcome: o });
+          return o;
+        }
+        const verdict = readValidateJson(v.exitCode, v.stdout, v.stderr);
+        if (verdict.kind === 'crashed') {
+          const o: PasteOutcome = {
+            kind: 'crashed', stage: 'validate', why: verdict.why, exitCode: verdict.exitCode,
+            stdout: verdict.stdout, stderr: verdict.stderr, text: `${verdict.why}\n${toolText(v)}`.trim(), command: v.command,
+          };
+          set({ outcome: o });
+          return o;
+        }
+        if (verdict.kind === 'refused') {
+          const o: PasteOutcome = {
+            kind: 'refused', stage: 'validate', refusals: verdict.refusals, warnings: verdict.warnings,
+            text: verdict.refusals.map((n) => n.message).join('\n'), command: v.command,
+          };
           set({ outcome: o });
           return o;
         }
@@ -273,7 +291,7 @@ export const usePasteStore = create<PasteState>((set, get) => {
         };
         const o: PasteOutcome = {
           kind: 'pasted', clipId: clip.id, path: target.path, created: target.onDisk === null,
-          warnings: [...warningsOf(v)],
+          warnings: verdict.warnings,
         };
         const acts = get().acts ?? [];
         set({

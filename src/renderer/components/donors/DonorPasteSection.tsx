@@ -8,6 +8,17 @@
 // same rectangle as the art (clip_manifest.collision_grids shares cell_grids'
 // loop). The page states exactly that, and the per-clip solid-cell count it
 // shows is the bake's own, read from the clipact.json it just wrote.
+//
+// ROW 213 (aeon 1d9afb25). aeon's loader now answers in JSON, so a refusal
+// shows WHICH rule and WHICH clip or corridor as well as aeon's sentence, and a
+// loader that crashed is shown as a crash with its stderr, never as a refusal.
+// The readout carries each clip's and corridor's pool cost (tiles, and the two
+// page counts aeon defines) beside the act's totals. The look call, stated in
+// docs/reviews/2026-09-25-donor-clip-asks.md: a compact numeric grid, one row
+// per rectangle, column meanings as tooltips read from the file's own
+// per_clip_fields; no pages total (a shared page counts for every rectangle
+// that touches it), no per-clip camera window (aeon reports the act's only),
+// and "unavailable" with the reason when the file carries no rows.
 
 import React from 'react';
 import { CollapsibleSection, SectionBody, NumberField } from '../ui';
@@ -16,6 +27,8 @@ import { T } from '../ui/theme';
 import { useProjectStore } from '../../state/projectStore';
 import { useDonorStore } from '../../state/donorStore';
 import { usePasteStore, type PasteOutcome } from '../../state/donor-paste';
+import { subjectsLabel, type ClipNote } from '../../../core/formats/donors/clip-validate-json';
+import { readPoolRows, type PoolRow, type PoolRowField } from '../../../core/formats/donors/clipact-pool';
 import { useDonorDraft } from '../../state/donor-draft';
 import {
   clipIdProblem, gridToHold, REGION_ID_RE, suggestClipId, suggestDestination,
@@ -109,22 +122,81 @@ function TargetPicker(): React.ReactElement {
   );
 }
 
+const TAG: React.CSSProperties = {
+  fontFamily: T.fontMono, fontSize: T.t2xs, border: `1px solid ${T.border}`, borderRadius: T.rSm,
+  padding: `0 ${T.s1}`, marginRight: T.s1, color: T.textHi,
+};
+
+/** One refusal or warning as aeon's --json names it: the rule, who it is about, aeon's sentence. */
+function NoteHead({ note, kind }: { note: ClipNote; kind: 'refusal' | 'warning' }): React.ReactElement {
+  return (
+    <div style={{ ...(kind === 'refusal' ? WARN : NOTE), marginBottom: T.s1 }}>
+      <span data-donors-note-rule style={{ ...TAG, borderColor: kind === 'refusal' ? T.warning : T.border }}>
+        {note.rule ?? 'untagged'}
+      </span>
+      <span data-donors-note-subjects>{subjectsLabel(note.subjects)}</span>
+    </div>
+  );
+}
+
+function WarningList({ warnings }: { warnings: ClipNote[] }): React.ReactElement | null {
+  if (warnings.length === 0) return null;
+  return (
+    <>
+      {warnings.map((w, i) => (
+        <div key={i} data-donors-warning={w.rule ?? ''} style={{ marginTop: T.s1 }}>
+          <NoteHead note={w} kind="warning" />
+          <div style={WARN}>aeon warns: {w.message}</div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function outcomeView(o: PasteOutcome): React.ReactElement {
   switch (o.kind) {
     case 'pasted':
       return (
         <div data-donors-outcome="pasted" style={NOTE}>
           Pasted {o.clipId}: {o.created ? 'created' : 'rewrote'} {o.path}. aeon validated it and baked it.
-          {o.warnings.map((w, i) => <div key={i} style={WARN}>aeon warns: {w}</div>)}
+          <WarningList warnings={o.warnings} />
         </div>
       );
     case 'refused':
+      if (o.stage === 'validate') {
+        return (
+          <div data-donors-outcome="refused" data-donors-stage="validate">
+            <div style={{ ...WARN, marginBottom: T.s1 }}>
+              aeon&apos;s manifest loader refused this paste, so nothing was written:
+            </div>
+            {o.refusals.map((r, i) => (
+              <div key={i} data-donors-refusal-note={r.rule ?? ''}>
+                <NoteHead note={r} kind="refusal" />
+                <pre data-donors-refusal style={PRE}>{r.message}</pre>
+              </div>
+            ))}
+            <WarningList warnings={o.warnings} />
+          </div>
+        );
+      }
       return (
-        <div data-donors-outcome="refused">
+        <div data-donors-outcome="refused" data-donors-stage="bake">
           <div style={{ ...WARN, marginBottom: T.s1 }}>
-            aeon&apos;s {o.stage === 'validate' ? 'manifest loader' : 'bake'} refused this paste, so nothing was written:
+            aeon&apos;s bake refused this paste, so nothing was written:
           </div>
           <pre data-donors-refusal style={PRE}>{o.text}</pre>
+        </div>
+      );
+    case 'crashed':
+      return (
+        <div data-donors-outcome="crashed">
+          <div style={{ ...WARN, marginBottom: T.s1 }}>
+            aeon&apos;s manifest loader CRASHED ({o.exitCode === null ? 'no exit code' : `exit ${o.exitCode}`}), so this paste
+            was not judged and nothing was written. This is not a refusal: {o.why}.
+          </div>
+          <pre data-donors-crash-stderr style={PRE}>{o.stderr.trim() || '(nothing on stderr)'}</pre>
+          {o.stdout.trim() && <pre data-donors-crash-stdout style={{ ...PRE, marginTop: T.s1 }}>{o.stdout.trim()}</pre>}
+          <div style={{ ...NOTE, marginTop: T.s1, userSelect: 'text' }}>{o.command}</div>
         </div>
       );
     case 'could-not-run':
@@ -254,6 +326,71 @@ interface PerClip {
   marks_inside_src: number; marks_outside_src: number;
 }
 
+const POOL_COLUMNS: Array<{ field: PoolRowField; label: string }> = [
+  { field: 'tiles', label: 'tiles' },
+  { field: 'tiles_added', label: 'added' },
+  { field: 'pages_touched', label: 'pages touched' },
+  { field: 'pages_exclusive', label: 'own pages' },
+];
+
+const NUM: React.CSSProperties = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
+
+/**
+ * Each clip's and corridor's pool cost, as aeon's bake counted it. The column
+ * tooltips are the file's own per_clip_fields. Nothing is totalled but the one
+ * sum aeon states (added tiles plus the blank make the act's tiles).
+ */
+function PoolRowsView({ clipact }: { clipact: Record<string, unknown> }): React.ReactElement {
+  const pr = readPoolRows(clipact);
+  if (pr.state === 'unavailable') {
+    return (
+      <div data-donors-pool-rows="unavailable" style={NOTE}>
+        Per-clip tiles and pages: unavailable. {pr.why}.
+      </div>
+    );
+  }
+  const rows: Array<{ kind: 'clip' | 'corridor'; row: PoolRow }> = [
+    ...pr.perClip.map((row) => ({ kind: 'clip' as const, row })),
+    ...pr.perCorridor.map((row) => ({ kind: 'corridor' as const, row })),
+  ];
+  const cell: React.CSSProperties = { ...NOTE, padding: `0 ${T.s1}` };
+  return (
+    <div data-donors-pool-rows="present" style={{ display: 'flex', flexDirection: 'column', gap: T.s1 }}>
+      <div role="table" aria-label="Pool cost per clip and corridor" style={{
+        display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) repeat(4, auto)', columnGap: T.s2,
+        border: `1px solid ${T.border}`, borderRadius: T.rSm, padding: T.s1,
+      }}>
+        <div role="columnheader" style={cell}>pool cost</div>
+        {POOL_COLUMNS.map((c) => (
+          <div key={c.field} role="columnheader" title={pr.fields[c.field]} data-donors-pool-head={c.field}
+               style={{ ...cell, ...NUM, textDecoration: 'underline dotted', cursor: 'help' }}>{c.label}</div>
+        ))}
+        {rows.map(({ kind, row }) => (
+          <React.Fragment key={`${kind}:${row.index}`}>
+            <div role="cell" data-donors-pool-row={`${kind}:${row.index}`} data-donors-pool-id={row.id}
+                 style={{ ...cell, color: T.textHi, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {kind === 'corridor' ? `corridor ${row.id}` : row.id}
+            </div>
+            {POOL_COLUMNS.map((c) => (
+              <div key={c.field} role="cell" data-donors-pool-cell={`${kind}:${row.index}:${c.field}`} style={{ ...cell, ...NUM }}>
+                {row[c.field]}
+              </div>
+            ))}
+          </React.Fragment>
+        ))}
+      </div>
+      <div data-donors-pool-note style={NOTE}>
+        Tiles leave out the blank tile every act carries: the added column plus 1 makes the act&apos;s {pr.poolTiles}.
+        Pages touched counts a shared page once for EACH rectangle that touches it, so that column is not a share
+        of the act&apos;s {pr.poolPages} pages and is not totalled. The worst camera window is counted for the act only.
+      </div>
+      {pr.broken.length > 0 && (
+        <div data-donors-pool-broken style={WARN}>aeon&apos;s own sums disagree in this file: {pr.broken.join('; ')}.</div>
+      )}
+    </div>
+  );
+}
+
 function BakeReadout(): React.ReactElement | null {
   const baked = usePasteStore((s) => s.baked);
   const bakeNote = usePasteStore((s) => s.bakeNote);
@@ -273,6 +410,7 @@ function BakeReadout(): React.ReactElement | null {
         ({c.verdict_at_placement?.over ?? '?'} over budget); {c.collision?.attr_entries ?? '?'} of {c.collision?.cap ?? '?'} collision
         attr entries.
       </div>
+      <PoolRowsView clipact={baked.clipact} />
       {per.map((p) => (
         <div key={p.clip} data-donors-readout-clip={p.clip} style={NOTE}>
           <strong style={{ color: T.textHi }}>{p.clip}</strong> ({p.zone}): {p.attr_entries_alone} attr entries alone,
@@ -280,9 +418,6 @@ function BakeReadout(): React.ReactElement | null {
           {' '}crossover marks {p.marks_inside_src} inside the source, {p.marks_outside_src} cut off outside it.
         </div>
       ))}
-      <div style={NOTE}>
-        Tiles and pages are the act&apos;s, not per clip: aeon&apos;s clipact.json counts the pool once for the whole act.
-      </div>
     </div>
   );
 }
