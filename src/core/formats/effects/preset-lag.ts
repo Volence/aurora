@@ -96,6 +96,10 @@
  *   --is-ancestor` says it is NOT an ancestor of aeon `origin/master`
  *   `ddaab282`. On aeon's MASTER none of what follows has happened yet, and a
  *   merge announcement is not a merge — check the ancestry, not the report.
+ *   [MERGED SINCE (ROADMAP row 212, re-read at aeon origin/master a0c63764 on 2026-09-25): `a1a76741` and the sign fix `7a5d237d` are
+ *   both ancestors of aeon origin/master, and tools/ramp_authored_witness.py is
+ *   on master. Everything below that says "on a branch" or "unmerged" is the
+ *   2026-09 reading, kept as the record.]
  *
  *   - THE SIGN RULE IS CLOSED THERE, and it was closed BY this editor's
  *     document. `raster_ramp_program` never two's-complement encoded a NEGATIVE

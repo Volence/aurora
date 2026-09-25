@@ -33,6 +33,7 @@ import { BG_WIDTH } from '../core/formats/bg-tiles';
 // that moved the constant.
 import { FG_TILE_LIMIT, FG_PAGE_TILES, FG_PAGE_FRAMES } from '../core/export/vram-coloring';
 import { BG_SECTION_BINDING_LIMIT } from '../core/formats/bg-binding';
+import { CROSSOVER_RESERVED_BAKE_CLAUSE } from '../core/collision/crossover-audit';
 import { RASTER_SECTION_BINDING_LIMIT } from '../core/formats/raster-binding';
 // The layer bound an agent is TOLD about, read from the same vendored schema
 // the validator enforces. It was the literal `1..8` until empyrean `277bc15`
@@ -282,8 +283,12 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + '{word:null, mixed:true, sub:[tl,tr,bl,br]} with NO shape/flip/solidity, never by sampling one of the '
       + 'four, and "mixedCells" counts them (a null in "words" is what paint_collision skips). "word" is all '
       + '16 raw bits, including bits 15:14, the LOOP CROSSOVER, reported by name as "crossover" per cell '
-      + '("none" / "to-a" / "to-b", or "reserved" for the illegal value 3 (rule R1 specifies a bake hard error; as of 2026-08-29 the bake does not read this field, so NOTHING downstream refuses it), '
-      + 'which is reported rather than normalised away). "crossoverCells" counts the cells carrying one and '
+      + '("none" / "to-a" / "to-b", or "reserved" for the illegal value 3 ('
+      // A template hole, not a bare `+ IDENT`: check-prose-constants folds a
+      // `${}` hole to a space but drops a whole description that concatenates
+      // an identifier, which would take this description out of its population.
+      + `${CROSSOVER_RESERVED_BAKE_CLAUSE}`
+      + '), which is reported rather than normalised away). "crossoverCells" counts the cells carrying one and '
       + '"cellsWithUnownedBits" counts the cells with any bit outside the four picture fields: the same '
       + 'bits, counted from the encoder\'s own mask rather than from the crossover\'s. '
       + '⚠ A CROSSOVER DOES NOT TRAVEL IN "words": paint_collision masks those bits off and keeps the '
@@ -456,14 +461,22 @@ export const EDITOR_METHODS: EditorMethod[] = [
           + 'must equal the id parameter. Validated against the contract schema; an invalid document is '
           + 'refused with the specific issues and nothing is written.'),
     },
+    // ⚠ ROADMAP row 212, 2026-09-25: this description said binding "installs
+    // nothing yet" and then appended RASTER_SECTION_BINDING_LIMIT, which says a
+    // binding DOES install on a wired owner ({sec5, sec6} at aeon c7ebe7a1).
+    // The "yet" had lapsed by aeon c9a462be (2026-08-30, section 5 bound and
+    // threaded, "the first effect that reaches a frame") with no reader. The
+    // install question is now answered only by the constant, whose reading is
+    // re-derived by core/formats/__tests__/raster-binding-threaded-set.test.ts.
     description: 'Create, replace or delete one raster band preset. Takes the WHOLE document, not a field '
       + 'patch: read the current one with get_effects_preset, change what you want, send it back. Fields '
       + 'this editor does not expose survive because nothing enumerates them. One undo step. A document is '
       + 'at least one band, each band being {top, bot, sh, on} with EXACTLY ONE ON arm (cram or pal_region). '
       + 'Two arms would be two writes and therefore two restores, which is two bands. No numeric value is '
       + 'range-checked or clamped on this side, on purpose: the engine refuses out-of-budget bands with the '
-      + 'measurement behind the rule. ⚠ Saving does NOT install the preset: binding it to a section is a '
-      + 'separate call (assign_section_preset), and even that installs nothing yet: '
+      + 'measurement behind the rule. ⚠ Binding is a separate call (assign_section_preset, or a '
+      + 'region row\'s rasterRef in the Regions panel), and whether a binding installs anything is '
+      + 'aeon\'s fact, re-derived below: '
       + RASTER_SECTION_BINDING_LIMIT },
 
   // THE FOURTH TOOL, and it was absent on purpose until 2026-08-30: there was no

@@ -295,7 +295,7 @@ const NOT_A_LABEL = [
   { text: 'Ctrl+Z', kind: 'key chord' },
   { text: 'preset()', kind: 'aeon identifier' },
   { text: 'Sec.sec_effects', kind: 'aeon identifier' },
-  { text: 'ojz_act1_sec_raster(sec: N)', kind: 'aeon build message, quoted' },
+  { text: 'ojz_act1_preset_raster(preset: <Record>_KEY)', kind: 'aeon build message, quoted (re-derived from aeon by guide-aeon-quote.test.ts)' },
   { text: 'ojz_water_tint', kind: 'project data: an id the reader invents' },
   { text: 'OJZ_Preset_Plain', kind: 'project data: an aeon preset record' },
   { text: 'Authored probe (red / blue)', kind: 'project data: a shipped preset document' },

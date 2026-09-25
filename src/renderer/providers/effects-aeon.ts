@@ -2493,6 +2493,10 @@ export function planeLineOf(
 //     sibling rule (raster_dsl.emp:432) is therefore NOT reachable from the
 //     editor path today; when wave 2 lands preset composition it will be, and
 //     its bound is the same 3..223, so nothing here would need loosening.
+//     [FALSE NOW (ROADMAP row 212, re-read at aeon origin/master a0c63764 on 2026-09-25): the editor path reaches it.
+//     tools/effects_gen.py lowers a `boundary` preset document to
+//     `patchable(fx_tint_band(...))`. The conclusion (same bound, nothing to
+//     loosen) is what this note predicted and was not re-checked here.]
 //   - The other scene-side consumer of a top is `scene_band()`
 //     (scene_dsl.emp:2566), which produces a BAND RECORD and never a fire.
 //     That is the layer this panel's 0..511 belongs to.

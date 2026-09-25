@@ -482,7 +482,8 @@ binding.
 
 A binding on a section that owns its preset but is not threaded writes the key,
 and aeon's canonical build refuses it by name ("no preset threads
-`ojz_act1_sec_raster(sec: N)`") until that line is added.
+`ojz_act1_preset_raster(preset: <Record>_KEY)`", with the name of the record that
+section installs in place of Record) until that line is added.
 
 **Aurora derives these facts from aeon's own files on every load**: the act
 descriptor and the effects library. It prints those two sets act-wide, on the
@@ -504,8 +505,9 @@ questions. A section that is in `threaded` and in `bound` is a home with an occu
 Binding over an occupant is allowed, and it does not delete anything: it replaces that
 section's `rasterRef`, and choosing the old value again puts it back in one undo step.
 What it can cost is the **incumbent document**. A preset document reaches the running
-game through exactly two installers: a `rasterRef` in some section's sidecar, or a row
-in aeon's DEBUG raster table. A document in neither is refused by name ("reachable by
+game through exactly two installers: a `rasterRef` on a binding (a region row, or on an
+act with no regions file a section's sidecar), or a row in aeon's DEBUG raster table. A
+document in neither is refused by name ("reachable by
 NOTHING"). So if this section is the only one naming that document, and aeon's lab
 table does not name it either, taking the section turns a green build red **on the
 document you displaced**, not on the one you just authored. Aurora does not read that

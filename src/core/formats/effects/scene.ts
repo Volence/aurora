@@ -151,7 +151,10 @@ export type EffectsAnchor = 'none' | { at: { channel: number; dsa: number; dsb: 
  * NOT AUTHORABLE FROM AURORA, DELIBERATELY, and this is the whole reason there
  * is a type here and no control anywhere. aeon's `tools/effects_gen.py` REFUSES
  * the key until their `CAP_BAND_DRIFT` emission parcel lands, so a scene
- * carrying `drift` does not build today. Shipping a spinner for it would
+ * carrying `drift` does not build today. [FALSE NOW (ROADMAP row 212, re-read at aeon origin/master a0c63764 on 2026-09-25):
+ * `render_drift` in tools/effects_gen.py lowers `drift` to `SceneDrift.Rate`, so
+ * the key builds. Whether Aurora should now author it is a product call, not
+ * made here.] Shipping a spinner for it would
  * originate a value the build rejects for EVERY input — the open defect ROADMAP
  * row O13 already tracks for the curve dropdown, in a worse form. What Aurora
  * owes the field now is the other thing: reading it, round-tripping it, and not
@@ -232,7 +235,10 @@ export type EffectsRowRemap = 'none' | { plane_y: number; height_shift: number }
  * that wraps mod 256. `drift.rate`'s ×256 export conversion MUST NOT be applied
  * here. A panel or converter copied from the drift path emits **768 for an
  * intended 3**, and the `-128..127` bound is the ONLY place that mistake is
- * caught today (aeon has no magnitude ensure yet). Nothing in the reels path
+ * caught today (aeon has no magnitude ensure yet). [FALSE NOW (ROADMAP row 212, re-read at aeon origin/master a0c63764 on 2026-09-25):
+ * aeon's `reel_rates_ok` in games/sonic4/config/constants.emp ensures
+ * -128..127 and its message names the 768-for-3 mistake, so this bound is the
+ * EARLIER catch, not the only one.] Nothing in the reels path
  * calls `driftPxPerFrameToRate` / `driftRateToPxPerFrame`, the only two places
  * in this repo the ×256 lives, and both are named for drift; a future panel
  * must keep it that way. `EFFECTS_REEL_RATE_BOUNDS` below is read out of the

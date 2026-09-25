@@ -302,7 +302,10 @@ export interface AeonProjectData {
    *
    * An ABSENT `{dataRoot}editor/effects/` directory yields an empty library and no
    * error — §2 says so in as many words, and today that is the ordinary case, since
-   * the directory does not exist in the aeon tree at all.
+   * the directory does not exist in the aeon tree at all. [FALSE NOW (ROADMAP row 212, re-read at aeon origin/master a0c63764 on 2026-09-25):
+   * games/sonic4/data/editor/effects/ exists, with four scene files and a
+   * presets/ directory. The absent-directory behaviour is unchanged; it is just
+   * no longer the ordinary case.]
    */
   scenes: EffectsSceneLibrary;
   /**

@@ -365,12 +365,25 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     // a document has neither. Corrected here rather than left, because an author
     // who binds a preset and is then told their build will fail for a missing
     // row would go add one they do not need.
+    //
+    // ⚠ WIDENED 2026-09-25 (ROADMAP row 212). It said "reached by neither a
+    // table row nor a section binding". aeon e2af59ea put OJZ act 1 in REGION
+    // mode, where the second installer is a region row's rasterRef, and aeon's
+    // own check (tools/test_raster_cycle_table_lint.py
+    // `test_every_preset_document_is_REACHABLE`) names region rows first. On the
+    // one act this editor opens, the sentence therefore told an author whose
+    // document was bound on a region row that the build would fail. Its only
+    // reader pinned /neither a table row nor a section binding/. The installer
+    // list is now re-derived from that aeon test's message by
+    // band-preset-wording.test.ts, and "canonical" says which build runs it.
     body:
       'aeon steps a band-demo table with START held + UP to install the next program and ' +
       'START + DOWN to remove it. That table is a hand-typed dc.l list, and this document ' +
-      'does not add itself to it. aeon\'s build fails loudly when a preset document is ' +
-      'reached by neither a table row nor a section binding (aeon 4aa2abc0), so the ' +
-      'omission is not silent, but adding the row is a programmer\'s edit.',
+      'does not add itself to it. aeon\'s canonical build fails loudly when a preset document is ' +
+      'reached by neither a table row nor a binding (a region row\'s rasterRef, or on a ' +
+      'section-mode act a section sidecar\'s; aeon 4aa2abc0 made a binding count), so the ' +
+      'omission is not silent, but adding the ' +
+      'row is a programmer\'s edit.',
   }),
   Object.freeze({
     key: 'unchecked_visibility' as const,
@@ -427,8 +440,9 @@ const SHORT_BODIES: Record<PresetLimit['key'], string> = {
     + 'BIND it, and aeon has to thread the raster chooser into the record that binder installs. On a '
     + 'section-mode act the dropdown below says which state the section you are on is in.',
   debug_chord:
-    'A preset also needs a row in aeon\'s band-demo table or a section binding to be reachable '
-    + 'at all. aeon\'s build fails loudly when it has neither, so this is never silent.',
+    'A preset also needs a row in aeon\'s band-demo table or a binding (a region row, or a '
+    + 'section on a section-mode act) to be reachable at all. aeon\'s canonical build fails loudly '
+    + 'when it has neither, so this is never silent.',
   unchecked_visibility:
     'Nothing checks that a band is VISIBLE. A legal band over an unused palette entry, or one '
     + 'whose colour matches what it repaints, builds green and shows nothing.',
@@ -483,6 +497,17 @@ export function presetLimitsShort(): readonly PresetLimitShort[] {
  * a band — owner Aurora. Evaluate, do not obey: re-read that README at a
  * revision (`git show origin/master:docs/research/reference_captures/
  * 2026-08-30-sec5-band/README.md`), never by path into their working tree.
+ *
+ * WHO EVALUATES EACH CONDITION (ROADMAP row 212, 2026-09-25). Until then only
+ * the list's WORDING was tested. Now `band-preset-wording.test.ts` ("its
+ * EXPIRES conditions, evaluated against aeon origin/master") reads aeon's
+ * published tree every run: the directory-and-README condition in full, and
+ * the second-measurement condition by a proxy (exactly one capture README
+ * carries `VERDICT: BAND SEEN`) that a differently-worded second capture would
+ * slip past. THE AURORA-OWNED CONDITION ("this editor draws a band") HAS NO
+ * AUTOMATED READER: no source property here says so unambiguously, since the
+ * raster timeline draws where bands land and not their colour. Whoever adds a
+ * raster-band preview owes this sentence its retirement, by hand.
  */
 /**
  * The author's version of NO_PREVIEW — defect 3's cut, same rule as

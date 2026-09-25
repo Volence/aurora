@@ -100,7 +100,10 @@
 // are ELIGIBLE (six own presets), 6/7/8 share `OJZ_Preset_Plain`; exactly one
 // section — 5 — is THREADED. THOSE NUMBERS ARE NOT WRITTEN ANYWHERE IN THIS
 // FILE; they are what the parse below returns today, recorded here so a future
-// reader can tell a changed world from a broken parser.
+// reader can tell a changed world from a broken parser. [The world changed
+// (ROADMAP row 212, re-read at aeon origin/master a0c63764 on 2026-09-25): Sec6 and Sec7 have their own records, Plain is sec8's
+// alone, Sec5 and Sec6 both thread `ojz_act1_preset_raster`, and the act is in
+// REGION mode. "Today" above means 2026-09-02.]
 //
 // ═══════════════════════════════════════════════════════════════════════════
 // ⚠ THIS DERIVES; IT DOES NOT GATE

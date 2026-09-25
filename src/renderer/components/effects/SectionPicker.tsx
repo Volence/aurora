@@ -107,7 +107,10 @@ type UnmetMeaning = 'limit' | 'refused';
  * broke it'"*, two minutes lost before the paragraph beside it resolved it.
  *
  * ⚠ THE VERDICT WAS CORRECT. Section 0 genuinely cannot carry an editor-authored
- * raster band until aeon threads it. What was wrong is that a fact about the
+ * raster band until aeon threads it. [Reason corrected (ROADMAP row 212, re-read at aeon origin/master a0c63764 on 2026-09-25):
+ * section 0's preset holds `patched: OJZ_TwoChannel`, `preset()` makes raster and
+ * patched exclusive, and aeon ruled it a STABLE property (DEFERRED_WORK
+ * SECTION0-SPECIAL-CASE), so it is not waiting on a thread.] What was wrong is that a fact about the
  * LEVEL DATA was drawn in the vocabulary of DAMAGE: `✗` is right/wrong, and
  * `T.warning` is the tier this app uses for something going wrong. Neither is
  * true of a section nobody has wired yet, and nothing on the row said whose fact

@@ -51,6 +51,7 @@ import {
   presetIdRefusal, newPreset,
 } from '../../../providers/effects-preset';
 import { RASTER_SECTION_BINDING_LIMIT } from '../../../../core/formats/raster-binding';
+import { peerRepo, resolveRev, readAtRev, grepAtRev, isAncestor } from '../../../../../test/support/peer-repo';
 
 const PANEL_PATH = join(__dirname, '..', 'BandPresetPanel.tsx');
 const panel = readFileSync(PANEL_PATH, 'utf8');
@@ -557,7 +558,45 @@ describe('the three limits say the words that carry them', () => {
     expect(l.body).toMatch(/hand-typed dc\.l list/);
     expect(l.body).toMatch(/does not add itself/i);
     expect(l.body).toMatch(/fails loudly/i);
-    expect(l.body).toMatch(/neither a table row nor a section binding/i);
+  });
+
+  /**
+   * LIMIT 2's INSTALLER LIST, RE-DERIVED FROM aeon (ROADMAP row 212).
+   *
+   * The row above used to pin /neither a table row nor a section binding/. aeon
+   * e2af59ea put OJZ act 1 in REGION mode, where the second installer is a region
+   * row's rasterRef, so that pin held a sentence that was false on the one act
+   * this editor opens. It now reads the installers from the MESSAGE of aeon's own
+   * reachability check (`test_every_preset_document_is_REACHABLE` in
+   * tools/test_raster_cycle_table_lint.py, at origin/master, through git
+   * objects) and requires both LIMIT 2 surfaces to name every one of them.
+   */
+  it('LIMIT 2 names every installer aeon\'s reachability check names', (ctx) => {
+    const repo = peerRepo('aeon');
+    if (repo === null) { ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo'); return; }
+    if (resolveRev(repo, 'origin/master') === null) { ctx.skip('SKIPPED, NOT PASSED: origin/master does not resolve in aeon'); return; }
+    const b = readAtRev(repo, 'origin/master', 'tools/test_raster_cycle_table_lint.py');
+    expect(b.ok, b.ok ? '' : b.why).toBe(true);
+    const src = (b as { ok: true; text: string }).text;
+    const at = src.indexOf('def test_every_preset_document_is_REACHABLE');
+    expect(at, 'aeon no longer has test_every_preset_document_is_REACHABLE: re-read what makes a preset reachable').toBeGreaterThanOrEqual(0);
+    const next = src.indexOf('\ndef ', at + 1);
+    const msg = src.slice(at, next < 0 ? undefined : next).replace(/"\s*\n\s*f?"/g, '');
+    // Each installer aeon's message names, and the words a LIMIT 2 surface must use for it.
+    const installers: { aeon: RegExp; ours: RegExp; name: string }[] = [
+      { name: 'the DEBUG table row', aeon: /\.raster_table/, ours: /table row|band-demo table/i },
+      { name: 'a region row', aeon: /REGION ROW/, ours: /region row/i },
+      { name: 'a section sidecar (legacy / section mode)', aeon: /section sidecar/i, ours: /section/i },
+    ];
+    const named = installers.filter((i) => i.aeon.test(msg));
+    expect(named.length, 'the detector finds none of the known installers in aeon\'s message, so it measures nothing').toBeGreaterThan(0);
+    const long = PRESET_LIMITS.find((x) => x.key === 'debug_chord')!.body;
+    const short = presetLimitsShort().find((x) => x.key === 'debug_chord')?.body;
+    expect(short, 'no short debug_chord body to check').toBeDefined();
+    for (const i of named) {
+      expect(long, `aeon's reachability check counts ${i.name}; LIMIT 2 does not name it`).toMatch(i.ours);
+      expect(short!, `aeon's reachability check counts ${i.name}; LIMIT 2 (short) does not name it`).toMatch(i.ours);
+    }
   });
 
   /** Limit 3. "Builds green and shows nothing" is the sentence that lands. */
@@ -631,6 +670,68 @@ describe('the three limits say the words that carry them', () => {
       expect(NO_PREVIEW).toMatch(/nothing to draw a faithful preview from/i);
       expect(NO_PREVIEW).toMatch(/an unfaithful one would be worse than none/);
       expect(NO_PREVIEW).toMatch(/A preview here could at most be checked against that one frame; none is built\./);
+    });
+
+    /**
+     * THE EXPIRES LIST, EVALUATED RATHER THAN SPELLED (ROADMAP row 212).
+     *
+     * The row below pins the list's WORDING. Until 2026-09-25 nothing evaluated
+     * its CONDITIONS, so the list would have gone on being obeyed after it
+     * lapsed: that is the defect class row 212 exists for (the `ONLY SECTION 5
+     * IS WIRED` finding, lane log 2026-09-10T10:02:43Z). These rows evaluate the
+     * two aeon-owned conditions against aeon's PUBLISHED tree, through git
+     * objects, every run. A red here is not an Aurora regression: it means an
+     * expiry fired, and NO_PREVIEW is the sentence to re-read.
+     *
+     *   (a) "when that directory leaves aeon's tree or its README stops saying
+     *       so": the capture's README is read at origin/master and must still
+     *       carry the verdict and the two values NO_PREVIEW quotes, and the
+     *       capture commit must be on origin/master.
+     *   (b) "a second section or camera position is measured": PROXY, and a
+     *       weak one, stated as such. aeon names band captures with a
+     *       `VERDICT: BAND SEEN` line; the row requires exactly one README under
+     *       reference_captures to carry it. A second measurement spelled some
+     *       other way is not seen here.
+     *   (c) "when this editor draws a band (Aurora's)": NOT DERIVED. No source
+     *       property of this repo says "draws a raster band" unambiguously (the
+     *       raster timeline draws where bands LAND, not their colour), so this
+     *       half is read by a person, and the NO_PREVIEW docblock says so.
+     */
+    describe('its EXPIRES conditions, evaluated against aeon origin/master', () => {
+      const TIP = 'origin/master';
+      const CAPTURE_COMMIT = '4a4d3474';
+      const CAPTURES = 'docs/research/reference_captures';
+      const README = `${CAPTURES}/2026-08-30-sec5-band/README.md`;
+      function aeonOrSkip(ctx: { skip: (why: string) => void }): string | null {
+        const repo = peerRepo('aeon');
+        if (repo === null) { ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo'); return null; }
+        if (resolveRev(repo, TIP) === null) { ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in aeon`); return null; }
+        return repo;
+      }
+
+      it('(a) the cited capture is still in aeon\'s tree, still says what NO_PREVIEW quotes, and is published', (ctx) => {
+        const repo = aeonOrSkip(ctx); if (repo === null) return;
+        // The sentence under test cites this directory and commit; if it stops
+        // citing them this row has nothing to evaluate, so it says so.
+        expect(NO_PREVIEW).toContain(`aeon ${CAPTURE_COMMIT}`);
+        expect(NO_PREVIEW).toContain('docs/research/reference_captures/2026-08-30-sec5-band/');
+        expect(isAncestor(repo, CAPTURE_COMMIT, TIP), `aeon ${CAPTURE_COMMIT} is not on ${TIP}`).toBe(true);
+        const b = readAtRev(repo, TIP, README);
+        expect(b.ok, `EXPIRED (a): ${b.ok ? '' : b.why}`).toBe(true);
+        const text = (b as { ok: true; text: string }).text;
+        expect(text, `EXPIRED (a): ${README} no longer carries its verdict`).toMatch(/VERDICT: BAND SEEN/);
+        expect(text, `EXPIRED (a): ${README} no longer carries the in-band value NO_PREVIEW quotes`).toContain('$0EA4');
+        expect(text, `EXPIRED (a): ${README} no longer carries the out-of-band value NO_PREVIEW quotes`).toContain('$0000');
+      });
+
+      it('(b) proxy: exactly one capture README in aeon carries a band verdict', (ctx) => {
+        const repo = aeonOrSkip(ctx); if (repo === null) return;
+        const g = grepAtRev(repo, TIP, 'VERDICT: BAND SEEN', [CAPTURES]);
+        expect(g.ok, g.ok ? '' : g.why).toBe(true);
+        expect((g as { ok: true; files: string[] }).files,
+          'EXPIRED (b)? a second capture now carries a band verdict, so NO_PREVIEW\'s "ONE measured frame" '
+          + 'may be false. Read the new capture and re-point NO_PREVIEW.').toEqual([README]);
+      });
     });
 
     it('carries a dated EXPIRES list with an owner per half', () => {

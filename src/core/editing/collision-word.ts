@@ -165,10 +165,15 @@ export function collisionPaintWord(
    * depends on which plane the word belongs to. There is no way to call this
    * that produces a self-mark — the value is DERIVED from (brush, plane) and
    * never supplied, which is also why value 3 is unreachable from here.
-   * ⚠ Rule R2 says a self-mark is a hard build error in aeon's bake. As of
-   * 2026-08-29 that is SPECIFIED AND NOT IMPLEMENTED: the bake does not read
-   * bits 15:14. Keep this derivation honest on its own merits, not because
-   * something downstream is expected to catch a mistake — nothing is.
+   * ⚠ Rule R2 says a self-mark is a hard build error in aeon's bake, and since
+   * aeon 8a4313b5 (2026-09-02) it is one: `tools/ojz_strip_gen.py`
+   * `apply_editor_collision_overlay` raises on it, and `bake_plane_cell` reads
+   * bits 15:14 and raises on the reserved 3 (R1). This comment said until
+   * 2026-09-25 (ROADMAP row 212) that the bake did not read those bits and that
+   * nothing downstream would catch a mistake; both were true on 2026-08-29 and
+   * false a week later. Keep this derivation honest on its own merits anyway: a
+   * build error an hour later carries no brush and no stroke, so the place to
+   * be right is here. Re-read at aeon origin/master a0c63764.
    */
   crossover: CrossoverBrush = 'keep',
   plane?: CollisionPlaneId,
