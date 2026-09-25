@@ -173,7 +173,94 @@ export function updateRegionDrag(
  * still has to see the rectangle they are dragging.
  */
 export function regionDragPreview(doc: RegionsDocument, drag: RegionDrag): RegionPiece[] {
-  return applyRegionGesture(regionPieces(doc), regionGestureOf(drag)).pieces;
+  return regionDragGesturePreview(doc, drag).pieces;
+}
+
+/**
+ * The same preview, with the two facts the GESTURE-ONLY picture needs kept
+ * rather than thrown away (ROADMAP §5.1 row 208, ruled C).
+ *
+ * ONE `applyRegionGesture` CALL, shared with `regionDragPreview` above, so the
+ * full overlay and the gesture-only one cannot disagree about the carve.
+ *
+ * - `dragged`: the rectangle the hand describes right now, under the id it
+ *   belongs to (the draw's id, or the moved/resized piece's region). It is
+ *   `drag.rect` itself and not a piece of the result, because the result has
+ *   already coalesced it with the region's other rectangles and the author is
+ *   dragging ONE rectangle.
+ * - `trimmed`: every piece of the result that belongs to a region the release
+ *   TRIMS (the layer's own `trimmedIds`) and is not a rectangle that region
+ *   already had, i.e. what the carve LEAVES of each region it cuts. A region's
+ *   untouched rectangles are not in it, and neither is the dragged region
+ *   itself: a same-region overlap changes no boundary the author can see, and
+ *   the coalesced piece it produces would draw on top of `dragged`. A region
+ *   carved to nothing has no remainder, and `dragged` covers where it was.
+ */
+export interface RegionDragGesturePreview {
+  /** The whole set as the release will leave it: `regionDragPreview`'s answer. */
+  pieces: RegionPiece[];
+  /** The layer's `trimmedIds`, unchanged. */
+  trimmedIds: string[];
+  dragged: RegionPiece;
+  trimmed: RegionPiece[];
+}
+
+export function regionDragGesturePreview(
+  doc: RegionsDocument, drag: RegionDrag,
+): RegionDragGesturePreview {
+  const before = regionPieces(doc);
+  const gesture = regionGestureOf(drag);
+  const out = applyRegionGesture(before, gesture);
+  const draggedId = gesture.kind === 'draw'
+    ? gesture.id
+    : (before[gesture.pieceIndex]?.id ?? drag.press.id ?? drag.drawId);
+  const key = (p: RegionPiece) => `${p.id}|${p.rect.x},${p.rect.y},${p.rect.w},${p.rect.h}`;
+  const had = new Set(before.map(key));
+  const trimmed = out.pieces.filter((p) => p.id !== draggedId
+    && out.trimmedIds.includes(p.id) && !had.has(key(p)));
+  return {
+    pieces: out.pieces,
+    trimmedIds: out.trimmedIds,
+    dragged: { id: draggedId, rect: { ...drag.rect } },
+    trimmed,
+  };
+}
+
+/**
+ * WHAT THE MAP'S REGIONS OVERLAY DRAWS THIS REPAINT: nothing, the full overlay,
+ * or the gesture only. The decision `MapViewport` used to make inline, moved
+ * here so the node suite can drive it.
+ *
+ * - tint ON (`OverlayOptions.showRegions`): the FULL overlay, over the preview
+ *   pieces while a drag is live and the document's own pieces otherwise. This
+ *   arm is exactly what the viewport drew before row 208.
+ * - tint OFF, no drag: nothing. The owner, 2026-09-16: "Can we have it just
+ *   toggleable if we want to see it exactly?"
+ * - tint OFF, a drag live: the GESTURE ONLY (row 208, ruled C by the aurora
+ *   overseer on 2026-09-25, overturnable by the owner's one word): the dragged
+ *   rectangle's outline and the outline of what the release leaves of each
+ *   region it trims. No hatch, no unassigned wash, no labels.
+ */
+export type RegionOverlayPass =
+  | { kind: 'none' }
+  | { kind: 'full'; pieces: RegionPiece[] }
+  | { kind: 'gesture'; pieces: RegionPiece[]; dragged: RegionPiece; trimmed: RegionPiece[] };
+
+export function regionOverlayPass(
+  doc: RegionsDocument | null, drag: RegionDrag | null, showRegions: boolean,
+): RegionOverlayPass {
+  if (doc === null) return { kind: 'none' };
+  if (showRegions) {
+    return {
+      kind: 'full',
+      pieces: drag !== null
+        ? regionDragPreview(doc, drag)
+        : doc.regions.map((r) => ({ id: r.id, rect: r.rect })),
+    };
+  }
+  if (drag === null) return { kind: 'none' };
+  const g = regionDragGesturePreview(doc, drag);
+  return { kind: 'gesture', pieces: g.pieces, dragged: g.dragged, trimmed: g.trimmed };
 }
 
 /** The finished gesture this drag is, in the layer's own vocabulary. */

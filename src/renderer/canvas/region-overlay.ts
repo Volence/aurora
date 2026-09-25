@@ -61,8 +61,19 @@
 // `docs/reviews/2026-09-12-dpr-guides-offset.md` is about and
 // `canvas/device-grid.ts` is the fix.
 //
-// ⚠ NOT WIRED. Nothing calls this yet. MapViewport, the `region` tool id and the
-// facet's arming are parcel 8B.
+// ═══ TWO DRAWS: THE FULL OVERLAY, AND THE GESTURE ONLY ═══
+//
+// `drawRegionOverlay` is the whole thing: wash, hatch, outlines, labels. It is
+// what the map draws with the View-menu tick "Tint the ground by region"
+// (`OverlayOptions.showRegions`) ON, at rest and mid-drag alike.
+// `drawRegionGesture` is what it draws with the tick OFF while a region drag is
+// live (ROADMAP §5.1 row 208, ruled C by the aurora overseer on 2026-09-25,
+// overturnable by the owner): the dragged rectangle's outline and the outline
+// of what the release leaves of each region it trims, and nothing else. No
+// hatch, no unassigned wash, no labels, because the author hid the tint to see
+// the art and the only thing owed on top of it is the hand's picture of itself.
+// Which one runs is `regionOverlayPass` in `components/map-region-gesture.ts`;
+// MapViewport calls both.
 
 import {
   REGION_HUES, REGION_LABEL_BG, REGION_LABEL_TEXT, REGION_LABEL_WARN,
@@ -293,6 +304,11 @@ export function drawRegionOverlay(
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.setLineDash([]);
 
+  // What was actually drawn, counted where it is drawn (the report's `drew`).
+  // Plain counters: nothing here touches the context, so the call log is the
+  // one master issued (row 208's control golden holds that).
+  const counts = { hatches: 0, unassignedHoles: 0, labels: 0 };
+
   // --- UNASSIGNED: the cross hatch, then one label on the largest hole -------
   const holes = cover.unassigned;
   if (holes.length > 0) {
@@ -301,6 +317,7 @@ export function drawRegionOverlay(
     for (const hole of holes) {
       const c = toCanvas(hole, vp);
       if (!intersects(c, canvasBox)) continue;
+      counts.unassignedHoles += 1;
       ctx.save();
       ctx.beginPath();
       ctx.rect(c.x, c.y, c.w, c.h);
@@ -343,6 +360,7 @@ export function drawRegionOverlay(
     ctx.globalAlpha = REGION_HATCH_ALPHA;
     ctx.lineWidth = snapStroke(0, REGION_OUTLINE_PX, dpr).width;
     hatch(ctx, clampToCanvas(box, canvasBox), regionHatchSlope(i), REGION_HATCH_PX);
+    counts.hatches += 1;
     ctx.restore();
 
     const lw = selected ? REGION_OUTLINE_SELECTED_PX : REGION_OUTLINE_PX;
@@ -370,6 +388,7 @@ export function drawRegionOverlay(
       { text: region.label, color: REGION_LABEL_TEXT },
       { text: region.bgText, color: region.bgMissing ? REGION_LABEL_WARN : REGION_LABEL_TEXT },
     ], REGION_LABEL_BG);
+    counts.labels += 1;
   }
 
   if (holes.length > 0) {
@@ -378,16 +397,112 @@ export function drawRegionOverlay(
     if (intersects(c, canvasBox)) {
       plate(ctx, c, [{ text: UNASSIGNED_LABEL, color: REGION_UNASSIGNED_LABEL_TEXT }],
         REGION_UNASSIGNED_LABEL_BG);
+      counts.labels += 1;
     }
   }
 
   ctx.restore();
 
   return publishRegionOverlayReport({
+    mode: 'full',
     regions: drawn,
     selectedId: input.selectedId,
     unassignedRects: holes.length,
     unassignedArea: cover.unassignedArea,
+    drew: { ...counts, gestureOutlines: 0, trimmedOutlines: 0 },
+  });
+}
+
+/** What the gesture-only draw needs: `regionOverlayPass`'s `gesture` arm, plus
+ *  the act and the regions for the report and the hues. */
+export interface RegionGestureOverlayInput {
+  /** The whole act, for the report's coverage figures only. Nothing is washed. */
+  act: Rect;
+  /** The set as the release will leave it, for the same figures. */
+  pieces: readonly RegionPiece[];
+  /** The rectangle the hand describes right now, under its region's id. */
+  dragged: RegionPiece;
+  /** What the release leaves of each region it trims (`regionDragGesturePreview`). */
+  trimmed: readonly RegionPiece[];
+  /** The regions, in DOCUMENT order: the index is the hue, as in the full draw. */
+  regions: readonly RegionOverlayRegion[];
+  selectedId: string | null;
+}
+
+/**
+ * THE GESTURE ONLY, for a drag with the tint hidden (row 208; file docblock).
+ *
+ * Each trimmed region's remainder is outlined in that region's hue at the
+ * unselected width, with interior edges suppressed exactly as the full draw
+ * does, so a carve reads as the same shape it will be when the tint comes back.
+ * The dragged rectangle is outlined LAST, at the selected width, in its
+ * region's hue (a minted id the document has no row for draws in the label
+ * text colour instead, since it has no hue yet). Nothing else: no clip, no
+ * alpha, no fill, no text.
+ */
+export function drawRegionGesture(
+  ctx: CanvasRenderingContext2D, dpr: number, vp: RegionViewport, input: RegionGestureOverlayInput,
+): RegionOverlayReport {
+  const canvasBox: CanvasRect = { x: 0, y: 0, w: vp.width, h: vp.height };
+  const hueOf = (id: string): string => {
+    const i = input.regions.findIndex((r) => r.id === id);
+    return i >= 0 ? regionHue(i) : REGION_LABEL_TEXT;
+  };
+  let gestureOutlines = 0;
+  let trimmedOutlines = 0;
+
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setLineDash([]);
+
+  // --- each trimmed region's remainder, in document order ------------------
+  const trimmedIds = input.regions.map((r) => r.id)
+    .concat(input.trimmed.map((p) => p.id).filter((id) => !input.regions.some((r) => r.id === id)))
+    .filter((id, k, all) => all.indexOf(id) === k);
+  for (const id of trimmedIds) {
+    const rects = input.trimmed.filter((p) => p.id === id).map((p) => p.rect);
+    const bounds = unionBounds(rects);
+    if (bounds === null || !intersects(toCanvas(bounds, vp), canvasBox)) continue;
+    ctx.strokeStyle = hueOf(id);
+    ctx.lineWidth = snapStroke(0, REGION_OUTLINE_PX, dpr).width;
+    ctx.beginPath();
+    for (const s of regionOutlineSegments(rects)) {
+      const a = toCanvas({ x: s.x1, y: s.y1, w: 0, h: 0 }, vp);
+      const b = toCanvas({ x: s.x2, y: s.y2, w: 0, h: 0 }, vp);
+      const vertical = s.x1 === s.x2;
+      const at = snapStroke(vertical ? a.x : a.y, REGION_OUTLINE_PX, dpr).at;
+      ctx.moveTo(vertical ? at : a.x, vertical ? a.y : at);
+      ctx.lineTo(vertical ? at : b.x, vertical ? b.y : at);
+    }
+    ctx.stroke();
+    trimmedOutlines += 1;
+  }
+
+  // --- the dragged rectangle, last, so nothing crosses the hand's own line ----
+  if (!isEmptyRect(input.dragged.rect)) {
+    const c = toCanvas(input.dragged.rect, vp);
+    if (intersects(c, canvasBox)) {
+      const lw = REGION_OUTLINE_SELECTED_PX;
+      ctx.strokeStyle = hueOf(input.dragged.id);
+      ctx.lineWidth = snapStroke(0, lw, dpr).width;
+      ctx.strokeRect(
+        snapStroke(c.x, lw, dpr).at, snapStroke(c.y, lw, dpr).at,
+        snapLength(c.w, dpr), snapLength(c.h, dpr),
+      );
+      gestureOutlines += 1;
+    }
+  }
+
+  ctx.restore();
+
+  const cover = coverage(input.act, input.pieces);
+  return publishRegionOverlayReport({
+    mode: 'gesture',
+    regions: [],
+    selectedId: input.selectedId,
+    unassignedRects: cover.unassigned.length,
+    unassignedArea: cover.unassignedArea,
+    drew: { hatches: 0, unassignedHoles: 0, labels: 0, gestureOutlines, trimmedOutlines },
   });
 }
 
@@ -430,7 +545,29 @@ export const UNASSIGNED_LABEL = 'unassigned: no region owns this';
 // ---------------------------------------------------------------------------
 
 export interface RegionOverlayReport {
-  /** Every region with area, in document order. */
+  /**
+   * Which draw published: `full` is `drawRegionOverlay`, `gesture` is
+   * `drawRegionGesture` (row 208: the tint hidden, a drag live).
+   */
+  mode: 'full' | 'gesture';
+  /**
+   * What the draw ISSUED, counted at the call sites: region hatches, unassigned
+   * holes washed, label plates, dragged-rectangle outlines and trimmed-region
+   * outlines. Only what intersected the canvas counts. A `gesture` publish has
+   * the first three at zero by construction, which is why harness row 7c pairs
+   * this with a pixel readback rather than trusting it alone.
+   */
+  drew: {
+    hatches: number;
+    unassignedHoles: number;
+    labels: number;
+    gestureOutlines: number;
+    trimmedOutlines: number;
+  };
+  /**
+   * Every region with area, in document order, as the FULL draw drew it. Empty
+   * for a `gesture` publish, which draws no region as a region.
+   */
   regions: Array<{
     id: string;
     /** False when the region's union is entirely off-canvas: nothing was drawn. */
@@ -443,7 +580,8 @@ export interface RegionOverlayReport {
     selected: boolean;
   }>;
   selectedId: string | null;
-  /** How many rectangles of the act belong to nobody. Zero is a finished act. */
+  /** How many rectangles of the act belong to nobody. Zero is a finished act. In
+   *  `gesture` mode this is the state the release would leave; none of it is drawn. */
   unassignedRects: number;
   unassignedArea: number;
   /** The visual calls, so a harness asserts what the code chose, not a memory of it. */
@@ -469,7 +607,9 @@ const VISUAL: RegionOverlayReport['visual'] = {
 };
 
 let lastReport: RegionOverlayReport = {
-  regions: [], selectedId: null, unassignedRects: 0, unassignedArea: 0, visual: VISUAL, paints: 0,
+  mode: 'full', regions: [], selectedId: null, unassignedRects: 0, unassignedArea: 0,
+  drew: { hatches: 0, unassignedHoles: 0, labels: 0, gestureOutlines: 0, trimmedOutlines: 0 },
+  visual: VISUAL, paints: 0,
 };
 
 export function publishRegionOverlayReport(

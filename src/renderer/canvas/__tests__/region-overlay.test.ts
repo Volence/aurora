@@ -328,7 +328,8 @@ describe('the report', () => {
 
   it('carries the visual calls, so a harness reads them from the code', () => {
     const report = publishRegionOverlayReport({
-      regions: [], selectedId: null, unassignedRects: 0, unassignedArea: 0,
+      mode: 'full', regions: [], selectedId: null, unassignedRects: 0, unassignedArea: 0,
+      drew: { hatches: 0, unassignedHoles: 0, labels: 0, gestureOutlines: 0, trimmedOutlines: 0 },
     });
     expect(report.visual.hatchPx).toBe(REGION_HATCH_PX);
     expect(report.visual.grabPx).toBe(REGION_GRAB_PX);
