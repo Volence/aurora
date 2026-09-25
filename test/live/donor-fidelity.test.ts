@@ -286,7 +286,7 @@ describe('F5, F6: aeon\'s row-213 answers, from its real tools, through Aurora\'
       }
       expect(rows.broken).toEqual([]);
       const vendored = JSON.parse(readFileSync(join(VENDORED, 's2_ehz_cpz.clipact.json'), 'utf8')) as { pool: { per_clip_fields: unknown } };
-      expect(clipact.pool.per_clip_fields, 'aeon\'s per_clip_fields moved: re-vendor test/fixtures/clips/aeon-outputs (see each file's .provenance.json)')
+      expect(clipact.pool.per_clip_fields, 'aeon\'s per_clip_fields moved: re-vendor test/fixtures/clips/aeon-outputs (see each file\'s .provenance.json)')
         .toEqual(vendored.pool.per_clip_fields);
       const touched = all.reduce((a, x) => a + x.pages_touched, 0);
       process.stdout.write(`donor-fidelity F5 ${act} @ aeon ${s.rev}: pool ${clipact.pool.tiles} tiles / ${clipact.pool.pages} pages; `
