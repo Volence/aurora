@@ -14,7 +14,7 @@
 //
 // Exactly two verbs reach a subprocess, each with a FIXED argv:
 //
-//   validate  python3 tools/clip_manifest.py validate <candidate> --donor-root <root>/games/sonic4/data/donors
+//   validate  python3 tools/clip_manifest.py validate <candidate> --donor-root <root>/games/sonic4/data/donors --json
 //   bake      python3 tools/clip_act_bake.py bake <candidate> --out <temp>/baked
 //
 // The renderer supplies only the project root (which must hold both tools) and
@@ -24,12 +24,17 @@
 //
 // ═══ WHAT COMES BACK ══════════════════════════════════════════════════════
 //
-// The tool's exit code and its whole stdout/stderr (the refusal the page shows
-// is aeon's own sentence), the printable command, and for a bake that exited 0
+// The tool's exit code and its whole stdout/stderr, the printable command, and for a bake that exited 0
 // the composed act: clipact.json and every section's tiles/collattr/collattrb/
 // zonekey bytes, plus corridor_sheet.bin when the act has a corridor. A tool
 // that could not be STARTED (no python3, a timeout) is `couldNotRun`, which is
 // never rendered as a refusal of the manifest: the manifest was not judged.
+//
+// validate runs with `--json` (aeon 1d9afb25, ROADMAP row 213): its stdout is one
+// document naming the rule and the clip or corridor, read by the renderer with
+// core/formats/donors/clip-validate-json.ts. This module does not interpret it:
+// exit 1 with no JSON on stdout is aeon's documented CRASH (a traceback), and
+// telling that from a refusal is the reader's job, in one place.
 
 import { spawn as nodeSpawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -87,7 +92,7 @@ export const spawnRunner: Runner = makeSpawnRunner(process.env);
 /** The fixed argv for one verb. Exported so a row can hold it to exactly this. */
 export function clipToolArgv(verb: ClipToolVerb, basePath: string, candidate: string, outDir: string): string[] {
   if (verb === 'validate') {
-    return ['python3', CLIP_TOOLS.validate, 'validate', candidate, '--donor-root', join(basePath, DONOR_ROOT_REL)];
+    return ['python3', CLIP_TOOLS.validate, 'validate', candidate, '--donor-root', join(basePath, DONOR_ROOT_REL), '--json'];
   }
   return ['python3', CLIP_TOOLS.bake, 'bake', candidate, '--out', outDir];
 }

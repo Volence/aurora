@@ -28,6 +28,14 @@
 //         (R10) and the page shows aeon's words; clips.json on disk is unchanged.
 //   DP.8  a real Ctrl+Z undoes the paste (the file it created is gone from disk);
 //         a real click on Redo writes the same bytes back.
+//   ROW 213 (aeon 1d9afb25) adds two:
+//   DP.6e the readout's per-clip pool grid shows, cell for cell, the pool.per_clip
+//         row of the clipact.json the HARNESS's own bake of the file on disk
+//         wrote; each column's tooltip is that file's per_clip_fields meaning;
+//         the note names the act's pool.tiles and pool.pages; nothing is totalled.
+//   DP.7s the R10 refusal is shown STRUCTURALLY: the rule tag reads R10 and the
+//         subjects name both clips, first claimant first, ids read from the file
+//         on disk and the draft (not from the app's store).
 //
 // EXPECTATIONS COME FROM THE TREE: CONVERTER_COMMAND, marqueeRect, marqueeReadout,
 // clipsManifestPath and suggestDestination are bundled from the tree under test
@@ -491,8 +499,10 @@ async function rows(d, O, COPY, dpr) {
   check('DP.6b', 'aeon\'s own loader, run by the harness on the file ON DISK, accepts it',
     v.status === 0 && /clips\.json OK/.test(v.stdout), `exit ${v.status}; ${String(v.stdout).trim().split('\n')[0]}`);
   const outDir = mkdtempSync(join(os.tmpdir(), 'donor-page-bake-'));
+  let harnessClipact = null;
   try {
     const bk = aeonTool(COPY, ['tools/clip_act_bake.py', 'bake', path, '--out', outDir]);
+    if (bk.status === 0 && existsSync(join(outDir, 'clipact.json'))) harnessClipact = JSON.parse(readFileSync(join(outDir, 'clipact.json'), 'utf8'));
     const st = zone.grid.section_px / 8;
     const bad = [];
     let compared = 0; let paintedCells = 0;
@@ -520,6 +530,31 @@ async function rows(d, O, COPY, dpr) {
   check('DP.6d', 'the target pane drew the pasted clip from the bake\'s bytes (section 0 drew pixels)',
     !!t0 && t0.drawnPixels > 0, `target compose ${J(s6d.targetCompose)}; pane ${J(s6d.targetPane)}`);
 
+  // ── DP.6e the per-clip pool grid, against the harness's own bake ────────
+  const pool = harnessClipact && harnessClipact.pool;
+  if (!pool || !Array.isArray(pool.per_clip)) {
+    check('DP.6e', 'the per-clip pool grid', 'UNMEASURABLE', `the harness's bake wrote no pool.per_clip (aeon predates 1d9afb25?): ${J(pool && Object.keys(pool))}`);
+  } else {
+    await sleep(500);
+    const dom6e = await c.json(String.raw`(() => {
+      const box = document.querySelector('[data-donors-pool-rows]');
+      const cells = {}; for (const el of document.querySelectorAll('[data-donors-pool-cell]')) cells[el.getAttribute('data-donors-pool-cell')] = el.textContent;
+      const heads = {}; for (const el of document.querySelectorAll('[data-donors-pool-head]')) heads[el.getAttribute('data-donors-pool-head')] = el.getAttribute('title');
+      const ids = [...document.querySelectorAll('[data-donors-pool-id]')].map((el) => el.getAttribute('data-donors-pool-id'));
+      const note = (document.querySelector('[data-donors-pool-note]') || {}).textContent || null;
+      return { state: box && box.getAttribute('data-donors-pool-rows'), cells, heads, ids, note, broken: !!document.querySelector('[data-donors-pool-broken]') }; })()`);
+    const fields = ['tiles', 'tiles_added', 'pages_touched', 'pages_exclusive'];
+    const want = {};
+    for (const r of pool.per_clip) for (const f of fields) want[`clip:${r.index}:${f}`] = String(r[f]);
+    for (const r of pool.per_corridor || []) for (const f of fields) want[`corridor:${r.index}:${f}`] = String(r[f]);
+    const wantHeads = Object.fromEntries(fields.map((f) => [f, pool.per_clip_fields[f]]));
+    const wantIds = [...pool.per_clip, ...(pool.per_corridor || [])].map((r) => r.id);
+    check('DP.6e', 'the readout\'s per-clip pool grid equals, cell for cell, pool.per_clip of the clipact.json the HARNESS\'s own bake wrote; column tooltips are that file\'s per_clip_fields; the note names pool.tiles and pool.pages; no invariant flagged',
+      dom6e.state === 'present' && J(dom6e.cells) === J(want) && J(dom6e.heads) === J(wantHeads) && J(dom6e.ids) === J(wantIds)
+        && !!dom6e.note && dom6e.note.includes(String(pool.tiles)) && dom6e.note.includes(`${pool.pages} pages`) && !dom6e.broken,
+      `harness bake pool ${pool.tiles} tiles / ${pool.pages} pages, per_clip ${J(pool.per_clip)}; DOM ${J(dom6e).slice(0, 700)}`);
+  }
+
   await shot('pasted');
   // ── DP.7 a paste aeon refuses ───────────────────────────────────────────
   const shaBefore = sha(readFileSync(path));
@@ -531,10 +566,18 @@ async function rows(d, O, COPY, dpr) {
   await d.realClick('document.querySelector("[data-donors-paste-button]")');
   const s7 = await d.waitFor((s) => s.paste.outcome && !s.paste.busy && s.paste.outcome.kind !== 'pasted', 'the refusal', 160);
   const shown = await c.evalExpr('(document.querySelector("[data-donors-refusal]") || {}).textContent || null');
+  const dom7 = await c.json(String.raw`(() => { const n = document.querySelector('[data-donors-refusal-note]');
+    return n ? { rule: (n.querySelector('[data-donors-note-rule]') || {}).textContent, subjects: (n.querySelector('[data-donors-note-subjects]') || {}).textContent,
+      attr: n.getAttribute('data-donors-refusal-note'), stage: (document.querySelector('[data-donors-stage]') || { getAttribute: () => null }).getAttribute('data-donors-stage') } : null; })()`);
   await shot('refused');
   check('DP.7', 'a REAL click on the target pane places a second paste over the first; aeon REFUSES it naming R10, the page shows aeon\'s own words, and clips.json on disk is byte-identical',
     s7.paste.outcome.kind === 'refused' && /R10/.test(s7.paste.outcome.text) && !!shown && /R10/.test(shown) && sha(readFileSync(path)) === shaBefore,
     `target aim ${J(tAim)} (view ${J(T.view)}, rect ${J(T.rect)}); draft ${J(s7a.draft)}; outcome ${J(s7.paste.outcome).slice(0, 400)}`);
+  const firstId = JSON.parse(readFileSync(path, 'utf8')).clips[0].id;
+  const wantSubjects = `clip 0 ${firstId} and clip 1 ${s7a.draft.clipId}`;
+  check('DP.7s', 'the R10 refusal is shown STRUCTURALLY: the rule tag reads R10 and the subjects name both clips, first claimant first (ids from the file on disk and the draft)',
+    !!dom7 && dom7.rule === 'R10' && dom7.attr === 'R10' && dom7.subjects === wantSubjects && dom7.stage === 'validate',
+    `DOM ${J(dom7)}; want subjects ${J(wantSubjects)}`);
 
   // ── DP.8 undo by a real Ctrl+Z, redo by a real click ────────────────────
   const pasted = readFileSync(path);

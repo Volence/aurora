@@ -32,6 +32,16 @@
 //       baked section files back from disk;
 //   F4  aeon's own s2_two_clip_pins, rewritten by Aurora's writer, is still
 //       accepted: the writer drops nothing aeon needs.
+//   F5  (row 213) aeon's REAL bake of its committed clip acts, through Aurora's
+//       channel: Aurora's pool-row reader takes every row, and the rows keep
+//       aeon's stated invariants (sum(tiles_added) + 1 == pool.tiles,
+//       sum(pages_exclusive) <= pool.pages, each row's added <= tiles and own
+//       <= touched), and the file's per_clip_fields is the one the vendored
+//       unit fixture carries;
+//   F6  (row 213) a REAL `validate --json` refusal, through Aurora's argv,
+//       parses to the rule and the clip the mutation touched, and a manifest
+//       that is not JSON comes back as a CRASH (exit 1, no JSON), never a
+//       refusal.
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawnSync } from 'node:child_process';
@@ -46,6 +56,8 @@ import {
   newClipManifest, parseClipManifest, serializeClipManifest, suggestDestination, withClip, gridToHold,
 } from '../../src/core/formats/donors/clip-manifest-doc';
 import { makeSpawnRunner, runClipTool as runTool, type Runner } from '../../src/main/clip-tool';
+import { readValidateJson } from '../../src/core/formats/donors/clip-validate-json';
+import { readPoolRows } from '../../src/core/formats/donors/clipact-pool';
 import { parseNametable } from '../../src/core/formats/s4-nametable';
 import { parseCollAttr } from '../../src/core/formats/s4-collattr';
 import { peerRepo, resolveRev } from '../support/peer-repo';
@@ -178,6 +190,7 @@ describe('F2..F4: what Aurora writes is what aeon accepts and composes', () => {
     const good = withClip(base, { id: 'ehz_1', donor: 's2disasm', zone: 'EHZ', src, dst: { ...dst, w: src.w, h: src.h } });
     const ok = await runTool(s.copy, 'validate', serializeClipManifest(good), s.runner);
     expect(ok.ok, `${ok.stdout}\n${ok.stderr}\n${ok.couldNotRun ?? ''}`).toBe(true);
+    expect(readValidateJson(ok.exitCode, ok.stdout, ok.stderr).kind).toBe('accepted');
     const bad = withClip(base, {
       id: 'ehz_1', donor: 's2disasm', zone: 'EHZ', src,
       dst: { x: dst.x + 8, y: dst.y, w: src.w, h: src.h }, unalignedDstReason: 'fidelity row: an 8-px shift',
@@ -186,6 +199,10 @@ describe('F2..F4: what Aurora writes is what aeon accepts and composes', () => {
     expect(no.ok).toBe(false);
     expect(no.couldNotRun).toBeUndefined();
     expect(no.stdout).toMatch(/R12/);
+    const v = readValidateJson(no.exitCode, no.stdout, no.stderr);
+    expect(v.kind === 'refused' && v.refusals.map((r) => ({ rule: r.rule, subjects: r.subjects }))).toEqual([
+      { rule: 'R12', subjects: [{ kind: 'clip', index: 0, id: 'ehz_1' }] },
+    ]);
   }, 120_000);
 
   it('F3: aeon\'s bake puts the donor\'s words and BOTH planes at the destination, byte for byte', async (ctx) => {
@@ -234,6 +251,72 @@ describe('F2..F4: what Aurora writes is what aeon accepts and composes', () => {
     const r = await runTool(s.copy, 'validate', rewritten, s.runner);
     expect(r.ok, `${r.stdout}\n${r.stderr}`).toBe(true);
     expect(JSON.parse(rewritten)).toEqual(JSON.parse(text));
+  }, 120_000);
+});
+
+describe('F5, F6: aeon\'s row-213 answers, from its real tools, through Aurora\'s channel', () => {
+  const VENDORED = resolve(__dirname, '../fixtures/clips/aeon-outputs');
+
+  for (const act of ['s2_ehz_cpz', 's2_two_clip', 's2_two_clip_pins', 's2_ehz_boot']) {
+    it(`F5: ${act}: a real bake's per-clip rows read in full and keep aeon's stated invariants`, async (ctx) => {
+      const s = need(ctx);
+      if (!s) return;
+      const manifest = join(s.copy, `games/sonic4/data/clips/${act}/clips.json`);
+      if (!existsSync(manifest)) {
+        ctx.skip(`SKIPPED, NOT PASSED: CANNOT MEASURE: aeon ${s.rev} no longer has ${act}/clips.json`);
+        return;
+      }
+      const r = await runTool(s.copy, 'bake', readFileSync(manifest, 'utf8'), s.runner);
+      expect(r.ok, `${r.stdout}\n${r.stderr}\n${r.couldNotRun ?? ''}`).toBe(true);
+      const clipact = JSON.parse(r.baked!.clipact) as Record<string, unknown> & {
+        pool: { tiles: number; pages: number; per_clip: unknown[]; per_corridor: unknown[]; per_clip_fields: Record<string, string> };
+        clips: unknown[]; corridors: unknown[];
+      };
+      const rows = readPoolRows(clipact);
+      expect(rows.state, rows.state === 'unavailable' ? rows.why : '').toBe('present');
+      if (rows.state !== 'present') return;
+      const all = [...rows.perClip, ...rows.perCorridor];
+      expect(rows.perClip.length).toBe(clipact.clips.length);
+      expect(rows.perCorridor.length).toBe(clipact.corridors.length);
+      expect(all.reduce((a, x) => a + x.tiles_added, 0) + 1).toBe(clipact.pool.tiles);
+      expect(all.reduce((a, x) => a + x.pages_exclusive, 0)).toBeLessThanOrEqual(clipact.pool.pages);
+      for (const x of all) {
+        expect(x.tiles_added).toBeLessThanOrEqual(x.tiles);
+        expect(x.pages_exclusive).toBeLessThanOrEqual(x.pages_touched);
+      }
+      expect(rows.broken).toEqual([]);
+      const vendored = JSON.parse(readFileSync(join(VENDORED, 's2_ehz_cpz.clipact.json'), 'utf8')) as { pool: { per_clip_fields: unknown } };
+      expect(clipact.pool.per_clip_fields, 'aeon\'s per_clip_fields moved: re-vendor test/fixtures/clips/aeon-outputs (see each file\'s .provenance.json)')
+        .toEqual(vendored.pool.per_clip_fields);
+      const touched = all.reduce((a, x) => a + x.pages_touched, 0);
+      process.stdout.write(`donor-fidelity F5 ${act} @ aeon ${s.rev}: pool ${clipact.pool.tiles} tiles / ${clipact.pool.pages} pages; `
+        + `rows ${all.map((x) => `${x.id} ${x.tiles}/${x.tiles_added}t ${x.pages_touched}/${x.pages_exclusive}p`).join(', ')}; `
+        + `pages_touched sums to ${touched}\n`);
+    }, 300_000);
+  }
+
+  it('F6: a real validate --json refusal parses to aeon\'s rule and the clip it names; a non-JSON manifest is a CRASH', async (ctx) => {
+    const s = need(ctx);
+    if (!s) return;
+    const doc = JSON.parse(readFileSync(join(s.copy, 'games/sonic4/data/clips/s2_two_clip/clips.json'), 'utf8')) as {
+      clips: Array<{ id: string; dst_rect: { w: number } }>;
+    };
+    doc.clips[1].dst_rect.w = 1024; // aeon's own R7 mutation (tools/test_clip_manifest_json.py)
+    const r = await runTool(s.copy, 'validate', JSON.stringify(doc, null, 2), s.runner);
+    expect(r.command).toMatch(/--json$/);
+    expect(r.exitCode).toBe(1);
+    const v = readValidateJson(r.exitCode, r.stdout, r.stderr);
+    expect(v.kind, `${r.stdout}\n${r.stderr}`).toBe('refused');
+    if (v.kind !== 'refused') return;
+    expect(v.refusals.map((n) => ({ rule: n.rule, subjects: n.subjects }))).toEqual([
+      { rule: 'R7', subjects: [{ kind: 'clip', index: 1, id: doc.clips[1].id }] },
+    ]);
+    const crash = await runTool(s.copy, 'validate', '{ this is not json', s.runner);
+    expect(crash.exitCode).toBe(1);
+    expect(crash.stdout.trim()).toBe('');
+    const cv = readValidateJson(crash.exitCode, crash.stdout, crash.stderr);
+    expect(cv.kind).toBe('crashed');
+    expect(cv.kind === 'crashed' && cv.stderr).toMatch(/Traceback/);
   }, 120_000);
 });
 

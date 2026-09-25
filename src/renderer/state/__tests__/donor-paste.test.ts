@@ -5,6 +5,10 @@
  *   * NOTHING IS WRITTEN unless aeon's loader AND bake both accepted the exact
  *     bytes that are then written (the tools and the file see one text);
  *   * a tool that could not run is not a refusal, and writes nothing either;
+ *   * aeon's loader answers in --json (row 213): a refusal carries its rule and
+ *     subjects, and a loader that CRASHED (exit 1, no JSON) is its own outcome,
+ *     never a refusal. The loader's stdout in these rows is aeon's REAL output
+ *     (test/fixtures/clips/aeon-outputs/validate-json.cases.json), not typed here;
  *   * undo puts back the exact prior bytes, or removes a file the paste created,
  *     and refuses when the file moved since the paste wrote it;
  *   * a guarded-write conflict writes nothing and says why.
@@ -20,6 +24,13 @@ import type { NewClip } from '../../../core/formats/donors/clip-manifest-doc';
 
 const PINS = readFileSync(resolve(__dirname, '../../../../test/fixtures/clips/s2_two_clip_pins.clips.json'), 'utf8');
 const PINS_PATH = 'games/sonic4/data/clips/s2_two_clip_pins/clips.json';
+const CASES = JSON.parse(readFileSync(resolve(__dirname, '../../../../test/fixtures/clips/aeon-outputs/validate-json.cases.json'), 'utf8')) as
+  Record<string, { exit: number; stdout: string; stderr: string }>;
+/** One of aeon's real validate --json runs, as the clip-tool channel would return it. */
+function aeonSaid(name: string): Partial<ClipToolResult> {
+  const c = CASES[name];
+  return { ok: c.exit === 0, exitCode: c.exit, stdout: c.stdout, stderr: c.stderr };
+}
 
 interface Disk { files: Map<string, { text: string; mtimeMs: number }>; clock: number }
 
@@ -34,7 +45,10 @@ function ports(disk: Disk, opts: {
     seen, writes, deletes,
     async clipTool(_root, verb, text) {
       seen.push({ verb, text });
-      const base: ClipToolResult = { verb, ok: true, exitCode: 0, stdout: 'clips.json OK', stderr: '', command: `python3 ${verb}` };
+      const base: ClipToolResult = {
+        verb, ok: true, exitCode: 0, stdout: verb === 'validate' ? CASES.accept_s2_ehz_cpz.stdout : 'clip act baked', stderr: '',
+        command: `python3 ${verb}`,
+      };
       const over = verb === 'validate' ? opts.validate?.(text) : opts.bake?.(text);
       const r = { ...base, ...over };
       if (verb === 'bake' && r.ok && !r.baked) r.baked = { clipact: '{"zone_table":[]}', files: {} };
@@ -90,16 +104,46 @@ describe('a paste writes only what aeon accepted', () => {
     expect(JSON.parse(written).clips.map((c: { id: string }) => c.id)).toEqual(['ehz_s1', 'cpz_s1', 'ehz_x']);
   });
 
-  it('a REFUSAL at the loader writes nothing and carries aeon\'s words', async () => {
+  it('a REFUSAL at the loader writes nothing and carries aeon\'s rule, BOTH subjects and words', async () => {
     const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
-    const p = ports(disk, { validate: () => ({ ok: false, exitCode: 1, stdout: 'clips.json REFUSED R10 clips overlap' }) });
+    const p = ports(disk, { validate: () => aeonSaid('refuse_r10_pair') });
     await usePasteStore.getState().selectAct('s2_two_clip_pins', p);
     const o = await usePasteStore.getState().paste(CLIP, p);
     expect(o).toMatchObject({ kind: 'refused', stage: 'validate' });
-    expect(o.kind === 'refused' && o.text).toMatch(/R10/);
+    const doc = JSON.parse(CASES.refuse_r10_pair.stdout);
+    expect(o.kind === 'refused' && o.stage === 'validate' && o.refusals).toEqual(doc.refusals);
+    expect(o.kind === 'refused' && o.text).toBe(doc.refusals[0].message);
     expect(p.writes).toEqual([]);
     expect(disk.files.get(PINS_PATH)!.text).toBe(PINS);
     expect(usePasteStore.getState().undoStack.length).toBe(0);
+  });
+
+  it('a loader that CRASHED (exit 1, no JSON: aeon\'s traceback) is a crash carrying stderr, NOT a refusal, and writes nothing', async () => {
+    const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
+    let bakes = 0;
+    const p = ports(disk, {
+      validate: (t) => (t.includes('ehz_x') ? aeonSaid('crash_not_json') : {}),
+      bake: (t) => { if (t.includes('ehz_x')) bakes++; return {}; },
+    });
+    await usePasteStore.getState().selectAct('s2_two_clip_pins', p);
+    const o = await usePasteStore.getState().paste(CLIP, p);
+    expect(o.kind).toBe('crashed');
+    expect(o.kind === 'crashed' && o.stderr).toBe(CASES.crash_not_json.stderr);
+    expect(bakes).toBe(0);
+    expect(p.writes).toEqual([]);
+    expect(usePasteStore.getState().undoStack.length).toBe(0);
+  });
+
+  it('an ACCEPTANCE with warnings pastes, and the outcome carries each warning\'s rule and subjects as aeon printed them', async () => {
+    const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk, { validate: (t) => (t.includes('ehz_x') ? aeonSaid('accept_w3') : {}) });
+    await usePasteStore.getState().selectAct('s2_two_clip_pins', p);
+    const o = await usePasteStore.getState().paste(CLIP, p);
+    expect(o.kind).toBe('pasted');
+    const want = JSON.parse(CASES.accept_w3.stdout).warnings;
+    expect(want.length).toBeGreaterThan(0);
+    expect(o.kind === 'pasted' && o.warnings).toEqual(want);
+    expect(p.writes.length).toBe(1);
   });
 
   it('a REFUSAL at the bake writes nothing either', async () => {
