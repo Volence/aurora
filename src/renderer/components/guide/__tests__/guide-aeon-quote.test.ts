@@ -68,6 +68,32 @@ describe('effects-first-run.md: what it quotes of aeon exists in aeon', () => {
     }
   });
 
+  it('its "exactly two installers" sentence names every installer aeon\'s reachability check names', (ctx) => {
+    const flat = GUIDE.replace(/\s+/g, ' ');
+    const at = flat.indexOf('exactly two installers');
+    expect(at, 'the guide no longer states the installers, so this row measures nothing').toBeGreaterThanOrEqual(0);
+    const sentence = flat.slice(at, flat.indexOf('.', flat.indexOf('raster table', at)) + 1);
+    const repo = peerRepo('aeon');
+    if (repo === null) { ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo'); return; }
+    if (resolveRev(repo, TIP) === null) { ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in aeon`); return; }
+    const b = readAtRev(repo, TIP, 'tools/test_raster_cycle_table_lint.py');
+    expect(b.ok, b.ok ? '' : b.why).toBe(true);
+    const src = (b as { ok: true; text: string }).text;
+    const from = src.indexOf('def test_every_preset_document_is_REACHABLE');
+    expect(from, 'aeon no longer has test_every_preset_document_is_REACHABLE').toBeGreaterThanOrEqual(0);
+    const to = src.indexOf('\ndef ', from + 1);
+    const msg = src.slice(from, to < 0 ? undefined : to).replace(/"\s*\n\s*f?"/g, '');
+    const installers = [
+      { name: 'the DEBUG table row', aeon: /\.raster_table/, ours: /raster table/i },
+      { name: 'a region row', aeon: /REGION ROW/, ours: /region row/i },
+      { name: 'a section sidecar', aeon: /section sidecar/i, ours: /section's sidecar/i },
+    ].filter((i) => i.aeon.test(msg));
+    expect(installers.length, 'no known installer found in aeon\'s message: the detector measures nothing').toBeGreaterThan(0);
+    for (const i of installers) {
+      expect(sentence, `aeon's reachability check counts ${i.name}; the guide's installer sentence does not name it`).toMatch(i.ours);
+    }
+  });
+
   it('every aeon path it backticks exists at aeon origin/master', (ctx) => {
     const paths = quotedAeonPaths(GUIDE);
     expect(paths.length, 'the guide backticks no aeon path, so this row measures nothing').toBeGreaterThan(0);

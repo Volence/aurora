@@ -505,8 +505,9 @@ questions. A section that is in `threaded` and in `bound` is a home with an occu
 Binding over an occupant is allowed, and it does not delete anything: it replaces that
 section's `rasterRef`, and choosing the old value again puts it back in one undo step.
 What it can cost is the **incumbent document**. A preset document reaches the running
-game through exactly two installers: a `rasterRef` in some section's sidecar, or a row
-in aeon's DEBUG raster table. A document in neither is refused by name ("reachable by
+game through exactly two installers: a `rasterRef` on a binding (a region row, or on an
+act with no regions file a section's sidecar), or a row in aeon's DEBUG raster table. A
+document in neither is refused by name ("reachable by
 NOTHING"). So if this section is the only one naming that document, and aeon's lab
 table does not name it either, taking the section turns a green build red **on the
 document you displaced**, not on the one you just authored. Aurora does not read that
