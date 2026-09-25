@@ -226,7 +226,11 @@ async function main() {
       Array.isArray(rows) && rows.map((r) => r.entry).join() === forestBefore.map((e) => e.entry).join(),
       `panel entries ${JSON.stringify(rows?.map((r) => r.entry))} vs document ${JSON.stringify(forestBefore.map((e) => e.entry))}`);
     check('3c', "each row's four fields show ITS entry's rectangle (row #2 is not rectangle 1)",
-      Array.isArray(rows) && rows.every((r, i) => JSON.stringify(r.rect) === JSON.stringify({
+      // `rows.length === forestBefore.length` FIRST: under a list that drops an
+      // entry the index below would read past the end and crash the run instead
+      // of reporting this row red (measured: the M2 plant did exactly that).
+      Array.isArray(rows) && rows.length === forestBefore.length && rows.length >= 2
+        && rows.every((r, i) => JSON.stringify(r.rect) === JSON.stringify({
         x: forestBefore[i].rect.x, y: forestBefore[i].rect.y, w: forestBefore[i].rect.w, h: forestBefore[i].rect.h,
       })) && JSON.stringify(rows[1].rect) !== JSON.stringify(rows[0].rect),
       `panel ${JSON.stringify(rows?.map((r) => r.rect))}`);
