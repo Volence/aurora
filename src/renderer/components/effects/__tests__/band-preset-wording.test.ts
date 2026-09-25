@@ -558,7 +558,45 @@ describe('the three limits say the words that carry them', () => {
     expect(l.body).toMatch(/hand-typed dc\.l list/);
     expect(l.body).toMatch(/does not add itself/i);
     expect(l.body).toMatch(/fails loudly/i);
-    expect(l.body).toMatch(/neither a table row nor a section binding/i);
+  });
+
+  /**
+   * LIMIT 2's INSTALLER LIST, RE-DERIVED FROM aeon (ROADMAP row 212).
+   *
+   * The row above used to pin /neither a table row nor a section binding/. aeon
+   * e2af59ea put OJZ act 1 in REGION mode, where the second installer is a region
+   * row's rasterRef, so that pin held a sentence that was false on the one act
+   * this editor opens. It now reads the installers from the MESSAGE of aeon's own
+   * reachability check (`test_every_preset_document_is_REACHABLE` in
+   * tools/test_raster_cycle_table_lint.py, at origin/master, through git
+   * objects) and requires both LIMIT 2 surfaces to name every one of them.
+   */
+  it('LIMIT 2 names every installer aeon\'s reachability check names', (ctx) => {
+    const repo = peerRepo('aeon');
+    if (repo === null) { ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo'); return; }
+    if (resolveRev(repo, 'origin/master') === null) { ctx.skip('SKIPPED, NOT PASSED: origin/master does not resolve in aeon'); return; }
+    const b = readAtRev(repo, 'origin/master', 'tools/test_raster_cycle_table_lint.py');
+    expect(b.ok, b.ok ? '' : b.why).toBe(true);
+    const src = (b as { ok: true; text: string }).text;
+    const at = src.indexOf('def test_every_preset_document_is_REACHABLE');
+    expect(at, 'aeon no longer has test_every_preset_document_is_REACHABLE: re-read what makes a preset reachable').toBeGreaterThanOrEqual(0);
+    const next = src.indexOf('\ndef ', at + 1);
+    const msg = src.slice(at, next < 0 ? undefined : next).replace(/"\s*\n\s*f?"/g, '');
+    // Each installer aeon's message names, and the words a LIMIT 2 surface must use for it.
+    const installers: { aeon: RegExp; ours: RegExp; name: string }[] = [
+      { name: 'the DEBUG table row', aeon: /\.raster_table/, ours: /table row|band-demo table/i },
+      { name: 'a region row', aeon: /REGION ROW/, ours: /region row/i },
+      { name: 'a section sidecar (legacy / section mode)', aeon: /section sidecar/i, ours: /section/i },
+    ];
+    const named = installers.filter((i) => i.aeon.test(msg));
+    expect(named.length, 'the detector finds none of the known installers in aeon\'s message, so it measures nothing').toBeGreaterThan(0);
+    const long = PRESET_LIMITS.find((x) => x.key === 'debug_chord')!.body;
+    const short = presetLimitsShort().find((x) => x.key === 'debug_chord')?.body;
+    expect(short, 'no short debug_chord body to check').toBeDefined();
+    for (const i of named) {
+      expect(long, `aeon's reachability check counts ${i.name}; LIMIT 2 does not name it`).toMatch(i.ours);
+      expect(short!, `aeon's reachability check counts ${i.name}; LIMIT 2 (short) does not name it`).toMatch(i.ours);
+    }
   });
 
   /** Limit 3. "Builds green and shows nothing" is the sentence that lands. */

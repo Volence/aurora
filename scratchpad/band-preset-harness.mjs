@@ -630,7 +630,7 @@ async function main() {
       // apostrophe is back so this file is the standing regression control for
       // it. If `check:harness-guards` ever reports G2 on THIS file again, the
       // report is backwards and the checker's scanner is what broke.
-      /a row in aeon's band-demo table or a section binding/.test(debugChord.text)
+      /a row in aeon's band-demo table or a binding \(a region row/.test(debugChord.text)
       && /fails loudly when it has neither/.test(debugChord.text)
       // HOVERED — the chord itself, and the fact the table is hand-typed. These
       // are what a programmer needs and an author does not, which is why the cut
@@ -641,7 +641,7 @@ async function main() {
       && /aeon 4aa2abc0/.test(debugChord.title),
       debugChord.missing ? 'NO ELEMENT LED "Seeing it is a debug chord." — the limit is gone'
         : `painted(${debugChord.text.length}B): `
-        + `rowOrBinding=${/a row in aeon's band-demo table or a section binding/.test(debugChord.text)} `
+        + `rowOrBinding=${/a row in aeon's band-demo table or a binding \(a region row/.test(debugChord.text)} `
         + `loudWhenNeither=${/fails loudly when it has neither/.test(debugChord.text)}; `
         + `hover(${debugChord.title.length}B): chord=${/START/.test(debugChord.title)} `
         + `handTyped=${/hand-typed dc\.l list/.test(debugChord.title)} `
