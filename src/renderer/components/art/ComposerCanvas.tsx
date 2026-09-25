@@ -17,7 +17,7 @@ import {
   recordComposerEdit, recordComposerSnapshot, takeComposerSnapshot,
 } from '../../state/composer-history';
 import {
-  chunkDocSyncKey, commitChunkDocStep, isChunkDocument, syncChunkDocFromLibrary,
+  chunkDocSyncKey, commitChunkDocStep, isChunkDocument, reconcileChunkDocDirty, syncChunkDocFromLibrary,
 } from '../../state/chunk-doc-commit';
 import type { ComposerSnapshot } from '../../../core/editing/composer-history';
 import { paintDocCollision, applyClipboardCollisionToDoc } from '../../../core/art/composer-collision';
@@ -260,6 +260,11 @@ export default function ComposerCanvas() {
    */
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { syncChunkDocFromLibrary(); }, chunkDocSyncKey(historyVersion, open));
+  // ...and on the same key, declared AFTER it so it runs once the document is
+  // rebuilt: an undo back to the saved state reads clean and a redo away from it
+  // reads dirty (ART-STROKE-FOLLOWUPS (c); the rule is at `reconcileChunkDocDirty`).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { reconcileChunkDocDirty(); }, chunkDocSyncKey(historyVersion, open));
 
   // ---------- resolved render inputs ----------
 

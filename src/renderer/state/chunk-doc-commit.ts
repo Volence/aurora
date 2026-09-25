@@ -51,7 +51,9 @@ import type { OpenDocument } from './artStore';
 import { useProjectStore, getActiveLevel, getCurrentZone } from './projectStore';
 import { executeCommand } from './editorStore';
 import { useToastStore } from './toastStore';
-import { docFromChunk, restoreComposerDoc, sliceForSave } from '../../core/art/composer-buffer';
+import {
+  cloneComposerDoc, docFromChunk, restoreComposerDoc, sameComposerCell, sliceForSave,
+} from '../../core/art/composer-buffer';
 import type { ComposerDoc } from '../../core/art/composer-buffer';
 import type { AnyCommand } from '../../core/editing/commands';
 import type { ChunkDef, Tile } from '../../core/model/s4-types';
@@ -262,6 +264,70 @@ export function syncChunkDocFromLibrary(): void {
     && sameWords(o!.doc.collisionB, chunk.collisionB)) return;
   restoreComposerDoc(o!.doc, docFromChunk(chunk));
   s.bumpDoc();
+}
+
+/**
+ * THE SAVED STATE OF EACH CLEAN CHUNK DOCUMENT, keyed by its buffer: what the
+ * document held when it was opened or last saved (Save re-opens, so a save
+ * mints a new buffer and a new entry). A WeakMap on `open.doc` because that
+ * buffer is a stable object for the life of one document (see
+ * `chunkDocSyncKey`) and every opener makes a fresh one.
+ */
+const savedChunkDocs = new WeakMap<ComposerDoc, ComposerDoc>();
+
+function sameDocContents(a: ComposerDoc, b: ComposerDoc): boolean {
+  if (a.widthTiles !== b.widthTiles || a.heightTiles !== b.heightTiles) return false;
+  if (a.cells.length !== b.cells.length) return false;
+  for (let i = 0; i < a.cells.length; i++) {
+    const ca = a.cells[i]; const cb = b.cells[i];
+    if (!sameComposerCell(ca, cb)) return false;
+    if (ca.localId !== null) {
+      const pa = a.localPixels.get(ca.localId); const pb = b.localPixels.get(cb.localId!);
+      if (!pa || !pb || pa.length !== pb.length) return false;
+      for (let k = 0; k < pa.length; k++) if (pa[k] !== pb[k]) return false;
+    }
+  }
+  return sameWords(a.collisionA, b.collisionA) && sameWords(a.collisionB, b.collisionB);
+}
+
+/**
+ * UNDO BACK TO THE SAVED STATE READS CLEAN, REDO AWAY FROM IT READS DIRTY
+ * (ART-STROKE-FOLLOWUPS (c)). The chunk document's half of the save contract's
+ * R5, which `state/composer-history.ts` states for the pure doc-local document.
+ *
+ * A chunk document's gestures are steps on the zone-art stack, and undoing one
+ * rewrites the library chunk, after which `syncChunkDocFromLibrary` rebuilds the
+ * document. `open.dirty` was set by the gesture (`markOpenDirty`) and nothing on
+ * that path cleared it, so a chunk undone back to exactly what was opened still
+ * read "unsaved" and the discard prompt still asked.
+ *
+ * WHAT "SAVED" MEANS HERE: the document's contents (nametable cells, local art,
+ * both collision planes) when it was first seen CLEAN. That is the same
+ * definition of dirty the gestures use: `markOpenDirty` is called for a write
+ * into the document, and NOT for a pixel edit of an atlas-backed cell (that is a
+ * tileset command, `ComposerCanvas.commitWrites`), so atlas pixels are not part
+ * of the comparison either.
+ *
+ * A document OPENED dirty (a map capture opens dirty on purpose, per
+ * `artStore.setOpenDirty`) never gets a saved state, so this never calls it
+ * clean; that is the setter's own rule.
+ *
+ * Call it where `syncChunkDocFromLibrary` is called, right after it: on the
+ * history clock and on a new document, never mid-gesture (the same reason, at
+ * `chunkDocSyncKey`). It only compares, so it cannot throw a stroke away.
+ */
+export function reconcileChunkDocDirty(): void {
+  const s = useArtStore.getState();
+  const o = s.open;
+  if (!isChunkDocument(o)) return;
+  const saved = savedChunkDocs.get(o!.doc);
+  if (!saved) {
+    if (!o!.dirty) savedChunkDocs.set(o!.doc, cloneComposerDoc(o!.doc));
+    return;
+  }
+  const atSaved = sameDocContents(o!.doc, saved);
+  if (o!.dirty === !atSaved) return;
+  s.setOpenDirty(!atSaved);
 }
 
 /**
