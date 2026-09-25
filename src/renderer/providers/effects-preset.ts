@@ -483,6 +483,17 @@ export function presetLimitsShort(): readonly PresetLimitShort[] {
  * a band — owner Aurora. Evaluate, do not obey: re-read that README at a
  * revision (`git show origin/master:docs/research/reference_captures/
  * 2026-08-30-sec5-band/README.md`), never by path into their working tree.
+ *
+ * WHO EVALUATES EACH CONDITION (ROADMAP row 212, 2026-09-25). Until then only
+ * the list's WORDING was tested. Now `band-preset-wording.test.ts` ("its
+ * EXPIRES conditions, evaluated against aeon origin/master") reads aeon's
+ * published tree every run: the directory-and-README condition in full, and
+ * the second-measurement condition by a proxy (exactly one capture README
+ * carries `VERDICT: BAND SEEN`) that a differently-worded second capture would
+ * slip past. THE AURORA-OWNED CONDITION ("this editor draws a band") HAS NO
+ * AUTOMATED READER: no source property here says so unambiguously, since the
+ * raster timeline draws where bands land and not their colour. Whoever adds a
+ * raster-band preview owes this sentence its retirement, by hand.
  */
 /**
  * The author's version of NO_PREVIEW — defect 3's cut, same rule as
