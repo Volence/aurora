@@ -5,9 +5,7 @@
  * assigned background, and the ref persists in the section's `.meta.json`
  * sidecar. All of that is real and none of it reaches a ROM: no aeon generator
  * reads `{zone}_bglib.json` or a sidecar's `bgLayoutRef` (the effects generator
- * says so explicitly, aeon `tools/EFFECTS_CONSUMER_CONTRACT.md:178`), and every
- * section of the shipped act still carries `sec_bg_layout: default` — "use the
- * act-wide BG" (aeon `games/sonic4/data/levels/ojz/act1/act_descriptor.emp:207`).
+ * says so explicitly in aeon `tools/EFFECTS_CONSUMER_CONTRACT.md` §2.2).
  * The background that DOES reach a ROM is the ACT-WIDE one, through
  * `{dataRoot}editor_bg_override.json` and aeon's `tools/inject_editor_bg.py`.
  *
@@ -38,10 +36,31 @@
  * a future change can close in one line rather than by re-authoring the words.
  */
 
+/*
+ * ⚠ REWRITTEN 2026-09-25 (ROADMAP row 212, EXPIRY-LISTS-WITH-NO-READER). The
+ * sentence said its evidence was that "every section of the shipped act still
+ * carries sec_bg_layout: default". aeon DELETED `Sec.sec_bg_layout` on
+ * 2026-09-16 (regions part 2 step 3; `engine/structs.emp`, Sec 26 -> 22), so an
+ * MCP tool description and two agent replies cited a field that no longer
+ * exists for nine days. The only automated reader was
+ * `expect(BG_SECTION_BINDING_LIMIT).toMatch(/sec_bg_layout: default/)`, green
+ * exactly while the clause was false and red on its repair. The conclusion (no
+ * aeon build reads a sidecar's bgLayoutRef) was and is TRUE; only the evidence
+ * rotted. It now names aeon's own statement of what its generator reads, and
+ * the command that checks it, and `agent-handler.bg-binding.test.ts` re-derives
+ * both halves from aeon origin/master: the contract sentence, and that no
+ * non-test aeon tool reads a quoted "bgLayoutRef" key.
+ *
+ * "section-mode" on the last clause is load-bearing: on a region-mode act
+ * (regions.json exists) aeon refuses a sidecar sceneRef, so assign_section_scene
+ * bakes nothing there either (its own description says so).
+ */
 export const BG_SECTION_BINDING_LIMIT =
   'This binding is an editor/preview assignment and stops at the editor\'s own files. '
-  + 'It persists in the section\'s .meta.json sidecar and the viewport composites it, but no aeon '
-  + 'generator reads a per-section bgLayoutRef and every section of the shipped act still carries '
-  + 'sec_bg_layout: default, so nothing bakes it into a ROM. The background that DOES reach a ROM '
+  + 'It persists in the section\'s .meta.json sidecar and the viewport composites it, but aeon\'s '
+  + 'build does not read a sidecar\'s bgLayoutRef, so nothing bakes it into a ROM. aeon\'s '
+  + 'tools/EFFECTS_CONSUMER_CONTRACT.md lists the sidecar keys its generator reads and says it does '
+  + 'not read bgLayoutRef; grep -n bgLayoutRef over that file at a committed aeon revision checks it '
+  + '(read at aeon a0c63764, 2026-09-25). The background that DOES reach a ROM '
   + 'is the ACT-WIDE one (set_bg without a name, then aeon\'s tools/inject_editor_bg.py). Unlike '
-  + 'assign_section_scene, which is baked.';
+  + 'a section-mode assign_section_scene, which is baked.';

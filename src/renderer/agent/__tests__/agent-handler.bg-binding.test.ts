@@ -2,8 +2,9 @@
 //
 // The assignment is real: the ref is written, one undo step, the sidecar
 // persists it, the viewport composites it. What no aeon generator does is read
-// it — every section of the shipped act still carries `sec_bg_layout: default`
-// — so an agent that reads `changed: true` and stops reasonably concludes the
+// it (aeon's EFFECTS_CONSUMER_CONTRACT.md says its generator does not read a
+// sidecar's bgLayoutRef; re-derived below) — so an agent that reads
+// `changed: true` and stops reasonably concludes the
 // background is in the game. That is this parcel's defect class in its fourth
 // costume, and the one that shows the class is not only about servers: a reply
 // that asserts an effect it cannot know reached anything.
@@ -28,6 +29,7 @@ import { documentHistoryHub } from '../../state/history-hub';
 import type { AgentRequest } from '../../../shared/agent-protocol';
 import type { Color } from '../../../core/model/s4-types';
 import { BG_SECTION_BINDING_LIMIT } from '../../../core/formats/bg-binding';
+import { peerRepo, resolveRev, readAtRev, grepAtRev } from '../../../../test/support/peer-repo';
 
 const black = (): Color => ({ r: 0, g: 0, b: 0, a: 255 });
 const line = () => ({ colors: Array.from({ length: 16 }, black) });
@@ -197,9 +199,84 @@ describe('the reply says where the success stops', () => {
     const l = await ask({ kind: 'list-bgs' }) as Record<string, unknown>;
     expect(a.binding).toBe(l.sectionBinding);
     expect(BG_SECTION_BINDING_LIMIT.length).toBeGreaterThan(80);
-    expect(BG_SECTION_BINDING_LIMIT).toMatch(/sec_bg_layout: default/);
     expect(BG_SECTION_BINDING_LIMIT).toMatch(/inject_editor_bg/);
     expect(BG_SECTION_BINDING_LIMIT).toMatch(/assign_section_scene/);
+  });
+});
+
+// ═══ THE SENTENCE'S CLAIMS ABOUT AEON, RE-DERIVED FROM AEON (ROADMAP row 212) ═══
+//
+// Until 2026-09-25 the row above also did
+// `expect(BG_SECTION_BINDING_LIMIT).toMatch(/sec_bg_layout: default/)`. aeon
+// deleted `Sec.sec_bg_layout` on 2026-09-16, so that pin was green for nine days
+// EXACTLY WHILE the clause it pinned was false, and would have gone red on the
+// repair. A wording pin holds a claim still; it does not read it. These rows read
+// it: every claim the sentence makes about aeon is re-derived from aeon's
+// PUBLISHED tree (origin/master, through git objects, never the working tree).
+// They redden on aeon's change, which is the point.
+//
+// LOUD ON UNMEASURABLE: no aeon checkout or no resolvable origin/master is a
+// `ctx.skip` naming what was looked for, never a pass.
+describe('BG_SECTION_BINDING_LIMIT: its claims about aeon, against aeon origin/master', () => {
+  const TIP = 'origin/master';
+  const CONTRACT = 'tools/EFFECTS_CONSUMER_CONTRACT.md';
+  /** A Python line that reads a quoted sidecar key: `"bgLayoutRef"` / `'bgLayoutRef'`. */
+  const quotedKey = (key: string) => `["']${key}["']`;
+  /** Non-test aeon tools, as pathspecs. Tests WRITE sidecar fixtures and are not readers. */
+  const TOOLS = ['tools/*.py', ':(exclude)tools/test_*.py'];
+
+  function aeonOrSkip(ctx: { skip: (why: string) => void }): string | null {
+    const repo = peerRepo('aeon');
+    if (repo === null) { ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo'); return null; }
+    if (resolveRev(repo, TIP) === null) { ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in aeon`); return null; }
+    return repo;
+  }
+
+  it('the sentence claims aeon\'s build does not read bgLayoutRef, and aeon\'s contract still says so', (ctx) => {
+    const repo = aeonOrSkip(ctx); if (repo === null) return;
+    expect(BG_SECTION_BINDING_LIMIT).toMatch(/does not read a sidecar's bgLayoutRef/);
+    const blob = readAtRev(repo, TIP, CONTRACT);
+    expect(blob.ok, blob.ok ? '' : blob.why).toBe(true);
+    expect((blob as { ok: true; text: string }).text,
+      `${CONTRACT} at aeon ${TIP} no longer says its generator does not read bgLayoutRef. `
+      + 'Re-read aeon: if a sidecar bgLayoutRef now bakes, BG_SECTION_BINDING_LIMIT is false.')
+      .toMatch(/does not read `bgLayoutRef`/);
+  });
+
+  it('no non-test aeon tool reads a quoted "bgLayoutRef" key (control: the same detector finds "rasterRef")', (ctx) => {
+    const repo = aeonOrSkip(ctx); if (repo === null) return;
+    const control = grepAtRev(repo, TIP, quotedKey('rasterRef'), TOOLS);
+    expect(control.ok, control.ok ? '' : control.why).toBe(true);
+    // The detector can see a key read: aeon's generator reads rasterRef.
+    expect((control as { ok: true; files: string[] }).files.length,
+      'the detector finds no quoted "rasterRef" in aeon tools either, so it cannot see a key read at all')
+      .toBeGreaterThan(0);
+    const g = grepAtRev(repo, TIP, quotedKey('bgLayoutRef'), TOOLS);
+    expect(g.ok, g.ok ? '' : g.why).toBe(true);
+    expect((g as { ok: true; files: string[] }).files,
+      'an aeon tool now reads a sidecar bgLayoutRef, so BG_SECTION_BINDING_LIMIT ("nothing bakes it") may be false')
+      .toEqual([]);
+  });
+
+  it('every aeon path it names exists, and every engine field it names is declared', (ctx) => {
+    const repo = aeonOrSkip(ctx); if (repo === null) return;
+    const paths = [...BG_SECTION_BINDING_LIMIT.matchAll(/\btools\/[A-Za-z0-9_./-]+\.(?:py|md)\b/g)].map((m) => m[0]);
+    expect(paths.length, 'the sentence names no aeon path, so this row measures nothing').toBeGreaterThan(0);
+    for (const p of paths) {
+      const b = readAtRev(repo, TIP, p);
+      expect(b.ok, `${p}: ${b.ok ? '' : b.why}`).toBe(true);
+    }
+    // An engine struct field (`sec_*`, `rg_*`, `act_*`) named in the sentence must
+    // be DECLARED in aeon's engine/structs.emp. This is the check that would have
+    // caught `sec_bg_layout` nine days after aeon deleted it.
+    const fields = [...BG_SECTION_BINDING_LIMIT.matchAll(/\b(?:sec|rg|act)_[a-z0-9_]+\b/g)].map((m) => m[0]);
+    const structs = readAtRev(repo, TIP, 'engine/structs.emp');
+    expect(structs.ok, structs.ok ? '' : structs.why).toBe(true);
+    const text = (structs as { ok: true; text: string }).text;
+    for (const f of fields) {
+      expect(new RegExp(`^\\s*${f}\\s*:`, 'm').test(text),
+        `BG_SECTION_BINDING_LIMIT names ${f}, which engine/structs.emp at aeon ${TIP} does not declare`).toBe(true);
+    }
   });
 });
 
