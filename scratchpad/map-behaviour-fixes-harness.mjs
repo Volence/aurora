@@ -28,6 +28,17 @@
 //            still carry the pressed word (cdp-sweep-4 section 5.4 O2 measured
 //            them taking the new one). BW.b, BW.c, BW.d are controls that hold
 //            with or without the latch; BW.a is the discriminating row.
+//   abw ABW.* ART-BRUSH-WORD-LATCH (hub ruling, empyrean OVERSEER-LOG
+//            2026-09-12T18:49:16Z, applying BRUSH-WORD-LATCH (a) to the Art
+//            facet): the Art facet's collision brush (ComposerCanvas) keeps
+//            the word it was pressed with. The composer's first chunk
+//            document (opened by the aeon open), the Collision paint tool and
+//            a shape button are armed by real clicks; the stroke is pressed on
+//            the composer canvas and HELD; real Tabs move focus to a shape
+//            button whose word differs and a real Space presses it; cells 3
+//            and 4 must still carry the pressed word. ABW.b, ABW.c, ABW.d
+//            are controls; ABW.a is the discriminating row. See
+//            docs/reviews/2026-09-25-art-brush-word-latch.md.
 //   m6  M6.*  a real stamp press under a still pointer names the placement it
 //            made, in the store and in the Chunk links readout, with no move.
 //
@@ -95,7 +106,7 @@ assertDebugBuild(RUN);
 const ELECTRON = RUN.electron;
 const MAIN = RUN.main;
 const PORT = Number(process.env.PORT ?? 9433);
-const ALL_PARTS = ['m1', 'm2', 'm4', 'bw', 'm6'];
+const ALL_PARTS = ['m1', 'm2', 'm4', 'bw', 'abw', 'm6'];
 const PARTS = (process.env.PART ?? 'all') === 'all' ? ALL_PARTS : String(process.env.PART).split(',');
 for (const p of PARTS) if (!ALL_PARTS.includes(p)) throw new Error(`PART ${p} is not one of ${ALL_PARTS.join(', ')}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -376,7 +387,7 @@ async function main() {
     await setup(d, A);
     const st0 = await d.strays();
     if (st0.length) check('SETUP.STRAY', 'no mouse event reached the page at a position this harness never sent', 'UNMEASURABLE', J(st0.slice(0, 10)));
-    const parts = { m1: m1Part, m2: m2Part, m4: m4Part, bw: bwPart, m6: m6Part };
+    const parts = { m1: m1Part, m2: m2Part, m4: m4Part, bw: bwPart, abw: abwPart, m6: m6Part };
     for (const p of ALL_PARTS) {
       if (!PARTS.includes(p)) continue;
       console.log(`\n════════ PART ${p} ════════`);
@@ -913,6 +924,169 @@ async function bwPart(d, O) {
   const w5 = await words();
   note('BW.cleanup', `after the control's Ctrl+Z the four cells ${same(w5, w0) ? 'match' : 'DIFFER FROM'} the start`);
   await d.blur();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PART abw. ART-BRUSH-WORD-LATCH: the Art facet's collision brush WORD is
+// latched at the press, as the map's is (PART bw). The composer's writer is a
+// different function from the map's (ComposerCanvas.applyTileCell, reached from
+// the hostPointer PixelViewport routes pointer events to), so PART bw says
+// nothing about it. The document is the chunk the aeon open put in the
+// composer (aeon-open.ts, `firstEditableChunk`); nothing is saved, and the
+// project is this run's copy. The composer canvas does not preventDefault its
+// press, so the press can take focus off the shape button the setup clicked:
+// the route is therefore "real Tabs until focus is on a shape button other
+// than the pressed one", every hop recorded, then one real Space.
+// Expected words: the tree's own `collisionPaintWord` over each cell's word
+// before the stroke.
+// ═══════════════════════════════════════════════════════════════════════════
+const COMPOSER_CANVAS = String.raw`([...document.querySelectorAll('canvas')].find((k) =>
+  k.parentElement && k.parentElement.style.margin === 'auto'
+  && k.parentElement.style.padding === '24px' && k.offsetParent !== null) || null)`;
+async function abwPart(d, O) {
+  const { c } = d;
+  await neutral(d);
+  // The document: a chunk with art, at least 8 tiles wide (four 16px cells in a
+  // row), opened by a REAL double-click on its Chunks grid thumbnail
+  // (ChunkGrid's onDoubleClick -> chunk-grid-aeon `openChunkInComposer`, which
+  // opens it in the composer and switches to the Art facet). The grid shows
+  // under the stamp tool, as PART m6 uses it.
+  await d.chord('k');
+  const CELLS = String.raw`[...document.querySelectorAll('button')].filter((b) => b.title && !/^tile /i.test(b.title) && !/blank/i.test(b.title)
+    && b.querySelector(':scope > canvas') && b.getBoundingClientRect().width > 0)`;
+  const nCells = await c.evalExpr(`${CELLS}.length`);
+  let X = null;
+  for (let n = 0; n < Math.min(nCells, 40) && !X; n++) {
+    const p = await d.realClick(`(${CELLS}[${n}] || null)`, { scroll: true });
+    const id = await c.json('window.__dbg.aeon.selectedChunk()');
+    const info = id ? await c.json(`window.__dbg.aeon.chunkInfo(${J(id)})`) : null;
+    if (p && p.hitOk && info && info.nonzeroTiles > 0 && info.widthTiles >= 8 && info.heightTiles >= 2) X = { id, info, aim: { x: p.x, y: p.y } };
+  }
+  if (X) {
+    // A real double-click: two presses, the second with clickCount 2.
+    const dbl = async (x, y) => {
+      SENT.add(`${x},${y}`);
+      await c.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'none', buttons: 0 });
+      for (const n of [1, 2]) {
+        await c.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: n });
+        await sleep(30);
+        await c.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: n });
+        await sleep(60);
+      }
+    };
+    await dbl(X.aim.x, X.aim.y);
+    await sleep(1200);
+  }
+  const facet = { hitOk: (await c.json('window.__dbg.aeon.artChunkOpen()'))?.chunkId === X?.id && !!X, chunk: X, gridCells: nCells };
+  const tool = await d.realClick('document.querySelector(\'button[aria-label="Collision paint"]\')');
+  await sleep(600);
+  const doc = await c.json('window.__dbg.aeon.artChunkOpen()');
+  const planeA = await d.realClick(d.BTN_IN('Plane', 'A'), { scroll: true });
+  const shape = await d.realClick(SHAPE_N(3), { scroll: true });
+  await sleep(200);
+  const G = await c.json(String.raw`(() => { const cv = ${COMPOSER_CANVAS}; if (!cv) return null; const b = cv.getBoundingClientRect();
+    return { x: b.left, y: b.top, w: b.width, h: b.height, cw: cv.width, ch: cv.height, dpr: window.devicePixelRatio }; })()`);
+  const brush = await brushRead(d);
+  const setupOk = !!facet?.hitOk && !!tool?.hitOk && !!planeA?.hitOk && !!shape?.hitOk && !!doc && doc.chunkId !== null
+    && doc.tool === 'collision' && !!G && brush.plane === 'a' && brush.word !== 0;
+  const zoom = G && doc ? G.cw / (doc.widthTiles * 8) : null;
+  const cellsW = doc ? doc.widthTiles >> 1 : 0; const cellsH = doc ? doc.heightTiles >> 1 : 0;
+  /** Integer aim at the centre of composer cell (cx, cy), the cell derived back
+   *  from that integer, and whether the point is on the composer canvas. */
+  const aimCell = async (cx, cy) => {
+    const x = Math.round(G.x + (cx * 16 + 8) * zoom); const y = Math.round(G.y + (cy * 16 + 8) * zoom);
+    const back = { cx: Math.floor((x - G.x) / zoom / 16), cy: Math.floor((y - G.y) / zoom / 16) };
+    const on = await c.evalExpr(`document.elementFromPoint(${x}, ${y}) === ${COMPOSER_CANVAS}`);
+    return { x, y, back, on };
+  };
+  let cells = null; let aims = null;
+  if (setupOk && Number.isInteger(zoom) && zoom >= 1 && cellsW >= 4) {
+    for (let cy = 0; cy < cellsH && !cells; cy++) {
+      for (let cx = 0; cx + 4 <= cellsW && !cells; cx++) {
+        const a = [];
+        for (let k = 0; k < 4; k++) a.push(await aimCell(cx + k, cy));
+        if (a.every((p, k) => p.on && p.back.cx === cx + k && p.back.cy === cy)) { cells = [0, 1, 2, 3].map((k) => ({ cx: cx + k, cy })); aims = a; }
+      }
+    }
+  }
+  if (!cells) {
+    check('ABW.0', 'PREMISE: the Art facet, the Collision paint tool, Plane A and a shape armed by real clicks on a chunk document, and four cells in a row on the composer canvas, each aimed at an integer client pixel on that cell', 'UNMEASURABLE',
+      `facet ${J(facet)}; tool ${J(tool)}; doc ${J(doc)}; planeA ${J(planeA)}; shape ${J(shape)}; canvas ${J(G)} zoom ${zoom}; brush ${J(brush)}`);
+    return;
+  }
+  const idx = cells.map((q) => q.cy * cellsW + q.cx);
+  const words = () => c.json(String.raw`(() => { const a = window.__dbg.aeon; const idx = ${J(idx)};
+    return { a: idx.map((i) => a.artDocCollisionAt('a', i)), b: idx.map((i) => a.artDocCollisionAt('b', i)) }; })()`);
+  const w0 = await words();
+  const expectA = (W) => w0.a.map((old) => O.paintWord(W, old));
+  const W1 = (await brushRead(d)).word;
+  const f0 = await focusShape(d);
+  await d.clicksDrain();
+  await d.mouse('mouseMoved', aims[0].x, aims[0].y);
+  await d.mouse('mousePressed', aims[0].x, aims[0].y, 'left', 1); await sleep(80);
+  await d.mouse('mouseMoved', aims[1].x, aims[1].y, 'left', 1); await sleep(150);
+  const w1 = await words();
+  const fHeld = await focusShape(d);
+  // Real Tabs until focus is on a shape button other than the pressed one.
+  // Bounded; every hop is recorded. A Tab presses nothing (checked below).
+  const hops = [];
+  let fTab = fHeld;
+  for (let n = 0; n < 60; n++) {
+    await d.tab();
+    fTab = await focusShape(d);
+    hops.push(fTab.shape ? `shape#${fTab.index}` : (fTab.body ? 'BODY' : `${fTab.tag}:${fTab.title ?? ''}`));
+    if (fTab.shape && fTab.index !== f0.index) break;
+  }
+  const tabClicks = await d.clicksDrain();
+  await d.space();
+  const spaceClicks = await d.clicksDrain();
+  const W2 = (await brushRead(d)).word;
+  const G1 = await c.json(String.raw`(() => { const cv = ${COMPOSER_CANVAS}; if (!cv) return null; const b = cv.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; })()`);
+  const unmoved = !!G1 && Math.abs(G1.x - G.x) < 0.01 && Math.abs(G1.y - G.y) < 0.01 && Math.abs(G1.w - G.w) < 0.01 && Math.abs(G1.h - G.h) < 0.01;
+  const u1 = O.unpack(W1); const u2 = O.unpack(W2);
+  const differs = Object.keys(u1).filter((k) => u1[k] !== u2[k]);
+  const shapeClick = spaceClicks.some((k) => /^#\d+/.test(k.title || ''));
+  const premise = unmoved && f0.shape && fTab.shape && fTab.index !== f0.index && tabClicks.length === 0 && shapeClick && W2 !== W1
+    && !same(expectA(W2), expectA(W1))
+    && same(w1.a.slice(0, 2), expectA(W1).slice(0, 2));
+  check('ABW.0', 'PREMISE: on the composer\'s chunk document, with the stroke HELD (cells 1 and 2 painted with the pressed word W1), real Tabs moved focus to ANOTHER shape button (no Tab clicked anything) and a real Space pressed it (a click reached a shape button), so the store now selects a word W2 that paints differently (ANTI-VACUOUS); the canvas did not move',
+    premise, `dpr ${G.dpr}; canvas ${J(G)} zoom ${zoom}; doc ${J(doc)}; cells ${J(cells)} idx ${J(idx)}; aims ${J(aims)}; `
+    + `focus after setup ${J(f0)}, while held ${J(fHeld)}, Tab hops ${J(hops)}, final ${J(fTab)}; clicks during Tabs ${J(tabClicks)}; clicks the Space produced ${J(spaceClicks)}; `
+    + `W1 ${W1} ${J(u1)} -> W2 ${W2} ${J(u2)} (fields that differ ${J(differs)}); A cells 1,2 after the press ${J(w1.a.slice(0, 2))} (before ${J(w0.a.slice(0, 2))}); canvas unmoved ${unmoved}`);
+  await d.mouse('mouseMoved', aims[2].x, aims[2].y, 'left', 1); await sleep(150);
+  await d.mouse('mouseMoved', aims[3].x, aims[3].y, 'left', 1); await sleep(150);
+  await d.mouse('mouseReleased', aims[3].x, aims[3].y, 'left', 0); await sleep(400);
+  const w2 = await words();
+  if (premise) {
+    check('ABW.a', 'the word picked MID-DRAG does not change the composer stroke: cells 3 and 4, painted AFTER the Space, carry the word LATCHED at the press (W1) like cells 1 and 2, not W2',
+      same(w2.a, expectA(W1)),
+      `A cells 1..4 ${J(w2.a)}; W1 paints ${J(expectA(W1))}; the live word W2 would paint ${J(expectA(W2))}`);
+    check('ABW.b', 'CONTROL (green with or without the latch): cells 1 and 2, painted BEFORE the Space, carry W1, and plane B is untouched',
+      same(w2.a.slice(0, 2), expectA(W1).slice(0, 2)) && same(w2.b, w0.b),
+      `A cells 1,2 ${J(w2.a.slice(0, 2))}; B ${J(w2.b)}; B before ${J(w0.b)}`);
+  }
+  await d.blur();
+  await d.chord('z', CTRL);
+  await sleep(300);
+  const w3 = await words();
+  if (premise) {
+    check('ABW.c', 'CONTROL: the stroke is ONE undo step: one Ctrl+Z puts both planes of the four cells back exactly',
+      same(w3.a, w0.a) && same(w3.b, w0.b), `after one Ctrl+Z ${J(w3)}; before ${J(w0)}`);
+  }
+  await d.mouse('mouseMoved', aims[0].x, aims[0].y);
+  await d.mouse('mousePressed', aims[0].x, aims[0].y, 'left', 1); await sleep(80);
+  await d.mouse('mouseReleased', aims[0].x, aims[0].y, 'left', 0); await sleep(400);
+  const w4 = await words();
+  if (premise) {
+    check('ABW.d', 'CONTROL: the NEXT press takes the word picked during the last stroke: a click on cell 1 paints it with W2, and cells 2 to 4 stay as they were',
+      w4.a[0] === expectA(W2)[0] && same(w4.a.slice(1), w0.a.slice(1)),
+      `A cells 1..4 ${J(w4.a)}; W2 paints ${expectA(W2)[0]} on cell 1; cells 2..4 before ${J(w0.a.slice(1))}`);
+  }
+  await d.blur();
+  await d.chord('z', CTRL);
+  await sleep(300);
+  const w5 = await words();
+  note('ABW.cleanup', `after the control's Ctrl+Z the four cells ${same(w5, w0) ? 'match' : 'DIFFER FROM'} the start`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

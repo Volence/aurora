@@ -1,0 +1,67 @@
+run dev1 PART=abw start 07:01:14Z load 11.66 16.62 12.77
+node --check ok
+copy /tmp/claude-1000/-home-volence-sonic-hacks-aurora/018119fd-1390-4542-8d96-96728556d717/scratchpad/aeon-copy-dev1-292773 273M
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a8734cd086fe87bd6
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a8734cd086fe87bd6
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a8734cd086fe87bd6 — dist/main/index.mjs is 195s newer than the newest of 1016 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a8734cd086fe87bd6/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a8734cd086fe87bd6/src/renderer/components/art/ComposerCanvas.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-25T07:01:11.163Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-25T07:01:11.163Z), so window.__dbg is in this bundle
+=== map-behaviour-fixes 2026-09-12 harness ===
+    uptime       : 03:01:16 up 1 day, 16:02,  1 user,  load average: 11.66, 16.62, 12.77
+    PARTS        : abw
+    node         : v24.15.0
+    root         : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a8734cd086fe87bd6
+    in-tree      : yes (the tree under test is /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a8734cd086fe87bd6; this file lives in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a8734cd086fe87bd6)
+    ORACLE_SOCKET: /tmp/mbfix-sock-C3ftt8/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-297389-cbb7e321
+    PORT         : 9433   DISPLAY: xvfb-run -a (never :0)
+    oracle       : literals from HEAD b43f26f4d9b7705e65df18a112855c37aff37dd2; collision-paint, collision-cell, s4-types, collision-word, collision-cell-word bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a8734cd086fe87bd6/src; brush sizes [1,7,15,25]; section 256x256 tiles
+    harness      : blob 00a531046065380ed2a1473d7579c3689f5ea13b (DIFFERS from HEAD's 673b939abe3833d898b4cfa60baeedfd6a920466)
+    src on disk  : identical to HEAD
+    aeon source  : AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/018119fd-1390-4542-8d96-96728556d717/scratchpad/aeon-copy-dev1-292773   (live sibling /home/volence/sonic_hacks/aeon: refused if equal)
+    copy         : /tmp/mbfix-aeon-et0XX8   project "Sonic 4"
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 1444352 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 1444352,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 1444352 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 1444352,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-297389-cbb7e321 — see HAZARD 6
+    X pointer    : PARKED outside the window: display :128 (Xvfb pid 298544); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed   click log: installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1, by a real click on its Explorer row   [load 13.67/16.87/12.89]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row "Oracle Jungle Zone · act1" aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+════════ PART abw ════════
+UNMS  [ABW.0] PREMISE: the Art facet, the Collision paint tool, Plane A and a shape armed by real clicks on a chunk document, and four cells in a row on the composer canvas, each aimed at an integer client pixel on that cell   [load 15.62/17.22/13.03]
+        facet {"x":702,"y":54,"hitOk":true,"dpr":1,"rect":{"x":683.11,"y":44.5,"w":38.06,"h":18}}; tool {"x":262,"y":414,"hitOk":true,"dpr":1,"rect":{"x":247.5,"y":400,"w":28,"h":28}}; doc null; planeA null; shape null; canvas null zoom null; brush {"plane":"a","bothPlanes":false,"crossover":"keep","crossoverSpanMode":"cell","word":0}
+NOTE  [abw.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 298533 (11 process(es)):
+           298533 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           298544 Xvfb :128 -screen 0 1680x1050x24 -nolisten tcp
+           311612 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           311626 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           311903 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           311908 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           311996 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           312681 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           312701 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           312734 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           312788 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server still up, tree gone in 52 ms; teardown 402 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: X artifacts reaped (1): /tmp/xvfb-run.BzQpvh/
+
+════ PARTS=abw: 1/2 rows PASS · 0 FAIL · 1 UNMEASURABLE · 16.7s ════
+     uptime at end 03:01:32 up 1 day, 16:02,  1 user,  load average: 15.62, 17.22, 13.03
+UNMEASURABLE:
+  [ABW.0] PREMISE: the Art facet, the Collision paint tool, Plane A and a shape armed by real clicks on a chunk document, and four cells in a row on the composer canvas, each aimed at an integer client pixel on that cell
+END-OF-RUN
+harness exit 1
+copy removed: yes
+run dev1 end 07:01:33Z load 15.62 17.22 13.03
+RUN-HELPER-END

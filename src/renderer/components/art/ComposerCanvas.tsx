@@ -138,6 +138,17 @@ export default function ComposerCanvas() {
   const hoverRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   /** Last cell touched by a tile-space drag (Bresenham fill between samples). */
   const lastTileCellRef = useRef<{ cx: number; cy: number } | null>(null);
+  /** The collision brush WORD (shape, the picked entry's mirror flag, Flip H,
+   *  Flip V and the floor type, packed by `selectedCollisionWord`), latched at
+   *  the collision press (hub ruling ART-BRUSH-WORD-LATCH, empyrean
+   *  OVERSEER-LOG 2026-09-12T18:49:16Z, applying BRUSH-WORD-LATCH (a) of
+   *  09:39:48Z: "the word latches at the press, as size does"). It used to be
+   *  built from the store per cell, so a shape, flip or floor type picked
+   *  mid-drag (Space on a focused palette button) painted the rest of the
+   *  stroke with another word. The map's twin is MapViewport's
+   *  `paintBrushWord`. `null` means no collision press has latched one on this
+   *  mount: see `applyTileCell`. */
+  const paintBrushWord = useRef<number | null>(null);
   const [selection, setSelection] = useState<SelRect | null>(null);
   const selectionRef = useRef<SelRect | null>(null);
   selectionRef.current = selection;
@@ -393,6 +404,17 @@ export default function ComposerCanvas() {
     useArtStore.getState().bumpDoc();
   }
 
+  /** The collision brush word the palette selects NOW. Called by the collision
+   *  press, which latches it (`paintBrushWord`), and by `applyTileCell`'s
+   *  no-press fallback. */
+  function brushWordNow(): number {
+    const est = useEditorStore.getState();
+    return selectedCollisionWord({
+      shape: est.selectedCollisionProfile, entryFlipX: est.selectedCollisionEntryFlipX,
+      userXFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
+    });
+  }
+
   /** Apply one tile-space tool action to a doc cell (stamp / collision /
    *  palette-apply). */
   function applyTileCell(t: 'tile-stamp' | 'collision' | 'palette-apply', cx: number, cy: number) {
@@ -435,13 +457,18 @@ export default function ComposerCanvas() {
       if (!applyPaletteLineToDocCell(doc, cx, cy, useArtStore.getState().paletteLine)) return;
     } else {
       // Same packed-word pattern as MapViewport.paintCollisionCell — one palette
-      // drives both surfaces via selectedCollisionWord.
-      const est = useEditorStore.getState();
-      const word = selectedCollisionWord({
-        shape: est.selectedCollisionProfile, entryFlipX: est.selectedCollisionEntryFlipX,
-        userXFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
-      });
-      if (!paintDocCollision(doc, est.collisionPaintPlane, cx, cy, word)) return;
+      // drives both surfaces via selectedCollisionWord, and on both the word is
+      // the one LATCHED at the press (`paintBrushWord`, ART-BRUSH-WORD-LATCH),
+      // not the store's live selection: a shape, flip or floor type picked
+      // mid-drag waits for the next stroke. The corner HUD chip still reads the
+      // live selection, because it describes the NEXT press. `?? brushWordNow()`
+      // answers only a drag this mount never pressed with the collision tool (a
+      // tile-space stroke whose tool changed under the held button): it paints
+      // the live selection, as every cell did before the latch, never a made-up
+      // air word that would erase. The PLANE is still read per cell: it is not
+      // part of the word, and the ruling latches the word.
+      const word = paintBrushWord.current ?? brushWordNow();
+      if (!paintDocCollision(doc, useEditorStore.getState().collisionPaintPlane, cx, cy, word)) return;
     }
     // Past every early return, so the write LANDED: bank the drag's pre-gesture
     // snapshot as one undo step. `commitTileGestureStep` is idempotent within a
@@ -575,6 +602,7 @@ export default function ComposerCanvas() {
           return;
         }
         const cx = p.x >> 3, cy = p.y >> 3;
+        if (t === 'collision') paintBrushWord.current = brushWordNow(); // shape, flip, floor type (ART-BRUSH-WORD-LATCH)
         beginTileGesture();
         applyTileCell(t, cx, cy);
         lastTileCellRef.current = { cx, cy };
