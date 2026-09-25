@@ -1,0 +1,110 @@
+start 09:53:20Z
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a323cc4453f3854fa
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a323cc4453f3854fa
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a323cc4453f3854fa — dist/main/index.mjs is 8s newer than the newest of 1024 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a323cc4453f3854fa/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a323cc4453f3854fa/src/renderer/workspace/facets/art-facet.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-25T09:53:20.423Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-25T09:53:20.423Z), so window.__dbg is in this bundle
+=== map-behaviour-fixes 2026-09-12 harness ===
+    uptime       : 05:53:20 up 1 day, 18:54,  1 user,  load average: 8.08, 11.14, 16.23
+    PARTS        : aob
+    node         : v24.15.0
+    root         : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a323cc4453f3854fa
+    in-tree      : yes (the tree under test is /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a323cc4453f3854fa; this file lives in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a323cc4453f3854fa)
+    ORACLE_SOCKET: /tmp/mbfix-sock-2m9LnO/o.sock   (private; made by this run)
+    profile      : /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-2020540-7a118fc5
+    PORT         : 9433   DISPLAY: xvfb-run -a (never :0)
+    oracle       : literals from HEAD e0f5ea860310386350cf8da9558b52f0fa88fd4c; collision-paint, collision-cell, s4-types, collision-word, collision-cell-word bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a323cc4453f3854fa/src; brush sizes [1,7,15,25]; section 256x256 tiles
+    harness      : blob 8d731737a45cdc44aae19921fcc56247bf049cf9 (as committed at HEAD)
+    src on disk  : DIFFERS FROM HEAD (a mutation?):
+                   M  src/renderer/components/ui/primitives.tsx
+                   M  src/renderer/shell/ArtToolOptions.tsx
+                   MM src/renderer/workspace/facets/art-facet.tsx
+    aeon source  : AEON_DIR=/tmp/claude-1000/-home-volence-sonic-hacks-aurora/e92b8955-2a0d-40d8-b3bd-4c15ca1e75dd/scratchpad/aeon-src   (live sibling /home/volence/sonic_hacks/aeon: refused if equal)
+    copy         : /tmp/mbfix-aeon-wTecrA   project "Sonic 4"
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 3072542 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 3072542,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 3072542 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 3072542,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/map-behaviour-fixes-harness-2020540-7a118fc5 — see HAZARD 6
+    X pointer    : PARKED outside the window: display :159 (Xvfb pid 2020597); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed   click log: installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1, by a real click on its Explorer row   [load 7.90/11.01/16.13]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row "Oracle Jungle Zone · act1" aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+════════ PART aob ════════
+   rail from HEAD: ["pencil","eraser","fill","eyedropper","line","rect","select","dither","tile-stamp","collision","palette-apply"]; warning from HEAD: "pixel edits to existing tiles propagate everywhere they're used"; document reached by double-click on the Chunks grid: {"chunkId":"OJZ_01","name":"OJZ $01","widthTiles":16,"heightTiles":16,"dirty":false,"tool":"pencil","brushTile":0,"stampPriority":"keep"}
+   CENSUS [full window] window 1400x872 dpr 1
+     pencil         store tool pencil         bar h 37 New… y 83  canvas {"x":308,"y":135,"w":1024,"h":1024}  bar scroll/client w 1160/1160 overflow-x visible (scrollbar+border 1)  tallest item {"h":34,"t":"OJZ $01⚠ pixel edits to "}
+     eraser         store tool eraser         bar h 37 New… y 83  canvas {"x":308,"y":135,"w":1024,"h":1024}  bar scroll/client w 1160/1160 overflow-x visible (scrollbar+border 1)  tallest item {"h":34,"t":"OJZ $01⚠ pixel edits to "}
+     fill           store tool fill           bar h 37 New… y 83  canvas {"x":308,"y":135,"w":1024,"h":1024}  bar scroll/client w 1160/1160 overflow-x visible (scrollbar+border 1)  tallest item {"h":34,"t":"OJZ $01⚠ pixel edits to "}
+     eyedropper     store tool eyedropper     bar h 37 New… y 83  canvas {"x":308,"y":135,"w":1024,"h":1024}  bar scroll/client w 1160/1160 overflow-x visible (scrollbar+border 1)  tallest item {"h":34,"t":"OJZ $01⚠ pixel edits to "}
+     line           store tool line           bar h 37 New… y 83  canvas {"x":308,"y":135,"w":1024,"h":1024}  bar scroll/client w 1160/1160 overflow-x visible (scrollbar+border 1)  tallest item {"h":34,"t":"OJZ $01⚠ pixel edits to "}
+     rect           store tool rect           bar h 37 New… y 83  canvas {"x":308,"y":135,"w":1024,"h":1024}  bar scroll/client w 1160/1160 overflow-x visible (scrollbar+border 1)  tallest item {"h":34,"t":"OJZ $01⚠ pixel edits to "}
+     select         store tool select         bar h 37 New… y 83  canvas {"x":308,"y":135,"w":1024,"h":1024}  bar scroll/client w 1160/1160 overflow-x visible (scrollbar+border 1)  tallest item {"h":34,"t":"OJZ $01⚠ pixel edits to "}
+     dither         store tool dither         bar h 60 New… y 94.5  canvas {"x":308,"y":158,"w":1024,"h":1024}  bar scroll/client w 1160/1160 overflow-x visible (scrollbar+border 1)  tallest item {"h":57,"t":"OJZ $01⚠ pixel edits to "}
+     tile-stamp     store tool tile-stamp     bar h 46 New… y 87.5  canvas {"x":308,"y":144,"w":1024,"h":1024}  bar scroll/client w 1160/1160 overflow-x visible (scrollbar+border 1)  tallest item {"h":43,"t":"OJZ $01⚠ pixel edits to "}
+     collision      store tool collision      bar h 37 New… y 83  canvas {"x":308,"y":135,"w":1024,"h":1024}  bar scroll/client w 1160/1160 overflow-x visible (scrollbar+border 1)  tallest item {"h":34,"t":"OJZ $01⚠ pixel edits to "}
+     palette-apply  store tool palette-apply  bar h 74 New… y 101.5  canvas {"x":308,"y":172,"w":1024,"h":1024}  bar scroll/client w 1160/1160 overflow-x visible (scrollbar+border 1)  tallest item {"h":71,"t":"OJZ $01⚠ pixel edits to "}
+PASS  [AOB.0] PREMISE (full window): every one of the 11 rail tools (HEAD's ArtToolDock TOOLS table) was armed by a real click on its rail button, and the store's tool read back after each click is that tool: the census really switched tools   [load 7.57/10.78/15.97]
+        ["pencil -> pencil","eraser -> eraser","fill -> fill","eyedropper -> eyedropper","line -> line","rect -> rect","select -> select","dither -> dither","tile-stamp -> tile-stamp","collision -> collision","palette-apply -> palette-apply"]
+FAIL  [AOB.a] (full window) the options bar's height, the composer canvas rect and the bar's own New… button (its items do not jump inside it) are the SAME under every rail tool   [load 7.57/10.78/15.97]
+        bar heights {"pencil":37,"eraser":37,"fill":37,"eyedropper":37,"line":37,"rect":37,"select":37,"dither":60,"tile-stamp":46,"collision":37,"palette-apply":74}; canvas y {"pencil":135,"eraser":135,"fill":135,"eyedropper":135,"line":135,"rect":135,"select":135,"dither":158,"tile-stamp":144,"collision":135,"palette-apply":172}; New… top {"pencil":83,"eraser":83,"fill":83,"eyedropper":83,"line":83,"rect":83,"select":83,"dither":94.5,"tile-stamp":87.5,"collision":83,"palette-apply":101.5}
+PASS  [AOB.b] CONTROL (full window): nothing is silently cut: under every tool the bar's content either fits its width or the bar scrolls it (overflow-x auto or scroll)   [load 7.57/10.78/15.97]
+        tools whose content is wider than the bar: none; of those without a scrolling bar: []
+FAIL  [AOB.t] the shared-tile warning's FULL sentence (HEAD's SharedTileWarning.tsx) is reachable on hover (title) and by assistive tech (aria-label), whatever the bar shows   [load 7.57/10.78/15.97]
+        warning {"text":"⚠ pixel edits to existing tiles propagate everywhere they're used","title":null,"aria":null,"h":71}; the sentence "pixel edits to existing tiles propagate everywhere they're used"
+FAIL  [AOB.w] the FIRST write to a clean chunk document (one real Tile stamp click that changed a tile and dirtied the document) moves neither the options bar's height nor the composer canvas   [load 7.57/10.78/15.97]
+        dpr 1; tile {"tx":0,"ty":0} aim (340,176) {"t":0,"hf":false,"vf":true} -> {"t":0,"hf":false,"vf":false}; dirty true; bar h 46 -> 88; canvas {"x":308,"y":144,"w":1024,"h":1024} -> {"x":308,"y":186,"w":1024,"h":1024}
+NOTE  [AOB.w.cleanup] after one Ctrl+Z the tile matches its start; dirty false
+   narrow window by Emulation.setDeviceMetricsOverride (Browser.setWindowBounds refused: Browser.getWindowForTarget: {"code":-32601,"message":"'Browser.getWindowForTarget' wasn't found"}): innerWidth 1100
+   CENSUS [1100 wide] window 1100x872 dpr 1
+     pencil         store tool pencil         bar h 116 New… y 122.5  canvas {"x":308,"y":214,"w":1024,"h":1024}  bar scroll/client w 983/860 overflow-x visible (scrollbar+border 1)  tallest item {"h":113,"t":"OJZ $01⚠ pixel edits to "}
+     eraser         store tool eraser         bar h 116 New… y 122.5  canvas {"x":308,"y":214,"w":1024,"h":1024}  bar scroll/client w 921/860 overflow-x visible (scrollbar+border 1)  tallest item {"h":113,"t":"OJZ $01⚠ pixel edits to "}
+     fill           store tool fill           bar h 116 New… y 122.5  canvas {"x":308,"y":214,"w":1024,"h":1024}  bar scroll/client w 921/860 overflow-x visible (scrollbar+border 1)  tallest item {"h":113,"t":"OJZ $01⚠ pixel edits to "}
+     eyedropper     store tool eyedropper     bar h 116 New… y 122.5  canvas {"x":308,"y":214,"w":1024,"h":1024}  bar scroll/client w 921/860 overflow-x visible (scrollbar+border 1)  tallest item {"h":113,"t":"OJZ $01⚠ pixel edits to "}
+     line           store tool line           bar h 116 New… y 122.5  canvas {"x":308,"y":214,"w":1024,"h":1024}  bar scroll/client w 983/860 overflow-x visible (scrollbar+border 1)  tallest item {"h":113,"t":"OJZ $01⚠ pixel edits to "}
+     rect           store tool rect           bar h 116 New… y 122.5  canvas {"x":308,"y":214,"w":1024,"h":1024}  bar scroll/client w 921/860 overflow-x visible (scrollbar+border 1)  tallest item {"h":113,"t":"OJZ $01⚠ pixel edits to "}
+     select         store tool select         bar h 116 New… y 122.5  canvas {"x":308,"y":214,"w":1024,"h":1024}  bar scroll/client w 921/860 overflow-x visible (scrollbar+border 1)  tallest item {"h":113,"t":"OJZ $01⚠ pixel edits to "}
+     dither         store tool dither         bar h 116 New… y 122.5  canvas {"x":308,"y":214,"w":1024,"h":1024}  bar scroll/client w 1095/860 overflow-x visible (scrollbar+border 1)  tallest item {"h":113,"t":"OJZ $01⚠ pixel edits to "}
+     tile-stamp     store tool tile-stamp     bar h 116 New… y 122.5  canvas {"x":308,"y":214,"w":1024,"h":1024}  bar scroll/client w 1089/860 overflow-x visible (scrollbar+border 1)  tallest item {"h":113,"t":"OJZ $01⚠ pixel edits to "}
+     collision      store tool collision      bar h 116 New… y 122.5  canvas {"x":308,"y":214,"w":1024,"h":1024}  bar scroll/client w 921/860 overflow-x visible (scrollbar+border 1)  tallest item {"h":113,"t":"OJZ $01⚠ pixel edits to "}
+     palette-apply  store tool palette-apply  bar h 116 New… y 122.5  canvas {"x":308,"y":214,"w":1024,"h":1024}  bar scroll/client w 1109/860 overflow-x visible (scrollbar+border 1)  tallest item {"h":113,"t":"OJZ $01⚠ pixel edits to "}
+PASS  [AOB.N.0] PREMISE (1100 wide): every one of the 11 rail tools (HEAD's ArtToolDock TOOLS table) was armed by a real click on its rail button, and the store's tool read back after each click is that tool: the census really switched tools   [load 7.25/10.60/15.86]
+        ["pencil -> pencil","eraser -> eraser","fill -> fill","eyedropper -> eyedropper","line -> line","rect -> rect","select -> select","dither -> dither","tile-stamp -> tile-stamp","collision -> collision","palette-apply -> palette-apply"]
+PASS  [AOB.N.a] (1100 wide) the options bar's height, the composer canvas rect and the bar's own New… button (its items do not jump inside it) are the SAME under every rail tool   [load 7.25/10.60/15.86]
+        bar heights {"pencil":116,"eraser":116,"fill":116,"eyedropper":116,"line":116,"rect":116,"select":116,"dither":116,"tile-stamp":116,"collision":116,"palette-apply":116}; canvas y {"pencil":214,"eraser":214,"fill":214,"eyedropper":214,"line":214,"rect":214,"select":214,"dither":214,"tile-stamp":214,"collision":214,"palette-apply":214}; New… top {"pencil":122.5,"eraser":122.5,"fill":122.5,"eyedropper":122.5,"line":122.5,"rect":122.5,"select":122.5,"dither":122.5,"tile-stamp":122.5,"collision":122.5,"palette-apply":122.5}
+FAIL  [AOB.N.b] CONTROL (1100 wide): nothing is silently cut: under every tool the bar's content either fits its width or the bar scrolls it (overflow-x auto or scroll)   [load 7.25/10.60/15.86]
+        tools whose content is wider than the bar: pencil 983/860, eraser 921/860, fill 921/860, eyedropper 921/860, line 983/860, rect 921/860, select 921/860, dither 1095/860, tile-stamp 1089/860, collision 921/860, palette-apply 1109/860; of those without a scrolling bar: ["pencil visible","eraser visible","fill visible","eyedropper visible","line visible","rect visible","select visible","dither visible","tile-stamp visible","collision visible","palette-apply visible"]
+NOTE  [AOB.restore] window back to 1400x872 (was 1400x872)
+NOTE  [AOB.s] NOT DRIVEN: none of this project's 71 library chunks has an all-zero nametable, so the shared-tile warning cannot APPEAR on a first write here (O3 is NOT MEASURED by this run, neither green nor red)
+NOTE  [aob.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 2020587 (11 process(es)):
+           2020587 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           2020597 Xvfb :159 -screen 0 1680x1050x24 -nolisten tcp
+           2022309 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/tmp/auro
+           2022317 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/tmp/
+           2022320 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2022336 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2022338 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           2022365 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2022372 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           2022374 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           2022377 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 49 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 349 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=aob: 5/9 rows PASS · 4 FAIL · 0 UNMEASURABLE · 37.2s ════
+     uptime at end 05:53:57 up 1 day, 18:55,  1 user,  load average: 7.07, 10.51, 15.80
+FAILING:
+  [AOB.a] (full window) the options bar's height, the composer canvas rect and the bar's own New… button (its items do not jump inside it) are the SAME under every rail tool
+  [AOB.t] the shared-tile warning's FULL sentence (HEAD's SharedTileWarning.tsx) is reachable on hover (title) and by assistive tech (aria-label), whatever the bar shows
+  [AOB.w] the FIRST write to a clean chunk document (one real Tile stamp click that changed a tile and dirtied the document) moves neither the options bar's height nor the composer canvas
+  [AOB.N.b] CONTROL (1100 wide): nothing is silently cut: under every tool the bar's content either fits its width or the bar scrolls it (overflow-x auto or scroll)
+END-OF-RUN
+end 09:53:57Z exit 1
