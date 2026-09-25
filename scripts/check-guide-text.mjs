@@ -297,7 +297,6 @@ const NOT_A_LABEL = [
   { text: 'Sec.sec_effects', kind: 'aeon identifier' },
   { text: 'ojz_act1_preset_raster(preset: <Record>_KEY)', kind: 'aeon build message, quoted (re-derived from aeon by guide-aeon-quote.test.ts)' },
   { text: 'ojz_water_tint', kind: 'project data: an id the reader invents' },
-  { text: 'OJZ_Preset_Plain', kind: 'project data: an aeon preset record' },
   { text: 'Authored probe (red / blue)', kind: 'project data: a shipped preset document' },
   { text: '0x', kind: 'a hex prefix, in prose' },
   { text: '0000 BBB0 GGG0 RRR0', kind: 'a bit layout, in prose' },
