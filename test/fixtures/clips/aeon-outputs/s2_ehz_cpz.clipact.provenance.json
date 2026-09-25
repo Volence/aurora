@@ -1,0 +1,20 @@
+{
+  "$what": "Provenance of s2_ehz_cpz.clipact.json: an OUTPUT of aeon's own tools/clip_act_bake.py, captured from a real run, vendored for the donor page's row-213 readers (ROADMAP row 213, docs/reviews/2026-09-25-donor-clip-asks.md). Not a committed aeon file, so it is pinned by the revision and the command that produced it.",
+  "$why": "the unit rows read aeon's answers, not numbers typed by hand: the per-clip rows, their field list (the file's own pool.per_clip_fields) and every refusal/crash shape are aeon's. The opt-in fidelity rig (test/live/donor-fidelity.test.ts) re-runs the same tools at aeon origin/master and holds the vendored per_clip_fields to the live bake's, so a change in aeon's contract reds there.",
+  "aeon": {
+    "repo": "git@github.com:Volence/aeon.git",
+    "branch_that_answers_currency": "origin/master",
+    "revision": "a0c63764eac113f5da35b01f40d0d6b5933a2cb1",
+    "revision_is": "aeon origin/master tip, read 2026-09-25 after the fetch. tools/clip_act_bake.py and tools/clip_manifest.py were last changed at e6daa4dbcec19dc776523ac995cad861f33e500e (git log -1 a0c63764 -- <both>), inside the landing 1d9afb25; a0c63764 itself changes only docs.",
+    "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob and revision here (and in the sibling markers of test/fixtures/clips/aeon-outputs/)",
+    "materialised_by": "git -C <aeon> archive a0c63764 | tar -x into a scratch directory; EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 0 differing)",
+    "tool_path": "tools/clip_act_bake.py",
+    "tool_blob": "30829555a860695b57183171e5c775973cbd23e0"
+  },
+  "fixture": {
+    "path": "test/fixtures/clips/aeon-outputs/s2_ehz_cpz.clipact.json",
+    "command": "python3 tools/clip_act_bake.py bake games/sonic4/data/clips/s2_ehz_cpz/clips.json --out <scratch>/bake_s2_ehz_cpz (exit 0); the clipact.json it wrote, verbatim",
+    "why_this_one": "the corridor act, and the one where a page is shared (page 7 touched by ehz_act1, cpz_act1 and the corridor): pages_touched sums to 16 against a 14-page pool",
+    "sha256": "d39c379187e63caf7a024e52582dc78b0fe94cb501182eb4fb21c7eaeb050e93"
+  }
+}

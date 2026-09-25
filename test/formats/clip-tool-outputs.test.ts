@@ -1,6 +1,6 @@
 /**
  * The donor page's readers of aeon's two row-213 answers, held against aeon's
- * OWN outputs (test/fixtures/clips/aeon-outputs/, see its provenance file):
+ * OWN outputs (test/fixtures/clips/aeon-outputs/, each with its .provenance.json):
  *
  *   * `clipact.json` pool rows (clipact-pool.ts): every expected number and
  *     every expected field name is READ from a clipact.json aeon's bake wrote,
@@ -10,12 +10,14 @@
  *     The expected rule and subjects are read from aeon's own stdout, and the
  *     crash cases are aeon's real tracebacks.
  *
- * A currency row pins the two tools that produced the fixtures by blob at aeon
- * origin/master (through git objects, never the working tree), so a change in
- * aeon's contract is named here, not discovered on the page.
+ * Currency rows pin each fixture's bytes to its marker's sha256, and the tool
+ * that produced it by blob at aeon origin/master (through git objects, never
+ * the working tree), so a change in aeon's contract is named here, not
+ * discovered on the page.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { POOL_ROW_FIELDS, readPoolRows } from '../../src/core/formats/donors/clipact-pool';
 import { readValidateJson, subjectsLabel, VALIDATE_JSON_SCHEMA } from '../../src/core/formats/donors/clip-validate-json';
@@ -27,9 +29,9 @@ const clipact = (name: string) => JSON.parse(readFileSync(resolve(DIR, `${name}.
   clips: { id: string }[]; corridors: { id: string }[];
 };
 const CASES = JSON.parse(readFileSync(resolve(DIR, 'validate-json.cases.json'), 'utf8')) as Record<string, { exit: number; stdout: string; stderr: string }>;
-const PROV = JSON.parse(readFileSync(resolve(DIR, 'aeon-outputs.provenance.json'), 'utf8')) as {
-  aeon: { revision: string; tool_blobs: Record<string, string>; re_measure: string };
-};
+interface Marker { aeon: { revision: string; tool_path: string; tool_blob: string; re_measure: string }; fixture: { path: string; sha256: string } }
+const MARKERS = ['s2_ehz_cpz.clipact', 's2_two_clip.clipact', 'validate-json.cases'].map((stem) =>
+  JSON.parse(readFileSync(resolve(DIR, `${stem}.provenance.json`), 'utf8')) as Marker);
 const REAL = ['s2_ehz_cpz', 's2_two_clip'];
 
 describe('pool rows: read from a clipact.json aeon\'s bake wrote', () => {
@@ -212,25 +214,31 @@ describe('validate --json: accepted, refused and CRASHED are three answers', () 
 });
 
 describe('CURRENCY: the tools that produced these fixtures, at aeon origin/master', () => {
-  for (const [path, blob] of Object.entries(PROV.aeon.tool_blobs)) {
-    it(`${path} at aeon origin/master is the blob the fixtures were captured from`, (ctx) => {
-      expect(blob).toMatch(/^[0-9a-f]{40}$/);
+  for (const m of MARKERS) {
+    it(`${m.fixture.path}: its bytes are the ones the marker hashed`, () => {
+      const got = createHash('sha256').update(readFileSync(resolve(__dirname, '../..', m.fixture.path))).digest('hex');
+      expect(got).toBe(m.fixture.sha256);
+    });
+
+    it(`${m.fixture.path}: ${m.aeon.tool_path} at aeon origin/master is the blob it was captured from`, (ctx) => {
+      expect(m.aeon.tool_blob).toMatch(/^[0-9a-f]{40}$/);
       const aeon = peerRepo('aeon');
       if (aeon === null) {
-        ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR); CANNOT MEASURE whether ${path} is still blob ${blob}`);
+        ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR); CANNOT MEASURE whether ${m.aeon.tool_path} is still blob ${m.aeon.tool_blob}`);
         return;
       }
       const tip = resolveRev(aeon, 'origin/master');
       if (tip === null) {
-        ctx.skip(`SKIPPED, NOT PASSED: origin/master does not resolve in ${aeon}; CANNOT MEASURE ${path}'s currency`);
+        ctx.skip(`SKIPPED, NOT PASSED: origin/master does not resolve in ${aeon}; CANNOT MEASURE ${m.aeon.tool_path}'s currency`);
         return;
       }
-      const at = readAtRev(aeon, tip, path);
+      const at = readAtRev(aeon, tip, m.aeon.tool_path);
       expect(at.ok, at.ok ? '' : at.why).toBe(true);
       if (!at.ok) return;
-      process.stdout.write(`clip-tool-outputs currency: ${path} at aeon origin/master ${tip} is blob ${at.blob}; pinned ${blob}\n`);
-      expect(at.blob, 'NOT AN AURORA REGRESSION: aeon\'s clip tool moved since these outputs were captured.\n'
-        + `  pinned ${blob} (aeon ${PROV.aeon.revision}); origin/master ${tip} has ${at.blob}\n  Re-measure: ${PROV.aeon.re_measure}`).toBe(blob);
+      process.stdout.write(`clip-tool-outputs currency: ${m.aeon.tool_path} at aeon origin/master ${tip} is blob ${at.blob}; pinned ${m.aeon.tool_blob}\n`);
+      expect(at.blob, 'NOT AN AURORA REGRESSION: aeon\'s clip tool moved since this output was captured.\n'
+        + `  pinned ${m.aeon.tool_blob} (aeon ${m.aeon.revision}); origin/master ${tip} has ${at.blob}\n  Re-measure: ${m.aeon.re_measure}`)
+        .toBe(m.aeon.tool_blob);
     });
   }
 });

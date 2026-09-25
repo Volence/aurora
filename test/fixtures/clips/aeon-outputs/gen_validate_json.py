@@ -1,4 +1,4 @@
-# Regenerates validate-json.cases.json (see aeon-outputs.provenance.json).
+# Regenerates validate-json.cases.json (see validate-json.cases.provenance.json).
 # Run FROM a materialised aeon copy (git archive of a named revision, donors converted
 # with `tools/s2_zone_convert.py convert --all-six`):
 #   EMPYREAN_SUITE_ROOT=<suite> python3 <this file> <scratch dir> <bundle out path>
