@@ -109,7 +109,7 @@
       0
     ],
     "rung": "searched",
-    "seconds": 0.103,
+    "seconds": 0.163,
     "stats": {
       "refine_rounds": [
         {
@@ -125,7 +125,7 @@
           "sample_over_target_after": 0,
           "sample_over_target_before": 180,
           "sample_windows": 4096,
-          "seconds": 0.072,
+          "seconds": 0.113,
           "stride": [
             8,
             4
