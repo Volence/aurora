@@ -183,6 +183,25 @@ describe('undo puts the file back exactly', () => {
   });
 });
 
+describe('undo of a paste that CREATED the manifest', () => {
+  it('REFUSES to remove the file once someone else changed it: the delete channel has no guard of its own', async () => {
+    // The row the guarded-write rows above cannot be: a restore is a guarded
+    // write and would conflict by itself, but a removal goes through deleteFile,
+    // which takes no expected mtime. The page's own mtime check is the ONLY
+    // thing standing between an undo and deleting someone else's edit.
+    const disk: Disk = { files: new Map(), clock: 100 };
+    const p = ports(disk);
+    usePasteStore.getState().newAct('fx_act', 1, 2);
+    await usePasteStore.getState().paste(CLIP, p);
+    const path = 'games/sonic4/data/clips/fx_act/clips.json';
+    disk.files.set(path, { text: 'edited by hand', mtimeMs: 999 });
+    const u = await usePasteStore.getState().undo(p);
+    expect(u?.kind).toBe('conflict');
+    expect(p.deletes).toEqual([]);
+    expect(disk.files.get(path)!.text).toBe('edited by hand');
+  });
+});
+
 describe('Ctrl+Z on the Donors facet reaches the paste, not the act', () => {
   it('focusedDocId names the paste stack on the donors facet and the act on layout; that stack holds the paste', async () => {
     const { focusedDocId, focusedHistory } = await import('../editorStore');
