@@ -622,11 +622,17 @@ export default function RegionsPanel(): React.ReactElement {
           {state.kind === 'none' && (
             // "NO FILE" AND "A FILE AURORA REFUSED" ARE DIFFERENT SCREENS. This
             // is the first: nothing on disk, and a save creates nothing.
+            // ROADMAP row 212 (2026-09-25): this hint said regions also arrive
+            // "from painting (step 8, not built yet)". Step 8 shipped the region
+            // rectangle, and over an act with no document it toasts
+            // NO_REGIONS_HERE (map-region-gesture.ts) and makes nothing, so the
+            // clause was false on both halves. It now says what the map does,
+            // which is the same fact NO_REGIONS_HERE states from the other side.
             <>
               <Hint style={{ marginBottom: T.s2 }}>
                 {state.actId} has no regions.json. Regions arrive from
-                &quot;Migrate sections&quot; below, or from painting (step 8,
-                not built yet).
+                &quot;Migrate sections&quot; below; the map&apos;s region
+                rectangle reshapes regions that exist and cannot make the first.
               </Hint>
               <MigrateSections onOutcome={setOutcome} />
             </>
