@@ -72,6 +72,14 @@ LIMITS, stated rather than left to be discovered
   stuck red announces itself and a silent green does not, so the set keying is kept and
   the twins limit is the price. Both discriminating cases are canaries in the gate
   (K6h, K6i), so a later swap to counting cannot pass unnoticed.
+* A `+` line BYTE-IDENTICAL to a `-` line in the SAME commit's diff is not an appearance
+  (added 2026-09-25). That is how git renders an end-of-file newline change: a ledger whose
+  last line was committed without `\n` shows that untouched line as `-L` / `+L` in the next
+  append's diff, and reading `+L` as an appearance made every later append a collision
+  (aurora 62bfcd6d then 769aafb2). Pairing is one-to-one within one commit; it never
+  crosses commits, so K6h's remove-then-restore-later stays red, and an edit that changes
+  any byte pairs with nothing. Skips are counted on the SAME-COMMIT RE-ADDS line of every
+  run. Canaries K8a-K8d in the gate pin both directions.
 * A repair commit that alters an entry's `at` is indistinguishable from a new entry. That
   is correct: changing a stamp IS the thing being audited.
 * A squashed or rewritten history moves committer times, so deltas after a rebase describe
@@ -189,8 +197,11 @@ def parse_at(value: str) -> datetime | None:
         return None
 
 
-def collect(repo: str, ledger: str) -> tuple[list[dict], list[dict], list[dict]]:
-    """Return (judged, duplicates, unparsed) for the ledger, keyed on first appearance.
+def collect(repo: str, ledger: str) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+    """Return (judged, duplicates, unparsed, readds) for the ledger, keyed on first appearance.
+
+    `readds` are `+` lines cancelled by an identical `-` line in the SAME commit's diff; see
+    the note inside the loop. They are not appearances, and they are counted, not dropped.
 
     Every record carries the COMMITTER TIME of the commit it came from (`ctime`), which
     `--since` filters on. That is the commit's time, never the entry's own `at`; see the
@@ -207,6 +218,7 @@ def collect(repo: str, ledger: str) -> tuple[list[dict], list[dict], list[dict]]
     judged: list[dict] = []
     duplicates: list[dict] = []
     unparsed: list[dict] = []
+    readds: list[dict] = []
 
     for line in log.split("\n"):
         sha, ctime_raw = line.split()
@@ -219,8 +231,29 @@ def collect(repo: str, ledger: str) -> tuple[list[dict], list[dict], list[dict]]
         diff = git(repo, "show", sha, "--format=", "--unified=0", "--diff-merges=off",
                    "--", ledger)
 
+        # SAME-COMMIT IDENTICAL RE-ADDS ARE NOT APPEARANCES. When the ledger's last line
+        # has no trailing newline, the next append makes git render that untouched line as
+        # `-L` / `\ No newline at end of file` / `+L`: byte-identical content on both sides
+        # of ONE commit's diff. Counting that `+L` as an appearance made the untouched entry
+        # a SECOND in-scope appearance of its own stamp (aurora 769aafb2 on top of 62bfcd6d,
+        # measured 2026-09-25), so every later append would red the gate. The same holds for
+        # a pure move inside one commit. Pairing is ONE-TO-ONE (a multiset): each `-L`
+        # cancels at most one `+L`, so a commit that turns one L into two still books the
+        # extra copy as an appearance. Scope is deliberately ONE commit: a line removed in
+        # one commit and restored in a LATER one is still an appearance (K6h stays red).
+        # A `-old` / `+new` edit that changes any byte, the `at` included, pairs with
+        # nothing and is judged exactly as before. Every skip is counted and printed.
+        removed: dict[str, int] = {}
+        for dline in diff.split("\n"):
+            if dline.startswith("-") and not dline.startswith("---"):
+                removed[dline[1:]] = removed.get(dline[1:], 0) + 1
+
         for dline in diff.split("\n"):
             if not dline.startswith("+") or dline.startswith("+++"):
+                continue
+            if removed.get(dline[1:], 0) > 0:
+                removed[dline[1:]] -= 1
+                readds.append({"sha": sha[:8], "ctime": ctime, "text": dline[1:][:100]})
                 continue
             try:
                 entry = json.loads(dline[1:])
@@ -261,7 +294,7 @@ def collect(repo: str, ledger: str) -> tuple[list[dict], list[dict], list[dict]]
                 "label": label_of(entry),
             })
 
-    return judged, duplicates, unparsed
+    return judged, duplicates, unparsed, readds
 
 
 def label_of(entry: dict) -> str:
@@ -333,7 +366,7 @@ def main() -> int:
                 f"in UTC and a naive cutoff cannot be placed against them."
             )
 
-    judged_all, duplicates, unparsed = collect(args.repo, args.ledger)
+    judged_all, duplicates, unparsed, readds = collect(args.repo, args.ledger)
     if not judged_all:
         die_unmeasurable(
             f"{args.ledger} in {args.repo} yielded no entries carrying an `at` field, so "
@@ -415,6 +448,13 @@ def main() -> int:
           f"appearance, {unjudged} NOT JUDGED ({len(duplicates)} repeated stamps, "
           f"{len(unparsed)} unparseable)  (threshold {args.threshold:g}s"
           f"{', strict-ahead' if args.strict_ahead else ''})")
+    # Printed on EVERY run, zero included, so the exclusion below is never invisible.
+    readds_scope = [r for r in readds if in_scope(r)]
+    print(f"  SAME-COMMIT RE-ADDS: {len(readds)} `+` line(s) byte-identical to a `-` line in "
+          f"the SAME commit's diff (an end-of-file newline change, or a move) were NOT "
+          f"treated as appearances"
+          + (f"; {len(readds_scope)} of them in scope" if since is not None else "")
+          + ". Pairing is one-to-one and never crosses commits.")
     if since is not None:
         print(f"  RATCHET: cutoff {since.isoformat().replace('+00:00', 'Z')} on COMMITTER "
               f"TIME (not on `at`). {len(judged)} entr{'y' if len(judged) == 1 else 'ies'} "

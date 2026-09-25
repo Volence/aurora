@@ -131,6 +131,18 @@
  *       WOULD cover this one; K6h is the price of counting, and a stuck red announces
  *       itself where a silent green does not. Written up under LIMITS in the audit;
  *       asserted here so K6d is not read as covering it.
+ *   K8a an entry committed WITHOUT a trailing newline, then one entry appended: exit 0,
+ *       both judged, and "SAME-COMMIT RE-ADDS: 1". git renders the untouched last line as
+ *       `-L` / `+L` in the append's diff; the audit used to read `+L` as a second in-scope
+ *       appearance of its stamp and red the gate. It happened here (62bfcd6d left the EOF
+ *       bare, 769aafb2's append went red, 2026-09-25).
+ *   K8b the same bed with the appended entry remembered: exit 1. The exclusion does not
+ *       swallow the line next to it.
+ *   K8c the bare-EOF entry EDITED in place to a remembered stamp: exit 1. `-old` / `+new`
+ *       differ, so nothing pairs; only a byte-identical line is a re-add.
+ *   K8d the bare-EOF line re-added TWICE in one commit: exit 1. Pairing is one-to-one, so
+ *       the extra copy is still an appearance and still collides. K6h is the cross-commit
+ *       counterpart: removed in one commit and restored in a LATER one stays red.
  *   K7  a ledger path git does not track: exit 2, and the gate treats 2 as FAILURE. A
  *       gate that cannot see is not a gate that passed.
  *
@@ -261,7 +273,10 @@ function bed(commits) {
       if (c.rewrite) body.pop();
       body.push(...c.lines);
     }
-    writeFileSync(join(dir, BED_LEDGER), `${body.join('\n')}\n`);
+    // `noEol: true` writes the file WITHOUT its trailing newline, the shape aurora's own
+    // lane-log was left in by 62bfcd6d. The next commit's diff then shows the untouched
+    // last line as `-` and `+` with identical content, which is what K8a-K8d are about.
+    writeFileSync(join(dir, BED_LEDGER), `${body.join('\n')}${c.noEol ? '' : '\n'}`);
     git('add', BED_LEDGER);
     execFileSync('git', ['-C', dir, 'commit', '-q', '-m', `at ${c.at}`], {
       env: { ...env, GIT_AUTHOR_DATE: c.at, GIT_COMMITTER_DATE: c.at },
@@ -522,6 +537,67 @@ const CASES = [
     fires: ['duplicate-in-scope'],
   },
   {
+    // THE END-OF-FILE NEWLINE. The ledger's last entry was committed with no trailing
+    // newline, then a later commit appends one entry. git renders the untouched line as
+    // `-L`, `\ No newline at end of file`, `+L`, and the audit used to read that `+L` as a
+    // SECOND in-scope appearance of L's stamp: exit 1, "TWO IN-SCOPE ENTRIES SHARE ONE
+    // STAMP", on a repo where nothing is wrong. Measured on aurora itself 2026-09-25
+    // (62bfcd6d left the EOF bare; 769aafb2's append then red the gate). "2 entries IN
+    // SCOPE" is the proof the NEW entry was judged and not swallowed along with the re-add.
+    name: 'K8a an append after an entry committed WITHOUT a trailing newline: exit 0',
+    commits: [OLD_BAD,
+      { at: T(3, 9, 0), lines: [line(T(3, 9, 0), 'no-eol')], noEol: true },
+      { at: T(4, 9, 0), lines: [line(T(4, 9, 0), 'after-eol')] }],
+    args: gateArgs(CANARY_SINCE),
+    status: 0,
+    want: ['2 entries IN SCOPE', 'SAME-COMMIT RE-ADDS: 1 ', '1 of them in scope'],
+    absent: ['TWO IN-SCOPE ENTRIES SHARE ONE STAMP', 'DUPLICATE STAMPS', 'OVER THRESHOLD'],
+    fires: ['same-commit-readd'],
+  },
+  {
+    // ...and the exclusion must not swallow the entry appended NEXT TO it. The same bed
+    // with a remembered stamp on the new entry: still judged at its own commit, exit 1.
+    name: 'K8b the entry appended after a bare EOF is still judged: a bad one fails',
+    commits: [OLD_BAD,
+      { at: T(3, 9, 0), lines: [line(T(3, 9, 0), 'no-eol')], noEol: true },
+      { at: T(4, 9, 0), lines: [line(T(4, 8, 40), 'after-eol-bad')] }],
+    args: gateArgs(CANARY_SINCE),
+    status: 1,
+    want: ['OVER THRESHOLD (1)', T(4, 8, 40), 'SAME-COMMIT RE-ADDS: 1 '],
+    absent: ['TWO IN-SCOPE ENTRIES SHARE ONE STAMP'],
+    fires: ['over-threshold', 'same-commit-readd'],
+  },
+  {
+    // AN IN-PLACE EDIT IS NOT A RE-ADD. The bare-EOF entry is corrected in place with a
+    // stamp that is itself remembered: `-old` / `+new` differ (in their `at`), so nothing
+    // pairs and the replacement is judged at its own commit, as K6c's is. A pairing keyed
+    // on anything looser than the whole line (the stamp, the headline) would pass this.
+    name: 'K8c a bare-EOF entry EDITED in place to a remembered stamp: exit 1, judged',
+    commits: [OLD_BAD,
+      { at: T(3, 9, 0), lines: [line(T(3, 9, 0), 'no-eol')], noEol: true },
+      { at: T(4, 9, 0), lines: [line(T(4, 8, 40), 'no-eol')], rewrite: true }],
+    args: gateArgs(CANARY_SINCE),
+    status: 1,
+    want: ['OVER THRESHOLD (1)', T(4, 8, 40), 'SAME-COMMIT RE-ADDS: 0 '],
+    absent: [],
+    fires: ['over-threshold'],
+  },
+  {
+    // PAIRING IS ONE-TO-ONE. The bare-EOF line L is kept AND a byte-identical second copy
+    // appended in the same commit: `-L` / `+L` / `+L`. One `+L` is the re-add; the other
+    // is a real second appearance of L's stamp and must still collide. A pairing by SET
+    // (any `+` whose text was removed at all) cancels both and goes silently green here.
+    name: 'K8d a bare-EOF line re-added TWICE in one commit: one pairs, the copy collides',
+    commits: [OLD_BAD,
+      { at: T(3, 9, 0), lines: [line(T(3, 9, 0), 'no-eol')], noEol: true },
+      { at: T(4, 9, 0), lines: [line(T(3, 9, 0), 'no-eol')] }],
+    args: gateArgs(CANARY_SINCE),
+    status: 1,
+    want: ['TWO IN-SCOPE ENTRIES SHARE ONE STAMP (1)', 'SAME-COMMIT RE-ADDS: 1 '],
+    absent: [],
+    fires: ['duplicate-in-scope', 'same-commit-readd'],
+  },
+  {
     name: 'K7 a ledger git does not track: exit 2, which this gate treats as FAILURE',
     commits: [OLD_BAD],
     ledger: 'docs/not-tracked.jsonl',
@@ -546,6 +622,10 @@ const RULES_EXERCISED = [
   // unreachable until 2026-09-03: a repeated stamp whose own line has been corrected away
   // stops failing, and is counted and printed rather than dropped.
   'duplicate-withdrawn',
+  // A `+` line cancelled by an identical `-` line in the SAME commit (the end-of-file
+  // newline case) is counted and not booked as an appearance. Its count line must have
+  // been seen non-zero on some case, or the exclusion is invisible.
+  'same-commit-readd',
 ];
 
 function runCanaries() {
