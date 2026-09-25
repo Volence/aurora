@@ -1,0 +1,19 @@
+{
+  "$what": "Provenance of s2_two_clip.clips.json: aeon's committed clip manifest games/sonic4/data/clips/s2_two_clip/clips.json, vendored verbatim for the S2 donor page (ROADMAP row 211, docs/reviews/2026-09-25-s2-donor-page.md).",
+  "$why_this_one": "the PROMINENT fixture: the one aeon's spec names, carrying the explanatory note. BOTH of its clips carry `region_id` (ehz_s2, cpz_s2), so a reader built against it alone assumes presence. It is here as the PRESENT case, beside s2_two_clip_pins, which is the absent case.",
+  "aeon": {
+    "repo": "git@github.com:Volence/aeon.git",
+    "path": "games/sonic4/data/clips/s2_two_clip/clips.json",
+    "branch_that_answers_currency": "origin/master",
+    "revision": "0aa5e10600ed91731625f3d9f68311990dd4e9de",
+    "blob": "2ff33b48aff412945e1e57777ff01cac29008403",
+    "revision_is": "the LAST commit that touched the path on origin/master (git log -1 origin/master -- <path>), read 2026-09-25 after a fetch at aeon origin/master f4f1a32e40b6377d557f4f67fd8cec9278d5df5a; not a tip and not a merge."
+  },
+  "fixture": {
+    "path": "test/fixtures/clips/s2_two_clip.clips.json",
+    "bytes": 1126,
+    "sha256": "b9511d4bafedf2ccdffd850195b0ca31e0295108e702297f27fa5caa52440f0d",
+    "git_blob": "2ff33b48aff412945e1e57777ff01cac29008403"
+  },
+  "re_vendor": "node scripts/revendor.mjs test/fixtures/clips/s2_two_clip.clips.json test/fixtures/clips/s2_two_clip.clips.provenance.json <AEON_DIR> games/sonic4/data/clips/s2_two_clip/clips.json <the commit git log names>"
+}

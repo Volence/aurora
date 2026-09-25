@@ -148,6 +148,7 @@
     "harness:d27-effects-focus": "node scratchpad/d27-effects-focus-harness.mjs",
     "harness:d27-four-survivors": "node scratchpad/d27-four-survivors-harness.mjs",
     "harness:d27-sprite-focus": "node scratchpad/d27-sprite-focus-harness.mjs",
+    "harness:donor-page": "node scratchpad/donor-page-harness.mjs",
     "harness:delete-refusal-onscreen": "node scratchpad/delete-refusal-onscreen-harness.mjs",
     "harness:region-mode-advice-onscreen": "node scratchpad/region-mode-advice-onscreen-harness.mjs",
     "harness:deleted-scene-returns": "node scratchpad/deleted-scene-returns-harness.mjs",

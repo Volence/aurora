@@ -29,6 +29,12 @@ import { isBlockAligned, effectiveGranularity } from '../core/editing/map-clipbo
 import { COLLISION_CELL_OWNED_MASK, COLLISION_CELL_UNOWNED_MASK } from '../core/editing/collision-word';
 import { lastPasteGhostReport, type PasteGhostReport } from './canvas/region-preview';
 import { useSessionStore } from './state/sessionStore';
+import { useDonorStore } from './state/donorStore';
+import { usePasteStore } from './state/donor-paste';
+import { useDonorDraft } from './state/donor-draft';
+import { lastZonePaneReport } from './components/donors/ZonePane';
+import { lastDonorComposeReport } from './components/donors/DonorsCanvas';
+import { lastTargetComposeReport } from './components/donors/DonorTargetPane';
 import { useWorkspaceStore } from './workspace/workspaceStore';
 import { switchFacet } from './workspace/facet-tools';
 import type { FacetCapability } from '../core/project/adapter';
@@ -1833,6 +1839,56 @@ function installCanvasProbe(): CanvasProbeApi {
   };
 }
 
+interface DonorProbeState {
+  listing: unknown;
+  listingError: string | null;
+  selected: { donor: string; zone: string } | null;
+  zone: { donor: string; zone: string; cols: number; rows: number; cropPx: unknown } | null;
+  zoneError: string | null;
+  marquee: unknown;
+  donorCompose: unknown;
+  donorPane: unknown;
+  targetPane: unknown;
+  targetCompose: unknown;
+  paste: {
+    acts: string[] | null; target: { actId: string; path: string; clips: string[]; onDisk: boolean } | null;
+    busy: boolean; outcome: unknown; undo: number; redo: number; baked: boolean; bakeNote: string | null;
+  };
+  draft: { clipId: string; dst: unknown; mode: string; reason: string };
+  focusedDocId: string | null;
+}
+
+function donorProbeState(): DonorProbeState {
+  const d = useDonorStore.getState();
+  const p = usePasteStore.getState();
+  const dr = useDonorDraft.getState();
+  return {
+    listing: d.listing,
+    listingError: d.listingError,
+    selected: d.selected,
+    zone: d.zone ? {
+      donor: d.zone.manifest.donor, zone: d.zone.manifest.zone, cols: d.zone.cols, rows: d.zone.rows,
+      cropPx: d.zone.manifest.cropPx,
+    } : null,
+    zoneError: d.zoneError,
+    marquee: d.marquee,
+    donorCompose: lastDonorComposeReport(),
+    donorPane: lastZonePaneReport('donor'),
+    targetPane: lastZonePaneReport('target'),
+    targetCompose: lastTargetComposeReport(),
+    paste: {
+      acts: p.acts,
+      target: p.target ? {
+        actId: p.target.actId, path: p.target.path, clips: p.target.doc.clips.map((c) => c.id), onDisk: p.target.onDisk !== null,
+      } : null,
+      busy: p.busy, outcome: p.outcome, undo: p.undoStack.length, redo: p.redoStack.length,
+      baked: p.baked !== null, bakeNote: p.bakeNote,
+    },
+    draft: { clipId: dr.clipId, dst: dr.dst, mode: dr.mode, reason: dr.reason },
+    focusedDocId: focusedDocId(),
+  };
+}
+
 interface DebugApi {
   openDir(dir: string): Promise<string>;
   projStatus(): { status: string; zones: number };
@@ -1911,6 +1967,13 @@ interface DebugApi {
   classic: ClassicProbeApi;
   /** The aeon read-only query surface + its open door — see AeonProbeApi. */
   aeon: AeonProbeApi;
+  /**
+   * The Donors facet, READ-ONLY: what it listed, drew and wrote, and the two
+   * panes' view transforms, so a harness can aim integer client pixels at world
+   * points and derive back what it hit. Every gesture on the page is a real
+   * Input event; nothing here opens, marquees or pastes.
+   */
+  donors: { state(): DonorProbeState };
   /** Task 14 (origination canvas) read-only query surface — see CanvasProbeApi. */
   canvas: CanvasProbeApi;
   /**
@@ -2303,6 +2366,7 @@ export function installDebugHooks(): void {
     resetAct: () => useProjectStore.setState({ currentActId: null }),
     perf: () => ({ marks: [], readCount: 0, readTotalMs: 0, mtimeCount: 0, mtimeTotalMs: 0 }),
     aeon: installAeonProbe(),
+    donors: { state: donorProbeState },
     classic: installClassicProbe(),
     canvas: installCanvasProbe(),
     setPaintColor: (v) => useArtStore.getState().setSelectedColor(v),

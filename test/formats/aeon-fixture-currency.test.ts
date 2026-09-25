@@ -89,6 +89,14 @@ const VENDORED: Vendored[] = [
   // leaves from another is a number no build ever computed.
   'regions/act-constants/act_descriptor.emp',
   'regions/act-constants/engine_constants.emp',
+  // aeon's CLIP MANIFESTS, vendored 2026-09-25 for the S2 donor page (ROADMAP
+  // row 211). Three, because each carries a case the other two cannot:
+  // s2_two_clip has `region_id` on every clip, s2_two_clip_pins on none (the
+  // absent case the settled packet names), s2_ehz_cpz a corridor, an R11
+  // opt-out and top-level keys Aurora never reads but must not drop on write.
+  'clips/s2_two_clip.clips.json',
+  'clips/s2_two_clip_pins.clips.json',
+  'clips/s2_ehz_cpz.clips.json',
 ].map((rel) => {
   // ⚠ THE ENTRIES ARE PATHS UNDER `test/fixtures`, NOT BARE BASENAMES, and the
   // directory is no longer hard-coded to `effects`. It was, and the vendored

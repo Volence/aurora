@@ -1,0 +1,19 @@
+{
+  "$what": "Provenance of s2_two_clip_pins.clips.json: aeon's committed clip manifest games/sonic4/data/clips/s2_two_clip_pins/clips.json, vendored verbatim for the S2 donor page (ROADMAP row 211, docs/reviews/2026-09-25-s2-donor-page.md).",
+  "$why_this_one": "the REGION_ID-ABSENT case: 0 of 2 clips carry `region_id`; the key set of each clip is exactly donor, dst_rect, id, src_rect, zone. The settled packet (docs/reviews/2026-09-17-s2-donor-page-read-half-settled.md, \"Four things\", item 1) names this fixture for the absent-case row, and test/formats/clip-manifest-doc.test.ts reads it for exactly that.",
+  "aeon": {
+    "repo": "git@github.com:Volence/aeon.git",
+    "path": "games/sonic4/data/clips/s2_two_clip_pins/clips.json",
+    "branch_that_answers_currency": "origin/master",
+    "revision": "0aa5e10600ed91731625f3d9f68311990dd4e9de",
+    "blob": "e83c638cf9447fd14c0ac62b429831fc6936ab02",
+    "revision_is": "the LAST commit that touched the path on origin/master (git log -1 origin/master -- <path>), read 2026-09-25 after a fetch at aeon origin/master f4f1a32e40b6377d557f4f67fd8cec9278d5df5a; not a tip and not a merge."
+  },
+  "fixture": {
+    "path": "test/fixtures/clips/s2_two_clip_pins.clips.json",
+    "bytes": 1198,
+    "sha256": "7d469d808d1cb94c102060788a255aebde1cc3cba1f7a7b4027750eb069d95c7",
+    "git_blob": "e83c638cf9447fd14c0ac62b429831fc6936ab02"
+  },
+  "re_vendor": "node scripts/revendor.mjs test/fixtures/clips/s2_two_clip_pins.clips.json test/fixtures/clips/s2_two_clip_pins.clips.provenance.json <AEON_DIR> games/sonic4/data/clips/s2_two_clip_pins/clips.json <the commit git log names>"
+}

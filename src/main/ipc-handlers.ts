@@ -4,6 +4,8 @@ import { IPC_CHANNELS } from '../shared/ipc-types';
 import type { GuardedWriteFile } from '../shared/ipc-types';
 import { readBinaryFile, readManyFiles, listProjectFiles, listProjectSources, probePath, probeDir, fileMtime, deleteProjectFile, writeProjectFile } from './file-io';
 import { performGuardedWrite } from './guarded-write';
+import { runClipTool } from './clip-tool';
+import type { ClipToolVerb } from '../shared/ipc-types';
 import { readRecents, addRecentProject, removeRecentProject } from './recent-projects';
 
 export function registerIpcHandlers(): void {
@@ -60,6 +62,11 @@ export function registerIpcHandlers(): void {
 
   // Atomic, mtime-guarded classic save (Task 10). The pure cycle lives in
   // guarded-write.ts; this is the thin IPC seam.
+  // The Donors page's one subprocess: aeon's own clip tools, two fixed argvs.
+  // Everything it can reach is stated in main/clip-tool.ts.
+  ipcMain.handle(IPC_CHANNELS.CLIP_TOOL, async (_event, basePath: string, verb: ClipToolVerb, manifestText: string) =>
+    runClipTool(basePath, verb, String(manifestText)));
+
   ipcMain.handle(IPC_CHANNELS.WRITE_GUARDED, async (_event, basePath: string, files: GuardedWriteFile[]) => {
     return performGuardedWrite(basePath, files);
   });

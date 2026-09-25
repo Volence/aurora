@@ -555,3 +555,21 @@ export const REGION_LABEL_WARN = 'rgba(240, 198, 116, 0.98)';
 export const REGION_UNASSIGNED_FILL = 'rgba(255, 96, 96, 0.95)';
 export const REGION_UNASSIGNED_LABEL_BG = 'rgba(40, 10, 12, 0.90)';
 export const REGION_UNASSIGNED_LABEL_TEXT = 'rgba(255, 205, 200, 0.97)';
+
+// ---------- the Donors facet (components/donors/ZonePane.tsx) ----------
+// The donor zone and the target clip act are drawn over the void; these are the
+// only marks the page lays on them.
+/** Dims everything outside a donor's crop: aeon's R9 refuses a source there. */
+export const DONOR_CROP_SHADE = 'rgba(0, 0, 0, 0.55)';
+/** The crop's own edge. */
+export const DONOR_CROP_EDGE = 'rgba(255, 255, 255, 0.35)';
+/** The world's edge, so an empty act still reads as a place. */
+export const DONOR_WORLD_EDGE = 'rgba(255, 255, 255, 0.15)';
+/** The marquee and the paste placement (mirrors --accent). */
+export const DONOR_MARK = '#34D399';
+export const DONOR_MARK_FILL = 'rgba(52, 211, 153, 0.12)';
+/** A rectangle that will be refused, or needs the author's attention (mirrors --warning). */
+export const DONOR_MARK_WARN = '#FBBF24';
+/** Clips already in the target act: present, not selected. */
+export const DONOR_MARK_FAINT = 'rgba(255, 255, 255, 0.5)';
+export const DONOR_MARK_FAINT_FILL = 'rgba(255, 255, 255, 0.06)';
