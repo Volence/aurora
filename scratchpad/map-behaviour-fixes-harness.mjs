@@ -1594,7 +1594,9 @@ const AOB_READ = String.raw`(() => { const cv = ${COMPOSER_CANVAS}; const nb = d
   const b = cv ? cv.getBoundingClientRect() : null; const br = bar ? bar.getBoundingClientRect() : null;
   const warn = bar ? [...bar.querySelectorAll('span')].find((s) => s.children.length === 0 && s.textContent.includes('⚠')) || null : null;
   const cs = bar ? getComputedStyle(bar) : null;
-  return { canvas: b ? { x: b.left, y: b.top, w: b.width, h: b.height } : null, dpr: window.devicePixelRatio, iw: innerWidth, ih: innerHeight,
+  const kids = bar ? [...bar.children].map((k) => ({ h: k.getBoundingClientRect().height, t: (k.getAttribute('aria-label') || k.textContent || k.tagName).trim().slice(0, 24) })) : [];
+  const tall = kids.reduce((m, k) => (m && m.h >= k.h ? m : k), null);
+  return { tallest: tall, canvas: b ? { x: b.left, y: b.top, w: b.width, h: b.height } : null, dpr: window.devicePixelRatio, iw: innerWidth, ih: innerHeight,
     bar: br ? { y: br.top, h: br.height, sw: bar.scrollWidth, cw: bar.clientWidth, sh: bar.scrollHeight, ch: bar.clientHeight, ox: cs.overflowX } : null,
     warn: warn ? { text: warn.textContent.trim(), title: warn.getAttribute('title'), aria: warn.getAttribute('aria-label'), h: warn.getBoundingClientRect().height } : null }; })()`;
 const sameRect = (p, q) => !!p && !!q && ['x', 'y', 'w', 'h'].every((k) => Math.abs(p[k] - q[k]) < 0.01);
@@ -1607,10 +1609,10 @@ async function aobCensus(d, label) {
     await sleep(350);
     const tool = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.tool ?? null;
     const r = await c.json(AOB_READ);
-    rows.push({ id: t.id, hit: !!hit?.hitOk, tool, barH: r.bar?.h ?? null, canvas: r.canvas, sw: r.bar?.sw, cw: r.bar?.cw, ox: r.bar?.ox, dpr: r.dpr, iw: r.iw, ih: r.ih });
+    rows.push({ id: t.id, hit: !!hit?.hitOk, tool, barH: r.bar?.h ?? null, tallest: r.tallest, canvas: r.canvas, sw: r.bar?.sw, cw: r.bar?.cw, ox: r.bar?.ox, dpr: r.dpr, iw: r.iw, ih: r.ih });
   }
   console.log(`   CENSUS [${label}] window ${rows[0]?.iw}x${rows[0]?.ih} dpr ${rows[0]?.dpr}`);
-  for (const r of rows) console.log(`     ${r.id.padEnd(14)} store tool ${String(r.tool).padEnd(14)} bar h ${r.barH}  canvas ${J(r.canvas)}  bar scroll/client w ${r.sw}/${r.cw} overflow-x ${r.ox}`);
+  for (const r of rows) console.log(`     ${r.id.padEnd(14)} store tool ${String(r.tool).padEnd(14)} bar h ${r.barH}  canvas ${J(r.canvas)}  bar scroll/client w ${r.sw}/${r.cw} overflow-x ${r.ox}  tallest item ${J(r.tallest)}`);
   return rows;
 }
 function aobCensusRows(id, label, rows) {
@@ -1742,7 +1744,11 @@ async function aobPart(d) {
   const blank = await c.json(String.raw`(() => { const a = window.__dbg.aeon; for (const id of a.chunkIds()) { const i = a.chunkInfo(id);
     if (i && i.nonzeroTiles === 0 && i.widthTiles >= 2) return { id, ...i }; } return null; })()`);
   if (!blank) {
-    check('AOB.s', 'PREMISE: a library chunk with an all-zero nametable, so the warning can APPEAR', 'UNMEASURABLE', 'none in this project');
+    // NOT a row, and said so: in a project with no all-zero library chunk the
+    // warning cannot appear on a first write (every other chunk opens with an
+    // atlas cell, so it is already on screen), and the part does not plant one.
+    const n = await c.evalExpr('window.__dbg.aeon.chunkIds().length');
+    note('AOB.s', `NOT DRIVEN: none of this project's ${n} library chunks has an all-zero nametable, so the shared-tile warning cannot APPEAR on a first write here (O3 is NOT MEASURED by this run, neither green nor red)`);
   } else {
     await neutral(d);
     await d.chord('k');
