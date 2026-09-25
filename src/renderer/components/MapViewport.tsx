@@ -80,6 +80,7 @@ import {
   NO_REGIONS_HERE, type RegionDrag,
 } from './map-region-gesture';
 import { regionListRows, actBindingDefaults } from '../providers/regions-aeon';
+import { regionsRemovedSentence } from '../providers/regions-rect-list';
 import type { RegionsDocument } from '../../core/formats/regions/document';
 import { publishPriorityLensReport } from '../canvas/priority-lens';
 import { publishBothPlanesLensReport } from '../canvas/both-planes-lens';
@@ -2924,7 +2925,8 @@ export default function MapViewport() {
     // say nothing; a removal is named.
     if (outcome.removedIds.length > 0) {
       useToastStore.getState().addToast(
-        `${outcome.removedIds.join(', ')} had no rectangle left and ${outcome.removedIds.length === 1 ? 'was' : 'were'} removed. Ctrl+Z undoes the whole gesture.`,
+        // ONE composition, shared with the Regions panel's per-rect Delete.
+        regionsRemovedSentence(outcome.removedIds),
         'warning',
       );
     }

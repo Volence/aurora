@@ -29,7 +29,6 @@ import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import { sceneRefOptions, unassignableSceneRef } from '../../providers/effects-aeon';
 import type { AnyCommand } from '../../../core/editing/commands';
-import type { RegionRect } from '../../../core/formats/regions/document';
 import {
   ACT_ROW_NOTE,
   regionBindingCommand,
@@ -42,7 +41,16 @@ import {
   type RegionStatusRow,
   type RegionsPanelState,
 } from '../../providers/regions-aeon';
-import { cloneRegionsDocument } from '../../../core/formats/regions/act-regions';
+import {
+  regionRectDeleteOutcome,
+  regionRectFieldCommand,
+  regionRectFitOutcome,
+  regionRectRows,
+  regionsRemovedSentence,
+  type RegionRectOutcome,
+} from '../../providers/regions-rect-list';
+import { REGION_SNAP_PX } from '../../../core/editing/region-marquee';
+import { useToastStore } from '../../state/toastStore';
 import { planActMigration } from '../../providers/regions-migrate';
 import { BG_ACT_SENTINEL } from '../../../core/formats/regions/validate';
 import { projectDataRoot } from '../../../core/config/s4-config';
@@ -327,42 +335,89 @@ function BindingRow({ state, regionId, row }: {
 // ---------------------------------------------------------------------------
 
 /**
- * The rect, as four numbers.
+ * THE PER-RECTANGLE LIST — §3.4's `rects #1 x … y … w … h … [Fit to 16]`.
  *
- * ⚠ THIS IS THE ONLY EDITING GESTURE IN STEP 6, and it is numeric on purpose:
- * §7 row 6 says "no painting yet: regions are created from the migration or by
- * typing rect numbers". The marquee, move, resize and carve are step 8.
+ * One row per `regions[]` ENTRY of the selected region, from
+ * `regionRectRows`; every control addresses its entry by DOCUMENT INDEX, so an
+ * edit lands on the rectangle it is shown beside. This replaced four fields
+ * that resolved the id's FIRST entry and a warning line saying so (ROADMAP row
+ * 206 item 1). What each door carves, and why §3.4's [Carve] is not here, is
+ * `providers/regions-rect-list.ts`'s header.
  *
  * ONE COMMAND PER COMMITTED FIELD, on §3.3's "one command per gesture": typing
  * `2048` is one edit, not four.
+ *
+ * ⚠ EVERY MARKER IS ON A PLAIN ELEMENT, never on `Hint`/`NumberField`: a
+ * hyphenated attribute on a component is silently dropped (the migrate
+ * receipt's lesson, `MigrationReceipt` below).
  */
-function RectFields({ state, regionId, rect }: {
+function RectList({ state, regionId }: {
   state: Extract<RegionsPanelState, { kind: 'open' }>;
-  regionId: string; rect: RegionRect;
+  regionId: string;
 }) {
-  const set = (key: keyof RegionRect, value: number) => {
-    if (rect[key] === value) return;
-    const next = cloneRegionsDocument(state.doc);
-    const region = next.regions.find((r) => r.id === regionId);
-    if (!region) return;
-    region.rect = { ...region.rect, [key]: value };
-    run({
-      type: 'set-regions',
-      description: `Set ${regionId} rect ${key}`,
-      sectionIndex: -1,
-      oldDocument: cloneRegionsDocument(state.doc),
-      newDocument: next,
-    });
+  const rows = regionRectRows(state.doc, regionId, state.act);
+  const outcome = (o: RegionRectOutcome) => {
+    if (o.kind === 'refused') {
+      useToastStore.getState().addToast(o.reason, 'warning');
+      return;
+    }
+    if (o.kind === 'none') return;
+    run(o.command);
+    // THE SAME SENTENCE THE MAP DRAG SAYS: a region whose last rectangle went
+    // is a row vanishing from the list, the one outcome an author would not
+    // predict from the button they pressed.
+    if (o.removedIds.length > 0) {
+      useToastStore.getState().addToast(regionsRemovedSentence(o.removedIds), 'warning');
+    }
   };
   return (
-    <Field label="rect">
-      <div data-region-rect={regionId} style={{ display: 'flex', gap: T.s2, flexWrap: 'wrap' }}>
-        {(['x', 'y', 'w', 'h'] as const).map((k) => (
-          <label key={k} style={{ ...NOTE, marginBottom: 0, display: 'flex', gap: 2 }}>
-            {k}
-            <NumberField value={rect[k]} onChange={(v) => set(k, v)}
-                         title={`${k}, in world pixels`} width={54} />
-          </label>
+    <Field label="rects">
+      <div data-region-rects-of={regionId}>
+        {rows.map((r) => (
+          <div key={r.entryIndex} data-region-rect-row={r.n} data-entry-index={r.entryIndex}
+               style={{ marginBottom: T.s2 }}>
+            <div style={{ display: 'flex', gap: T.s2, flexWrap: 'wrap', alignItems: 'baseline' }}>
+              <span style={{ fontWeight: T.wSemibold }}>#{r.n}</span>
+              {(['x', 'y', 'w', 'h'] as const).map((k) => (
+                <label key={k} data-rect-field={k}
+                       style={{ ...NOTE, marginBottom: 0, display: 'flex', gap: 2 }}>
+                  {k}
+                  <NumberField value={r.rect[k]}
+                               onChange={(v) => run(regionRectFieldCommand(state.doc, r.entryIndex, k, v))}
+                               title={`rectangle #${r.n} ${k}, in world pixels`} width={54} />
+                </label>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: T.s2, marginTop: 2 }}>
+              {r.fitted !== null && (
+                <button type="button" data-rect-fit={r.n}
+                        onClick={() => outcome(regionRectFitOutcome(state.doc, r.entryIndex))}
+                        title={`Move each edge to the nearest ${REGION_SNAP_PX} px line: `
+                          + `x ${r.fitted.x} y ${r.fitted.y} w ${r.fitted.w} h ${r.fitted.h}. `
+                          + 'Like a drag, it trims any region it now lands on.'}
+                        style={{ font: 'inherit' }}>
+                  Fit to {REGION_SNAP_PX}
+                </button>
+              )}
+              <button type="button" data-rect-delete={r.n}
+                      onClick={() => outcome(regionRectDeleteOutcome(state.doc, r.entryIndex))}
+                      title={rows.length === 1
+                        ? 'Delete this rectangle. It is the region\'s last, so the region goes too; '
+                          + 'its ground becomes unassigned.'
+                        : 'Delete this rectangle. Its ground becomes unassigned.'}
+                      style={{ font: 'inherit' }}>
+                Delete
+              </button>
+            </div>
+            {r.overlaps.length > 0 && (
+              <div data-rect-overlap={r.n} style={{ ...WARN, marginBottom: 0 }}>
+                #{r.n} overlaps {r.overlaps.join(', ')}
+              </div>
+            )}
+            {r.findings.map((f, i) => (
+              <div key={i} data-rect-finding={r.n} style={{ ...WARN, marginBottom: 0 }}>{f}</div>
+            ))}
+          </div>
         ))}
       </div>
     </Field>
@@ -379,30 +434,10 @@ function SelectedRegion({ state }: { state: Extract<RegionsPanelState, { kind: '
     );
   }
   const rows = regionBindingRows(region, state.defaults);
-  // HOW MANY RECTANGLES THIS REGION IS, from the list row rather than counted a
-  // second time here.
-  const pieces = state.rows.find((r) => r.id === region.id)?.rects.length ?? 1;
   return (
     <div data-region-detail={region.id}>
       <Row><span style={{ fontWeight: T.wSemibold }}>{region.name ?? region.id}</span></Row>
-      {pieces > 1 && (
-        // ⚠ SAID OUT LOUD, BECAUSE THE FIELDS BELOW EDIT ONE OF THEM. `state.selected`
-        // and `RectFields`' `.find()` both resolve the region's FIRST entry, so on a
-        // carved region these four numbers are rectangle 1 and the others are not on
-        // screen at all. §3.4's mock answers this properly with a per-rect list
-        // ("rects #1 …" plus Carve / Fit to 16) and that list is not built yet — so
-        // until it is, the state is NAMED rather than left to be discovered by an
-        // author wondering why moving `x` moved a third of their region.
-        // The BINDINGS below are a different case and need no such note: they are
-        // identical across every entry by construction (`setRegionBinding`).
-        <div data-region-rect-of={region.id}>
-          <Hint under tone="warning">
-            {rectCountWord(pieces)}: these four numbers are rectangle 1. The others are
-            edited on the map; the list row shows the bounds of all of them.
-          </Hint>
-        </div>
-      )}
-      <RectFields state={state} regionId={region.id} rect={region.rect} />
+      <RectList state={state} regionId={region.id} />
       {rows.map((r) => (
         <BindingRow key={r.key} state={state} regionId={region.id} row={r} />
       ))}
