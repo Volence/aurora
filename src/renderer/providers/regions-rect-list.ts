@@ -106,7 +106,13 @@ export interface RegionRectRow {
  * edge is a coordinate in continuous world pixels, not a cell).
  */
 export function fitRectToGrid(rect: RegionRect, snap: number = REGION_SNAP_PX): RegionRect {
-  throw new Error('NOT BUILT: fitRectToGrid');
+  const x0 = snapWorld(rect.x, snap);
+  const y0 = snapWorld(rect.y, snap);
+  let x1 = snapWorld(rect.x + rect.w, snap);
+  let y1 = snapWorld(rect.y + rect.h, snap);
+  if (x1 - x0 < snap) x1 = x0 + snap;
+  if (y1 - y0 < snap) y1 = y0 + snap;
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
 function sameRect(a: RegionRect, b: RegionRect): boolean {
@@ -120,7 +126,33 @@ function sameRect(a: RegionRect, b: RegionRect): boolean {
 export function regionRectRows(
   doc: RegionsDocument, regionId: string, act: ActExtent,
 ): RegionRectRow[] {
-  throw new Error('NOT BUILT: regionRectRows');
+  const pieces: RegionPiece[] = doc.regions.map((r) => ({ id: r.id, rect: r.rect }));
+  const others = new Map<number, Set<string>>();
+  for (const o of disjointness(pieces).overlaps) {
+    if (o.idA === o.idB) continue;
+    if (o.idA === regionId) {
+      if (!others.has(o.indexA)) others.set(o.indexA, new Set());
+      others.get(o.indexA)!.add(o.idB);
+    }
+    if (o.idB === regionId) {
+      if (!others.has(o.indexB)) others.set(o.indexB, new Set());
+      others.get(o.indexB)!.add(o.idA);
+    }
+  }
+  const rows: RegionRectRow[] = [];
+  doc.regions.forEach((r, entryIndex) => {
+    if (r.id !== regionId) return;
+    const fit = fitRectToGrid(r.rect);
+    rows.push({
+      n: rows.length + 1,
+      entryIndex,
+      rect: { ...r.rect },
+      fitted: sameRect(fit, r.rect) ? null : fit,
+      findings: regionRectFindings(r, act),
+      overlaps: [...(others.get(entryIndex) ?? [])],
+    });
+  });
+  return rows;
 }
 
 /** A panel door's result: a command, nothing to do, or the layer's reason. */
@@ -160,7 +192,13 @@ function ordinalOf(doc: RegionsDocument, entryIndex: number): number {
 export function regionRectFieldCommand(
   doc: RegionsDocument, entryIndex: number, key: keyof RegionRect, value: number,
 ): SetRegionsCommand | null {
-  throw new Error('NOT BUILT: regionRectFieldCommand');
+  const entry = doc.regions[entryIndex];
+  if (entry === undefined) return null;
+  if (entry.rect[key] === value) return null;
+  const next = cloneRegionsDocument(doc);
+  next.regions[entryIndex].rect = { ...next.regions[entryIndex].rect, [key]: value };
+  return commandOf(doc, next,
+    `Set ${entry.id} rect #${ordinalOf(doc, entryIndex)} ${key}`);
 }
 
 function gestureOutcome(
@@ -181,7 +219,12 @@ function gestureOutcome(
  * layer (door 2): the fitted rectangle carves whatever it now lands on.
  */
 export function regionRectFitOutcome(doc: RegionsDocument, entryIndex: number): RegionRectOutcome {
-  throw new Error('NOT BUILT: regionRectFitOutcome');
+  const entry = doc.regions[entryIndex];
+  if (entry === undefined) return { kind: 'none' };
+  const fit = fitRectToGrid(entry.rect);
+  if (sameRect(fit, entry.rect)) return { kind: 'none' };
+  return gestureOutcome(doc, { kind: 'resize', pieceIndex: entryIndex, rect: fit },
+    `Fit ${entry.id} rect #${ordinalOf(doc, entryIndex)} to ${REGION_SNAP_PX}`);
 }
 
 /**
@@ -192,7 +235,10 @@ export function regionRectFitOutcome(doc: RegionsDocument, entryIndex: number): 
 export function regionRectDeleteOutcome(
   doc: RegionsDocument, entryIndex: number,
 ): RegionRectOutcome {
-  throw new Error('NOT BUILT: regionRectDeleteOutcome');
+  const entry = doc.regions[entryIndex];
+  if (entry === undefined) return { kind: 'none' };
+  return gestureOutcome(doc, { kind: 'delete', pieceIndex: entryIndex },
+    `Delete ${entry.id} rect #${ordinalOf(doc, entryIndex)}`);
 }
 
 /**
@@ -201,5 +247,6 @@ export function regionRectDeleteOutcome(
  * two cannot come to say different things about the same event.
  */
 export function regionsRemovedSentence(ids: readonly string[]): string {
-  throw new Error('NOT BUILT: regionsRemovedSentence');
+  return `${ids.join(', ')} had no rectangle left and ${ids.length === 1 ? 'was' : 'were'} `
+    + 'removed. Ctrl+Z undoes the whole gesture.';
 }
