@@ -425,6 +425,15 @@ bound to (`scene <id> · raster <id>`), lets you change which section without le
 the tab, and states the raster-wiring conditions as three rows (below). It is the
 same number the Layout tab's `SECTIONS` grid sets: one section, two tabs.
 
+**On an act with a regions file, both bindings live somewhere else.** If the act's
+regions.json exists (OJZ act 1 has one), aeon's build takes the scene and the raster
+binding from the **region rows**, not from the section sidecars, and refuses the build
+while a sidecar of that act still names one. So on such an act the strip says where
+the bindings are instead of printing them, shows one notice in place of the condition
+rows below, and both section dropdowns refuse a new binding. Clearing one is still
+allowed, because that is the repair. Bind them in the Regions panel, under Bindings.
+Everything else in this section is about an act with no regions file.
+
 ### Which section can carry a raster band?
 
 This is a fact about **the level's own data**, not a limit of the editor, and Aurora
@@ -432,31 +441,40 @@ derives it per project rather than shipping a list.
 
 A section's effects come from a `preset()` record in aeon's effects library, and
 `Sec.sec_effects` is a **pointer**, so several sections can point at the same record.
-Giving a section-keyed raster band to a record that two sections share would give the
-band to **both** of them, so aeon's build refuses it.
+aeon's raster chooser is keyed on **that record**, not on the section number: a
+record is wired when its own `preset()` passes its own key,
+`ojz_act1_preset_raster(preset: <Record>_KEY)`, to its raster channel.
 
-> A section can carry an editor-authored raster band **only if it binds a preset that no other section binds.**
+> A section can carry an editor-authored raster band **only if it binds a preset record whose own preset() threads the raster chooser with that record's key.**
 
-Which sections those are **changes when aeon changes the level**, so the answer is
+**Sharing a record is allowed.** Sections that point at one record share its
+channels, so a band bound on one of them is installed on all of them: that is what
+sharing a record means, and nothing has to be split first. What aeon's build refuses
+is sections of one record naming **different** preset documents. Aurora says so at
+the control, naming the sections that share the record.
+
+Which sections pass **changes when aeon changes the level**, so the answer is
 printed by the strip rather than written down here: the `act:` line under the
-condition rows names the set. Sections that **share** one record (`OJZ_Preset_Plain`
-has been shared by three at a time) can none of them have a band until a programmer
-splits that record. Aurora says so at the control, naming the sections that share and
-what would happen.
+condition rows names the sets.
 
-There are two further steps behind that one, and Aurora keeps all three apart
-because conflating them is how the wrong answer got published twice in one day:
+Aurora keeps three conditions apart, because conflating them is how the wrong answer
+got published twice in one day:
 
 | condition | what it means | what clears it |
 |---|---|---|
-| **1**, `own preset` | no other section binds this section's preset record | a programmer **splits a preset record** |
-| **2**, `threaded` | some `preset()` also threads the raster chooser on this index | **one line of aeon** |
+| **1**, `own preset` | this section binds a preset record in the act descriptor. Shared is fine: the row names the sections it shares with | a programmer **gives the section a record** |
+| **2**, `threaded` | the `preset()` of the record this section binds threads the raster chooser **with its own key**. A record passing another record's key is refused by name | **one line of aeon** |
 | **3**, `its channels` | the preset bound here today owes a generated chooser for every **other** key it carries (`cycles`, `variants`, the moving anchors of §5), and has one | **one line of aeon**, on a different chooser |
 
 The strip prints these as **three rows**, each with its own mark, because which one
 you fail decides what you do next, and a single verdict cannot tell you which. Which
 sections pass which condition is on the `act:` line under the rows, re-derived on
 every load; no number in this guide would survive aeon's next landing.
+
+The first row's label is older than its rule. `own preset` used to mean a record no
+other section binds, and an older copy of this guide told you to have that record
+split. Since aeon keyed the chooser on the record, it means only that the section has
+a record to hang a band off; a shared one reads `✓`.
 
 **The four marks, and what each one is telling you.** A mark on this strip is a
 statement about the level data, not a report on anything you did.
@@ -480,7 +498,7 @@ generated chooser beside the raster one. That is condition 3, and it is about th
 document you have bound **today**, so it re-derives the moment you change the
 binding.
 
-A binding on a section that owns its preset but is not threaded writes the key,
+A binding on a section whose record is not threaded writes the key,
 and aeon's canonical build refuses it by name ("no preset threads
 `ojz_act1_preset_raster(preset: <Record>_KEY)`", with the name of the record that
 section installs in place of Record) until that line is added.
@@ -514,7 +532,8 @@ document you displaced**, not on the one you just authored. Aurora does not read
 table, so it states the condition instead of promising the refusal: the note under the
 section dropdown in RASTER BAND PRESETS says it at the control, naming the document.
 
-Scenes have no such restriction: bind a scene to any section.
+Scenes have no such restriction: on an act with no regions file, bind a scene to any
+section.
 
 ---
 
@@ -654,7 +673,7 @@ If you are looking for a coloured stripe, you want the **Colour** sub-tab, not t
 
 ### Things the build can still refuse
 
-- Binding a raster preset to a section aeon has not threaded yet (§6). Aurora warns
+- Binding a raster preset to a section whose record aeon has not threaded yet (§6). Aurora warns
   at the control and does not block it, because that is aeon's fact to change.
 - A band whose colour is invisible against the palette it repaints. Nothing anywhere
   catches that: not this panel, not the schema, not the build.

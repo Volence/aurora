@@ -100,7 +100,8 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { readAeonShippedPreset } from './lib/aeon-shipped-preset.mjs';
-import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
+import { build as esbuildBuild } from 'esbuild';
 
 const PORT = Number(process.env.PORT ?? 9431);
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 96);
@@ -151,6 +152,54 @@ if (SHIPPED_BANDS < 1) {
 }
 /** Where THIS harness's own preset lands. Deleted before every run — see below. */
 const MINE = `${AEONDIR}/games/sonic4/data/editor/effects/presets/${PRESET_ID}.json`;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE LIMITS' WORDING, IMPORTED FROM THE PROVIDER THE PANEL RENDERS — ROW 197
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠ ROW 3a WAS RED ON MASTER FOR FIFTEEN DAYS AND NOTHING ABOUT THE PANEL WAS
+// WRONG. It asserted eight phrases COPIED out of two strings — five out of
+// `RASTER_SECTION_BINDING_LIMIT` (the hover) and three out of
+// `SHORT_BODIES.unbound` (the paint). 3962cc77 (2026-09-10) rewrote the first
+// and 3f985513 (2026-09-17, ruling b1) rewrote the second, both for true
+// reasons, and neither touched this file: a copied string is a second pin that
+// can only drift from the product. ROADMAP row 197.
+//
+// So the expectation is now the provider's own value, imported — not read
+// back out of the running app (a harness must not ask the component under test
+// what it should have said) and not re-sliced from source text by regex (the
+// unbound limit's body is an 8.6 KB concatenation with comments between its
+// literals). esbuild bundles `presetLimitsShort()` from THIS checkout's src/
+// into memory and it is imported from a data: URL, so the row compares what
+// the app PAINTS and HOVERS against what the source SAYS, byte for byte.
+// WHAT THE WORDING CLAIMS is not this harness's to pin: the node suite owns
+// that (raster-binding-threaded-set.test.ts re-derives the wired set from
+// aeon's file; band-preset-wording.test.ts pins the provider's strings).
+//
+// ⚠ THAT COMPARISON MEANS NOTHING AGAINST A STALE BUNDLE, which is why this
+// harness now calls `assertFreshBuild`: a dist/ older than src/ would make the
+// row red for a reason that is not the panel's.
+assertFreshBuild(RUN);
+const PRESET_PROVIDER_SRC = `${ROOT}/src/renderer/providers/effects-preset.ts`;
+const PROVIDER = await (async () => {
+  const out = await esbuildBuild({
+    entryPoints: [PRESET_PROVIDER_SRC], bundle: true, format: 'esm', platform: 'node',
+    write: false, logLevel: 'error',
+  });
+  return import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
+})();
+/** `{ key, title, body, full }` per limit, exactly what `LimitBlock` maps over. */
+const SOURCE_LIMITS = PROVIDER.presetLimitsShort();
+const SOURCE_UNBOUND = SOURCE_LIMITS.find((l) => l.key === 'unbound');
+// ANTI-VACUOUS: an import that yielded nothing (or an empty string) would make
+// row 3a compare "" with "" wherever the panel also lost it. Refuse up front.
+if (!SOURCE_UNBOUND || SOURCE_UNBOUND.body.length < 80 || SOURCE_UNBOUND.full.length < 100
+  || SOURCE_UNBOUND.title.length < 8) {
+  throw new Error(`CANNOT MEASURE: ${PRESET_PROVIDER_SRC} did not yield an \`unbound\` limit with `
+    + `a title, an author-length body and a contract-length full wording (got ${JSON.stringify(
+      SOURCE_UNBOUND && { title: SOURCE_UNBOUND.title.length, body: SOURCE_UNBOUND.body.length,
+        full: SOURCE_UNBOUND.full.length })}) — row 3a would pass vacuously.`);
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -533,12 +582,9 @@ async function main() {
           }));
       })()`;
     const parts = await c.json(LIMIT_PARTS);
-    /** The lead-ins `PRESET_LIMITS` supplies, in the order the panel renders them. */
-    const LEADS = [
-      'Saving does not install the band.',
-      'Seeing it is a debug chord.',
-      'Nothing checks that a band is visible.',
-    ];
+    /** The lead-ins `PRESET_LIMITS` supplies, in the order the panel renders them.
+     *  IMPORTED, not typed (row 197): `LimitBlock` paints `<span>{l.title}.</span>`. */
+    const LEADS = SOURCE_LIMITS.map((l) => `${l.title}.`);
     // NOT `?? {}`. A part that is not there must make its row say so, not make
     // it pass over an empty string — an absent limit and a silent one read the
     // same otherwise. The sentinel is impossible to match, and it PRINTS.
@@ -573,46 +619,36 @@ async function main() {
     // innerText excludes `title=` attribute text and any `display:none`
     // subtree, so a limit buried in a tooltip reads as ABSENT here. That is
     // exactly the failure the brief forbids ("do not bury this in a tooltip").
-    // ⚠ RE-CUT 2026-08-30, TWICE-STALE. This row asserted /effectsRef/ and
-    // /not implemented in either repo/ — wording retired when the limit was rewritten
-    // for a key that exists and a build that reads it. Worse than merely stale: it
-    // demanded the RESERVED key be on screen, which the unit gate now forbids outright,
-    // so the two instruments had come to contradict each other. Re-pointed at phrases
-    // LIMIT 1 alone owns today. `costs ROM` survives both rewrites and is kept.
-    // ⚠ RE-PHRASED 2026-08-30, and the OLD phrases are why this row is checked
-    // by hand every time the limit moves. It read `/the band does not play/i`
-    // and `/one line per section/i` — the constant's UNIVERSAL call-site clause
-    // — until aeon `9cdf32d8` threaded the chooser for section 5 and the clause
-    // became a case split. Both phrases left the constant, so both `.test()`s
-    // would have gone false and this row would have reddened on a wording change
-    // rather than on a painting failure. It now anchors on the case split's two
-    // halves, which is the pair an author must SEE together: bind section 5 and
-    // aeon can carry it, bind any other and nothing consumes the key.
+    // ⚠ THIS ROW'S PHRASES WERE RE-COPIED THREE TIMES AND ROTTED FOUR. 2026-08-30
+    // twice (`effectsRef` / `not implemented in either repo`, then `the band does
+    // not play` / `one line per section`, each retired by a true rewrite of the
+    // limit), then the hover's five at 3962cc77 (09-10) and the paint's three at
+    // 3f985513 (09-17), which left it red on master until ROADMAP row 197.
+    // RE-DERIVED 2026-09-25: the expectation is the provider's own value, imported
+    // at the top of this file, so a true rewrite of the wording moves this row
+    // with it and only a panel that paints or hovers something ELSE reds it.
+    const paintedWant = `${SOURCE_UNBOUND.title}. ${SOURCE_UNBOUND.body}`;
+    /** Where two strings first differ, so a red prints the place, not 8 KB. */
+    const firstDiff = (got, want) => {
+      let i = 0;
+      while (i < got.length && i < want.length && got[i] === want[i]) i++;
+      return i === got.length && i === want.length ? 'identical'
+        : `first difference at char ${i}: got ${JSON.stringify(got.slice(i, i + 40))} `
+          + `want ${JSON.stringify(want.slice(i, i + 40))}`;
+    };
     check('3a', 'LIMIT 1: the author-length sentence is PAINTED and the contract wording is on its hover',
-      // PAINTED — the author's half. `SHORT_BODIES.unbound`, and the two clauses
-      // an author has to act on: that a SECTION must bind the document, and that
-      // the control which does it is the one below this block.
-      /a section has to BIND it/.test(unbound.text)
-      && /aeon has to have wired that section/.test(unbound.text)
-      && /at the dropdown below/.test(unbound.text)
-      // HOVERED — the contract half, `RASTER_SECTION_BINDING_LIMIT`, the sentence
-      // this panel, `assign_section_preset`'s reply and the published tool
-      // descriptions all quote. Same five phrases the pre-O77 row asserted; the
-      // string they are asserted against is the one that carries them.
-      && /rasterRef/.test(unbound.title)
-      && /ONLY SECTION 5 IS WIRED/.test(unbound.title)
-      && /BINDING ANY OTHER SECTION STILL REACHES NOTHING/.test(unbound.title)
-      && /a preset split plus one call-site line/i.test(unbound.title)
-      && /costs ROM/i.test(unbound.title),
-      unbound.missing ? 'NO ELEMENT LED "Saving does not install the band." — the limit is gone'
-        : `painted(${unbound.text.length}B): mustBind=${/a section has to BIND it/.test(unbound.text)} `
-        + `aeonWired=${/aeon has to have wired that section/.test(unbound.text)} `
-        + `namesTheControl=${/at the dropdown below/.test(unbound.text)}; `
-        + `hover(${unbound.title.length}B): rasterRef=${/rasterRef/.test(unbound.title)} `
-        + `sec5Wired=${/ONLY SECTION 5 IS WIRED/.test(unbound.title)} `
-        + `othersReachNothing=${/BINDING ANY OTHER SECTION STILL REACHES NOTHING/.test(unbound.title)} `
-        + `splitPlusLine=${/a preset split plus one call-site line/i.test(unbound.title)} `
-        + `costsROM=${/costs ROM/i.test(unbound.title)}`);
+      // PAINTED — the author's half: `<span>{title}.</span> {SHORT_BODIES.unbound}`,
+      // read from innerText, which a hover-only limit would be absent from.
+      unbound.text === paintedWant
+      // HOVERED — the contract half on the SAME element's `title`: `PRESET_LIMITS`'
+      // unbound body, which is `RASTER_SECTION_BINDING_LIMIT`, the sentence this
+      // panel, `assign_section_preset`'s reply and the MCP tool descriptions quote.
+      && unbound.title === SOURCE_UNBOUND.full,
+      unbound.missing ? `NO ELEMENT LED ${JSON.stringify(LEADS[0])} — the limit is gone`
+        : `painted(${unbound.text.length}B vs source ${paintedWant.length}B): `
+        + `${firstDiff(unbound.text, paintedWant)}; `
+        + `hover(${unbound.title.length}B vs source ${SOURCE_UNBOUND.full.length}B): `
+        + `${firstDiff(unbound.title, SOURCE_UNBOUND.full)}`);
     check('3b', 'LIMIT 2: the author-length sentence is PAINTED and the debug chord is on its hover',
       // PAINTED. ⚠ `fails loudly` ALONE IS NOT THIS ROW'S PHRASE and never was:
       // it occurs three times in effects-preset.ts and one of them is this very
