@@ -200,6 +200,28 @@ if (!SOURCE_UNBOUND || SOURCE_UNBOUND.body.length < 80 || SOURCE_UNBOUND.full.le
       SOURCE_UNBOUND && { title: SOURCE_UNBOUND.title.length, body: SOURCE_UNBOUND.body.length,
         full: SOURCE_UNBOUND.full.length })}) — row 3a would pass vacuously.`);
 }
+// ROW 214: 3b, 3c and 3e are derived the same way. 3b and 3c read the other two
+// limits by KEY (not by index), and 3e reads the two constants the no-preview
+// div renders: `NO_PREVIEW_SHORT` painted, `NO_PREVIEW` on its `title`. Each
+// must exist and be non-trivial, or its row would compare "" with "".
+const SOURCE_DEBUG_CHORD = SOURCE_LIMITS.find((l) => l.key === 'debug_chord');
+const SOURCE_UNCHECKED = SOURCE_LIMITS.find((l) => l.key === 'unchecked_visibility');
+const SOURCE_NO_PREVIEW_SHORT = PROVIDER.NO_PREVIEW_SHORT;
+const SOURCE_NO_PREVIEW = PROVIDER.NO_PREVIEW;
+for (const [row, l] of [['3b', SOURCE_DEBUG_CHORD], ['3c', SOURCE_UNCHECKED]]) {
+  if (!l || l.body.length < 80 || l.full.length < 100 || l.title.length < 8) {
+    throw new Error(`CANNOT MEASURE: ${PRESET_PROVIDER_SRC} did not yield the limit row ${row} reads `
+      + `with a title, a body and a full wording (got ${JSON.stringify(l && {
+        key: l.key, title: l.title.length, body: l.body.length, full: l.full.length })}) — row ${row} `
+      + 'would pass vacuously.');
+  }
+}
+if (typeof SOURCE_NO_PREVIEW_SHORT !== 'string' || SOURCE_NO_PREVIEW_SHORT.length < 80
+  || typeof SOURCE_NO_PREVIEW !== 'string' || SOURCE_NO_PREVIEW.length < 100) {
+  throw new Error(`CANNOT MEASURE: ${PRESET_PROVIDER_SRC} did not export NO_PREVIEW_SHORT and `
+    + `NO_PREVIEW as non-trivial strings (got ${typeof SOURCE_NO_PREVIEW_SHORT} / `
+    + `${typeof SOURCE_NO_PREVIEW}) — row 3e would pass vacuously.`);
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -608,8 +630,10 @@ async function main() {
         painted: p.text.length, hover: p.title.length,
       }))));
     const unbound = partByLead(LEADS[0]);
-    const debugChord = partByLead(LEADS[1]);
-    const unchecked = partByLead(LEADS[2]);
+    // By the source limit's KEY, not LEADS[1]/[2] (row 214): a reorder in the
+    // provider must not re-attribute one limit's wording to another row.
+    const debugChord = partByLead(`${SOURCE_DEBUG_CHORD.title}.`);
+    const unchecked = partByLead(`${SOURCE_UNCHECKED.title}.`);
     /** Every word the block can put in front of an author, painted or hovered. */
     const allProse = [panelText, ...parts.map((p) => p.title)].join('\n');
 
@@ -649,59 +673,49 @@ async function main() {
         + `${firstDiff(unbound.text, paintedWant)}; `
         + `hover(${unbound.title.length}B vs source ${SOURCE_UNBOUND.full.length}B): `
         + `${firstDiff(unbound.title, SOURCE_UNBOUND.full)}`);
+    // ⚠ A BARE APOSTROPHE INSIDE A REGEX LITERAL, KEPT ON PURPOSE (O79). Row 3b
+    // used to match /a row in aeon's band-demo table…/ and that literal was this
+    // file's standing regression control for `check-harness-guards.mjs`: its
+    // `stripInert` once had no regex-literal case, a bare apostrophe inside
+    // `/…/` opened a string to it, the scanner desynchronised, and a COMMENT
+    // further down this file — the one saying there is no `pkill` here —
+    // survived stripping and tripped G2 as a `pkill` CALL. Row 214 moved 3b off
+    // copied phrases, so the control is kept here as its own literal. If
+    // `check:harness-guards` ever reports G2 on THIS file again, the report is
+    // backwards and the checker's scanner is what broke.
+    const STRIP_INERT_REGEX_CONTROL = /aeon's scanner control: a bare ' inside a regex literal/;
+    void STRIP_INERT_REGEX_CONTROL;
+    // ⚠ ROWS 3b, 3c AND 3e ASSERTED COPIED PHRASES UNTIL ROW 214 (2026-09-25) —
+    // the shape that left 3a red on master for fifteen days. Each now compares
+    // the element's painted `innerText` and its `title` EXACTLY against the
+    // provider value the panel renders from, imported at the top of this file,
+    // and prints the first differing character on a red. `innerText` still
+    // excludes the `title`, so a limit moved into a tooltip still reads absent.
+    // The old 3b note — `fails loudly` alone occurs three times in the provider —
+    // no longer applies: an exact match on ONE element cannot borrow a neighbour.
+    const paintedWantOf = (l) => `${l.title}. ${l.body}`;
+    const limitDetail = (part, l) => (part.missing
+      ? `NO ELEMENT LED ${JSON.stringify(`${l.title}.`)} — the limit is gone`
+      : `painted(${part.text.length}B vs source ${paintedWantOf(l).length}B): `
+        + `${firstDiff(part.text, paintedWantOf(l))}; `
+        + `hover(${part.title.length}B vs source ${l.full.length}B): `
+        + `${firstDiff(part.title, l.full)}`);
     check('3b', 'LIMIT 2: the author-length sentence is PAINTED and the debug chord is on its hover',
-      // PAINTED. ⚠ `fails loudly` ALONE IS NOT THIS ROW'S PHRASE and never was:
-      // it occurs three times in effects-preset.ts and one of them is this very
-      // short body, so before O77 it was the one conjunct that stayed true while
-      // the row was measuring the wrong string. Scoped to this element and
-      // carried through to its object.
-      // ⚠ THIS APOSTROPHE WAS SPELLED `\x27` UNTIL O79, AND THE WORKAROUND IS
-      // NOW GONE BECAUSE ITS DEFECT IS. `check-harness-guards.mjs` (in
-      // `npm test`) strips comments before hunting for `pkill`, and its
-      // `stripInert` had no regex-literal case: a bare apostrophe inside `/…/`
-      // opened a string to it, the scanner desynchronised, and a COMMENT
-      // further down this file — the one saying there is no `pkill` here —
-      // survived stripping and tripped G2 as a `pkill` CALL. Filed as a
-      // bug-tier row in the O77 packet §5b and repaired in O79; the bare
-      // apostrophe is back so this file is the standing regression control for
-      // it. If `check:harness-guards` ever reports G2 on THIS file again, the
-      // report is backwards and the checker's scanner is what broke.
-      /a row in aeon's band-demo table or a binding \(a region row/.test(debugChord.text)
-      && /fails loudly when it has neither/.test(debugChord.text)
-      // HOVERED — the chord itself, and the fact the table is hand-typed. These
-      // are what a programmer needs and an author does not, which is why the cut
-      // put them here rather than deleting them.
-      && /START/.test(debugChord.title)
-      && /hand-typed dc\.l list/.test(debugChord.title)
-      && /does not add itself/i.test(debugChord.title)
-      && /aeon 4aa2abc0/.test(debugChord.title),
-      debugChord.missing ? 'NO ELEMENT LED "Seeing it is a debug chord." — the limit is gone'
-        : `painted(${debugChord.text.length}B): `
-        + `rowOrBinding=${/a row in aeon's band-demo table or a binding \(a region row/.test(debugChord.text)} `
-        + `loudWhenNeither=${/fails loudly when it has neither/.test(debugChord.text)}; `
-        + `hover(${debugChord.title.length}B): chord=${/START/.test(debugChord.title)} `
-        + `handTyped=${/hand-typed dc\.l list/.test(debugChord.title)} `
-        + `notSelfAdding=${/does not add itself/i.test(debugChord.title)} `
-        + `anchor=${/aeon 4aa2abc0/.test(debugChord.title)}`);
-    // ⚠ THIS ROW WAS GREEN THROUGH THE WHOLE O77 OUTAGE, AND THAT IS THE FINDING
-    // rather than a reprieve. `SHORT_BODIES.unchecked_visibility` happens to keep
-    // both phrases the long body used, so the row went on passing while its two
-    // neighbours could not go green — same instrument, same drift, one accident
-    // of wording apart. It was measuring the painted half only and claiming the
-    // contract wording; it now says which half it reads, like the other three.
+      // PAINTED — `<span>{title}.</span> {SHORT_BODIES.debug_chord}`.
+      debugChord.text === paintedWantOf(SOURCE_DEBUG_CHORD)
+      // HOVERED — `PRESET_LIMITS`' debug_chord body: the chord, and the fact the
+      // table is hand-typed. What a programmer needs and an author does not.
+      && debugChord.title === SOURCE_DEBUG_CHORD.full,
+      limitDetail(debugChord, SOURCE_DEBUG_CHORD));
+    // ⚠ THIS ROW WAS GREEN THROUGH THE WHOLE O77 OUTAGE, AND THAT WAS THE FINDING
+    // rather than a reprieve: `SHORT_BODIES.unchecked_visibility` happened to keep
+    // both phrases the long body used, so it passed while its neighbours could
+    // not — same drift, one accident of wording apart. It now reads both halves
+    // exactly, like the other three.
     check('3c', 'LIMIT 3: the author-length sentence is PAINTED and the full wording is on its hover',
-      /builds green and shows nothing/i.test(unchecked.text)
-      && /unused palette entry/i.test(unchecked.text)
-      && /Nothing checks that a band is VISIBLE/.test(unchecked.text)
-      && /No check anywhere in the pipeline catches that/.test(unchecked.title)
-      && /not this panel, not the schema, not the build/.test(unchecked.title),
-      unchecked.missing ? 'NO ELEMENT LED "Nothing checks that a band is visible." — the limit is gone'
-        : `painted(${unchecked.text.length}B): `
-        + `buildsGreen=${/builds green and shows nothing/i.test(unchecked.text)} `
-        + `unusedEntry=${/unused palette entry/i.test(unchecked.text)}; `
-        + `hover(${unchecked.title.length}B): `
-        + `nothingCatches=${/No check anywhere in the pipeline catches that/.test(unchecked.title)} `
-        + `namesAllThree=${/not this panel, not the schema, not the build/.test(unchecked.title)}`);
+      unchecked.text === paintedWantOf(SOURCE_UNCHECKED)
+      && unchecked.title === SOURCE_UNCHECKED.full,
+      limitDetail(unchecked, SOURCE_UNCHECKED));
     check('3d', "the ACCURATE headline is visible, not the inaccurate one",
       /An author can author a raster band/.test(panelText)
       && /programmer wires it up in one line/.test(panelText)
@@ -716,42 +730,31 @@ async function main() {
       + `wiresItUp=${/programmer wires it up in one line/.test(panelText)} `
       + `forbiddenSentenceAbsent=${!/no longer needs a programmer/i.test(allProse)} `
       + `(searched ${allProse.length}B: ${panelText.length}B painted + ${allProse.length - panelText.length - 4}B hovered)`);
-    // ⚠ MATCHER MOVED 2026-08-30 (O64): it pinned "never been looked at on
-    // screen", which aeon `4a4d3474` made false; NO_PREVIEW now cites that
-    // one frame and says none is built against it. Both halves are pinned
-    // here so "aeon measured it" cannot paint as "you can preview it".
+    // ⚠ MATCHER MOVED 2026-08-30 (O64), then DERIVED 2026-09-25 (row 214). It
+    // pinned "never been looked at on screen", which aeon `4a4d3474` made false;
+    // NO_PREVIEW now cites that one frame and says none is built against it. The
+    // row now compares both halves exactly against the two constants the div
+    // renders, so "aeon measured it" cannot paint as "you can preview it" unless
+    // the SOURCE says so — and whether the source's wording is TRUE is the node
+    // suite's (band-preset-wording.test.ts), not this harness's.
     check('3e', 'and it says there is no preview — PAINTED, with the provenance on its hover',
       // PAINTED — `NO_PREVIEW_SHORT`. The absence of a preview is the one thing
-      // in this block an author must not have to hover to find: an empty space
-      // where a preview would be reads as "not built yet", and a hover-only
-      // disclosure is a silence to everyone who does not hover.
-      /No preview\. Aurora draws no raster band/.test(noPreview.text)
-      && /a wrong preview would be worse than none/.test(noPreview.text)
-      && /You see it when the ROM runs/.test(noPreview.text)
-      // HOVERED — `NO_PREVIEW`, with the one measured frame it cites. Both halves
-      // of the O64 matcher are kept, on the string that carries them.
-      && /No preview\. This editor draws no band/.test(noPreview.title)
-      && /could at most be checked against that one frame; none is built/i.test(noPreview.title)
-      && /aeon 4a4d3474 \(2026-08-30\)/.test(noPreview.title)
-      // ⚠ AND THE RETIRED PHRASE IS HUNTED ACROSS BOTH HALVES — O77. Before the
-      // prose cut this negative was asserted over the string that held the
-      // provenance; after it, that string holds none of it, so a `NO_PREVIEW`
-      // that regressed to "never been looked at on screen" would have sat in the
-      // hover unseen while the row reported the phrase gone.
+      // in this block an author must not have to hover to find.
+      noPreview.text === SOURCE_NO_PREVIEW_SHORT
+      // HOVERED — `NO_PREVIEW`, with the one measured frame it cites.
+      && noPreview.title === SOURCE_NO_PREVIEW
+      // ⚠ THE RETIRED PHRASE IS STILL HUNTED ACROSS BOTH HALVES (O77). This is a
+      // NEGATIVE, so it cannot rot into a false red the way a copied positive
+      // did; it would catch a source that regressed to the retired wording.
       && !/never been looked at on screen/i.test(noPreview.text)
       && !/never been looked at on screen/i.test(noPreview.title),
       noPreview.missing ? 'NO UNLED TITLED DIV IN THE BLOCK — the no-preview line is gone'
-        : `painted(${noPreview.text.length}B): `
-        + `auroraDrawsNone=${/No preview\. Aurora draws no raster band/.test(noPreview.text)} `
-        + `worseThanNone=${/a wrong preview would be worse than none/.test(noPreview.text)} `
-        + `whenTheROMRuns=${/You see it when the ROM runs/.test(noPreview.text)}; `
-        + `hover(${noPreview.title.length}B): `
-        + `drawsNone=${/No preview\. This editor draws no band/.test(noPreview.title)} `
-        + `noneBuilt=${/none is built/i.test(noPreview.title)} `
-        + `anchor=${/aeon 4a4d3474 \(2026-08-30\)/.test(noPreview.title)}; `
+        : `painted(${noPreview.text.length}B vs source ${SOURCE_NO_PREVIEW_SHORT.length}B): `
+        + `${firstDiff(noPreview.text, SOURCE_NO_PREVIEW_SHORT)}; `
+        + `hover(${noPreview.title.length}B vs source ${SOURCE_NO_PREVIEW.length}B): `
+        + `${firstDiff(noPreview.title, SOURCE_NO_PREVIEW)}; `
         + `retiredPhraseGoneFromBOTH=`
         + `${!/never been looked at on screen/i.test(noPreview.text + noPreview.title)}`);
-
     // IS IT ACTUALLY PAINTED? A rect is real even when the scrolling section
     // has clipped it away — the way a sibling harness's first capture came back
     // showing a control over an absent sentence. Containment in the nearest
