@@ -127,7 +127,11 @@ describe('the region tool reaches the map (a SOURCE scan, not a running app)', (
     expect(src).toContain('drawRegionOverlay(');
     // The LIVE carve, not the stored document: the preview runs the same
     // transform the commit will run, so what the author sees is what lands.
-    expect(src).toContain('regionDragPreview(');
+    // Since row 208 that call lives in `regionOverlayPass` (map-region-gesture.ts,
+    // its behaviour held by region-overlay-middrag.test.ts), and the viewport
+    // asks it and draws what it answers, including the gesture-only arm.
+    expect(src).toContain('regionOverlayPass(');
+    expect(src).toContain('drawRegionGesture(');
   });
 
   it('the wash is gated on the toggle, and an in-flight drag overrides the gate', () => {
@@ -144,13 +148,17 @@ describe('the region tool reaches the map (a SOURCE scan, not a running app)', (
     const src = mapViewport();
     const gate = src.split('\n').find((l) => l.includes('overlayOpts.showRegions'));
     expect(gate, 'MapViewport does not read the regions toggle at all').toBeDefined();
-    // ONE conjunction rather than two branches a later edit could separate: the
-    // override has to sit beside the toggle it overrides, and both upstream of
-    // the work, so a hidden wash costs no derivation either.
-    expect(gate).toContain('rd !== null');
+    // ONE call rather than two branches a later edit could separate: the toggle,
+    // the live drag and the document go into `regionOverlayPass` together, on
+    // one line, upstream of the work. WHAT it answers for each combination
+    // (row 208, ruled C: the tint hidden and a drag live draws the gesture only)
+    // is held behaviourally in region-overlay-middrag.test.ts, not here.
+    expect(gate).toContain('regionOverlayPass(');
     expect(gate).toContain('regionsDoc');
-    // Anti-vacuous: there is still exactly ONE draw call, so the line found
-    // above is the gate on the real one and not on a dead second copy.
+    expect(gate).toContain('rd');
+    // Anti-vacuous: there is still exactly ONE of each draw call, so the line
+    // found above is the gate on the real ones and not on a dead second copy.
     expect(src.split('drawRegionOverlay(').length - 1).toBe(1);
+    expect(src.split('drawRegionGesture(').length - 1).toBe(1);
   });
 });

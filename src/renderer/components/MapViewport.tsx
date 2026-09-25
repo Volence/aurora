@@ -74,9 +74,11 @@ import {
   drawScreenFrame, screenFrameEdgeAt, dragScreenFrame, publishScreenFrameReport,
   screenFrameRect, type ScreenFrameAnchor,
 } from '../canvas/screen-frame';
-import { drawRegionOverlay, type RegionOverlayRegion } from '../canvas/region-overlay';
 import {
-  beginRegionDrag, regionDragCommand, regionDragPreview, updateRegionDrag,
+  drawRegionGesture, drawRegionOverlay, type RegionOverlayRegion,
+} from '../canvas/region-overlay';
+import {
+  beginRegionDrag, regionDragCommand, regionOverlayPass, updateRegionDrag,
   NO_REGIONS_HERE, type RegionDrag,
 } from './map-region-gesture';
 import { regionListRows, actBindingDefaults } from '../providers/regions-aeon';
@@ -1790,21 +1792,25 @@ export default function MapViewport() {
     // so `showRegions` off means nothing of ours is over the level art at all,
     // which is why the whole block is gated rather than only the draw call.
     //
-    // THE `rd !== null` HALF IS AN OVERSEER'S CALL AND IS OVERTURNABLE. The
-    // owner did not ask for it. With the wash hidden, arming the region tool
-    // and dragging would be DRAWING BLIND: no rectangle, no carve preview, no
-    // feedback of any kind, and the document changes when the button comes up.
-    // What an in-flight `regionDrag` puts on screen is not "the regions
-    // overlay", it is feedback for the thing the author's hand is doing right
-    // now — and it costs nothing, because whoever is mid-drag is not inspecting
-    // art. Delete this disjunct and the toggle still reads correctly; what you
-    // lose is the gesture's own picture of itself.
+    // THE OVERRIDE IS ROW 208'S RULING C, AND IT IS STILL OVERTURNABLE. The
+    // owner did not ask for any drawing with the tint hidden. With nothing at
+    // all, arming the region tool and dragging would be DRAWING BLIND: no
+    // rectangle, no carve preview, and the document changes when the button
+    // comes up. The first answer (`dce413e9`, the overseer's call) brought the
+    // WHOLE overlay back for the drag, red UNASSIGNED wash and every label
+    // included, over art the author had just hidden it to see. ROADMAP §5.1
+    // row 208 (options A-D in section 7 of docs/reviews/2026-09-25-regions-list.md)
+    // was RULED C by the aurora overseer on 2026-09-25 as a look call,
+    // overturnable by the owner's one word: with the tint hidden and a drag
+    // live, draw ONLY the gesture (the dragged rectangle's outline and the
+    // outline of what the release leaves of each region it trims, from the
+    // release's own transform), with no hatch, no unassigned wash and no labels.
+    // With the tint on, nothing changed. The decision is `regionOverlayPass`, so
+    // the node suite can drive it; the drawing is `drawRegionGesture`.
     const regionsDoc = activeRegionsDocument();
     const rd = regionDrag.current;
-    if (regionsDoc && (overlayOpts.showRegions || rd !== null)) {
-      const pieces = rd
-        ? regionDragPreview(regionsDoc, rd)
-        : regionsDoc.regions.map((r) => ({ id: r.id, rect: r.rect }));
+    const pass = regionOverlayPass(regionsDoc, rd, overlayOpts.showRegions);
+    if (regionsDoc && pass.kind !== 'none') {
       // ONE ROW PER REGION ID, in document order, from the PANEL'S derivation.
       // The overlay's hue is its index in this list, so the map and the list
       // cannot disagree about which region is which colour, and the label and
@@ -1816,19 +1822,25 @@ export default function MapViewport() {
       const regions: RegionOverlayRegion[] = rows.map((r) => ({
         id: r.id, label: r.label, bgText: r.bg.text, bgMissing: r.bg.missing,
       }));
-      drawRegionOverlay(ctx, dpr, viewport, {
-        // THE ACT'S OWN SIZE, FROM ITS GRID, never from the document being
-        // drawn: a bound taken from the thing under test makes the holes true
-        // by construction (the load's own rule, restated in regions-aeon.ts).
-        act: {
-          x: 0, y: 0,
-          w: act.gridWidth * SECTION_PIXEL_SIZE,
-          h: act.gridHeight * SECTION_PIXEL_SIZE,
-        },
-        pieces,
-        regions,
-        selectedId: useEditorStore.getState().selectedRegionId,
-      });
+      // THE ACT'S OWN SIZE, FROM ITS GRID, never from the document being
+      // drawn: a bound taken from the thing under test makes the holes true
+      // by construction (the load's own rule, restated in regions-aeon.ts).
+      const actRect = {
+        x: 0, y: 0,
+        w: act.gridWidth * SECTION_PIXEL_SIZE,
+        h: act.gridHeight * SECTION_PIXEL_SIZE,
+      };
+      const selectedId = useEditorStore.getState().selectedRegionId;
+      if (pass.kind === 'full') {
+        drawRegionOverlay(ctx, dpr, viewport, {
+          act: actRect, pieces: pass.pieces, regions, selectedId,
+        });
+      } else {
+        drawRegionGesture(ctx, dpr, viewport, {
+          act: actRect, pieces: pass.pieces, dragged: pass.dragged, trimmed: pass.trimmed,
+          regions, selectedId,
+        });
+      }
     }
 
     // Realign the collision paint ghost after any pan/zoom/version change.

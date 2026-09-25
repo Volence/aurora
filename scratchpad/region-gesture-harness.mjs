@@ -470,9 +470,70 @@ async function main() {
       `paints ${offA?.paints} -> ${offB?.paints} across the same repaints that moved it in 7a`);
     await shot(c, 'region-overlay-OFF-art-exactly');
 
-    // The overseer's call, on screen: a drag while the wash is hidden must still
-    // show itself, or the author is carving blind. Pressed and MOVED without
-    // releasing, so the gesture is live when the report is read.
+    // ── 7c. A DRAG WHILE HIDDEN DRAWS THE GESTURE, AND ONLY THE GESTURE ──────
+    //
+    // ROADMAP §5.1 row 208, ruled C (options in section 7 of
+    // docs/reviews/2026-09-25-regions-list.md). This row used to assert only
+    // "paints advance", which the WHOLE overlay coming back also satisfies, and
+    // that is exactly what `e640e0fe`'s `region-overlay-OFF-mid-drag` capture
+    // showed: the red UNASSIGNED wash, every hatch and every label, mid-drag,
+    // over art the author had just asked to see. Now it asserts both halves:
+    // paints advance (not carving blind) AND the full wash is not drawn.
+    //
+    // ⚠ TWO INSTRUMENTS, BECAUSE THE REPORT IS THE CODE'S WORD ABOUT ITSELF.
+    // The report's `drew` counters come from the draw calls, but a drawer that
+    // miscounted would agree with itself. The pixels do not: the map canvas is
+    // read back (`getImageData`, device px) before the press and mid-drag, at
+    // the same view, and the fraction of pixels that changed is compared with
+    // the same fraction for the SAME drag with the tint ON (row 7e, the control
+    // that makes 7c2 mean anything) and with a repaint that changed nothing
+    // (row 7f, the noise floor). No coordinate is converted on this side.
+    const VIEW7 = `window.__dbg.setView(16, 16, ${ZOOM})`;
+    const PIXEL_DELTA = 12; // per channel, 0-255: antialiasing jitter below it
+    const snap = (tag) => c.json(`(() => {
+      const cv = document.getElementById('map-canvas');
+      if (!cv) return { ok: false, why: 'no #map-canvas' };
+      try {
+        const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+        (window.__h208 = window.__h208 || {})[${JSON.stringify(tag)}] = d;
+        return { ok: true, w: cv.width, h: cv.height };
+      } catch (e) { return { ok: false, why: String(e) }; }
+    })()`);
+    const changed = (a, b) => c.json(`(() => {
+      const A = window.__h208 && window.__h208[${JSON.stringify(a)}];
+      const B = window.__h208 && window.__h208[${JSON.stringify(b)}];
+      if (!A || !B || A.length !== B.length || A.length === 0) return null;
+      let n = 0;
+      for (let i = 0; i < A.length; i += 4) {
+        if (Math.abs(A[i] - B[i]) > ${PIXEL_DELTA} || Math.abs(A[i + 1] - B[i + 1]) > ${PIXEL_DELTA}
+          || Math.abs(A[i + 2] - B[i + 2]) > ${PIXEL_DELTA}) n += 1;
+      }
+      return n / (A.length / 4);
+    })()`);
+    const rest = async (tag) => {
+      // Pan away and back so the rest capture is a REAL repaint of this view.
+      await c.evalExpr(`window.__dbg.setView(40, 40, ${ZOOM})`);
+      await sleep(300);
+      await c.evalExpr(VIEW7);
+      await sleep(500);
+      return snap(tag);
+    };
+
+    await c.evalExpr(VIEW7);
+    await sleep(500);
+    const restA = await rest('offRestA');
+    const restB = await rest('offRestB');
+    const noise = await changed('offRestA', 'offRestB');
+    if (!restA.ok || !restB.ok || noise === null) {
+      unmeasurable('7f', 'CONTROL: two rest captures of the same view are the same picture',
+        `canvas readback failed: ${JSON.stringify({ restA, restB, noise })}`);
+    } else {
+      check('7f', 'CONTROL: two rest captures of the same view are the same picture (noise floor)',
+        noise < 0.001,
+        `${(noise * 100).toFixed(3)}% of ${restA.w}x${restA.h} device px changed across a repaint `
+        + 'that moved nothing. Above 0.1% the art itself animates and 7c2/7e cannot be read.');
+    }
+
     const d0 = aim(0.45, 0.40); const d1 = aim(0.62, 0.58);
     const beforeDrag = await report();
     await mouse(c, 'mousePressed', d0.x, d0.y);
@@ -480,13 +541,27 @@ async function main() {
     await mouse(c, 'mouseMoved', d1.x, d1.y, { buttons: 1 });
     await sleep(500);
     const midDrag = await report();
-    check('7c', 'but a drag IN PROGRESS still draws while hidden — no carving blind',
-      !!(beforeDrag && midDrag && midDrag.paints > beforeDrag.paints),
-      `paints ${beforeDrag?.paints} -> ${midDrag?.paints} with showRegions OFF and the button DOWN. `
-      + 'This is the overseer\'s call, not something the owner asked for, and it is overturnable.');
+    const offDragSnap = await snap('offDrag');
+    const drew = midDrag?.drew;
+    check('7c', 'a drag IN PROGRESS while hidden paints, and paints ONLY the gesture: no hatch, '
+      + 'no unassigned wash, no labels, and the dragged outline IS drawn',
+      !!(beforeDrag && midDrag && midDrag.paints > beforeDrag.paints
+        && midDrag.mode === 'gesture' && drew
+        && drew.hatches === 0 && drew.unassignedHoles === 0 && drew.labels === 0
+        && drew.gestureOutlines >= 1),
+      `paints ${beforeDrag?.paints} -> ${midDrag?.paints} with showRegions OFF and the button DOWN; `
+      + `mode=${JSON.stringify(midDrag?.mode)} drew=${JSON.stringify(drew)}. Row 208, ruled C.`);
     await shot(c, 'region-overlay-OFF-mid-drag');
+    const offChanged = offDragSnap.ok ? await changed('offRestA', 'offDrag') : null;
     await mouse(c, 'mouseReleased', d1.x, d1.y, { buttons: 0 });
     await sleep(700);
+    // The release committed a move. Undo it, so the ON control below drags the
+    // SAME document with the SAME aims and the two pictures differ in one thing.
+    await ctrlZ(c);
+    await sleep(900);
+    const docFor7e = JSON.stringify(await docNow(c));
+    check('7g', 'ANTI-VACUOUS: the ON control below starts from the same document as the OFF drag',
+      docFor7e === beforeJSON, 'one Ctrl+Z after the OFF drag must return the seeded bytes');
 
     // And back on, so the toggle is proven to work in BOTH directions rather
     // than only to turn things off.
@@ -498,6 +573,94 @@ async function main() {
     check('7d', 'and ticking it back on resumes painting — the toggle works both ways',
       !!(backA && backB && backB.paints > backA.paints),
       `paints ${backA?.paints} -> ${backB?.paints}`);
+
+    // ── 7e. THE CONTROL: the same drag with the tint ON draws the full wash ──
+    await c.evalExpr(VIEW7);
+    await sleep(600);
+    await mouse(c, 'mousePressed', d0.x, d0.y);
+    await sleep(160);
+    await mouse(c, 'mouseMoved', d1.x, d1.y, { buttons: 1 });
+    await sleep(500);
+    const onDrag = await report();
+    const onDragSnap = await snap('onDrag');
+    await shot(c, 'region-overlay-ON-mid-drag');
+    const onChanged = onDragSnap.ok ? await changed('offRestA', 'onDrag') : null;
+    await mouse(c, 'mouseReleased', d1.x, d1.y, { buttons: 0 });
+    await sleep(700);
+    await ctrlZ(c);
+    await sleep(900);
+
+    // Half the hatch's own line density, read from the code's visual calls: a
+    // 1 px line every `hatchPx` px covers about 1/hatchPx of what it washes.
+    const hatchPx = onDrag?.visual?.hatchPx ?? backB?.visual?.hatchPx;
+    const washFloor = typeof hatchPx === 'number' ? 1 / (2 * hatchPx) : null;
+    if (onChanged === null || washFloor === null) {
+      unmeasurable('7e', 'CONTROL: with the tint ON the same drag draws the full wash',
+        `readback ${JSON.stringify(onDragSnap)}, hatchPx ${JSON.stringify(hatchPx)}`);
+    } else {
+      check('7e', 'CONTROL: with the tint ON the same drag draws the full wash over the art',
+        onChanged > washFloor,
+        `${(onChanged * 100).toFixed(2)}% of device px differ from the art-only rest capture; `
+        + `floor ${(washFloor * 100).toFixed(2)}% = 1/(2 x hatchPx ${hatchPx}). Without this row, `
+        + '7c2 cannot tell "the wash is gone" from "this readback cannot see a wash".');
+    }
+    check('7e2', 'and the report says so: mode full, hatches and labels drawn',
+      !!(onDrag && onDrag.mode === 'full' && onDrag.drew
+        && onDrag.drew.hatches > 0 && onDrag.drew.labels > 0),
+      `mode=${JSON.stringify(onDrag?.mode)} drew=${JSON.stringify(onDrag?.drew)}`);
+
+    if (offChanged === null || onChanged === null || noise === null) {
+      unmeasurable('7c2', 'PIXELS: the hidden-tint drag changed the art only a little, and not by nothing',
+        `readback ${JSON.stringify({ offDragSnap, offChanged, onChanged, noise })}`);
+    } else {
+      check('7c2', 'PIXELS: with the tint hidden the drag changes far less of the art than the full wash '
+        + 'does, and more than a repaint that moved nothing (the gesture outline IS there)',
+        offChanged < onChanged / 4 && offChanged > noise,
+        `OFF mid-drag ${(offChanged * 100).toFixed(2)}% vs ON mid-drag ${(onChanged * 100).toFixed(2)}% `
+        + `(must be under a quarter of it) vs noise ${(noise * 100).toFixed(3)}% (must be above it)`);
+    }
+
+    // ── 7h. THE TRIMMED HALF OF THE GESTURE, ON SCREEN ─────────────────────
+    //
+    // 7c's drag is a MOVE of forest whose carve into night lands off screen, so
+    // it can only ever show the dragged outline (its report says
+    // trimmedOutlines 0, and that is correct, not a miss). This one is framed on
+    // the seam (4d's view) and is a DRAW inside night with forest selected, so
+    // night is TRIMMED on screen and its remainder's outline (the seam, in
+    // night's hue) is drawn beside the dragged rectangle. REPORT-ONLY: the
+    // pixel instrument above already proved the report's absences are honest;
+    // this row adds the one count 7c could not reach, and the capture is for
+    // the overseer's eye.
+    await c.evalExpr('window.__dbg.setOverlay("showRegions", false)');
+    await c.evalExpr(`window.__dbg.setView(${Math.round(BOUNDARY_X - halfSpan)}, 1200, ${BZOOM})`);
+    await sleep(800);
+    const t0 = aim(0.60, 0.40); const t1 = aim(0.75, 0.60);
+    await mouse(c, 'mousePressed', t0.x, t0.y);
+    await sleep(160);
+    await mouse(c, 'mouseMoved', t1.x, t1.y, { buttons: 1 });
+    await sleep(500);
+    const carveDrag = await report();
+    await shot(c, 'region-overlay-OFF-mid-drag-carve');
+    await mouse(c, 'mouseReleased', t1.x, t1.y, { buttons: 0 });
+    await sleep(700);
+    const docCarved = await docNow(c);
+    await ctrlZ(c);
+    await sleep(900);
+    const cd = carveDrag?.drew;
+    check('7h', 'a hidden-tint DRAW that trims night on screen outlines the dragged rectangle AND '
+      + 'what the carve leaves of night, with still no hatch, wash or label',
+      !!(carveDrag && carveDrag.mode === 'gesture' && cd && cd.gestureOutlines >= 1
+        && cd.trimmedOutlines >= 1 && cd.hatches === 0 && cd.unassignedHoles === 0 && cd.labels === 0),
+      `aim press=${JSON.stringify(t0)} move=${JSON.stringify(t1)} at zoom ${BZOOM}, seam view; `
+      + `mode=${JSON.stringify(carveDrag?.mode)} drew=${JSON.stringify(cd)}`);
+    const docAfter7h = JSON.stringify(await docNow(c));
+    const nightAfterRelease = (docCarved?.regions ?? []).filter((r) => r.id === 'night').length;
+    check('7h2', 'ANTI-VACUOUS: that drag really carved night on release, and one Ctrl+Z undid it',
+      nightAfterRelease > 1 && docAfter7h === beforeJSON,
+      `night entries after release ${nightAfterRelease} (a hole punched in one rectangle is several); `
+      + `back to the seeded bytes after the undo: ${docAfter7h === beforeJSON}`);
+    await c.evalExpr('window.__dbg.setOverlay("showRegions", true)');
+    await sleep(500);
 
     // ── 8. A picture for the owner, over real level art ───────────────────
     await c.evalExpr(`window.__dbg.setView(0, 0, 1)`);
