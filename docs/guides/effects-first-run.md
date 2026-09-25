@@ -482,7 +482,8 @@ binding.
 
 A binding on a section that owns its preset but is not threaded writes the key,
 and aeon's canonical build refuses it by name ("no preset threads
-`ojz_act1_sec_raster(sec: N)`") until that line is added.
+`ojz_act1_preset_raster(preset: <Record>_KEY)`", with the name of the record that
+section installs in place of Record) until that line is added.
 
 **Aurora derives these facts from aeon's own files on every load**: the act
 descriptor and the effects library. It prints those two sets act-wide, on the
