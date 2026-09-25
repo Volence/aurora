@@ -245,9 +245,12 @@ function driver(c) {
   };
   const FACET = (label) => `[...document.querySelectorAll('[aria-label="Facets"] button')].find((b) => b.textContent.trim() === ${J(label)}) || null`;
   const st = () => c.json('window.__dbg.donors.state()');
-  const waitFor = async (pred, what, tries = 80, ms = 250) => {
+  const waitFor = async (pred, what, tries = 80, ms = 250, { soft = false } = {}) => {
     let s = null;
     for (let i = 0; i < tries; i++) { s = await st(); if (pred(s)) return s; await sleep(ms); }
+    // SOFT: the row itself judges the state it was left with, so a property that
+    // never arrived prints as that row's FAIL instead of aborting the run.
+    if (soft) return s;
     throw new Error(`timed out waiting for ${what}: ${J(s).slice(0, 600)}`);
   };
   /** Pane geometry from the pane's own report: view (scale, ox, oy) and rect. */
@@ -327,7 +330,9 @@ async function main() {
     const dpr = await c.evalExpr('window.devicePixelRatio');
     console.log(`    dpr          : ${dpr}   window ${J(await c.json('({ iw: innerWidth, ih: innerHeight })'))}`);
     const d = driver(c);
-    await rows(d, O, COPY, dpr);
+    try { await rows(d, O, COPY, dpr); } catch (e) {
+      check('DP.ABORT', `the run stopped early, so every row after the last one printed did NOT run: ${e.message.slice(0, 300)}`, false);
+    }
   } finally {
     try { c && c.close(); } catch { /* closing a dead socket is not a result */ }
     await killTree(child);
@@ -536,10 +541,10 @@ async function rows(d, O, COPY, dpr) {
   await c.evalExpr('document.activeElement && document.activeElement !== document.body && document.activeElement.blur()');
   const focus = (await d.st()).focusedDocId;
   await d.chord('z', CTRL);
-  const s8 = await d.waitFor((s) => s.paste.outcome && s.paste.outcome.kind === 'undone', 'the undo', 80);
+  const s8 = await d.waitFor((s) => s.paste.outcome && s.paste.outcome.kind === 'undone', 'the undo', 40, 250, { soft: true });
   const goneAfterUndo = !existsSync(path);
   check('DP.8a', 'a REAL Ctrl+Z on the Donors facet undoes the paste: the clips.json it created is GONE from disk',
-    focus === 'doc:donor-paste' && goneAfterUndo && s8.paste.outcome.removed === true,
+    focus === 'doc:donor-paste' && goneAfterUndo && !!s8.paste.outcome && s8.paste.outcome.removed === true,
     `focused doc ${focus}; outcome ${J(s8.paste.outcome)}; on disk ${goneAfterUndo ? 'absent' : 'STILL THERE'}`);
   await d.realClick('document.querySelector("[data-donors-redo]")');
   const s8b = await d.waitFor((s) => s.paste.outcome && s.paste.outcome.kind === 'redone', 'the redo', 80);
