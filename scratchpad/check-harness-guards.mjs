@@ -1478,9 +1478,24 @@ let trackedFails = fails;
 }
 
 let untrackedFails = [];
+let unkeyedFails = [];
 const trackedAtTheEnd = trackedScratchpad();
 if (trackedAtTheEnd) {
   const tracked = trackedAtTheEnd;
+  // ⚠ ROADMAP row 196: THE SPLIT USED TO TRUST EVERY RULE'S SPELLING OF ITS
+  // PATH, AND G9 SPELLED IT `scratchpad/…`. The tracked set is
+  // scratchpad-relative, so no G9 key could ever match it, and every G9
+  // failure — on a file the repo DOES carry — was printed under the UNTRACKED
+  // heading below, whose own words say "the repo does not carry them", and
+  // exited 0. G6 above carries a comment warning of exactly this spelling; G9
+  // was written without it. Two repairs, one per half of the defect:
+  //   1. the key is normalised here, once, instead of by each rule's author;
+  //   2. "untracked" is now a POSITIVE finding, not the fallback: a failure is
+  //      filed untracked only when its key names a file this run WALKED and
+  //      git does not carry. A key that names neither a tracked file nor a
+  //      walked one means the split cannot tell which it is, and that is not a
+  //      pass: it is fatal and printed under its own heading, so the next rule
+  //      with a new spelling goes red instead of quietly non-fatal.
   // `[GS]` — the shell rules use S-codes, and leaving this as `G\d+` would have
   // filed every shell failure under "tracked" by accident (the rule id would
   // stay in the key and never match a path), making an untracked .sh fatal.
@@ -1490,9 +1505,12 @@ if (trackedAtTheEnd) {
   // when the path it names is untracked — so without this line the split makes
   // that rule non-fatal in precisely the case it exists to catch. Measured, not
   // reasoned: a planted rotten exemption exited 0 before this was here.
-  untrackedFails = fails.filter((f) => !alwaysFatal.has(f)
-    && !tracked.has(String(f).replace(/^\s*[GS]\d+ /, '').split(':')[0]));
-  trackedFails = fails.filter((f) => !untrackedFails.includes(f));
+  const walkedRel = new Set(walked.files.map((f) => relative(DIR, f)));
+  const keyOf = (f) => String(f).replace(/^\s*[GS]\d+ /, '').split(':')[0].replace(/^scratchpad\//, '');
+  const candidates = fails.filter((f) => !alwaysFatal.has(f) && !tracked.has(keyOf(f)));
+  untrackedFails = candidates.filter((f) => walkedRel.has(keyOf(f)));
+  unkeyedFails = candidates.filter((f) => !walkedRel.has(keyOf(f)));
+  trackedFails = fails.filter((f) => !candidates.includes(f));
 }
 // Cannot ask git -> cannot split -> treat every failure as fatal, `trackedFails`
 // keeping its `= fails` initialiser. Never the other way: an unanswerable
@@ -1505,18 +1523,26 @@ if (untrackedFails.length) {
   for (const f of untrackedFails) console.log(`  ${f}`);
 }
 
+if (unkeyedFails.length) {
+  console.log(`\nFAILING, AND THE TRACKED/UNTRACKED SPLIT CANNOT PLACE THEM (${unkeyedFails.length}):`);
+  console.log('  Each names a path that is neither tracked under scratchpad/ nor a file this run walked, so');
+  console.log('  the split cannot say whether the repo carries it. Fatal, because cannot-tell is not a pass:');
+  console.log('  fix the rule that spelled the path, so the split can file it truthfully.');
+  for (const f of unkeyedFails) console.log(`  ${f}`);
+}
+
 if (trackedFails.length) {
   console.log(`\nFAILING (${trackedFails.length}):`);
   for (const f of trackedFails) console.log(`  ${f}`);
 }
 
-const bad = trackedFails.length + unmeasurable.length;
+const bad = trackedFails.length + unkeyedFails.length + unmeasurable.length;
 const classified = rows.length + shRows.length;
-const clean = classified - trackedFails.length - untrackedFails.length - unmeasurable.length;
+const clean = classified - trackedFails.length - unkeyedFails.length - untrackedFails.length - unmeasurable.length;
 // `clean` subtracts the untracked ones too. They are NOT clean -- they are
 // unguarded and merely not fatal -- and a headline that counted them as clean
 // would be the gate telling the exact lie it exists to catch.
-console.log(`\n════ ${clean} clean / ${classified} classified (${rows.length} .mjs + ${shRows.length} .sh) · ${trackedFails.length} failure(s)`
+console.log(`\n════ ${clean} clean / ${classified} classified (${rows.length} .mjs + ${shRows.length} .sh) · ${trackedFails.length + unkeyedFails.length} failure(s)`
   + `${untrackedFails.length ? ` · ${untrackedFails.length} unguarded-untracked` : ''}`
   + ` · ${unmeasurable.length} unmeasurable ════`);
 process.exit(bad ? 1 : 0);
