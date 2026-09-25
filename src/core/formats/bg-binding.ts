@@ -4,8 +4,12 @@
  * `assign_section_bg` returns a success reply, the editor composites the
  * assigned background, and the ref persists in the section's `.meta.json`
  * sidecar. All of that is real and none of it reaches a ROM: no aeon generator
- * reads `{zone}_bglib.json` or a sidecar's `bgLayoutRef` (the effects generator
- * says so explicitly in aeon `tools/EFFECTS_CONSUMER_CONTRACT.md` §2.2).
+ * reads a sidecar's `bgLayoutRef` (the effects generator
+ * says so explicitly in aeon `tools/EFFECTS_CONSUMER_CONTRACT.md` §2.2). This
+ * paragraph also said no generator reads `{zone}_bglib.json`; aeon's
+ * `tools/gen_region_bg_showcase.py` does (its `LIBRARY`, for DEBUG region
+ * showcase rows), which is not a section binding and does not change the
+ * conclusion. Corrected under ROADMAP row 212, aeon a0c63764.
  * The background that DOES reach a ROM is the ACT-WIDE one, through
  * `{dataRoot}editor_bg_override.json` and aeon's `tools/inject_editor_bg.py`.
  *

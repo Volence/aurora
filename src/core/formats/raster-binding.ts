@@ -95,7 +95,9 @@
  *      author's choice in this editor can reach the raster channel at all.
  *   2. SECTION 5, UNBOUND — the chooser returns `hand:`
  *      (`Raster_Program_None`) and nothing changes. `OJZ_Preset_Sec5` is
- *      byte-identical to `OJZ_Preset_Plain` today.
+ *      byte-identical to `OJZ_Preset_Plain` today. [FALSE NOW (ROADMAP row 212, re-read at aeon origin/master a0c63764 on 2026-09-25):
+ *      `OJZ_Preset_Sec5` carries `parallax: ParallaxConfig_OJZ_Underwater`
+ *      and the record-keyed choosers, which Plain does not.]
  *   3. ANY OTHER SECTION, BOUND — the key is written, aeon's witness counts it,
  *      AND NOTHING CONSUMES IT. This is the case the sentence exists for.
  *
@@ -736,6 +738,10 @@
  *   section 0 is the only section with live patch channels while their own
  *   `ojz_effects.emp` has carried a second (`OJZ_Preset_Sec7`, `patched:
  *   OJZ_WorldWater`) since 2026-09-05. A literal would have been born stale.
+ *   [The disagreement is CLOSED (ROADMAP row 212, re-read at aeon origin/master a0c63764 on 2026-09-25): aeon corrected its prose on
+ *   2026-09-10; docs/DEFERRED_WORK.md SECTION0-SPECIAL-CASE and ojz_effects.emp
+ *   now both name the barred set [0, 7]. The argument for re-reading the ensure
+ *   stands; the example of it disagreeing is history.]
  *
  *   WHY IT IS A REFUSAL AND NOT AN ADVISORY: aeon ruled it (`92d744fc`,
  *   `docs/DEFERRED_WORK.md`) a STABLE PROPERTY under this lane's own
