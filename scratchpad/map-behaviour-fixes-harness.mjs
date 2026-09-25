@@ -1594,9 +1594,11 @@ const AOB_READ = String.raw`(() => { const cv = ${COMPOSER_CANVAS}; const nb = d
   const b = cv ? cv.getBoundingClientRect() : null; const br = bar ? bar.getBoundingClientRect() : null;
   const warn = bar ? [...bar.querySelectorAll('span')].find((s) => s.children.length === 0 && s.textContent.includes('⚠')) || null : null;
   const cs = bar ? getComputedStyle(bar) : null;
-  const kids = bar ? [...bar.children].map((k) => ({ h: k.getBoundingClientRect().height, t: (k.getAttribute('aria-label') || k.textContent || k.tagName).trim().slice(0, 24) })) : [];
+  const row = nb && nb.parentElement ? nb.parentElement.parentElement : null;
+  const kids = row ? [...row.children].map((k) => ({ h: k.getBoundingClientRect().height, t: (k.getAttribute('aria-label') || k.textContent || k.tagName).trim().slice(0, 24) })) : [];
   const tall = kids.reduce((m, k) => (m && m.h >= k.h ? m : k), null);
-  return { tallest: tall, canvas: b ? { x: b.left, y: b.top, w: b.width, h: b.height } : null, dpr: window.devicePixelRatio, iw: innerWidth, ih: innerHeight,
+  const nr = nb ? nb.getBoundingClientRect() : null;
+  return { tallest: tall, newY: nr ? nr.top : null, canvas: b ? { x: b.left, y: b.top, w: b.width, h: b.height } : null, dpr: window.devicePixelRatio, iw: innerWidth, ih: innerHeight,
     bar: br ? { y: br.top, h: br.height, sb: bar.offsetHeight - bar.clientHeight, sw: bar.scrollWidth, cw: bar.clientWidth, sh: bar.scrollHeight, ch: bar.clientHeight, ox: cs.overflowX } : null,
     warn: warn ? { text: warn.textContent.trim(), title: warn.getAttribute('title'), aria: warn.getAttribute('aria-label'), h: warn.getBoundingClientRect().height } : null }; })()`;
 const sameRect = (p, q) => !!p && !!q && ['x', 'y', 'w', 'h'].every((k) => Math.abs(p[k] - q[k]) < 0.01);
@@ -1609,10 +1611,10 @@ async function aobCensus(d, label) {
     await sleep(350);
     const tool = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.tool ?? null;
     const r = await c.json(AOB_READ);
-    rows.push({ id: t.id, hit: !!hit?.hitOk, tool, barH: r.bar?.h ?? null, sb: r.bar?.sb, tallest: r.tallest, canvas: r.canvas, sw: r.bar?.sw, cw: r.bar?.cw, ox: r.bar?.ox, dpr: r.dpr, iw: r.iw, ih: r.ih });
+    rows.push({ id: t.id, hit: !!hit?.hitOk, tool, newY: r.newY, barH: r.bar?.h ?? null, sb: r.bar?.sb, tallest: r.tallest, canvas: r.canvas, sw: r.bar?.sw, cw: r.bar?.cw, ox: r.bar?.ox, dpr: r.dpr, iw: r.iw, ih: r.ih });
   }
   console.log(`   CENSUS [${label}] window ${rows[0]?.iw}x${rows[0]?.ih} dpr ${rows[0]?.dpr}`);
-  for (const r of rows) console.log(`     ${r.id.padEnd(14)} store tool ${String(r.tool).padEnd(14)} bar h ${r.barH}  canvas ${J(r.canvas)}  bar scroll/client w ${r.sw}/${r.cw} overflow-x ${r.ox} (scrollbar+border ${r.sb})  tallest item ${J(r.tallest)}`);
+  for (const r of rows) console.log(`     ${r.id.padEnd(14)} store tool ${String(r.tool).padEnd(14)} bar h ${r.barH} New… y ${r.newY}  canvas ${J(r.canvas)}  bar scroll/client w ${r.sw}/${r.cw} overflow-x ${r.ox} (scrollbar+border ${r.sb})  tallest item ${J(r.tallest)}`);
   return rows;
 }
 function aobCensusRows(id, label, rows) {
@@ -1621,9 +1623,9 @@ function aobCensusRows(id, label, rows) {
     armed, J(rows.map((r) => `${r.id}${r.hit ? '' : ' (MISS)'} -> ${r.tool}`)));
   if (!armed) return;
   const h0 = rows[0].barH; const g0 = rows[0].canvas;
-  check(`${id}.a`, `(${label}) the options bar's height and the composer canvas rect are the SAME under every rail tool`,
-    rows.every((r) => r.barH !== null && Math.abs(r.barH - h0) < 0.01 && sameRect(r.canvas, g0)),
-    `bar heights ${J(Object.fromEntries(rows.map((r) => [r.id, r.barH])))}; canvas y ${J(Object.fromEntries(rows.map((r) => [r.id, r.canvas?.y])))}`);
+  check(`${id}.a`, `(${label}) the options bar's height, the composer canvas rect and the bar's own New… button (its items do not jump inside it) are the SAME under every rail tool`,
+    rows.every((r) => r.barH !== null && Math.abs(r.barH - h0) < 0.01 && sameRect(r.canvas, g0) && r.newY !== null && Math.abs(r.newY - rows[0].newY) < 0.01),
+    `bar heights ${J(Object.fromEntries(rows.map((r) => [r.id, r.barH])))}; canvas y ${J(Object.fromEntries(rows.map((r) => [r.id, r.canvas?.y])))}; New… top ${J(Object.fromEntries(rows.map((r) => [r.id, r.newY])))}`);
   const clipped = rows.filter((r) => r.sw > r.cw && !['auto', 'scroll'].includes(r.ox));
   const scrolls = rows.filter((r) => r.sw > r.cw).map((r) => `${r.id} ${r.sw}/${r.cw}`);
   check(`${id}.b`, `CONTROL (${label}): nothing is silently cut: under every tool the bar's content either fits its width or the bar scrolls it (overflow-x auto or scroll)`,
