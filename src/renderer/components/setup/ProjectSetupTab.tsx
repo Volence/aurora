@@ -5,7 +5,12 @@
 // merged .aurora/project.json and re-opens the project so resolution re-runs
 // for real. Sidecar parse issues (per-entry diagnostics from mapping.ts) and
 // overrides matching no profile entry render above the rows. Aeon shows an
-// info card until it becomes a full profile (Stage 3).
+// info card: it has no entry in core/project/profiles/, so there is no
+// mapping layer here to edit. (ROADMAP row 212, 2026-09-25: this said "until
+// it becomes a full profile (Stage 3)", and the card promised the editor would
+// arrive then. The UX overhaul's Stage 3 plan landed and Stage 4 is under way
+// with aeon still not a profile, so the promise named a milestone that had
+// passed. The card now says what is true and promises nothing.)
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { T, CollapsibleSection } from '../ui';
@@ -138,8 +143,8 @@ export default function ProjectSetupTab() {
             <div style={styles.infoLine}><span style={styles.infoKey}>zones</span><span style={styles.mono}>{config.zones.length}</span></div>
           </div>
           <div style={styles.note}>
-            Aeon projects configure through their own project.json today; the full
-            mapping-layer editor arrives when aeon becomes a profile (Stage 3).
+            Aeon projects configure through their own project.json, which this tab
+            shows and does not edit: aeon has no mapping-layer profile here.
           </div>
         </div></div>
       );
