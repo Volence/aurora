@@ -1131,7 +1131,19 @@ async function abwPart(d, O) {
 async function ablPart(d, O) {
   const { c } = d;
   await neutral(d);
-  const facet = await openArtChunk(d);
+  // A chunk already open in the composer (PART abw leaves its document open and
+  // DIRTY: final1 found that a double-click on a chunk then asks whether to
+  // discard it, and the facet never switched) is reached by a real click on the
+  // Art facet instead. Otherwise the real double-click of PART abw opens one.
+  const already = await c.json('window.__dbg.aeon.artChunkOpen()');
+  let facet;
+  if (already && already.chunkId !== null) {
+    const art = await d.realClick(d.FACET('Art'));
+    await sleep(800);
+    facet = { hitOk: !!art?.hitOk && (await c.json('window.__dbg.aeon.artChunkOpen()'))?.chunkId === already.chunkId, route: 'Art facet click, document already open', already, art };
+  } else {
+    facet = { ...(await openArtChunk(d)), route: 'double-click on the Chunks grid' };
+  }
   const tool = await d.realClick('document.querySelector(\'button[aria-label="Tile stamp"]\')');
   await sleep(600);
   const doc = await c.json('window.__dbg.aeon.artChunkOpen()');
@@ -1225,7 +1237,7 @@ async function ablPart(d, O) {
   const premise = unmoved && !!fPre && fPre.isBody && preClicks.length === 0 && !!fHeld && fHeld.isBody && keyClicks.length === 0
     && toolAfter === 'tile-stamp' && same(pick(c1).slice(0, 2), [stamped(true, false), stamped(true, false)]);
   check('ABL.0', 'PREMISE: on the composer\'s chunk document with the Tile stamp armed, a warm-up stamp made it dirty (so the status bar above the canvas no longer grows under the stroke); a real X before the stroke armed H; the stroke is HELD (tiles 1 and 2 stamped with the armed tile, hf true, vf false: the flips at the press); focus is on <body> both times (not a text field, so the composer\'s X/Y handler runs); a real Y was sent and clicked nothing; the tool is still the stamp; the canvas did not move',
-    premise, `dpr ${G.dpr}; canvas ${J(G)} zoom ${zoom}; warm-up ${J(warm)} dirty ${dirtyAfterWarm}; before X ${J(Gpre)}, after the press ${J(Gpress)}, after Y ${J(G1)}; doc ${J(doc)}; tiles ${J(tiles)}; aims ${J(aims)}; `
+    premise, `dpr ${G.dpr}; document reached by ${facet.route}; canvas ${J(G)} zoom ${zoom}; warm-up ${J(warm)} dirty ${dirtyAfterWarm}; before X ${J(Gpre)}, after the press ${J(Gpress)}, after Y ${J(G1)}; doc ${J(doc)}; tiles ${J(tiles)}; aims ${J(aims)}; `
     + `focus before X ${J(fPre)}, while held ${J(fHeld)}; clicks by X ${J(preClicks)}, by Y ${J(keyClicks)}; tool after ${toolAfter}; brushTile ${T}; `
     + `tiles 1..5 before ${J(pick(c0))}; tiles 1,2 after the press ${J(pick(c1).slice(0, 2))}`);
   await d.mouse('mouseMoved', aims[2].x, aims[2].y, 'left', 1); await sleep(150);
