@@ -620,6 +620,48 @@ async function main() {
         + `(must be under a quarter of it) vs noise ${(noise * 100).toFixed(3)}% (must be above it)`);
     }
 
+    // ── 7h. THE TRIMMED HALF OF THE GESTURE, ON SCREEN ─────────────────────
+    //
+    // 7c's drag is a MOVE of forest whose carve into night lands off screen, so
+    // it can only ever show the dragged outline (its report says
+    // trimmedOutlines 0, and that is correct, not a miss). This one is framed on
+    // the seam (4d's view) and is a DRAW inside night with forest selected, so
+    // night is TRIMMED on screen and its remainder's outline (the seam, in
+    // night's hue) is drawn beside the dragged rectangle. REPORT-ONLY: the
+    // pixel instrument above already proved the report's absences are honest;
+    // this row adds the one count 7c could not reach, and the capture is for
+    // the overseer's eye.
+    await c.evalExpr('window.__dbg.setOverlay("showRegions", false)');
+    await c.evalExpr(`window.__dbg.setView(${Math.round(BOUNDARY_X - halfSpan)}, 1200, ${BZOOM})`);
+    await sleep(800);
+    const t0 = aim(0.60, 0.40); const t1 = aim(0.75, 0.60);
+    await mouse(c, 'mousePressed', t0.x, t0.y);
+    await sleep(160);
+    await mouse(c, 'mouseMoved', t1.x, t1.y, { buttons: 1 });
+    await sleep(500);
+    const carveDrag = await report();
+    await shot(c, 'region-overlay-OFF-mid-drag-carve');
+    await mouse(c, 'mouseReleased', t1.x, t1.y, { buttons: 0 });
+    await sleep(700);
+    const docCarved = await docNow(c);
+    await ctrlZ(c);
+    await sleep(900);
+    const cd = carveDrag?.drew;
+    check('7h', 'a hidden-tint DRAW that trims night on screen outlines the dragged rectangle AND '
+      + 'what the carve leaves of night, with still no hatch, wash or label',
+      !!(carveDrag && carveDrag.mode === 'gesture' && cd && cd.gestureOutlines >= 1
+        && cd.trimmedOutlines >= 1 && cd.hatches === 0 && cd.unassignedHoles === 0 && cd.labels === 0),
+      `aim press=${JSON.stringify(t0)} move=${JSON.stringify(t1)} at zoom ${BZOOM}, seam view; `
+      + `mode=${JSON.stringify(carveDrag?.mode)} drew=${JSON.stringify(cd)}`);
+    const docAfter7h = JSON.stringify(await docNow(c));
+    const nightAfterRelease = (docCarved?.regions ?? []).filter((r) => r.id === 'night').length;
+    check('7h2', 'ANTI-VACUOUS: that drag really carved night on release, and one Ctrl+Z undid it',
+      nightAfterRelease > 1 && docAfter7h === beforeJSON,
+      `night entries after release ${nightAfterRelease} (a hole punched in one rectangle is several); `
+      + `back to the seeded bytes after the undo: ${docAfter7h === beforeJSON}`);
+    await c.evalExpr('window.__dbg.setOverlay("showRegions", true)');
+    await sleep(500);
+
     // ── 8. A picture for the owner, over real level art ───────────────────
     await c.evalExpr(`window.__dbg.setView(0, 0, 1)`);
     await sleep(800);
