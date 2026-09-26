@@ -56,8 +56,8 @@ import {
   readCollisionRegion, SECTION_CELLS_WIDE, SECTION_CELLS_HIGH, COLLISION_REGION_MAX_CELLS,
 } from '../../core/collision/collision-region-read';
 import {
-  auditCrossovers, crossoverAuditSeverity, crossoverAuditMessage,
-} from '../../core/collision/crossover-audit';
+  auditReservedBits, reservedAuditSeverity, reservedAuditMessage,
+} from '../../core/collision/reserved-bits-audit';
 import type { AgentRequest, AgentRequestEnvelope } from '../../shared/agent-protocol';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import {
@@ -489,6 +489,20 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // with nowhere to hang a refinement; see validateCollisionWrite.
       const formErr = validateCollisionWrite(req.word, req.words, req.w, req.h);
       if (formErr) throw new Error(formErr);
+      // THE RETIRED PARAMETERS ARE REFUSED, NOT IGNORED, on any road that
+      // reaches this handler with them. `crossover` / `crossoverSpan` painted the
+      // loop crossover mark (bits 15:14) until the owner ruled layer-switch LINES
+      // the only mechanism and aeon retired the marks (ROADMAP rows 223+224).
+      // A caller still asking for a handoff must learn it got none; painting the
+      // shape and saying nothing would be a success report for a write that did
+      // not happen. (The zod-validated roads strip unknown keys before this
+      // point; see the review packet's Open section.)
+      const retired = ['crossover', 'crossoverSpan'].filter((k) => (req as Record<string, unknown>)[k] !== undefined);
+      if (retired.length) {
+        throw new Error(`paint_collision: ${retired.join(' and ')} ${retired.length === 1 ? 'is' : 'are'} RETIRED `
+          + '(2026-09-26): the painted loop crossover mark no longer exists, and aeon refuses bits 15:14 of a '
+          + 'collision word. A layer switch is now a LINE in the act\'s layer_lines.json. Nothing was painted.');
+      }
       ensureCollisionPlanes(section);
       // "both" is a MODE, not a third plane — the aimed plane stays A so the
       // command, its description and its undo all name a real plane. See
@@ -499,16 +513,9 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const aimedId: 'a' | 'b' = req.plane === 'both' ? 'a' : req.plane;
       const aimed = aimedId === 'b' ? section.collisionEditB! : section.collisionEdit!;
       const other = aimedId === 'b' ? section.collisionEdit! : section.collisionEditB!;
-      // Absent means `keep`, never `clear` — see the protocol comment.
-      const crossover = req.crossover ?? 'keep';
-      // Absent means `'cell'` — the width this tool has always painted. The
-      // narrow widths exist because aeon's trigger reads 8px columns and
-      // Aurora's cell is two of them, so a two-way pair at cell width nets to
-      // nothing (core/collision/layer-transition.ts's CrossoverSpan block).
-      const crossoverSpan = req.crossoverSpan ?? 'cell';
-      // THE THREE AXES COMPOSE, AND NOTHING BRANCHES TWICE ON ANY OF THEM.
-      // FORM picks the builder; PLANE and CROSSOVER are passed through to the
-      // same `buildPlaneEntries` merge underneath either one. Both forms are
+      // THE TWO AXES COMPOSE, AND NOTHING BRANCHES TWICE ON EITHER.
+      // FORM picks the builder; PLANE is passed through to the same
+      // `buildPlaneEntries` merge underneath either one. Both forms are
       // DECIDERS and both reach `collisionPaintWord` — two forms of one tool
       // must not be two rules
       // (docs/reviews/2026-08-29-paint-collision-reconcile.md).
@@ -516,13 +523,11 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         ? paintCollisionCellsBothPlanes({
           x: req.x, y: req.y, w: req.w, h: req.h, words: req.words,
           aimedPlane: aimed, otherPlane: other, tileWidth: SECTION_TILES_WIDE, bothPlanes,
-          aimedPlaneId: aimedId, crossover, crossoverSpan,
         })
         : {
           ...paintCollisionRectBothPlanes({
             x: req.x, y: req.y, w: req.w, h: req.h, word: req.word!,
             aimedPlane: aimed, otherPlane: other, tileWidth: SECTION_TILES_WIDE, bothPlanes,
-            aimedPlaneId: aimedId, crossover, crossoverSpan,
           }),
           // The FILL form names a word for every cell in the rectangle, so it
           // can never skip one. Stated as a constant rather than left off the
@@ -551,27 +556,20 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // `skipped` counts CELLS whose word was null — one number, not one per
       // plane, because the nulls come from a single `words` array and a cell a
       // caller declined to name is declined on both planes.
-      // The audit rides back on the reply rather than waiting to be asked for.
-      // An agent painting a loop is the caller LEAST able to notice that it
-      // marked only one plane — it has no lens — and aeon's build does not
-      // check it either (anchor §8.2 assigns the loop-shaped check to Aurora).
-      // So the number that says "this loop works in one direction" is returned
-      // beside the paint that could have caused it.
-      const audit = auditCrossovers(section.collisionEdit, section.collisionEditB,
+      // The reserved-bits audit rides back on the reply rather than waiting to
+      // be asked for: a paint never writes bits 15:14, but it never clears them
+      // either, so a section that carries a retired mark still carries it after
+      // the paint, and aeon will refuse the act. The agent has no palette note
+      // to read, so the error comes back beside the paint.
+      const audit = auditReservedBits(section.collisionEdit, section.collisionEditB,
         SECTION_TILES_WIDE, req.section);
       return {
         painted: entries.length, paintedOther: otherPlaneEntries.length, bothPlanes,
         skipped: plan.skipped,
-        crossover,
-        // Reported back so a caller can SEE which width it painted at. A
-        // two-way pair authored at 'cell' is the defect this parcel exists to
-        // close, and the reply that could have said so said nothing.
-        crossoverSpan,
-        crossoverAudit: {
-          marksA: audit.marksA, marksB: audit.marksB, pairs: audit.pairs,
-          oneWay: audit.oneWay, selfMarks: audit.selfMarks, reserved: audit.reserved,
-          severity: crossoverAuditSeverity(audit),
-          note: crossoverAuditMessage(audit),
+        reservedBitsAudit: {
+          reservedA: audit.reservedA, reservedB: audit.reservedB,
+          severity: reservedAuditSeverity(audit),
+          note: reservedAuditMessage(audit),
         },
       };
     }

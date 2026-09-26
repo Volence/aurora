@@ -56,13 +56,10 @@ import {
   lastComposerPriorityLensReport, type ComposerPriorityLensReport,
 } from './canvas/composer-priority-lens';
 import { lastBothPlanesLensReport, type BothPlanesLensReport } from './canvas/both-planes-lens';
-import { lastCrossoverLensReport, type CrossoverLensReport } from './canvas/crossover-lens';
 import {
-  CROSSOVER_SHIFT, CROSSOVER_VALUE_MASK, CROSSOVER_BITS,
-  CROSSOVER_NONE, CROSSOVER_TO_A, CROSSOVER_TO_B, CROSSOVER_RESERVED,
-  readCrossover, crossoverRefusal,
-} from '../core/collision/layer-transition';
-import { auditCrossovers, crossoverAuditSeverity, type CrossoverAudit } from '../core/collision/crossover-audit';
+  PLANE_RESERVED_SHIFT, PLANE_RESERVED_MASK, PLANE_RESERVED_BITS, planeReservedBits,
+} from '../core/collision/reserved-bits';
+import { auditReservedBits, reservedAuditSeverity, type ReservedBitsAudit } from '../core/collision/reserved-bits-audit';
 import { lastCameraPreviewReport, type CameraPreviewReport } from './canvas/camera-preview';
 import { lastRasterTimelineReport, type RasterTimelineReport } from './canvas/raster-timeline';
 import { presetProgramArm } from '../core/formats/effects/preset';
@@ -711,19 +708,8 @@ interface AeonProbeApi {
      *  `set`, so the harness exercises the lens-surfacing side effect the chip
      *  carries instead of a shortcut around it. */
     bothPlanes?: boolean;
-    /** The crossover tri-state chip. Goes through
-     *  `setCollisionCrossoverBrush`, so the harness exercises the lens-surfacing
-     *  side effect rather than a shortcut around it. */
-    crossover?: 'keep' | 'clear' | 'hand-off';
-    /** The MARK WIDTH chip, which exists in the palette only while the
-     *  crossover brush authors. `half` narrows the mark to the 8px sub-column
-     *  under the cursor — the only width at which a two-way pair flips the
-     *  layer (core/collision/layer-transition.ts). Through the setter, like the
-     *  two above. */
-    crossoverSpanMode?: 'cell' | 'half';
   }): {
-    plane: 'a' | 'b'; word: number; bothPlanes: boolean; crossover: string;
-    crossoverSpanMode: string;
+    plane: 'a' | 'b'; word: number; bothPlanes: boolean;
   };
   /**
    * The both-planes lens's last publish. Same role as `priorityLens()`: it
@@ -731,37 +717,18 @@ interface AeonProbeApi {
    * from "never ran", and `reason` distinguishes off / bg-layer / no-plane-b.
    */
   bothPlanesLens(): BothPlanesLensReport;
-  /** The crossover lens's last publish. `oneWayVeils` is the interesting one. */
-  crossoverLens(): CrossoverLensReport;
   /**
-   * THE ENCODING, AS THE APP HOLDS IT.
-   *
-   * Published so a harness asserts against the running build's own constants
-   * rather than re-typing aeon's anchor into the harness — a second copy of a
-   * bit number is the exact defect this seam exists to prevent, and a harness
-   * is not exempt from that. The node test cross-checks these against the peer
-   * blob; this hook checks that the RUNNING app carries the same ones.
+   * THE RESERVED FIELD, AS THE APP HOLDS IT (bits 15:14 of the per-plane cell
+   * word; the retired loop crossover mark). Published so a harness asserts
+   * against the running build's own constants rather than re-typing them.
    */
-  crossoverEncoding(): {
-    shift: number; valueMask: number; bits: number;
-    none: number; toA: number; toB: number; reserved: number;
-  };
-  /** One cell's crossover, by name, off the live document. `reserved` is a real
-   *  answer (the illegal value 3), never folded into `none`. */
-  crossoverAt(sectionIndex: number, plane: 'a' | 'b', index: number): string | null;
-  /**
-   * The paint-time loop audit over one section's two planes — the check aeon
-   * assigned to Aurora rather than to its build (anchor §8.2).
-   *
-   * Exposed because the audit is the only thing that can see a HALF-PAINTED
-   * loop, and a harness proving the brush wrote two bits proves nothing about
-   * whether the loop it belongs to is traversable in both directions.
-   */
-  crossoverAudit(sectionIndex: number): (CrossoverAudit & { severity: string }) | null;
-  /** The refusal text for writing `crossover` on `plane`, or null when legal.
-   *  A harness row asserts the editor REFUSES a self-mark, which is a hard
-   *  build error in aeon and must never reach a file. */
-  crossoverRefusal(plane: 'a' | 'b', crossover: string): string | null;
+  reservedBitsEncoding(): { shift: number; mask: number; bits: number };
+  /** Bits 15:14 of one cell word off the live document, or null when there is
+   *  no such cell. */
+  reservedBitsAt(sectionIndex: number, plane: 'a' | 'b', index: number): number | null;
+  /** The reserved-bits audit over one section's two planes (an ERROR whenever
+   *  any word carries bits 15:14; core/collision/reserved-bits-audit.ts). */
+  reservedBitsAudit(sectionIndex: number): (ReservedBitsAudit & { severity: string }) | null;
   /** The armed stamp source (editorStore.selectedChunkId). Read-only. */
   selectedChunk(): string | null;
   /**
@@ -1533,14 +1500,10 @@ function installAeonProbe(): AeonProbeApi {
       // without the lens and every subsequent row would be measuring a state no
       // click can produce.
       if (sel.bothPlanes !== undefined) e.setCollisionPaintBothPlanes(sel.bothPlanes);
-      if (sel.crossover !== undefined) e.setCollisionCrossoverBrush(sel.crossover);
-      if (sel.crossoverSpanMode !== undefined) e.setCollisionCrossoverSpanMode(sel.crossoverSpanMode);
       const s = useEditorStore.getState();
       return {
         plane: s.collisionPaintPlane,
         bothPlanes: s.collisionPaintBothPlanes,
-        crossover: s.collisionCrossoverBrush,
-        crossoverSpanMode: s.collisionCrossoverSpanMode,
         word: selectedCollisionWord({
           shape: s.selectedCollisionProfile, entryFlipX: s.selectedCollisionEntryFlipX,
           userXFlip: s.selectedCollisionXFlip, yFlip: s.selectedCollisionYFlip,
@@ -1661,31 +1624,19 @@ function installAeonProbe(): AeonProbeApi {
     priorityLens: () => lastPriorityLensReport(),
     composerPriorityLens: () => lastComposerPriorityLensReport(),
     bothPlanesLens: () => lastBothPlanesLensReport(),
-    crossoverLens: () => lastCrossoverLensReport(),
-    crossoverEncoding: () => ({
-      shift: CROSSOVER_SHIFT, valueMask: CROSSOVER_VALUE_MASK, bits: CROSSOVER_BITS,
-      none: CROSSOVER_NONE, toA: CROSSOVER_TO_A, toB: CROSSOVER_TO_B, reserved: CROSSOVER_RESERVED,
-    }),
-    crossoverAt: (sectionIndex, planeId, index) => {
+    reservedBitsEncoding: () => ({ shift: PLANE_RESERVED_SHIFT, mask: PLANE_RESERVED_MASK, bits: PLANE_RESERVED_BITS }),
+    reservedBitsAt: (sectionIndex, planeId, index) => {
       const sec = getCurrentAct(useProjectStore.getState())?.sections[sectionIndex];
       const plane = planeId === 'b' ? sec?.collisionEditB : sec?.collisionEdit;
       if (!plane || index < 0 || index >= plane.length) return null;
-      return readCrossover(plane[index]);
+      return planeReservedBits(plane[index]);
     },
-    crossoverAudit: (sectionIndex) => {
+    reservedBitsAudit: (sectionIndex) => {
       const sec = getCurrentAct(useProjectStore.getState())?.sections[sectionIndex];
       if (!sec) return null;
-      // The section index is passed so the audit's messages can name a place.
-      // It is the caller's to supply: two flat word arrays carry no identity.
-      const a = auditCrossovers(sec.collisionEdit, sec.collisionEditB, SECTION_TILES_WIDE, sectionIndex);
-      return { ...a, severity: crossoverAuditSeverity(a) };
+      const a = auditReservedBits(sec.collisionEdit, sec.collisionEditB, SECTION_TILES_WIDE, sectionIndex);
+      return { ...a, severity: reservedAuditSeverity(a) };
     },
-    crossoverRefusal: (plane, crossover) =>
-      // Narrowed here rather than trusting the harness's string: an unknown
-      // value must not read as "legal".
-      (crossover === 'none' || crossover === 'to-a' || crossover === 'to-b')
-        ? crossoverRefusal(plane, crossover)
-        : `unknown crossover "${crossover}"`,
     cameraPreview: () => lastCameraPreviewReport(),
     rasterTimeline: () => lastRasterTimelineReport(),
     bandLens: () => lastBandLensReport(),

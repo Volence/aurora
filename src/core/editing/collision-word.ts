@@ -36,10 +36,7 @@
 // ═══ THE RULE: THE BRUSH OWNS ITS FIELDS, THE CELL KEEPS THE REST ═══
 //
 // This is a rule about the WORD, not about any feature that uses the bits the
-// brush does not own. (That phrase read "the spare bits" until 2026-09-04, four
-// paragraphs above the section below explaining that bits 15:14 are the LOOP
-// CROSSOVER and have been since `layer-transition.ts` claimed them — the same
-// stale "spare" that `collision-cell-word.ts` carried in its bit table.) It is
+// brush does not own. It is
 // stated as a mask complement rather than as "preserve
 // bits 15:14" precisely so that it stays true when the layout changes: the day
 // `packCollisionCell` starts writing bit 14, `COLLISION_CELL_OWNED_MASK` widens
@@ -60,8 +57,9 @@
 // preserves 15:14. Erasing the shape out of a cell is a statement about the
 // shape; it is not a statement about a field the shape does not own. The
 // gesture that DOES mean "empty this cell entirely" is CollisionPalette's
-// Clear, which writes a bare 0 on purpose and is documented there as the only
-// escape hatch that can ever remove an unowned-bit value.
+// Clear, which writes a bare 0 on purpose. It and `clearReservedBitsEntries`
+// (the audit's "Clear retired marks", at the end of this file) are the only
+// gestures that remove an unowned-bit value, and both are asked for by name.
 //
 // ═══ WHAT 15:14 ACTUALLY ARE — GROUNDED, AND DELIBERATELY NOT ENCODED ═══
 //
@@ -84,32 +82,26 @@
 // collision-cell-word.ts's docblock means by "the full Sonic 4 solidity bits =
 // this 2-bit field on plane A's word + the 2-bit field on plane B's word".
 //
-// ═══ UPDATE 2026-08-29 — 15:14 NOW MEAN SOMETHING, AND THIS FILE STILL DOES
-//     NOT KNOW WHAT ═══
+// ═══ 2026-08-29 .. 2026-09-26: 15:14 WERE THE LOOP CROSSOVER; NOW RESERVED ═══
 //
-// Aeon committed the anchor (`git -C ../aeon show
-// aa2a9f29:docs/LOOP_CROSSOVER_ENCODING.md`): in Aurora's per-plane word, bits
-// 15:14 are the LOOP CROSSOVER field. They remain path-B solidity in the donor
-// word, exactly as the block above warned, and the two must never be crossed.
+// For four weeks bits 15:14 of the per-plane word were the painted loop
+// crossover mark, and this function took a `crossover` brush that could write
+// them. The owner ruled (aeon `docs/decisions.jsonl` S2CLIP-PLANE-SWITCH) that
+// layer-switch LINES are the engine's only layer-switch mechanism, aeon retired
+// the marks (LINES-EVERYWHERE, aeon 19978b00), and ROADMAP rows 223+224 removed
+// the brush. The bits are now RESERVED: aeon REFUSES any non-zero value
+// (`core/collision/reserved-bits.ts`, the one module that knows their numbers).
 //
-// THE DIVISION OF LABOUR IS UNCHANGED AND THAT IS THE POINT. This module still
-// spells no bit number: `core/collision/layer-transition.ts` is the seam that
-// knows them, and `collisionPaintWord` below asks it for a NAMED value. What
-// changed is only that the seam is now filled.
-//
-// AND THE OLD RULE PAID FOR ITSELF ON THE DAY THE FIELD ARRIVED. Because the
-// preservation rule was stated as a MASK COMPLEMENT — "the brush owns its
-// fields, the cell keeps the rest" — rather than as "preserve bits 15:14",
-// every collision stroke, stamp, paste and agent call in the editor has been
-// carrying crossovers correctly since the moment they existed, with no edit.
-// `keep` is therefore the free default rather than a feature. A literal
-// `0xC000` anywhere in that parcel would have had to be revisited here today.
+// NOTHING HERE HAD TO CHANGE FOR THE PRESERVATION HALF, and that is the rule
+// paying for itself a second time. The bits are outside
+// `COLLISION_CELL_OWNED_MASK`, so a stroke CARRIES whatever a cell holds and
+// never invents a value: Aurora cannot write a non-zero 15:14 through this
+// function (the brush word is masked to the owned fields), and it does not
+// silently erase one a cell arrived with either. A stale value is REPORTED
+// (reserved-bits-audit.ts) and REFUSED at save, never quietly dropped here.
 
 import { packCollisionCell } from '../collision/collision-cell-word';
-import {
-  crossoverFor, withCrossover,
-  type CrossoverBrush, type CollisionPlaneId,
-} from '../collision/layer-transition';
+import { planeReservedBits, withoutReservedBits } from '../collision/reserved-bits';
 
 /**
  * Every bit `packCollisionCell` can set — the brush's fields, and nothing else.
@@ -148,52 +140,13 @@ export const COLLISION_CELL_UNOWNED_MASK = (~COLLISION_CELL_OWNED_MASK) & 0xFFFF
 export function collisionPaintWord(
   brushWord: number,
   oldWord: number | undefined,
-  /**
-   * What the stroke does to the destination's LOOP CROSSOVER field
-   * (bits 15:14 of the per-plane word — see core/collision/layer-transition.ts,
-   * the one module allowed to know that).
-   *
-   * DEFAULTS TO `keep`, AND `keep` IS A NO-OP HERE BY CONSTRUCTION. The
-   * crossover bits are outside `COLLISION_CELL_OWNED_MASK`, so the preservation
-   * rule above already carries them across untouched. That is not a
-   * coincidence to be relied on quietly — the test asserts it — but it does
-   * mean this parcel INHERITED the fix rather than needing one, which is the
-   * clearest possible argument for having stated the 2026-08-28 rule as a mask
-   * complement instead of as "preserve bits 15:14".
-   *
-   * `plane` is required whenever the brush authors, because the legal value
-   * depends on which plane the word belongs to. There is no way to call this
-   * that produces a self-mark — the value is DERIVED from (brush, plane) and
-   * never supplied, which is also why value 3 is unreachable from here.
-   * ⚠ Rule R2 says a self-mark is a hard build error in aeon's bake, and since
-   * aeon 8a4313b5 (2026-09-02) it is one: `tools/ojz_strip_gen.py`
-   * `apply_editor_collision_overlay` raises on it, and `bake_plane_cell` reads
-   * bits 15:14 and raises on the reserved 3 (R1). This comment said until
-   * 2026-09-25 (ROADMAP row 212) that the bake did not read those bits and that
-   * nothing downstream would catch a mistake; both were true on 2026-08-29 and
-   * false a week later. Keep this derivation honest on its own merits anyway: a
-   * build error an hour later carries no brush and no stroke, so the place to
-   * be right is here. Re-read at aeon origin/master a0c63764.
-   */
-  crossover: CrossoverBrush = 'keep',
-  plane?: CollisionPlaneId,
 ): number {
-  const merged = ((brushWord & COLLISION_CELL_OWNED_MASK)
+  return ((brushWord & COLLISION_CELL_OWNED_MASK)
     | ((oldWord ?? 0) & COLLISION_CELL_UNOWNED_MASK)) & 0xFFFF;
-  if (crossover === 'keep') return merged;
-  if (plane === undefined) {
-    // A caller that authors without naming a plane has asked for something this
-    // function cannot answer. THROW rather than defaulting: silently picking a
-    // plane here would author a self-mark half the time, and a self-mark is a
-    // build failure in aeon rather than a visible editor defect.
-    throw new Error('collisionPaintWord: a crossover brush that authors must name its plane');
-  }
-  const value = crossoverFor(crossover, plane);
-  return value === null ? merged : withCrossover(merged, value);
 }
 
-/** The bits of `word` that no field of the collision encoding owns. 0 for every
- *  cell in every act shipped so far — which is exactly why a test that does not
+/** The bits of `word` that no field of the collision encoding owns (today exactly
+ *  the RESERVED bits 15:14). 0 for every cell in every act aeon ships — which is exactly why a test that does not
  *  author them itself proves nothing. */
 export function unownedCollisionBits(word: number | undefined): number {
   return (word ?? 0) & COLLISION_CELL_UNOWNED_MASK;
@@ -294,4 +247,27 @@ export function resetToEngineEntries(
     entries.push({ index: i, oldColl, newColl });
   }
   return { entries, discardedUnownedCells };
+}
+
+// ═══ CLEAR RETIRED MARKS: THE EXPLICIT REMEDY FOR A REFUSED PLANE ═══════════
+//
+// Bits 15:14 are RESERVED and aeon refuses a non-zero value
+// (core/collision/reserved-bits.ts). Aurora never writes one and never silently
+// clears one, so a plane that arrives carrying them (a file saved by an older
+// Aurora, a hand edit, a copy from an old session) is REPORTED by the audit and
+// REFUSED by the save. This is the one gesture that fixes it without touching
+// anything else: it zeroes bits 15:14 ONLY, keeping shape, flips and solidity,
+// as one undoable command the author asks for by name. Aeon's own refusal
+// message tells the author to clear the marks in Aurora; this is what that
+// sentence now points at (the crossover "None" brush it used to name is gone).
+
+/** Diffed entries that zero bits 15:14 of every cell in `plane` carrying them,
+ *  and nothing else. Empty when the plane is clean. */
+export function clearReservedBitsEntries(plane: ArrayLike<number>): CollisionCellWrite[] {
+  const entries: CollisionCellWrite[] = [];
+  for (let i = 0; i < plane.length; i++) {
+    const oldColl = plane[i] ?? 0;
+    if (planeReservedBits(oldColl) !== 0) entries.push({ index: i, oldColl, newColl: withoutReservedBits(oldColl) });
+  }
+  return entries;
 }

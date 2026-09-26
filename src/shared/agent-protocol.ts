@@ -28,7 +28,7 @@ export type AgentRequest =
   | { kind: 'paint-region'; section: number; x: number; y: number; w: number; h: number; entries: NametableEntrySpec[] }
   // ── paint_collision, after the 2026-08-29 merge of two parcels ────────────
   //
-  // THREE INDEPENDENT AXES, and the combinations are decided in
+  // TWO INDEPENDENT AXES, and the combinations are decided in
   // docs/reviews/2026-08-29-paint-collision-reconcile.md rather than left to
   // fall out of the code:
   //
@@ -41,31 +41,16 @@ export type AgentRequest =
   //  • PLANE — `'both'` is a MODE, not a third plane. It writes A and B in ONE
   //    undo step, each cell merged against its own plane's word. See
   //    core/collision/both-planes-paint.ts.
-  //  • CROSSOVER — the LOOP CROSSOVER tri-state, OPTIONAL, and absent means
-  //    `keep`, not "none". A request that names a shape without naming a
-  //    crossover has said nothing about layer handoff, and answering
-  //    "definitely none" for it is the exact collapse
-  //    `brushPriorityFromOptional` exists to prevent on the nametable road
-  //    (docs/reviews/2026-08-29-agent-paint-priority.md).
   //
-  // ALL NINE COMBINATIONS ARE LEGAL and each axis keeps its own meaning under
-  // the others: `words` + `'both'` builds the cell plan once and hands it to
-  // each plane's OWN merge; `words` + a crossover applies the crossover to
-  // every cell the call WRITES and to none it skips.
-  //  • CROSSOVER SPAN — how WIDE the mark is, in 8px ENGINE TRIGGER CELLS.
-  //    OPTIONAL, absent means `'cell'` (the whole 16px cell, and what this tool
-  //    has always done). `'left'` / `'right'` mark ONE 8px sub-column of each
-  //    cell in the rectangle.
+  // BOTH COMBINATIONS OF EACH AXIS ARE LEGAL: `words` + `'both'` builds the
+  // cell plan once and hands it to each plane's OWN merge.
   //
-  //    ⚠ IT IS THE ONLY WIDTH AT WHICH A TWO-WAY PAIR WORKS. aeon's trigger
-  //    fires once per 8px column entered (COLL_CELL_W = 8), so a two-way pair
-  //    spanning a whole 16px cell flips the layer twice and nets to nothing.
-  //    See core/collision/layer-transition.ts's CrossoverSpan block.
-  //    It narrows the MARK only — the geometry still fills the rectangle.
+  // (A third axis, `crossover` / `crossoverSpan`, painted the loop crossover
+  // mark in bits 15:14 until 2026-09-26. The owner ruled layer-switch LINES the
+  // only mechanism and aeon retired the marks; the handler REFUSES either key
+  // if a request still carries it. ROADMAP rows 223+224.)
   | { kind: 'paint-collision'; section: number; plane: 'a' | 'b' | 'both'; x: number; y: number; w: number; h: number;
-      word?: number; words?: (number | null)[];
-      crossover?: 'keep' | 'clear' | 'hand-off';
-      crossoverSpan?: 'cell' | 'left' | 'right' }
+      word?: number; words?: (number | null)[] }
   // The READ half. Same 16px CELL units as paint-collision. `ascii` adds a
   // glyph grid a human can glance at; the JSON is the same either way.
   //

@@ -86,7 +86,6 @@ import { regionsRemovedSentence } from '../providers/regions-rect-list';
 import type { RegionsDocument } from '../../core/formats/regions/document';
 import { publishPriorityLensReport } from '../canvas/priority-lens';
 import { publishBothPlanesLensReport } from '../canvas/both-planes-lens';
-import { publishCrossoverLensReport } from '../canvas/crossover-lens';
 import {
   resolveSelectedScene, setLayerFieldCommand, clampLayerTop, layerTopSpace,
   setSceneFieldCommand, clampVOffset, guideBoundNotice, vsplitOrderAdvisory,
@@ -110,19 +109,13 @@ import {
   COLLISION_SHAPE_LINE, COLLISION_SOLID_EDGE, COLLISION_ANGLE_TICK, COLLISION_ANGLE_CASING,
   COLLISION_PREVIEW_FILL, COLLISION_PREVIEW_SCOPE, COLLISION_PREVIEW_PRIMARY, COLLISION_PREVIEW_ERASE,
   SELECTION_MARQUEE, MAP_MARQUEE_FILL, MAP_MARQUEE_ART_ONLY,
-  CROSSOVER_FILL, CROSSOVER_EDGE,
 } from '../canvas/canvas-colors';
 import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collision-model';
-import {
-  cellTileIndices, crossoverSpanForCursor, crossoverMarkIndices,
-} from '../../core/collision/collision-cell';
-import { crossoverPreviewRects } from '../canvas/crossover-preview';
+import { cellTileIndices } from '../../core/collision/collision-cell';
 import { collisionPaintTargets } from '../../core/collision/collision-paint';
 import { unpackCollisionCell, selectedCollisionWord } from '../../core/collision/collision-cell-word';
 import { collisionPaintWord } from '../../core/editing/collision-word';
 import { buildBothPlanesEntries, otherPlane } from '../../core/collision/both-planes-paint';
-import type { CrossoverBrush, CrossoverSpan, CrossoverSpanMode } from '../../core/collision/layer-transition';
-import { crossoverBrushAuthors } from '../../core/collision/layer-transition';
 import { resolveCell, resolvePlaneWords, ensureCollisionPlanes, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawCtx, ShapeDrawOpts } from '../../core/collision/collision-shape-draw';
@@ -387,9 +380,8 @@ export default function MapViewport() {
   // The block under the cursor in collision-paint mode (cell units), for the
   // ghost preview. `alt` latches the live Alt key (propagate to matching blocks).
   /** `col` is the 8px SUB-TILE column under the cursor, kept alongside the 16px
-   *  cell because the crossover mark is finer than the cell: it is the argument
-   *  `crossoverSpanForCursor` needs, and without it the preview could not know
-   *  which half of the cell the click is aimed at. */
+   *  cell. (It fed the retired loop crossover's half-cell mark width; nothing
+   *  on this path reads it at sub-cell resolution now.) */
   const previewHoverRef = useRef<
     { sectionIndex: number; cellCol: number; cellRow: number; col: number; alt: boolean } | null>(null);
   const isDragging = useRef(false);
@@ -475,20 +467,11 @@ export default function MapViewport() {
   // part of its length and two for the rest, and its single undo step would then
   // restore an inconsistent pair of planes.
   const paintBothPlanes = useRef(false);
-  // The crossover tri-state, latched for the same reason: half a stroke
-  // authoring a layer handoff and half of it preserving one would produce a
-  // gesture whose single undo step reverts an inconsistent set of cells.
-  const paintCrossover = useRef<CrossoverBrush>('keep');
-  /** The crossover MARK WIDTH, latched at mousedown with the rest of the mode.
-   *  `cell` is the default and today's behaviour; `half` narrows the mark to
-   *  the 8px sub-column under the cursor, which is the only width at which a
-   *  two-way pair changes the player's path (core/collision/layer-transition.ts). */
-  const paintCrossoverSpanMode = useRef<CrossoverSpanMode>('cell');
   /** The collision brush SIZE, latched at mousedown with its neighbours (hub
    *  ruling M4, docs/reviews/2026-09-12-rulings-asked.md). It used to be read
    *  live per cell, so a size picked mid-drag (Tab to a Brush button, Space)
-   *  changed the area for the rest of the stroke while Alt, both planes and the
-   *  crossover brush held (map-coverage-4). The next stroke takes the new size. */
+   *  changed the area for the rest of the stroke while Alt and both planes
+   *  held (map-coverage-4). The next stroke takes the new size. */
   const paintBrushSize = useRef(1);
   /** The collision brush WORD (shape, the picked entry's mirror flag, Flip H,
    *  Flip V and the floor type, packed by `selectedCollisionWord`), latched at
@@ -1035,41 +1018,6 @@ export default function MapViewport() {
     ctx.lineWidth = 1.5 / zoom;
     ctx.strokeRect(wx + 0.75 / zoom, wy + 0.75 / zoom, 16 - 1.5 / zoom, 16 - 1.5 / zoom);
 
-    // ═══ THE CROSSOVER MARK'S OWN FOOTPRINT, WHICH IS NOT THE CELL ═══════
-    //
-    // Everything above is the GEOMETRY the stroke would write, and that really
-    // is cell-wide whatever the mark width says. The MARK is finer: at "Half
-    // (8px)" it covers one 8px sub-column, which is the only width at which a
-    // two-way pair flips the layer (layer-transition.ts's CrossoverSpan block).
-    // Until 2026-09-06 the preview said nothing about it, so the picture under
-    // the cursor was a 16px outline for a write that was about to touch half of
-    // it — docs/reviews/2026-09-04-loops-two-way-mark.md §8 row 2.
-    //
-    // ⚠ THE SPAN IS NOT DECIDED HERE. `crossoverSpanForCursor` is the ONE rule,
-    // and paintCollisionCell makes the same call with the same 8px column; a
-    // parity re-derived beside this draw would be right today, wrong the day
-    // the rule moved, and would look correct in every screenshot.
-    //
-    // Drawn only when the brush AUTHORS the field, by `crossoverBrushAuthors` —
-    // the same condition that arms the lens — so a collision painter who never
-    // touches a loop never sees it. `clear` is depicted too, in the erase
-    // colour: "this sub-column is what the stroke will strip".
-    const xoBrush = useEditorStore.getState().collisionCrossoverBrush;
-    if (crossoverBrushAuthors(xoBrush)) {
-      const span = crossoverSpanForCursor(
-        useEditorStore.getState().collisionCrossoverSpanMode, hover.col);
-      const rects = crossoverPreviewRects({
-        targets: all, span, width: SECTION_TILES_WIDE, offsetX: offset.x, offsetY: offset.y,
-      });
-      ctx.fillStyle = xoBrush === 'clear' ? COLLISION_PREVIEW_ERASE : CROSSOVER_FILL;
-      for (const r of rects) ctx.fillRect(r.x, r.y, r.w, r.h);
-      ctx.strokeStyle = CROSSOVER_EDGE;
-      ctx.lineWidth = 1 / zoom;
-      for (const r of rects) {
-        ctx.strokeRect(r.x + inset, r.y + inset, r.w - 2 * inset, r.h - 2 * inset);
-      }
-    }
-
     ctx.restore();
   }, []);
 
@@ -1498,10 +1446,6 @@ export default function MapViewport() {
         active: false, reason: 'bg-layer', sections: 0, sectionsWithPlaneB: 0,
         veils: 0, segments: 0,
       });
-      publishCrossoverLensReport({
-        active: false, reason: 'bg-layer', plane: ed.collisionPaintPlane, sections: 0,
-        pairedVeils: 0, oneWayVeils: 0, segments: 0,
-      });
     } else {
       // showBgPlane: paint Plane B first, then composite the foreground over
       // it (empty FG words are transparent in the section canvases). Only
@@ -1558,8 +1502,7 @@ export default function MapViewport() {
         sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
       }
 
-      const lens = overlayRenderer.render(ctx, sectionInfos, overlayOpts, viewport, state.objectSprites, state.collisionProfiles,
-        ed.collisionPaintPlane);
+      const lens = overlayRenderer.render(ctx, sectionInfos, overlayOpts, viewport, state.objectSprites, state.collisionProfiles);
       // THE PRIORITY LENS REPORT — published from the draw body, like the
       // guides' and the frame's, so `active` and `veils` describe what HAPPENED
       // rather than what would happen. `reason: 'off'` with the toggle off is a
@@ -1582,19 +1525,6 @@ export default function MapViewport() {
         sections: sectionInfos.length,
         sectionsWithPlaneB: lens.bothPlanes.sectionsWithPlaneB,
         veils: lens.bothPlanes.veils, segments: lens.bothPlanes.segments,
-      });
-      // THE CROSSOVER LENS REPORT. `pairedVeils` and `oneWayVeils` stay apart
-      // all the way to the harness: a non-zero `oneWayVeils` is a loop that
-      // will work in one direction, and summing them into "crossovers marked"
-      // would hide the only failure this lens exists to show.
-      publishCrossoverLensReport({
-        active: overlayOpts.showCrossover,
-        reason: overlayOpts.showCrossover ? null : 'off',
-        plane: ed.collisionPaintPlane,
-        sections: sectionInfos.length,
-        pairedVeils: lens.crossover.pairedVeils,
-        oneWayVeils: lens.crossover.oneWayVeils,
-        segments: lens.crossover.segments,
       });
     }
 
@@ -3152,33 +3082,15 @@ export default function MapViewport() {
     // and keeps the two branches from reading different things.
     const otherCe = (plane === 'b' ? section.collisionEdit : section.collisionEditB)!;
     const bothPlanes = paintBothPlanes.current;
-    // The loop-crossover tri-state, latched at mousedown with the rest of the
-    // mode. `keep` — the default — is a no-op inside `collisionPaintWord`,
-    // because the crossover bits fall outside the mask the brush owns.
-    const crossover = paintCrossover.current;
-    // WHERE THE CURSOR IS *WITHIN* THE CELL IS NOW LOAD-BEARING, for the
-    // crossover and for nothing else. `info.col` is the 8px TILE column, so its
-    // low bit is the half the author is pointing at; `crossoverSpanForCursor`
-    // names it, and `cell` mode ignores it entirely. This is the only place the
-    // human road turns a COMMITTED gesture into a `CrossoverSpan` — the agent
-    // road names one, and THE HOVER PREVIEW MAKES THIS SAME CALL so the picture
-    // under the cursor is the write this line is about to make.
-    const crossoverSpan: CrossoverSpan =
-      crossoverSpanForCursor(paintCrossoverSpanMode.current, info.col);
     const cellCol = info.col >> 1, cellRow = info.row >> 1;
-    // ⚠ THE DRAG CACHE IS KEYED ON THE SPAN TOO. Without it, dragging from one
-    // half of a cell to the other inside a single stroke would be "the same
-    // cursor cell — skip", and the second half could never be marked. In `cell`
-    // mode the span is constant, so it never splits a cell on its own.
-    //
-    // ⚠ AND ON THE PLANE, for the same reason (hub ruling M2,
+    // ⚠ THE DRAG CACHE IS KEYED ON THE PLANE (hub ruling M2,
     // docs/reviews/2026-09-12-rulings-asked.md). `plane` is read from the store
     // per cell, above, so it can change under a held drag (Tab to the other
     // Plane button, then Space). Left out of the key, the cell under the
     // pointer at the switch was "the same cursor cell, skip" for the NEW
     // plane: it stayed unpainted there until the pointer left it
     // (map-coverage-6 O2). A key must name everything the write depends on.
-    const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}:${crossoverSpan}:${plane}`;
+    const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}:${plane}`;
     if (lastPaintedCell.current === cellKey) return; // same cursor cell — skip
     lastPaintedCell.current = cellKey;
 
@@ -3211,18 +3123,9 @@ export default function MapViewport() {
     // make the Both chip silently do nothing on exactly that cell.
     if (brush === 1 && propagate) {
       const clicked = cellTileIndices(cellCol, cellRow, SECTION_TILES_WIDE);
-      // The guard has to ask about the SAME write the stroke would make, and a
-      // narrowed mark writes `keep` outside its half — so the crossover it
-      // tests per index is the crossover that index would actually get. A guard
-      // that assumed the whole cell got the mark would answer "already done"
-      // for a cell whose OTHER half is marked and let the stroke silently
-      // no-op, which is this parcel's own defect wearing the guard's hat.
-      const markAt = new Set(
-        crossoverMarkIndices([{ cellCol, cellRow }], SECTION_TILES_WIDE, crossoverSpan));
-      const xoAt = (i: number): CrossoverBrush => (markAt.has(i) ? crossover : 'keep');
-      const aimedDone = clicked.every((i) => ce[i] === collisionPaintWord(word, ce[i], xoAt(i), plane));
+      const aimedDone = clicked.every((i) => ce[i] === collisionPaintWord(word, ce[i]));
       const otherDone = !bothPlanes
-        || clicked.every((i) => otherCe[i] === collisionPaintWord(word, otherCe[i], xoAt(i), otherPlane(plane)));
+        || clicked.every((i) => otherCe[i] === collisionPaintWord(word, otherCe[i]));
       if (aimedDone && otherDone) return;
     }
 
@@ -3233,15 +3136,6 @@ export default function MapViewport() {
       nametable: section.tileGrid.nametable, width: SECTION_TILES_WIDE, cellsW, cellsH,
     });
     const indices: number[] = [];
-    // The MARK's index set, narrower than the stroke's when the span is a half.
-    // `null` for `cell` — not "the same set" — so the default path is the write
-    // it has always been rather than a set that merely happens to be complete.
-    // ⚠ THE SAME ARRAY THE HOVER PREVIEW TURNS INTO RECTS
-    // (canvas/crossover-preview.ts), so "what was drawn under the cursor" and
-    // "what this stroke marks" are one call with one set of arguments.
-    const crossoverAt = crossoverSpan === 'cell'
-      ? null
-      : new Set<number>(crossoverMarkIndices(targets, SECTION_TILES_WIDE, crossoverSpan));
     for (const t of targets) {
       for (const index of cellTileIndices(t.cellCol, t.cellRow, SECTION_TILES_WIDE)) indices.push(index);
     }
@@ -3253,7 +3147,6 @@ export default function MapViewport() {
     // decider, called once per destination, is what buildBothPlanesEntries is.
     const { aimed: entries, other: otherEntries } = buildBothPlanesEntries({
       aimedPlaneWords: ce, otherPlaneWords: otherCe, indices, brushWord: word, bothPlanes,
-      aimedPlaneId: plane, crossover, crossoverAt,
     });
     if (entries.length === 0 && otherEntries.length === 0) return;
     // Live, and recorded: a collision drag is one edit, not one per cell. (The
@@ -3965,8 +3858,6 @@ export default function MapViewport() {
       lastPaintedCell.current = null;
       paintPropagate.current = e.altKey; // latch the mode for the whole stroke
       paintBothPlanes.current = useEditorStore.getState().collisionPaintBothPlanes;
-      paintCrossover.current = useEditorStore.getState().collisionCrossoverBrush;
-      paintCrossoverSpanMode.current = useEditorStore.getState().collisionCrossoverSpanMode;
       paintBrushSize.current = useEditorStore.getState().collisionBrushSize;
       paintBrushWord.current = brushWordNow(); // shape, flip, floor type (BRUSH-WORD-LATCH)
       paintCollisionCell(info, paintPropagate.current);
@@ -4435,19 +4326,8 @@ export default function MapViewport() {
         if (useEditorStore.getState().tool === 'paint-collision') {
           const cc = info.col >> 1, cr = info.row >> 1;
           const prev = previewHoverRef.current;
-          // ⚠ THE REDRAW TRIGGER HAS TO ASK ABOUT THE SPAN TOO — the same rule
-          // the drag cache learned (`cellKey` in paintCollisionCell). Moving
-          // from one half of a cell to the other is "the same cell" by the
-          // cell/row test alone, so a preview keyed on that would keep drawing
-          // the FIRST half while the click would mark the second: the exact
-          // preview-disagrees-with-the-brush defect this depiction exists to
-          // end, reintroduced by the cheapness guard. In `cell` mode the span
-          // is constant, so the redraw cadence is byte-for-byte what it was.
-          const mode = useEditorStore.getState().collisionCrossoverSpanMode;
-          const spanNow = crossoverSpanForCursor(mode, info.col);
           if (!prev || prev.sectionIndex !== info.sectionIndex || prev.cellCol !== cc
-              || prev.cellRow !== cr || prev.alt !== e.altKey
-              || crossoverSpanForCursor(mode, prev.col) !== spanNow) {
+              || prev.cellRow !== cr || prev.alt !== e.altKey) {
             previewHoverRef.current = {
               sectionIndex: info.sectionIndex, cellCol: cc, cellRow: cr, col: info.col, alt: e.altKey,
             };

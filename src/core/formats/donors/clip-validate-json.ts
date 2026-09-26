@@ -24,9 +24,10 @@
 //   1. its `schema` is BAKE_JSON_SCHEMA, a number of its OWN (1 today), bumped
 //      independently of validate's: so each tool is held to its own constant;
 //   2. `rule` takes more values: the loader's tags (a ClipManifestError reaches
-//      the bake too), the bake's own C1..C3, "FG_PAGE_BUDGET" (a named tag, not
-//      read from the message) and null. Every one is a string or null, which is
-//      all this reader requires; only C1 names a clip, the others are act-level;
+//      the bake too), the bake's own C2..C4 (C1 was retired with the painted
+//      crossover marks, aeon 19978b00), "FG_PAGE_BUDGET" (a named tag, not read
+//      from the message) and null. Every one is a string or null, which is all
+//      this reader requires; only C4 names a clip, the others are act-level;
 //   3. a refusal can come AFTER the tree is written (--expect-worst, the page
 //      budget): `ok: false` means "do not use that tree". Aurora's channel reads
 //      the tree only on exit 0 (main/clip-tool.ts), and the page uses it only

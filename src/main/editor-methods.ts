@@ -33,7 +33,7 @@ import { BG_WIDTH } from '../core/formats/bg-tiles';
 // that moved the constant.
 import { FG_TILE_LIMIT, FG_PAGE_TILES, FG_PAGE_FRAMES } from '../core/export/vram-coloring';
 import { BG_SECTION_BINDING_LIMIT } from '../core/formats/bg-binding';
-import { CROSSOVER_RESERVED_BAKE_CLAUSE } from '../core/collision/crossover-audit';
+import { RESERVED_BITS_BAKE_CLAUSE } from '../core/collision/reserved-bits-audit';
 import { RASTER_SECTION_BINDING_LIMIT } from '../core/formats/raster-binding';
 // The layer bound an agent is TOLD about, read from the same vendored schema
 // the validator enforces. It was the literal `1..8` until empyrean `277bc15`
@@ -174,55 +174,6 @@ export const EDITOR_METHODS: EditorMethod[] = [
         .describe('FILL form: one packed collision cell word (shape 9:0, xflip 10, yflip 11, solidity 13:12); 0 = air. Give this OR "words", never both'),
       words: z.array(z.number().int().min(0).max(0xFFFF).nullable()).optional()
         .describe('PER-CELL form: w*h packed cell words, row-major; null leaves that cell alone (on BOTH planes when plane is "both"). This is get_collision_region\'s reply "words" unchanged. Give this OR "word", never both'),
-      // OPTIONAL, and ABSENT MEANS "keep" — not "none". A request that names a
-      // shape has said nothing about layer handoff, and collapsing "no opinion"
-      // into "definitely no crossover" is how the nametable road silently
-      // cleared every priority bit it painted over
-      // (docs/reviews/2026-08-29-agent-paint-priority.md).
-      //
-      // There is no "to path A" / "to path B" here on purpose: per plane the
-      // field has only two legal values, because a plane-A cell saying "go to
-      // A" is a provable no-op that aeon's bake REFUSES with a hard error
-      // (LOOP_CROSSOVER_ENCODING.md rule R2). "hand-off" is whichever value
-      // leaves the plane being written, so an agent cannot author an illegal
-      // one, and with plane:"both" one call writes both halves of a two-way
-      // loop crossover correctly.
-      //
-      // ⚠ IT IS ONE AXIS, INDEPENDENT OF THE FILL/PER-CELL FORM. With "words"
-      // it applies to every cell the call WRITES and to no cell it skips —
-      // stated in the description because an agent cannot read this comment.
-      crossover: z.enum(['keep', 'clear', 'hand-off']).optional()
-        .describe('what to do with each cell\'s LOOP CROSSOVER (the field that hands the player '
-          + 'to the other collision path, for a loop): "keep" (default, and what omitting it means) '
-          + 'leaves it alone; "hand-off" marks each cell so a player on the plane being painted is '
-          + 'moved to the other one; "clear" erases it. With plane:"both" this writes the correct '
-          + 'opposite value on each plane, which is a complete TWO-WAY crossover, the pair a loop '
-          + 'needs to be traversable in both directions. With the "words" form it applies to every '
-          + 'cell that is WRITTEN and to no cell whose word is null (a skipped cell keeps its own '
-          + 'crossover even under "clear"). '
-          + 'IF YOU ARE AUTHORING A TWO-WAY CROSSOVER (plane:"both" + "hand-off"), READ '
-          + '"crossoverSpan" BELOW FIRST: at the default width a two-way pair does NOTHING.'),
-      // ⚠ THE ONE PARAMETER A TWO-WAY LOOP CANNOT BE AUTHORED WITHOUT.
-      //
-      // aeon's trigger (`Player_LoopCrossover`) fires once per 8px COLUMN
-      // entered — COLL_CELL_W = 8 — and their bake reads Aurora's saved plane
-      // at that same 8px column (`apply_editor_collision_overlay`:
-      // `o = (cr * 2) * W + col`). Aurora's cell is 16px, i.e. TWO trigger
-      // cells, so a two-way pair painted at cell width flips the layer twice
-      // and nets to nothing. See core/collision/layer-transition.ts.
-      //
-      // DEFAULT 'cell' because that is what this tool has always done and a
-      // one-way mark (the common case, and idempotent) does not care.
-      crossoverSpan: z.enum(['cell', 'left', 'right']).optional()
-        .describe('how WIDE each crossover mark is, in 8px ENGINE TRIGGER CELLS: "cell" (default, and '
-          + 'what omitting it means) marks the whole 16px cell; "left"/"right" mark ONE 8px sub-column '
-          + 'of every cell in the rectangle. ⚠ A TWO-WAY CROSSOVER ONLY WORKS AT "left" OR "right". The '
-          + 'engine fires the crossover once per 8px column the player enters, and a 16px cell is TWO '
-          + 'of them, so a two-way pair (plane:"both" + crossover:"hand-off") at the default width '
-          + 'flips the player\'s collision path twice and nets to NOTHING. Use "left" or "right" (either '
-          + 'one; pick the column you want the handoff to happen at) and paint the pair one cell wide. '
-          + 'A ONE-WAY mark ("hand-off" on a single plane) is idempotent and does not need this. '
-          + 'It narrows the MARK only: the shape and solidity still fill the whole rectangle.'),
     },
     description: 'Paint a w*h CELL rectangle (16px units) of one or BOTH collision planes. '
       + 'THE FORM: pass EITHER "word" (fill the whole rectangle with that packed cell word) OR "words" '
@@ -234,24 +185,20 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'plane separately is what leaves a second plane half-finished. '
       + 'THE COMBINATIONS ARE ALL LEGAL AND EACH AXIS KEEPS ITS MEANING: "words" with plane:"both" writes '
       + 'the same per-cell word into both planes, each merged against that plane\'s own cell, and a null '
-      + 'cell is skipped on BOTH planes; "words" with a crossover applies that crossover to every cell it '
-      + 'writes and to none it skips. '
-      + 'WHAT A PAINT AUTHORS: shape/xflip/yflip/solidity from the word, plus the crossover when you ask '
-      + 'for one, and it KEEPS whatever else each destination cell held. So bits 15:14 INSIDE a "words" '
-      + 'value are IGNORED: they are the loop crossover, they are not copied from the array, and the '
-      + 'destination keeps its own. Round-tripping a region OVER ITSELF is therefore exact, but copying '
-      + 'words to a DIFFERENT place carries the four picture fields only; use "crossover" to author the '
-      + 'crossover there. '
+      + 'cell is skipped on BOTH planes. '
+      + 'WHAT A PAINT AUTHORS: shape/xflip/yflip/solidity from the word, and it KEEPS whatever else each '
+      + 'destination cell held. So bits 15:14 INSIDE a "word"/"words" value are IGNORED: they are RESERVED '
+      + '(the painted loop crossover mark, retired 2026-09-26; aeon refuses any non-zero value), this tool '
+      + 'can never write them, and the destination keeps its own. A layer switch is now a LINE in the act\'s '
+      + 'layer_lines.json, not something this tool paints. The old "crossover"/"crossoverSpan" parameters '
+      + 'are gone and are REFUSED if sent. '
       + 'Reply: "painted" counts 8px sub-tile entries actually changed on the aimed plane (up to 4 per '
       + 'cell) and "paintedOther" counts them on the second plane when plane is "both", reported '
       + 'separately, never summed, so "wrote one plane" and "wrote two" cannot look alike. "skipped" '
-      + 'counts null cells. The reply also carries "crossoverAudit" for the whole section: '
-      + 'marksA/marksB/pairs/oneWay plus a severity and a note. THE NOTE NAMES A PLACE for the first '
-      + 'offender of each class ("section 3, cell (col 12, row 40), left half"), in the same 16px '
-      + 'cell coordinates this method\'s x/y take, so you can paint the fix without decoding an '
-      + 'index. CHECK "oneWay": a loop crossover marked '
-      + 'on one plane only is legal, is invisible, and plays correctly in exactly one direction. Aeon\'s '
-      + 'build does NOT check this; this reply is where it is checked.' },
+      + 'counts null cells. The reply also carries "reservedBitsAudit" for the whole section: '
+      + 'reservedA/reservedB (words carrying non-zero bits 15:14) plus a severity and a note naming the '
+      + 'cells. Non-zero is an ERROR: aeon will refuse the act and Aurora will not save the plane. '
+      + 'Nothing this tool writes can cause it; it reports marks the section already carried.' },
   { name: 'get_collision_region', kind: 'get-collision-region', result: 'json',
     params: {
       section: z.number().int().min(0),
@@ -276,25 +223,24 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'READ a w*h CELL rectangle (16px units, the same coordinates paint_collision writes) of ONE '
       + 'collision plane ("a" or "b", never "both"; see the plane parameter for why, and call it twice). '
       + 'Judge a layout from data instead of a screenshot. Returns "cells" (h rows of w '
-      + 'objects: word, shape, xFlip, yFlip, solidity, known, angle, crossover) and "words" (those same raw '
+      + 'objects: word, shape, xFlip, yFlip, solidity, known, angle, reservedBits) and "words" (those same raw '
       + 'words flat, row-major, w*h long). Pass "words" back to paint_collision as its "words" to restore '
       + 'the region. '
       + 'A 16px cell is STORED as four 8px sub-tiles: when they disagree the cell is reported honestly as '
       + '{word:null, mixed:true, sub:[tl,tr,bl,br]} with NO shape/flip/solidity, never by sampling one of the '
       + 'four, and "mixedCells" counts them (a null in "words" is what paint_collision skips). "word" is all '
-      + '16 raw bits, including bits 15:14, the LOOP CROSSOVER, reported by name as "crossover" per cell '
-      + '("none" / "to-a" / "to-b", or "reserved" for the illegal value 3 ('
+      + '16 raw bits, including bits 15:14, reported per cell as "reservedBits" (0 in every legal word). '
+      + 'They are RESERVED: they carried the painted loop crossover mark, retired 2026-09-26, and a non-zero '
+      + 'value is an error ('
       // A template hole, not a bare `+ IDENT`: check-prose-constants folds a
       // `${}` hole to a space but drops a whole description that concatenates
       // an identifier, which would take this description out of its population.
-      + `${CROSSOVER_RESERVED_BAKE_CLAUSE}`
-      + '), which is reported rather than normalised away). "crossoverCells" counts the cells carrying one and '
+      + `${RESERVED_BITS_BAKE_CLAUSE}`
+      + '), which is reported rather than normalised away. "reservedCells" counts the cells carrying one and '
       + '"cellsWithUnownedBits" counts the cells with any bit outside the four picture fields: the same '
-      + 'bits, counted from the encoder\'s own mask rather than from the crossover\'s. '
-      + '⚠ A CROSSOVER DOES NOT TRAVEL IN "words": paint_collision masks those bits off and keeps the '
-      + 'destination\'s, so writing this reply\'s "words" back over ITSELF is exact, but writing it '
-      + 'SOMEWHERE ELSE moves the picture and not the crossover; author that with paint_collision\'s '
-      + '"crossover" parameter. '
+      + 'bits, counted from the encoder\'s own mask rather than from the reserved field\'s. '
+      + 'paint_collision ignores bits 15:14 in "words" and keeps the destination\'s, so writing this reply\'s '
+      + '"words" back over ITSELF is exact. '
       + '"profilesLoaded" false means no collision shape '
       + 'tables are loaded, so "known" is false and "angle" null everywhere. Max 4096 cells per call.' },
   { name: 'save_chunk', kind: 'save-chunk', result: 'json',

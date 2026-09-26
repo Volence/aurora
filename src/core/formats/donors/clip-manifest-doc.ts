@@ -14,7 +14,7 @@
 // ═══ NOTHING IS DROPPED ON WRITE ══════════════════════════════════════════
 //
 // A manifest carries keys no Aurora code reads (`note`, `unpainted_remainder`,
-// `corridors`, a clip's `severed_xover_reason`) and aeon's gates read some of
+// `corridors`, a clip's `unaligned_dst_reason`) and aeon's gates read some of
 // them. So the document keeps the RAW object and edits it in place: a clip is
 // appended to `raw.clips`, and every other key, and every other clip, is the
 // value that was read. Keys keep their order; the only formatting Aurora imposes

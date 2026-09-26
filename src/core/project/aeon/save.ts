@@ -46,6 +46,8 @@ import { serializeRegionsDocument } from '../../formats/regions/document';
 import { regionsPathFor } from '../../formats/regions/act-regions';
 import { serializeTiles } from '../../export/tile-dedup';
 import type { S4Project } from '../../model/s4-types';
+import { SECTION_TILES_WIDE } from '../../model/s4-types';
+import { auditReservedBits, reservedAuditMessage } from '../../collision/reserved-bits-audit';
 import type { SaveCompare } from './save-skip';
 
 /** One planned write. `compare` tells the save glue how to decide whether the
@@ -196,6 +198,42 @@ export async function buildAeonSavePlan(
   }
 
   const dataPath = actConfig.dataPath;
+
+  // ═══ RESERVED BITS 15:14 — THE SAVE REFUSES, IT DOES NOT ERASE ═══════════
+  //
+  // Bits 15:14 of a per-plane collision word carried the painted loop crossover
+  // mark until 2026-09-26, when the owner ruled layer-switch LINES the only
+  // mechanism and aeon retired the marks (ROADMAP rows 223+224). aeon now
+  // REFUSES any non-zero value: its preflight names the cells and
+  // `bake_plane_cell` raises. Aurora never writes one, but a plane can still
+  // ARRIVE carrying them (a file saved by an older Aurora; a window opened
+  // before aeon cleared its own marks, whose in-memory planes still hold them —
+  // the exact hazard aeon's LINES-EVERYWHERE notice names at this file's
+  // collattr writes).
+  //
+  // So the WHOLE SAVE is refused, naming the cells, before anything is planned.
+  // Not the plane alone: a plane left unwritten keeps whatever file sits at its
+  // path, and after a grid resize that path can hold a DIFFERENT section's
+  // collision (the re-indexing the stranded-file sweep below exists for).
+  // Not by clearing the bits: silently rewriting the author's data to make a
+  // refusal go away is the defect "Aurora refuses, not erases" forbids. The
+  // author clears them with the collision palette's "Clear retired marks" (one
+  // undo step, bits 15:14 only) and saves again. A plane the LOAD could not
+  // read is not written at all (`understood()` below), so it is not checked.
+  const reservedAudits = act.sections.flatMap((section, i) => {
+    if (!section) return [];
+    const readable = (suffix: string): boolean => !section.unreadable?.includes(suffix);
+    const a = auditReservedBits(
+      readable('collattr.bin') ? section.collisionEdit : null,
+      readable('collattrb.bin') ? section.collisionEditB : null,
+      SECTION_TILES_WIDE, i);
+    return a.reservedA + a.reservedB > 0 ? [a] : [];
+  });
+  if (reservedAudits.length > 0) {
+    throw new Error(`refusing to save ${zoneId}/${actId}: `
+      + reservedAudits.map((a) => reservedAuditMessage(a)).join(' | ')
+      + ' Nothing was written.');
+  }
 
   // Every section path THIS PLAN WRITES, collected as the loop pushes them —
   // the `keep` argument of the stranded-file sweep below. Derived from the

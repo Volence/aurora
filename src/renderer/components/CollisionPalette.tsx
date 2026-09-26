@@ -14,10 +14,9 @@ import type { CollisionKind } from '../../core/collision/collision-classify';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawOpts, ShapeDrawCtx } from '../../core/collision/collision-shape-draw';
 import { fitCellSizeToBox } from '../../core/collision/collision-angle-mark';
-import { clearCollisionEntries, resetToEngineEntries } from '../../core/editing/collision-word';
+import { clearCollisionEntries, clearReservedBitsEntries, resetToEngineEntries } from '../../core/editing/collision-word';
 import { otherPlane } from '../../core/collision/both-planes-paint';
-import { auditCrossovers, crossoverAuditMessage, crossoverAuditSeverity } from '../../core/collision/crossover-audit';
-import { crossoverBrushAuthors } from '../../core/collision/layer-transition';
+import { auditReservedBits, reservedAuditMessage, reservedAuditSeverity } from '../../core/collision/reserved-bits-audit';
 import { SECTION_TILES_WIDE } from '../../core/model/s4-types';
 import { useToastStore } from '../state/toastStore';
 import { claimCollisionOverlay } from './collision-overlay-scope';
@@ -145,10 +144,6 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
   const plane = useEditorStore((s) => s.collisionPaintPlane);
   const bothPlanes = useEditorStore((s) => s.collisionPaintBothPlanes);
   const setBothPlanes = useEditorStore((s) => s.setCollisionPaintBothPlanes);
-  const crossover = useEditorStore((s) => s.collisionCrossoverBrush);
-  const setCrossover = useEditorStore((s) => s.setCollisionCrossoverBrush);
-  const spanMode = useEditorStore((s) => s.collisionCrossoverSpanMode);
-  const setSpanMode = useEditorStore((s) => s.setCollisionCrossoverSpanMode);
   // Re-read on every live edit so the audit follows the strokes, not the mount.
   const liveEdit = useEditorStore((s) => s.liveEditVersion);
   const brush = useEditorStore((s) => s.collisionBrushSize);
@@ -191,6 +186,31 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
     }, level);
   }
 
+  // CLEAR RETIRED MARKS: zero bits 15:14 of every cell of BOTH planes of the
+  // active section that carries them, and nothing else, as ONE undoable command.
+  // The one gesture that removes the reserved bits without touching shape or
+  // solidity; it exists because aeon refuses those bits and Aurora will not
+  // save a plane carrying them. It is offered only inside the audit's error
+  // note, i.e. only when there is something to clear. See
+  // clearReservedBitsEntries for why this is not done silently on load or save.
+  function clearRetiredMarks() {
+    const ed = useEditorStore.getState();
+    const level = getActiveLevel(useProjectStore.getState());
+    if (!level) return;
+    const section = level.sections[ed.activeSectionIndex];
+    if (!section) return;
+    const a = section.collisionEdit ? clearReservedBitsEntries(section.collisionEdit) : [];
+    const b = section.collisionEditB ? clearReservedBitsEntries(section.collisionEditB) : [];
+    if (!a.length && !b.length) return;
+    executeCommand({
+      type: 'set-collision-edit', plane: 'a',
+      description: `Clear retired loop marks (bits 15:14) in section ${ed.activeSectionIndex}: `
+        + `${a.length} word${a.length === 1 ? '' : 's'} on A, ${b.length} on B`,
+      sectionIndex: ed.activeSectionIndex, entries: a,
+      ...(b.length ? { otherPlaneEntries: b } : {}),
+    }, level);
+  }
+
   // Reset the active section's editable collision to the real engine baseline
   // (escape hatch for a section that drifted to empty/wrong). Undoable.
   function resetToEngine() {
@@ -229,13 +249,11 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
       : '';
     if (discardedUnownedCells > 0) {
       useToastStore.getState().addToast(
-        // NAME THE FIELD THE AUTHOR AUTHORED, not the bits. "reserved bits" is
-        // this file's internal word for the same thing the Loop row above writes,
-        // so an author who painted loop crossovers read a sentence about something
-        // they had never heard of losing something they had (O48b).
-        `Reset collision ${p.toUpperCase()}: the engine baseline cannot carry the loop crossover on `
-        + `${discardedUnownedCells} cell${discardedUnownedCells === 1 ? '' : 's'}, so it was discarded `
-        + `along with the reserved bits. Undo restores them.`,
+        // NAME THE FIELD THE AUTHOR WOULD RECOGNISE, not only the bits (O48b):
+        // the only thing that has ever lived in them is a retired loop mark.
+        `Reset collision ${p.toUpperCase()}: the engine baseline cannot carry bits 15:14 (a retired `
+        + `loop crossover mark) on ${discardedUnownedCells} cell${discardedUnownedCells === 1 ? '' : 's'}, `
+        + `so they were discarded. Undo restores them.`,
         'info');
     }
     executeCommand({
@@ -291,7 +309,8 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
     return s;
   }, [allEntries]);
 
-  // THE PAINT-TIME LOOP AUDIT (anchor §8.2: "Aurora checks the loop").
+  // THE RESERVED-BITS AUDIT: a non-zero bits 15:14 (a retired loop crossover
+  // mark) is an ERROR aeon refuses; see core/collision/reserved-bits-audit.ts.
   //
   // Recomputed on every live edit rather than on a timer, and deliberately
   // NOT memoised on the plane arrays: they are mutated in place by the paint
@@ -302,13 +321,13 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
     // `activeSection` rather than `auditSection.index`: it is the index this
     // panel is looking at, and it is what the section picker shows.
     () => (auditSection
-      ? auditCrossovers(auditSection.collisionEdit, auditSection.collisionEditB, SECTION_TILES_WIDE, activeSection)
+      ? auditReservedBits(auditSection.collisionEdit, auditSection.collisionEditB, SECTION_TILES_WIDE, activeSection)
       : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [auditSection, liveEdit],
   );
-  const auditNote = audit ? crossoverAuditMessage(audit) : null;
-  const auditSeverity = audit ? crossoverAuditSeverity(audit) : 'ok';
+  const auditNote = audit ? reservedAuditMessage(audit) : null;
+  const auditSeverity = audit ? reservedAuditSeverity(audit) : 'ok';
 
   if (!profiles) return <div style={styles.note}>Collision tables not found. Open a project with collision data.</div>;
 
@@ -388,95 +407,27 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
       {variant === 'map' && (
         <div style={styles.planes}>
           <span style={styles.planeLabel}>Sec {activeSection}</span>
-          {/* Both titles name the LOOP CROSSOVER explicitly. It is written by the
-              Loop row in this same palette and it is destroyed by both buttons,
-              and until O48b neither string said so — the reach was correct and the
-              wording understated it, which is the half a reader acts on. */}
           {/* Both of these ACT AND THEN DROP FOCUS (d-27) — see actAndDropFocus.
               A bare Space used to re-fire the wipe on the button the last click
               left focused; it no longer reaches either writer. */}
-          <button onClick={(e) => actAndDropFocus(e, resetToEngine)} title={`Reset section ${activeSection} collision (this plane) to the engine baseline, including any loop crossover. Undoable.`}
+          <button onClick={(e) => actAndDropFocus(e, resetToEngine)} title={`Reset section ${activeSection} collision (this plane) to the engine baseline, including any retired loop mark (bits 15:14). Undoable.`}
             style={styles.subtleBtn}>Reset</button>
-          <button onClick={(e) => actAndDropFocus(e, clearSection)} title={`Erase ALL collision in section ${activeSection} (this plane), including any loop crossover. Undoable.`}
+          <button onClick={(e) => actAndDropFocus(e, clearSection)} title={`Erase ALL collision in section ${activeSection} (this plane), including any retired loop mark (bits 15:14). Undoable.`}
             style={styles.subtleBtn}>Clear</button>
         </div>
       )}
-      {/*
-        THE CROSSOVER BRUSH — three states, and the middle one does not exist.
-        There is no "to path A" / "to path B" pair here on purpose: per plane
-        the field has only TWO legal values, because a plane-A cell saying "go
-        to A" is a no-op that aeon's bake hard-errors on (rule R2). "Hand off"
-        is whichever value leaves the plane you are painting, so the illegal
-        state is unreachable rather than guarded, and ONE armed brush paints
-        both halves of a two-way loop.
-
-        MAP ONLY, like the A+B chip and for the same reason: the Art facet's
-        chunk brush is a different writer this parcel does not extend.
-      */}
-      {variant === 'map' && (
-        <div style={styles.planes}>
-          <span style={styles.planeLabel}>Loop</span>
-          {([
-            ['keep', 'Keep', 'Leave each cell\u2019s crossover exactly as it is (the default). An ordinary shape stroke says nothing about which path the player is on.'],
-            ['hand-off', plane === 'a' ? 'Hand \u2192 B' : 'Hand \u2192 A', `Mark each painted cell so that a player standing on it while on path ${plane.toUpperCase()} is handed to path ${plane === 'a' ? 'B' : 'A'}. Paint the SAME cells on the other plane to make the crossover two-way. With "A+B" on, one stroke does both.`],
-            ['clear', 'None', 'Erase the crossover from each painted cell (write "no handoff").'],
-          ] as const).map(([value, label, title]) => (
-            <button key={value} onClick={() => setCrossover(value)} title={title}
-              style={{ ...styles.planeBtn, ...(crossover === value ? styles.planeSel : {}) }}>{label}</button>
-          ))}
-        </div>
-      )}
-      {/*
-        THE MARK WIDTH — AND IT IS INVISIBLE UNTIL IT IS NEEDED, ON PURPOSE.
-        ────────────────────────────────────────────────────────────────────
-        It renders only while the crossover brush AUTHORS (`crossoverBrushAuthors`,
-        the same rule-wired condition that surfaces the crossover lens), so a
-        collision painter who never touches a loop never meets it and there is
-        no mode to leave. The owner's standing note is that the effects tooling
-        is already "confusing and convoluted"; an always-on fourth axis on the
-        collision brush would be that mistake again, one facet over.
-
-        WHY IT HAS TO EXIST AT ALL, in one line: aeon's crossover trigger fires
-        once per 8px column entered and Aurora's cell is 16px = TWO of them, so
-        a two-way pair painted at cell width hands the player over and straight
-        back. `Half` marks the sub-column the CURSOR is on — the author aims at
-        a half rather than picking a side, which is why the store holds
-        'cell'|'half' and the core takes 'cell'|'left'|'right'.
-
-        DEFAULT IS `cell`: unchanged behaviour, and the width a ONE-WAY mark
-        wants (a one-way mark is idempotent, so its width does not matter).
-      */}
-      {variant === 'map' && crossoverBrushAuthors(crossover) && (
-        <>
-          <div style={styles.planes}>
-            <span style={styles.planeLabel}>Mark</span>
-            {([
-              ['cell', 'Cell (16px)', 'Mark the WHOLE 16px cell (the default). Right for a ONE-WAY mark (an entry or exit anchor, or either half of a loop built from two separated one-way marks), because a one-way mark fires idempotently and its width does not matter.'],
-              ['half', 'Half (8px)', 'Mark only the 8px half-cell UNDER THE CURSOR. This is the only width at which a TWO-WAY crossover works: the engine fires the crossover once per 8px column the player enters, a 16px cell is two of them, and a pair marked across both hands the player over and straight back. The shape and solidity still fill the whole cell; only the crossover narrows.'],
-            ] as const).map(([value, label, title]) => (
-              <button key={value} onClick={() => setSpanMode(value)} title={title}
-                style={{ ...styles.planeBtn, ...(spanMode === value ? styles.planeSel : {}) }}>{label}</button>
-            ))}
-          </div>
-          <div style={styles.hint}>
-            {spanMode === 'half'
-              ? 'Marking the 8px half-cell under the cursor. A TWO-WAY pair (this brush on both '
-                + 'planes at the same half, or with "A+B" on) flips the player\u2019s path here. At '
-                + '"Cell" width it would flip twice and net to nothing.'
-              : 'Marking the whole 16px cell. Fine for a ONE-WAY mark. ⚠ A TWO-WAY pair at this '
-                + 'width does NOTHING: the engine triggers every 8px and a cell is two of them, '
-                + 'so the player is handed over and handed straight back. Switch to "Half (8px)" '
-                + 'for a two-way handoff.'}
-          </div>
-        </>
-      )}
       {variant === 'map' && auditNote && (
-        // The testid is how `scratchpad/audit-coords-harness.mjs` reads this
-        // sentence off the running app. Locating it by its own text would be
-        // circular: the claim under test is what the text SAYS.
-        <div data-testid="crossover-audit-note"
+        // The testid lets a harness read this sentence off the running app.
+        // Locating it by its own text would be circular: the claim under test
+        // is what the text SAYS. There is no warn tier any more: the only thing
+        // this reports is an error aeon refuses.
+        <div data-testid="reserved-bits-audit-note"
           style={{ ...styles.hint, color: auditSeverity === 'error' ? T.error : T.warning }}>
           {auditNote}
+          {' '}
+          <button data-testid="clear-retired-marks" onClick={(e) => actAndDropFocus(e, clearRetiredMarks)}
+            title={`Zero bits 15:14 of every collision word in section ${activeSection} (both planes) that carries them. Shape, flips and solidity are kept. One undo step.`}
+            style={styles.subtleBtn}>Clear retired marks</button>
         </div>
       )}
       {/*

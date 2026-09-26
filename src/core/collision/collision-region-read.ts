@@ -45,8 +45,10 @@
 // is LOSSY, and a read that returned only the unpacked view would teach its
 // consumers those bits do not exist. In aeon's OTHER baker (`bake_cell`,
 // collision_pipeline.py @ b76576ea) they are path-B solidity; in the per-plane
-// word Aurora feeds (`bake_plane_cell`) they are unassigned but PRESERVED
-// through save/load — see docs/reviews/2026-08-28-collision-word-preservation.md §2.
+// word Aurora feeds (`bake_plane_cell`) they are RESERVED since 2026-09-26 and
+// aeon refuses a non-zero value (core/collision/reserved-bits.ts), but Aurora
+// still PRESERVES them through save/load rather than erasing them — see
+// docs/reviews/2026-08-28-collision-word-preservation.md §2.
 //
 // So every cell carries the RAW stored `word` alongside the unpacked fields.
 // The word is never re-packed from the unpacked view (that would silently strip
@@ -70,7 +72,7 @@ import { unpackCollisionCell } from './collision-cell-word';
 import { resolveCell } from './collision-cell-resolve';
 import { columnSolidRun } from './collision-render';
 import { unownedCollisionBits } from '../editing/collision-word';
-import { readCrossover, type CrossoverRead } from './layer-transition';
+import { planeReservedBits } from './reserved-bits';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../model/s4-types';
 
 /** A section's extent in 16px COLLISION CELLS. Derived from the tile extent and
@@ -121,20 +123,14 @@ export interface CollisionCellRead {
    *  own `hasAngle` is false. Flip-resolved, like `shape`'s profile. */
   angle?: number | null;
   /**
-   * The LOOP CROSSOVER this cell carries, BY NAME — bits 15:14 of the per-plane
-   * word, read through `layer-transition.ts`, the only module allowed to know
-   * that number. Absent on a mixed cell, like every other unpacked field.
-   *
-   * ADDED BY THE 2026-08-29 MERGE, and it is not decoration. When this module
-   * was written those bits were a field nothing in Aurora named, so reporting
-   * the raw `word` and a count was the whole honest answer. Hours later
-   * `lp2-loop-paint` gave them a meaning and a brush — and a read that still
-   * only counted them would leave the agent able to WRITE a crossover by name
-   * and unable to SEE one, on the surface whose entire purpose is verifying
-   * what a write did. `reserved` is the illegal value 3, reported rather than
-   * normalised, for the reason `readCrossover` states.
+   * Bits 15:14 of the per-plane word, read through `reserved-bits.ts`, the only
+   * module allowed to know that number. 0 in every legal word; non-zero means
+   * the cell carries a RETIRED loop-crossover mark that aeon REFUSES (the act
+   * will not build and Aurora will not save the plane). Absent on a mixed cell,
+   * like every other unpacked field. It was `crossover` (a named mark) until
+   * the marks were retired on 2026-09-26.
    */
-  crossover?: CrossoverRead;
+  reservedBits?: number;
 }
 
 export interface CollisionRegionRead {
@@ -164,19 +160,18 @@ export interface CollisionRegionRead {
    *  tomorrow. Zero in every act shipped so far, which is exactly why it is
    *  reported rather than assumed. */
   cellsWithUnownedBits: number;
-  /** How many cells carry a non-`none` crossover — the SAME bits as
-   *  `cellsWithUnownedBits` at today's layout, counted from the crossover
+  /** How many cells carry non-zero RESERVED bits 15:14 — the SAME bits as
+   *  `cellsWithUnownedBits` at today's layout, counted from the reserved
    *  field's own mask instead of from the encoder's complement.
    *
-   *  BOTH ARE REPORTED, AND THE DUPLICATION IS THE POINT. They are computed
-   *  from two independent constants and agree today by a coincidence
-   *  `layer-transition.test.ts` asserts rather than assumes
-   *  (`COLLISION_CELL_UNOWNED_MASK === CROSSOVER_BITS`). The day
-   *  `packCollisionCell` grows into bit 14, or the crossover moves, they part
-   *  company — and an agent seeing them disagree has learned something true
-   *  that a single number would have hidden. `reserved` (the illegal value 3)
-   *  counts here: it is not `none`, and its whole purpose is to be visible. */
-  crossoverCells: number;
+   *  BOTH ARE REPORTED, AND THE DUPLICATION IS THE POINT. They are computed from
+   *  two independent constants and agree today by a coincidence
+   *  `reserved-bits.test.ts` asserts rather than assumes
+   *  (`COLLISION_CELL_UNOWNED_MASK === PLANE_RESERVED_BITS`). The day
+   *  `packCollisionCell` grows into bit 14 they part company, and an agent seeing
+   *  them disagree has learned something true that a single number would hide.
+   *  Non-zero here is an ERROR: aeon refuses these cells. */
+  reservedCells: number;
   /** False when no collision shape tables are loaded, in which case `known` is
    *  false everywhere, `angle` is null everywhere and the ascii view is all
    *  `?` for non-air. Reported so "no tables" cannot be misread as "no shapes". */
@@ -375,10 +370,8 @@ export function readCollisionCell(
     solidity: c.solidity,
     known: r.known,
     angle: r.profile && r.profile.hasAngle ? r.profile.angle : null,
-    // BY NAME, through the seam — never `(word >> 14) & 3` here. See the
-    // "PROBLEM 2" block at the top of this file for why the merge that gave
-    // these bits a meaning had to reach the read as well as the write.
-    crossover: readCrossover(word),
+    // Through the seam — never `(word >> 14) & 3` here. See "PROBLEM 2" above.
+    reservedBits: planeReservedBits(word),
   };
 }
 
@@ -398,7 +391,7 @@ export function readCollisionRegion(args: {
   const words: (number | null)[] = [];
   let mixedCells = 0;
   let cellsWithUnownedBits = 0;
-  let crossoverCells = 0;
+  let reservedCells = 0;
   for (let r = 0; r < h; r++) {
     const row: CollisionCellRead[] = [];
     for (let c = 0; c < w; c++) {
@@ -409,21 +402,19 @@ export function readCollisionRegion(args: {
         // A mixed cell's unowned bits are counted if ANY sub-tile carries them:
         // there is no cell word to test, and reporting zero here would hide the
         // field behind the very disagreement that made it hard to see. The
-        // crossover count follows the same rule for the same reason — a cell
-        // whose sub-tiles disagree about a loop handoff is the most, not the
-        // least, worth surfacing.
+        // reserved count follows the same rule for the same reason.
         if (cell.sub!.some((s) => unownedCollisionBits(s) !== 0)) cellsWithUnownedBits++;
-        if (cell.sub!.some((s) => readCrossover(s) !== 'none')) crossoverCells++;
+        if (cell.sub!.some((s) => planeReservedBits(s) !== 0)) reservedCells++;
       } else {
         if (unownedCollisionBits(cell.word ?? 0) !== 0) cellsWithUnownedBits++;
-        if (cell.crossover !== undefined && cell.crossover !== 'none') crossoverCells++;
+        if ((cell.reservedBits ?? 0) !== 0) reservedCells++;
       }
       row.push(cell);
     }
     cells.push(row);
   }
   const out: CollisionRegionRead = {
-    plane, x, y, w, h, cells, words, mixedCells, cellsWithUnownedBits, crossoverCells,
+    plane, x, y, w, h, cells, words, mixedCells, cellsWithUnownedBits, reservedCells,
     profilesLoaded: profiles !== null,
   };
   if (ascii) {

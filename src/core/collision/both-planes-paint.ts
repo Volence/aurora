@@ -4,7 +4,7 @@
 //
 // Aeon's Route P proposes "solid on both planes" as a THIRD CELL STATE
 // (borrowed from Sonic Worlds Next, `docs/research/loops-and-sprite-rotation.md`
-// §10.4), riding in the spare cell-word bits alongside the layer transition.
+// §10.4), riding in the spare cell-word bits.
 //
 // It does not need to be a state, and reading it as one would have blocked half
 // this parcel behind an encoding it never required. In aeon's per-plane model
@@ -58,13 +58,12 @@
 
 import { collisionPaintWord, type CollisionCellWrite } from '../editing/collision-word';
 import { unpackCollisionCell } from './collision-cell-word';
-import { otherPlaneId, type CrossoverBrush, type CollisionPlaneId } from './layer-transition';
+import { otherPlaneId, type CollisionPlaneId } from './reserved-bits';
 
 export type { CollisionPlaneId };
 
 /** The plane a "both planes" stroke also writes, given the one it is aimed at.
- *  Re-exported from the seam rather than re-spelled: the crossover legality
- *  rules turn on the same ternary and two copies could drift. */
+ *  Re-exported from the seam rather than re-spelled. */
 export const otherPlane = otherPlaneId;
 
 /**
@@ -82,28 +81,11 @@ export function buildPlaneEntries(
   plane: ArrayLike<number>,
   indices: Iterable<number>,
   brushWord: number,
-  /** The crossover tri-state and the plane it is being written on. `keep` (the
-   *  default) leaves the destination's crossover alone, which is what an
-   *  ordinary shape stroke means. */
-  crossover: CrossoverBrush = 'keep',
-  planeId?: CollisionPlaneId,
-  /** When present, the crossover is authored ONLY at these sub-tile indices;
-   *  every other index in `indices` is written with `keep`.
-   *
-   *  THE GEOMETRY AND THE MARK ARE TWO WIDTHS OF ONE STROKE. A narrowed
-   *  crossover (`CrossoverSpan` 'left'/'right') still reshapes the whole 16px
-   *  cell — only the two bits move at 8px. Passing this as a SUBSET of the same
-   *  `indices` rather than as a second call is what keeps that a single merge
-   *  against a single destination: two `buildPlaneEntries` calls over
-   *  overlapping index sets would each diff against the UNMODIFIED plane and
-   *  the second would silently drop the first's word. */
-  crossoverAt?: ReadonlySet<number> | null,
 ): CollisionCellWrite[] {
   const entries: CollisionCellWrite[] = [];
   for (const index of indices) {
     const oldColl = plane[index] ?? 0;
-    const here = crossoverAt && !crossoverAt.has(index) ? 'keep' : crossover;
-    const newColl = collisionPaintWord(brushWord, oldColl, here, planeId);
+    const newColl = collisionPaintWord(brushWord, oldColl);
     if (oldColl !== newColl) entries.push({ index, oldColl, newColl });
   }
   return entries;
@@ -135,61 +117,25 @@ export function buildBothPlanesEntries(args: {
   indices: Iterable<number>;
   brushWord: number;
   bothPlanes: boolean;
-  /** Aimed plane id — required once the crossover brush authors, because the
-   *  legal crossover value is per-plane. */
-  aimedPlaneId?: CollisionPlaneId;
-  crossover?: CrossoverBrush;
-  /** The sub-tile indices the MARK covers, when it is narrower than the stroke
-   *  (see `buildPlaneEntries`). ⚠ THE SAME SET GOES TO BOTH PLANES, and that is
-   *  the point: a two-way pair only flips the layer when both planes carry the
-   *  mark at the SAME 8px column. */
-  crossoverAt?: ReadonlySet<number> | null;
 }): BothPlanesEntries {
-  const crossover = args.crossover ?? 'keep';
   // `indices` may be a one-shot iterator; materialise before the second pass.
   const idx = [...args.indices];
-  const aimed = buildPlaneEntries(
-    args.aimedPlaneWords, idx, args.brushWord, crossover, args.aimedPlaneId, args.crossoverAt);
+  const aimed = buildPlaneEntries(args.aimedPlaneWords, idx, args.brushWord);
   if (!args.bothPlanes || !args.otherPlaneWords) return { aimed, other: [] };
-  // ⚠ THE OTHER PLANE GETS THE OTHER PLANE'S CROSSOVER VALUE, not a copy.
-  //
-  // `hand-off` means "leave THIS plane", so on plane A it is TO_B and on plane
-  // B it is TO_A — and that per-plane pair IS the two-way loop crossover
-  // (anchor §3.3). Copying the aimed plane's value here would write TO_B into
-  // plane B's own word, which is a SELF-MARK: a provable no-op that aeon's bake
-  // refuses with a hard build error (rule R2). `crossoverFor` is what makes
-  // that unreachable, and it is called per plane precisely so it can be.
-  //
-  // This is the same shape as the unowned-bit trap this file opens with — one
-  // value computed once and broadcast to two planes is wrong BOTH times, for
-  // two independent reasons.
-  const otherId = args.aimedPlaneId === undefined ? undefined : otherPlane(args.aimedPlaneId);
-  return {
-    aimed,
-    other: buildPlaneEntries(
-      args.otherPlaneWords, idx, args.brushWord, crossover, otherId, args.crossoverAt),
-  };
+  // ONE MERGE PER PLANE, against that plane's own cell: a single merged word
+  // broadcast to both would copy plane A's unowned bits into plane B (the trap
+  // this file opens with).
+  return { aimed, other: buildPlaneEntries(args.otherPlaneWords, idx, args.brushWord) };
 }
 
-// ═══ THE PER-CELL FORM OF THE SAME TWO RULES ════════════════════════════════
+// ═══ THE PER-CELL FORM OF THE SAME RULE ════════════════════════════════════
 //
 // `get_collision_region` hands an agent one word PER CELL, and
 // `paint_collision`'s `words` form feeds them straight back
 // (docs/reviews/2026-08-29-collision-read.md). Combining that with `plane:
-// "both"` and with the crossover brush is what
-// docs/reviews/2026-08-29-paint-collision-reconcile.md decides, and the answer
-// is that NEITHER of this file's two rules changes — only the brush word does,
-// per cell:
-//
-//   1. the merge is against EACH PLANE'S OWN destination cell (so plane A's
-//      crossover bits can never land in plane B's word), and
-//   2. the other plane gets `crossoverFor(brush, otherPlane(aimed))`, never a
-//      copy of the aimed plane's value (so `hand-off` on "both" is the two-way
-//      pair and never a self-mark).
-//
-// Both are inherited here by CALLING the same `buildPlaneEntries` /
-// `otherPlane` this file already uses, once per cell instead of once per
-// rectangle — not by restating them.
+// "both"` changes nothing about this file's rule — the merge is against EACH
+// PLANE'S OWN destination cell — only the brush word changes, per cell. It is
+// inherited by CALLING `buildPlaneEntries`, once per cell, not by restating it.
 
 /** One cell's worth of a per-cell write: the 8px sub-tile indices the cell
  *  covers, and the word to paint into it. `word: null` is
@@ -200,10 +146,6 @@ export function buildBothPlanesEntries(args: {
 export interface CellWordPlan {
   indices: readonly number[];
   word: number | null;
-  /** The subset of `indices` the CROSSOVER covers, when the mark is narrower
-   *  than the cell (`CrossoverSpan` 'left'/'right'). Absent = the whole cell,
-   *  which is what every caller meant before mark widths existed. */
-  crossoverIndices?: readonly number[];
 }
 
 /** What a per-cell build produced: the writes, and how many cells were declined
@@ -216,29 +158,17 @@ export interface PlaneCellEntries { entries: CollisionCellWrite[]; skipped: numb
  *
  * Deliberately a loop over `buildPlaneEntries` rather than a second merge loop:
  * the fill form and the per-cell form are two forms of ONE tool, and two merge
- * loops would be two rules free to disagree — the exact defect
- * `paintCollisionRectBothPlanes` was written to avoid on the other axis.
- *
- * The crossover brush applies to every cell this call WRITES and to no other:
- * a `null` cell is skipped entirely, so it keeps its existing crossover even
- * under `clear`. That falls out of "null means leave this cell alone" rather
- * than being a separate rule, and it is what makes a `hand-off` over a region
- * read back from a mixed area mark exactly the cells it also reshaped.
+ * loops would be two rules free to disagree.
  */
 export function buildPlaneCellEntries(
   plane: ArrayLike<number>,
   cells: Iterable<CellWordPlan>,
-  crossover: CrossoverBrush = 'keep',
-  planeId?: CollisionPlaneId,
 ): PlaneCellEntries {
   const entries: CollisionCellWrite[] = [];
   let skipped = 0;
   for (const cell of cells) {
     if (cell.word === null || cell.word === undefined) { skipped++; continue; }
-    const at = cell.crossoverIndices ? new Set(cell.crossoverIndices) : null;
-    for (const e of buildPlaneEntries(plane, cell.indices, cell.word, crossover, planeId, at)) {
-      entries.push(e);
-    }
+    for (const e of buildPlaneEntries(plane, cell.indices, cell.word)) entries.push(e);
   }
   return { entries, skipped };
 }
@@ -251,19 +181,14 @@ export function buildBothPlanesCellEntries(args: {
   otherPlaneWords: ArrayLike<number> | undefined | null;
   cells: Iterable<CellWordPlan>;
   bothPlanes: boolean;
-  aimedPlaneId?: CollisionPlaneId;
-  crossover?: CrossoverBrush;
 }): BothPlanesEntries & { skipped: number } {
-  const crossover = args.crossover ?? 'keep';
   // `cells` may be a one-shot iterator; materialise before the second pass.
   const cells = [...args.cells];
-  const aimed = buildPlaneCellEntries(
-    args.aimedPlaneWords, cells, crossover, args.aimedPlaneId);
+  const aimed = buildPlaneCellEntries(args.aimedPlaneWords, cells);
   if (!args.bothPlanes || !args.otherPlaneWords) {
     return { aimed: aimed.entries, other: [], skipped: aimed.skipped };
   }
-  const otherId = args.aimedPlaneId === undefined ? undefined : otherPlane(args.aimedPlaneId);
-  const other = buildPlaneCellEntries(args.otherPlaneWords, cells, crossover, otherId);
+  const other = buildPlaneCellEntries(args.otherPlaneWords, cells);
   return { aimed: aimed.entries, other: other.entries, skipped: aimed.skipped };
 }
 
