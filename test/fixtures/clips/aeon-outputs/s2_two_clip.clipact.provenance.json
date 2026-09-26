@@ -4,10 +4,10 @@
   "aeon": {
     "repo": "git@github.com:Volence/aeon.git",
     "branch_that_answers_currency": "origin/master",
-    "revision": "64ab0221c67d302529818a6aeac58ad4e0a65574",
-    "revision_is": "the ONE pin of ROADMAP row 218 (REVENDOR-AEON-S2CLIP-TUNNEL, branch revendor-aeon-s2clip-0925b), named by the overseer and verified an ancestor of aeon origin/master on 2026-09-25; origin/master had moved to c29b0ac4 (a log file only; no clip tool, clip manifest or donor path differs) and was NOT chased. At the pin tools/clip_manifest.py is blob 8c658fa1 (last changed at 479b6637, S2CLIP-ADOPT-SHORT-TUNNEL: a docstring paragraph about crossing_overrides, no code) and tools/clip_act_bake.py is blob 232798dc (unchanged since row 216's capture). Previous capture: c838a30f (row 216), blobs 232798dc (bake) and 82e1bea3 (manifest).",
+    "revision": "91d4119cbc855a94adc05c74f7b45854d57b8af0",
+    "revision_is": "the ONE pin of ROADMAP row 221 (REVENDOR-AEON-ANCHOR-OVERLAY, branch parcel/revendor-221): aeon origin/master 91d4119c read 2026-09-26 after a fetch, taken as the pin itself (not chased afterwards). b90cd650 (music step 6) is an ancestor; between b90cd650 and the pin nothing touched games/sonic4/data/clips/**, tools/clip_*.py, engine/structs.emp or the OJZ act descriptor (git log over those paths is empty; the diff names docs and gate tools only). At the pin tools/clip_manifest.py is blob 0afd1a71 (last changed at 67f7787d, S2CLIP-REGION-MUSIC step 6: a per-clip OPTIONAL `music`, a SONG_* NAME; R3 refuses a non-name and two clips of one zone naming different music; Clip.to_json carries `music`) and tools/clip_act_bake.py is blob 232798dc (unchanged since row 216's capture; it does not import tools/clip_rom_bake.py, directly or through its imports). Previous capture: 64ab0221 (row 218), blobs 232798dc (bake) and 8c658fa1 (manifest).",
     "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, or any inputs[].path's blob differs from its inputs[].blob, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob, inputs[].blob and revision here (and in the sibling markers of test/fixtures/clips/aeon-outputs/)",
-    "materialised_by": "git -C <aeon> archive 64ab0221 | tar -x into a scratch directory (never ../aeon, a peer's live tree); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run with EMPYREAN_SUITE_ROOT=<suite> exported as well: without it the tools' import of suite_paths raises SuiteRootNotFound, because a /tmp copy has no suite above it.",
+    "materialised_by": "git -C <aeon> archive 91d4119c | tar -x into a scratch directory (never ../aeon, a peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run with EMPYREAN_SUITE_ROOT=<suite> exported as well: without it the tools' import of suite_paths raises SuiteRootNotFound, because a /tmp copy has no suite above it.",
     "tool_path": "tools/clip_act_bake.py",
     "tool_blob": "232798dcd7202b230d5b7578658b9eecf22138e7",
     "inputs_are": "the documents fixture.command names (the clips.json it bakes; the currency row requires every one of them here) and tools/clip_manifest.py, which clip_act_bake.py imports and whose change alone moved zone_table[2].synthesised in the s2_ehz_cpz output (measured at row 218). NOT pinned: the bake's other imports (collision_pipeline, fg_page_order, ojz_strip_gen, tile_dedupe and theirs) and the donor conversion; a change there moves the output with this row green.",
@@ -18,7 +18,7 @@
       },
       {
         "path": "tools/clip_manifest.py",
-        "blob": "8c658fa1ce439f60f88a5a4768e169f5c70f60ff"
+        "blob": "0afd1a71a4f44b58498a002c7db975df235f1726"
       }
     ]
   },
@@ -26,6 +26,6 @@
     "path": "test/fixtures/clips/aeon-outputs/s2_two_clip.clipact.json",
     "command": "python3 tools/clip_act_bake.py bake games/sonic4/data/clips/s2_two_clip/clips.json --out <scratch>/bake_s2_two_clip (exit 0); verbatim",
     "why_this_one": "no corridor (per_corridor is an empty list, which is not absent), and every page exclusive",
-    "sha256": "abb1b692fa9dd40f214599f07ebff2e029aefcd522b8b75bad7e3ce3a1700c14"
+    "sha256": "7f22f05c2fbe6f9f16d31960ef8b4a8fc11659704f271a2de061569d3a037602"
   }
 }

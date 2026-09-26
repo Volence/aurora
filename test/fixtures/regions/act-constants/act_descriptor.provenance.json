@@ -6,19 +6,19 @@
     "repo": "git@github.com:Volence/aeon.git",
     "path": "games/sonic4/data/levels/ojz/act1/act_descriptor.emp",
     "branch_that_answers_currency": "origin/master",
-    "revision": "4802c664a479f0eb3589eb99eb83694119bff5f6",
-    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log -1 origin/master -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` names 4802c664 (a single-parent commit, checked with `rev-list --parents`). Measured 2026-09-25 by the aurora overseer after a fetch, with aeon origin/master = 40c891f57128d18e977fe2131be7d813656acda8.",
-    "blob": "cbf001fb57ccbf5c996fe64a31643e1a2beba888",
-    "last_changed_by": "4802c664 S2 row 7: the clip act's bytes move to entity_data.emp; effects_gen's drift gate was right (the series from 58ee5dbf: a clip act owns its region table)",
-    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> ../aeon <path> 4802c664a479f0eb3589eb99eb83694119bff5f6 — bytes from `git show <rev>:<path>`, re-hashed on this side and compared to aeon's blob before the sidecar was written. Never the sibling working tree.",
-    "revision_published": "4802c664 is reachable from aeon origin/master (40c891f57128d18e977fe2131be7d813656acda8); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run.",
-    "what_changed_at_this_pin": "`act_regions` now binds through `ojz_clip_act_regions(hand: OJZ_Act1_Regions)` and `act_region_count` through a new `OJZ_ACT_REGION_COUNT` (an `if OJZ_CLIP_ACT == 1` initializer); a new `use games.sonic4.ojz_clip_act_act1.{...}` import and a clip-act table walk were appended. None of the five rule-4 constants (REGION_MIN_SPAN, CENTRE_X_MIN/MAX, CENTRE_Y_MIN/MAX) or their derivations changed in this diff. engine_constants.emp's pin 7d4d0ce6 is still the last commit touching engine/system/constants.emp, so the pair agrees."
+    "revision": "5c4633c98032306941bed42e72c9f5104b035a5a",
+    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log origin/master -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` at aeon origin/master 91d4119cbc855a94adc05c74f7b45854d57b8af0 names 5c4633c9 first (a single-parent commit, parent 53c61c0e). Measured 2026-09-26 by the row-221 agent after a fetch; nothing touched the path between 5c4633c9 and that tip.",
+    "blob": "cb954af34a3fb58717a286cf362fecd9cad6fca7",
+    "last_changed_by": "5c4633c9 region music (S2CLIP-REGION-MUSIC step 5): Region.rg_song + Music_Service (reached origin/master in the merge 9883a9c1)",
+    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> ../aeon <path> 5c4633c98032306941bed42e72c9f5104b035a5a — bytes from `git show <rev>:<path>`, re-hashed on this side and compared to aeon's blob before the sidecar was written. Never the sibling working tree.",
+    "revision_published": "5c4633c9 is reachable from aeon origin/master (91d4119cbc855a94adc05c74f7b45854d57b8af0); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run.",
+    "what_changed_at_this_pin": "Region grew 26 -> 28 B. This file: a new `use games.sonic4.sound_ids.{SONG_COUNT}` import; `ojz_region()` gains a trailing `song: int = 0` parameter, a rule-9 ensure (0 <= song <= SONG_COUNT) and emits `rg_song: song, rg_pad_1b: 0`; `ojz_cut_row` copies `rg_song`/`rg_pad_1b`; `ojz_region_table_check` gains rule 9; the two fault messages name rule 9. None of the five rule-4 constants (REGION_MIN_SPAN, CENTRE_X_MIN/MAX, CENTRE_Y_MIN/MAX) or their derivations changed in this diff. engine_constants.emp is pinned at 787a9980, which is still the last commit touching engine/system/constants.emp at 91d4119c (same blob faa16c4e), so the pair agrees. (The previous prose here said the pair was pinned at 7d4d0ce6; the engine_constants sidecar already named 787a9980.)"
   },
   "fixture": {
     "path": "test/fixtures/regions/act-constants/act_descriptor.emp",
-    "bytes": 80546,
-    "sha256": "d786cb2c6e9927212fb7091296745448714f7ea2c1dde6f0ac7b257fe3f3eb94",
-    "git_blob": "cbf001fb57ccbf5c996fe64a31643e1a2beba888",
+    "bytes": 81662,
+    "sha256": "319f7dd06e8cc3dac60ae8694188ea901150bef99b1d546dc3da8b22ed47c203",
+    "git_blob": "cb954af34a3fb58717a286cf362fecd9cad6fca7",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
   },
   "paired_with": {

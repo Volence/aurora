@@ -20,6 +20,7 @@
         "y": 0
       },
       "id": "ehz_s2",
+      "music": null,
       "region_id": "ehz_s2",
       "severed_xover_reason": null,
       "src_rect": {
@@ -41,6 +42,7 @@
         "y": 0
       },
       "id": "cpz_s2",
+      "music": null,
       "region_id": "cpz_s2",
       "severed_xover_reason": null,
       "src_rect": {
@@ -109,7 +111,7 @@
       0
     ],
     "rung": "searched",
-    "seconds": 0.163,
+    "seconds": 0.12,
     "stats": {
       "refine_rounds": [
         {
@@ -125,7 +127,7 @@
           "sample_over_target_after": 0,
           "sample_over_target_before": 180,
           "sample_windows": 4096,
-          "seconds": 0.113,
+          "seconds": 0.084,
           "stride": [
             8,
             4
