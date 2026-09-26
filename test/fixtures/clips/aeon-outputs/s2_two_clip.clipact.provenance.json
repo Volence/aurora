@@ -4,12 +4,12 @@
   "aeon": {
     "repo": "git@github.com:Volence/aeon.git",
     "branch_that_answers_currency": "origin/master",
-    "revision": "91d4119cbc855a94adc05c74f7b45854d57b8af0",
-    "revision_is": "the ONE pin of ROADMAP row 221 (REVENDOR-AEON-ANCHOR-OVERLAY, branch parcel/revendor-221): aeon origin/master 91d4119c read 2026-09-26 after a fetch, taken as the pin itself (not chased afterwards). b90cd650 (music step 6) is an ancestor; between b90cd650 and the pin nothing touched games/sonic4/data/clips/**, tools/clip_*.py, engine/structs.emp or the OJZ act descriptor (git log over those paths is empty; the diff names docs and gate tools only). At the pin tools/clip_manifest.py is blob 0afd1a71 (last changed at 67f7787d, S2CLIP-REGION-MUSIC step 6: a per-clip OPTIONAL `music`, a SONG_* NAME; R3 refuses a non-name and two clips of one zone naming different music; Clip.to_json carries `music`) and tools/clip_act_bake.py is blob 232798dc (unchanged since row 216's capture; it does not import tools/clip_rom_bake.py, directly or through its imports). Previous capture: 64ab0221 (row 218), blobs 232798dc (bake) and 8c658fa1 (manifest).",
+    "revision": "d3b98868a9bca7573957b84092b4acd3c72c4ee6",
+    "revision_is": "the ONE pin of ROADMAP rows 223+224 (LINES-EVERYWHERE, branch parcel/lines-everywhere-223-224): aeon origin/master d3b98868a9bca7573957b84092b4acd3c72c4ee6 read 2026-09-26T22:06Z after a fetch, taken as the pin itself. Since the previous capture: a974bc2e (LINES-EVERYWHERE) moved tools/clip_act_bake.py (C1 retired, new C4 for a clip carrying reserved bits 15:14; clipact.json drops clips[].severed_xover_reason and collision.per_clip[].marks_inside_src / marks_outside_src / severed_xover_reason), tools/clip_manifest.py (severed_xover_reason no longer modelled) and tools/collision_pipeline.py (XOVER_* gone; PLANE_RESERVED_SHIFT/MASK and plane_reserved_bits); 62140cd7 moved tools/fg_page_order.py (stress-bake frame-aware pins; PAGE_FRAMES unchanged, the --expect-worst argv is byte-identical); afc23f5b/119e9455/a974bc2e moved games/sonic4/data/clips/s2_ehz_cpz/clips.json (floorless_columns plane B + prose). Blobs at the pin: clip_act_bake 920a855a, clip_manifest 9a07d19a, collision_pipeline cbbae9d7, fg_page_order 68e303fc, s2_ehz_cpz clips.json 64ab630c.",
     "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, or any inputs[].path's blob differs from its inputs[].blob, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob, inputs[].blob and revision here (and in the sibling markers of test/fixtures/clips/aeon-outputs/)",
-    "materialised_by": "git -C <aeon> archive 91d4119c | tar -x into a scratch directory (never ../aeon, a peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run with EMPYREAN_SUITE_ROOT=<suite> exported as well: without it the tools' import of suite_paths raises SuiteRootNotFound, because a /tmp copy has no suite above it.",
+    "materialised_by": "git -C <aeon> archive d3b98868 | tar -x into a scratch directory under $HOME/.cache (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
     "tool_path": "tools/clip_act_bake.py",
-    "tool_blob": "232798dcd7202b230d5b7578658b9eecf22138e7",
+    "tool_blob": "920a855a234650e66936593f3e4f816255cb35dc",
     "inputs_are": "the documents fixture.command names (the clips.json it bakes; the currency row requires every one of them here) and tools/clip_manifest.py, which clip_act_bake.py imports and whose change alone moved zone_table[2].synthesised in the s2_ehz_cpz output (measured at row 218). NOT pinned: the bake's other imports (collision_pipeline, fg_page_order, ojz_strip_gen, tile_dedupe and theirs) and the donor conversion; a change there moves the output with this row green.",
     "inputs": [
       {
@@ -18,14 +18,15 @@
       },
       {
         "path": "tools/clip_manifest.py",
-        "blob": "0afd1a71a4f44b58498a002c7db975df235f1726"
+        "blob": "9a07d19aa2696e5f1c8cfb9cd47b701aad9f3667"
       }
-    ]
+    ],
+    "what_changed_at_this_pin": "Re-captured: ONLY the removed crossover fields and wall-clock `seconds` differ."
   },
   "fixture": {
     "path": "test/fixtures/clips/aeon-outputs/s2_two_clip.clipact.json",
     "command": "python3 tools/clip_act_bake.py bake games/sonic4/data/clips/s2_two_clip/clips.json --out <scratch>/bake_s2_two_clip (exit 0); verbatim",
     "why_this_one": "no corridor (per_corridor is an empty list, which is not absent), and every page exclusive",
-    "sha256": "7f22f05c2fbe6f9f16d31960ef8b4a8fc11659704f271a2de061569d3a037602"
+    "sha256": "0874d0d9c259c0e99c14237fd2a80221f1df33c447f0704e9cb94b5a350be2ed"
   }
 }

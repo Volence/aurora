@@ -4,25 +4,26 @@
   "aeon": {
     "repo": "git@github.com:Volence/aeon.git",
     "branch_that_answers_currency": "origin/master",
-    "revision": "5ca10281e38d6cea3e208ad0d292e62d7b398ba9",
-    "revision_is": "the ONE pin of ROADMAP row 222 (branch parcel/paste-music-222): aeon origin/master read 2026-09-26 after a fetch. At the pin tools/clip_manifest.py is blob 0afd1a71 (last changed at 67f7787d, S2CLIP-REGION-MUSIC step 6), the same blob row 221 vendored at 91d4119c, and games/sonic4/data/clips/s2_ehz_cpz/clips.json is blob a9ca3ecf, byte-identical to test/fixtures/clips/s2_ehz_cpz.clips.json.",
+    "revision": "d3b98868a9bca7573957b84092b4acd3c72c4ee6",
+    "revision_is": "the ONE pin of ROADMAP rows 223+224 (LINES-EVERYWHERE, branch parcel/lines-everywhere-223-224): aeon origin/master d3b98868a9bca7573957b84092b4acd3c72c4ee6 read 2026-09-26T22:06Z after a fetch, taken as the pin itself. Since the previous capture: a974bc2e (LINES-EVERYWHERE) moved tools/clip_act_bake.py (C1 retired, new C4 for a clip carrying reserved bits 15:14; clipact.json drops clips[].severed_xover_reason and collision.per_clip[].marks_inside_src / marks_outside_src / severed_xover_reason), tools/clip_manifest.py (severed_xover_reason no longer modelled) and tools/collision_pipeline.py (XOVER_* gone; PLANE_RESERVED_SHIFT/MASK and plane_reserved_bits); 62140cd7 moved tools/fg_page_order.py (stress-bake frame-aware pins; PAGE_FRAMES unchanged, the --expect-worst argv is byte-identical); afc23f5b/119e9455/a974bc2e moved games/sonic4/data/clips/s2_ehz_cpz/clips.json (floorless_columns plane B + prose). Blobs at the pin: clip_act_bake 920a855a, clip_manifest 9a07d19a, collision_pipeline cbbae9d7, fg_page_order 68e303fc, s2_ehz_cpz clips.json 64ab630c.",
     "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, or any inputs[].path's blob differs from its inputs[].blob, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob, inputs[].blob and revision here; then re-run test/formats/paste-music-r3.test.ts, which holds withClip's output to the manifests the fixture records",
-    "materialised_by": "git -C <aeon> archive 5ca10281 into a scratch directory (never ../aeon, a peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run with EMPYREAN_SUITE_ROOT=<suite> exported as well.",
+    "materialised_by": "git -C <aeon> archive d3b98868 | tar -x into a scratch directory under $HOME/.cache (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
     "tool_path": "tools/clip_manifest.py",
-    "tool_blob": "0afd1a71a4f44b58498a002c7db975df235f1726",
+    "tool_blob": "9a07d19aa2696e5f1c8cfb9cd47b701aad9f3667",
     "inputs_are": "the manifests the generator reads (the bases of its `plan`). The tool itself is tool_blob above. The donor trees the loader reads (s2disasm EHZ, CPZ, OOZ) are produced by the conversion above and not pinned here, as in the sibling markers.",
     "inputs": [
       {
         "path": "games/sonic4/data/clips/s2_ehz_cpz/clips.json",
-        "blob": "a9ca3ecf9fe730277d6bd3df50bea7d3459ec507"
+        "blob": "64ab630ce376ba7e985ba540d943728d89e6d79b"
       }
-    ]
+    ],
+    "what_changed_at_this_pin": "Re-captured: exit codes and aeon's stdout unchanged; the recorded manifests differ only by the s2_ehz_cpz clips.json change (floorless_columns plane B + prose)."
   },
   "fixture": {
     "path": "test/fixtures/clips/aeon-outputs/paste-music.cases.json",
     "command": "EMPYREAN_SUITE_ROOT=<suite> python3 test/fixtures/clips/aeon-outputs/gen_paste_music.py ../pm <this file>, run from the materialised copy (the relative scratch path keeps a home directory out of aeon's refusal text): three real subprocesses of `python3 tools/clip_manifest.py validate <path> --donor-root <copy>/games/sonic4/data/donors --json`, each {exit, stdout, stderr} verbatim plus the manifest validated",
     "why_these": "the paste row 222 fixes, both ways (with the zone's song: accepted; without it, the pre-222 write: refused R3 naming both clips and the two values), and the case the fix must not change (a zone new to the act gets no music and is accepted)",
-    "sha256": "3503aae7df31e9986e20d0bb36945f38b952f6f20ada51e8e97a2a4f19e2f078"
+    "sha256": "e6c8f767db0c2dbabd71f6b24c24670a4d0c0d788f317c7c9333105abe01d275"
   },
   "generator": {
     "path": "test/fixtures/clips/aeon-outputs/gen_paste_music.py",

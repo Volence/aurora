@@ -11,7 +11,6 @@
       16
     ],
     "cell_px_note": "SYNTHETIC FIXTURE.",
-    "crossover_marks": 0,
     "distinct_shapes": [
       1,
       255
@@ -20,7 +19,7 @@
       "section_N.collattr.bin (plane A)",
       "section_N.collattrb.bin (plane B)"
     ],
-    "format": "aurora per-plane cell word, big-endian u16: 9:0 base-bank shape, 10 X-flip, 11 Y-flip, 13:12 this plane's solidity, 15:14 XOVER",
+    "format": "aurora per-plane cell word, big-endian u16: 9:0 base-bank shape, 10 X-flip, 11 Y-flip, 13:12 this plane's solidity, 15:14 reserved, always 0",
     "index_note": "SYNTHETIC FIXTURE.",
     "index_primary": "none (synthetic)",
     "index_secondary": "none (synthetic)"
