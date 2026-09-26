@@ -169,6 +169,25 @@ deletion.** Counts are `it(`/`it.each(` declarations in the deleted file.
 Runner: every row above runs in `npm test` (vitest, default collection). The bake-claim detector has a control:
 at `a974bc2e^` (raised on value 3 only) it must say "not enforced", and does.
 
+### Addendum (overseer review): the one-plane shape
+
+The overseer planted `return a.reservedA + a.reservedB > 0 ? [a] : [];` -> `return a.reservedA > 0 ? [a] : [];`
+in `save.ts` (a save that ignores plane B) and `src/core/project/aeon` + `test/collision` stayed 402/402 green.
+Correction to the finding's cause: the REFUSES row planted on BOTH planes (A value 2, B value 3), not on A only. It
+stayed green because the A plant alone triggers the refusal, and the audit message names both planes either
+way. Every guard was re-checked one plane at a time:
+
+| Guard | Plane B covered before? | Now | Red-first (mutation shown from disk, restored by `git show HEAD:<path> >`) |
+|---|---|---|---|
+| save refusal | no | `it.each` A-only / B-only in `aeon-save.test.ts`, other plane clean, cell named, files unchanged (6899e542) | the overseer's exact line (`- ... a.reservedA + a.reservedB > 0 ...`, `+ return a.reservedA > 0 ? [a] : [];`): `src/core/project/aeon` + `test/collision` **1 failed of 404** (the B-only row); restored 404/404. Mirror `reservedB > 0`: the A-only row red, 1 of 36 |
+| audit ERROR | yes: value 1..3 x plane A/B rows, the other plane clean | no change | `- ... > 0 ? 'error' : 'ok'`, `+ return a.reservedA > 0 ? 'error' : 'ok';`: **3 failed of 13** (the three plane-B rows); restored 13/13 |
+| `save_chunk` refusal | no: the validator's unit rows name `collisionA` only, and the handler calls it once per plane | `it.each` over `collisionA`/`collisionB` through the handler, other plane clean, no chunk added, + a clean control (`agent-handler.chunk-stamp-zones.test.ts`) | `- if (collBErr) throw ...`, `+ if (false && collBErr) throw ...`: **1 failed of 13** (the collisionB row); restored 13/13 |
+| harness planted mark | no: plane A only | plane-B word (section 0, editor cell (100, 7), value 1): rows B1b, B2b, C1b, C3b, and B3 also requires the B file unchanged. 22/22 (a86d3ba5) | palette `const b = ... clearReservedBitsEntries(section.collisionEditB) ...` -> `const b = [] // MUTATION` in a rebuilt app: **6 FAIL of 22** (C1b, and C1/C2/C3/C3b/D1 downstream); restored, rebuilt, 22/22 |
+
+Targeted totals after the addendum: `src/core/project/aeon`, `test/collision`, `agent-handler.chunk-stamp-zones`,
+`test/agent/paint-collision`: 40 files, 417 passed, 0 failed, 0 skipped. Harness `root:` / `pinned:` unchanged
+(this worktree).
+
 ## 7. Suite, fidelity, harness
 
 **Suite**, `TMPDIR=$HOME/.cache/aurora-tmp VITEST_MAX_WORKERS=4 npm test` (all check scripts + typecheck + vitest),
