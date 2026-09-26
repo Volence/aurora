@@ -13,7 +13,7 @@ module games.sonic4.act_descriptor_ojz_act1 in act_descriptor
 // ---- The Sec/Act ROM-descriptor structs live in the shared engine.structs
 // module: it carries the layout + the per-field drift wall; act keeps the
 // validating constructor + field defaults below.
-use engine.structs.{Act, Sec, Region}
+use engine.structs.{Act, Sec, Region, LayerLine}
 // S2CLIP-REGION-MUSIC step 5: a region row's rg_song is checked against the game's song
 // count at build time (ojz_region() and ojz_region_table_check(), rule 9), so a row can
 // never name an id Sound_PlayMusic would index past SongTable with.
@@ -100,6 +100,17 @@ use games.sonic4.ojz_effects_editor_act1.{OJZ_Preset_Sec2_KEY, OJZ_Preset_Sec5_K
 // always-live binding-function seam `ojz_act1_act_default(hand:)` uses, for the same reason:
 // one path, no conditional import, no name that appears or vanishes with the shape.
 use games.sonic4.ojz_clip_act_act1.{OJZ_CLIP_ACT, OJZ_CLIP_REGION_ROWS, ojz_clip_act_regions}
+// THE ACT'S LAYER LINES (LINES-EVERYWHERE, 2026-09-26: lines are the engine's only
+// layer-switch mechanism). OJZ act 1's own rows are AUTHORED in
+// games/sonic4/data/editor/ojz/act1/layer_lines.json and baked by tools/layer_lines.py into a
+// generated const-only module (the regions.emp pattern); this file checks them and emits them
+// as `OJZ_Act1_LayerLines` at its end. A clip act's rows (Sonic 2's plane-switcher lines,
+// tools/s2_layer_lines.py) arrive through the clip module's chooser, which in every canonical
+// shape hands back its `hand` (the act's own table) and carries no rows of its own.
+use games.sonic4.ojz_layer_lines_act1.{OJZ_ACT1_LAYER_LINE_ROWS}
+use games.sonic4.ojz_clip_act_act1.{OJZ_CLIP_LAYER_LINE_ROWS, ojz_clip_act_layer_lines}
+use engine.constants.{LL_KEEP_PATH, LL_HORIZONTAL, LL_FWD_B, LL_BACK_B, LL_SEG_W,
+                      LL_KEY_BEFORE, LL_KEY_AFTER}
 
 // SECTION_SIZE_SHIFT + EDGE_CLAMP are engine constants — imported from their sole
 // author now that engine.constants is the definition (the P5 ownership flip).
@@ -116,6 +127,7 @@ use engine.constants.{SCREEN_WIDTH, SCREEN_HEIGHT, CAM_SCREEN_HALF_W, CAM_SCREEN
 // could not, and the pool-tile ceiling proof below now fails at COMPTIME).
 use games.sonic4.ojz_act_assets_act1.{BG_LAYOUT_TALL_SPAN}   // regions part 2 step 5
 use games.sonic4.ojz_act_pool_manifest_act1.{OJZ_ACT_POOL_PAGES}
+use games.sonic4.ojz_sec_local_maps_act1.{OJZ_ACT_NT_PHYSICAL}   // resident plain copy: the baked word form
 use games.sonic4.ojz_block_dicts_act1.{
     OJZ_SEC0_BLOCK_DICT_LEN,
     OJZ_SEC1_BLOCK_DICT_LEN,
@@ -230,13 +242,16 @@ pub data OJZ_Act1_Descriptor: Act = Act{
     act_art_pool_table:  OJZ_Act_Pool_PageTable,         // manifest v2 table [PageManifest;N] (generated)
     act_art_pool_pages:  OJZ_ACT_POOL_PAGES,             // generated manifest const
     edge_mode:           EDGE_CLAMP,                     // §10; OJZ ships CLAMP
-    pad_21:              default,
+    act_nt_physical:     OJZ_ACT_NT_PHYSICAL,            // generated: 1 = physical-form words (resident plain copy)
     act_sec_local_maps:  OJZ_Sec_LocalMaps,              // P2b per-section local->global tables (generated)
     act_art_budget:      ACT_ART_BUDGET,                  // P2c Task 9: 2 pages/frame (2×2048) steady-state ceiling; guarded above
     // painted-regions v1 — the table at the end of this file, unless a clip act is baked in
     // (the chooser then names that act's own table; see the clip_act import above)
     act_regions:         ojz_clip_act_regions(hand: OJZ_Act1_Regions),
     act_region_count:    OJZ_ACT_REGION_COUNT,           // the SAME rows the guards below read
+    // LINES-EVERYWHERE: the act's own authored table (the end of this file), unless a clip act
+    // is baked in (the chooser then names that act's table, or 0 when it has no lines).
+    act_layer_lines:     ojz_clip_act_layer_lines(hand: OJZ_Act1_LayerLines),
 }
 
 // -----------------------------------------------
@@ -1094,3 +1109,65 @@ ensure(OJZ_CLIP_REGION_OVERLAP == -1,
        "the clip act's region rows overlap (pair code {OJZ_CLIP_REGION_OVERLAP} = row i * 1000 + row j)")
 ensure(OJZ_CLIP_ACT == 0 || OJZ_CLIP_REGION_AREA == ACT_W * ACT_H,
        "the clip act's region rows do not tile the act: their areas sum to {OJZ_CLIP_REGION_AREA} px², the act is {ACT_W} x {ACT_H}")
+
+// ---- THE LAYER LINES (LINES-EVERYWHERE; S2CLIP-PLANE-SWITCH) ----
+// The rows Player_LayerLines depends on, checked where the Act binds them, for BOTH sources:
+// the act's authored table and a clip act's donor table. The bake (tools/layer_lines.py and
+// tools/s2_layer_lines.py) already refuses what it can see in its source; these are the
+// runtime's own preconditions, stated at the consumer so a table from any producer is held
+// to them. The first failing row and rule as `row * 16 + rule`, or -1:
+//   0  row 0 is not the LL_KEY_BEFORE sentinel      1  the last row is not LL_KEY_AFTER
+//   2  an interior key outside 0..$7FFE             3  keys out of order (the cursor walk and
+//                                                      the scan both assume a sorted table)
+//   4  a vertical row with an empty or inverted extent (ll_a >= ll_b), or one past $7FFE
+//   5  a horizontal segment that is empty, inverted or wider than LL_SEG_W (the window's
+//      floor is xmin - LL_SEG_W, so a wider one could fire outside it)
+//   6  a flag bit outside the seven LL_* bits       7  a priority-only row that also names a
+//                                                      path (the path bits would be ignored)
+comptime fn layer_line_table_check(r: array) -> int {
+    if r.len == 0 { return -1 }
+    if r[0].ll_key != LL_KEY_BEFORE { return 0 }
+    if r[r.len - 1].ll_key != LL_KEY_AFTER { return (r.len - 1) * 16 + 1 }
+    comptime var prev: int = 0
+    for i in 1..(r.len - 1) {
+        if r[i].ll_key >= LL_KEY_AFTER { return i * 16 + 2 }
+        if r[i].ll_key < prev { return i * 16 + 3 }
+        prev = r[i].ll_key
+        if (r[i].ll_flags & (1 << LL_HORIZONTAL)) == 0 {
+            if r[i].ll_a >= r[i].ll_b || r[i].ll_b >= LL_KEY_AFTER { return i * 16 + 4 }
+        }
+        if (r[i].ll_flags & (1 << LL_HORIZONTAL)) != 0 {
+            if r[i].ll_b <= r[i].ll_key || r[i].ll_b - r[i].ll_key > LL_SEG_W || r[i].ll_a >= LL_KEY_AFTER { return i * 16 + 5 }
+        }
+        if r[i].ll_flags > $7F { return i * 16 + 6 }
+        if (r[i].ll_flags & (1 << LL_KEEP_PATH)) != 0 && (r[i].ll_flags & ((1 << LL_FWD_B) | (1 << LL_BACK_B))) != 0 { return i * 16 + 7 }
+    }
+    return -1
+}
+const OJZ_CLIP_LAYER_LINE_FAULT = layer_line_table_check(OJZ_CLIP_LAYER_LINE_ROWS)
+const OJZ_CLIP_LAYER_LINE_FAULT_ROW = OJZ_CLIP_LAYER_LINE_FAULT / 16
+const OJZ_CLIP_LAYER_LINE_FAULT_RULE = OJZ_CLIP_LAYER_LINE_FAULT % 16
+ensure(OJZ_CLIP_LAYER_LINE_FAULT == -1,
+       "the clip act's layer-line table breaks a rule Player_LayerLines depends on: row {OJZ_CLIP_LAYER_LINE_FAULT_ROW}, rule {OJZ_CLIP_LAYER_LINE_FAULT_RULE} (0 no leading sentinel, 1 no trailing sentinel, 2 a key outside 0..$7FFE, 3 keys out of order, 4 a vertical extent empty or inverted, 5 a horizontal segment empty, inverted or wider than LL_SEG_W, 6 a flag bit outside the LL_* set, 7 a priority-only row naming a path). tools/s2_layer_lines.py emits this table")
+ensure(OJZ_CLIP_ACT == 1 || OJZ_CLIP_LAYER_LINE_ROWS.len == 0,
+       "the NEUTRAL clip_act module carries {OJZ_CLIP_LAYER_LINE_ROWS.len} layer-line row(s); with OJZ_CLIP_ACT == 0 they would be checked and never bound. Re-emit it: python3 tools/clip_rom_bake.py emit-neutral")
+ensure(OJZ_CLIP_LAYER_LINE_ROWS.len != 1 && OJZ_CLIP_LAYER_LINE_ROWS.len != 2,
+       "the clip act's layer-line table has only its sentinel row(s): an act with no lines binds no table (act_layer_lines 0), so Player_Main's null test is all it pays")
+
+// ---- OJZ ACT 1'S OWN LAYER LINES (LINES-EVERYWHERE, 2026-09-26) ----
+// Four lines at the edges of the column the section-0 loop's painted crossover marks used to
+// occupy (the authored file's `notes` say how they were derived). Checked by the same walk as a
+// clip act's rows, and emitted here, in this file's section, the way OJZ_Act1_Regions is.
+const OJZ_ACT1_LAYER_LINE_FAULT = layer_line_table_check(OJZ_ACT1_LAYER_LINE_ROWS)
+const OJZ_ACT1_LAYER_LINE_FAULT_ROW = OJZ_ACT1_LAYER_LINE_FAULT / 16
+const OJZ_ACT1_LAYER_LINE_FAULT_RULE = OJZ_ACT1_LAYER_LINE_FAULT % 16
+ensure(OJZ_ACT1_LAYER_LINE_FAULT == -1,
+       "OJZ act 1's layer-line table breaks a rule Player_LayerLines depends on: row {OJZ_ACT1_LAYER_LINE_FAULT_ROW}, rule {OJZ_ACT1_LAYER_LINE_FAULT_RULE} (the rule numbers of the check above). tools/layer_lines.py bakes it from games/sonic4/data/editor/ojz/act1/layer_lines.json")
+// An act with no lines must bind 0, not an empty table: the runtime walks the table between its
+// sentinels. That binding is not built (no canonical act has needed it), so an authored file
+// with every line deleted is refused HERE rather than shipped as a table the routine would
+// walk off the end of.
+ensure(OJZ_ACT1_LAYER_LINE_ROWS.len >= 3,
+       "OJZ act 1's authored layer-line table has {OJZ_ACT1_LAYER_LINE_ROWS.len} row(s), not at least one line between its two sentinels. An act with no lines must bind act_layer_lines 0, which this descriptor does not do yet: author a line, or bind 0 here")
+
+pub data OJZ_Act1_LayerLines (align: 2): [LayerLine; OJZ_ACT1_LAYER_LINE_ROWS.len] = OJZ_ACT1_LAYER_LINE_ROWS
