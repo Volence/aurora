@@ -1,0 +1,32 @@
+{
+  "$what": "Provenance of paste-music.cases.json: OUTPUTS of aeon's own tools/clip_manifest.py `validate --json`, captured from a real run for ROADMAP row 222 (CLIP-PASTE-MUSIC-R3, packet docs/reviews/2026-09-26-paste-music-222.md). Not a committed aeon file, so it is pinned by the revision and the command that produced it.",
+  "$why": "the proof that the paste's music rule is aeon's, not Aurora's: s2_ehz_cpz plus one pasted s2disasm EHZ clip is ACCEPTED when the clip carries the song the act's EHZ clip names (what withClip writes since row 222) and REFUSED by R3 when it carries none (what withClip wrote before); a clip of a zone the act does not carry, with no music, is accepted. Each case records the manifest it validated, and test/formats/paste-music-r3.test.ts holds withClip's own output to it, so the validated bytes are the ones the page would write.",
+  "aeon": {
+    "repo": "git@github.com:Volence/aeon.git",
+    "branch_that_answers_currency": "origin/master",
+    "revision": "5ca10281e38d6cea3e208ad0d292e62d7b398ba9",
+    "revision_is": "the ONE pin of ROADMAP row 222 (branch parcel/paste-music-222): aeon origin/master read 2026-09-26 after a fetch. At the pin tools/clip_manifest.py is blob 0afd1a71 (last changed at 67f7787d, S2CLIP-REGION-MUSIC step 6), the same blob row 221 vendored at 91d4119c, and games/sonic4/data/clips/s2_ehz_cpz/clips.json is blob a9ca3ecf, byte-identical to test/fixtures/clips/s2_ehz_cpz.clips.json.",
+    "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, or any inputs[].path's blob differs from its inputs[].blob, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob, inputs[].blob and revision here; then re-run test/formats/paste-music-r3.test.ts, which holds withClip's output to the manifests the fixture records",
+    "materialised_by": "git -C <aeon> archive 5ca10281 into a scratch directory (never ../aeon, a peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run with EMPYREAN_SUITE_ROOT=<suite> exported as well.",
+    "tool_path": "tools/clip_manifest.py",
+    "tool_blob": "0afd1a71a4f44b58498a002c7db975df235f1726",
+    "inputs_are": "the manifests the generator reads (the bases of its `plan`). The tool itself is tool_blob above. The donor trees the loader reads (s2disasm EHZ, CPZ, OOZ) are produced by the conversion above and not pinned here, as in the sibling markers.",
+    "inputs": [
+      {
+        "path": "games/sonic4/data/clips/s2_ehz_cpz/clips.json",
+        "blob": "a9ca3ecf9fe730277d6bd3df50bea7d3459ec507"
+      }
+    ]
+  },
+  "fixture": {
+    "path": "test/fixtures/clips/aeon-outputs/paste-music.cases.json",
+    "command": "EMPYREAN_SUITE_ROOT=<suite> python3 test/fixtures/clips/aeon-outputs/gen_paste_music.py ../pm <this file>, run from the materialised copy (the relative scratch path keeps a home directory out of aeon's refusal text): three real subprocesses of `python3 tools/clip_manifest.py validate <path> --donor-root <copy>/games/sonic4/data/donors --json`, each {exit, stdout, stderr} verbatim plus the manifest validated",
+    "why_these": "the paste row 222 fixes, both ways (with the zone's song: accepted; without it, the pre-222 write: refused R3 naming both clips and the two values), and the case the fix must not change (a zone new to the act gets no music and is accepted)",
+    "sha256": "3503aae7df31e9986e20d0bb36945f38b952f6f20ada51e8e97a2a4f19e2f078"
+  },
+  "generator": {
+    "path": "test/fixtures/clips/aeon-outputs/gen_paste_music.py",
+    "what": "the generator fixture.command runs",
+    "sha256": "2b8e92a84b2449832802e0ab0fb4ab1831414feba0db5be1c34a823f0b224c4c"
+  }
+}
