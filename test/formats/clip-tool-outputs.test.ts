@@ -34,7 +34,7 @@ interface Marker {
   fixture: { path: string; sha256: string; command: string };
   generator?: { path: string };
 }
-const MARKERS = ['s2_ehz_cpz.clipact', 's2_two_clip.clipact', 'validate-json.cases'].map((stem) =>
+const MARKERS = ['s2_ehz_cpz.clipact', 's2_two_clip.clipact', 'validate-json.cases', 'paste-music.cases'].map((stem) =>
   JSON.parse(readFileSync(resolve(DIR, `${stem}.provenance.json`), 'utf8')) as Marker);
 const REAL = ['s2_ehz_cpz', 's2_two_clip'];
 
