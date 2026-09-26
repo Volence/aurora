@@ -5,16 +5,20 @@
     "repo": "git@github.com:Volence/aeon.git",
     "path": "games/sonic4/data/clips/s2_ehz_cpz/clips.json",
     "branch_that_answers_currency": "origin/master",
-    "revision": "67f7787d656e5ce7896649bfb1d138987c997875",
-    "blob": "a9ca3ecf9fe730277d6bd3df50bea7d3459ec507",
-    "revision_is": "the LAST commit that touched the path (git log -1 <pin> -- <path>) at the ONE pin of ROADMAP row 221 (REVENDOR-AEON-ANCHOR-OVERLAY, branch parcel/revendor-221): aeon origin/master 91d4119cbc855a94adc05c74f7b45854d57b8af0, read 2026-09-26 after a fetch. 67f7787d is a single-parent commit (parent fc6712c3), not a tip and not a merge; it reached origin/master in the merge b90cd650. Previous pin: 479b6637, blob c3c9beb8, 12788 bytes.",
-    "what_changed_at_this_pin": "Two commits since 479b6637: 47a3316f (CLIP-ANCHORS-MISSING-FILE) adds the top-level `\"anchor_overlay\": true` (tools/clip_anchors.py refuses an overlay whose anchors.toml is missing or undeclared); 67f7787d (S2CLIP-REGION-MUSIC step 6) adds a per-clip `music` key, `\"SONG_S2_EHZ\"` on ehz_act1 and `\"SONG_S2_CPZ\"` on cpz_act1 (a SONG_* NAME from games/sonic4/config/sound_ids.emp, never a number; clip_manifest.py R3 refuses anything else and refuses two clips of one zone naming different music). No rectangle, corridor or grid moved; the file still has no final newline. Aurora's reader, src/core/formats/donors/clip-manifest-doc.ts, keeps the RAW object: both keys survive parse -> append -> serialise, and the round-trip row compares every pre-existing clip object whole, so a writer that dropped `music` goes red (measured at row 221 by mutation). Aurora does not model `music`: nothing in Aurora reads a song id."
+    "revision": "afc23f5bb09cf2b143a71a86ae57d49a61a63a85",
+    "blob": "64ab630ce376ba7e985ba540d943728d89e6d79b",
+    "revision_is": "the LAST commit that touched the path (git log -1 <pin> -- <path>) at the ONE pin of ROADMAP rows 223+224 (LINES-EVERYWHERE, branch parcel/lines-everywhere-223-224): aeon origin/master d3b98868a9bca7573957b84092b4acd3c72c4ee6, read 2026-09-26T22:06Z after a fetch. Previous pin: 67f7787d (see pin_history_current_last).",
+    "what_changed_at_this_pin": "Three commits since 67f7787d: a974bc2e (LINES-EVERYWHERE) rewrites `floorless_columns.why` (plane B is REACHABLE now that the act carries Sonic 2's lines) and adds `floorless_columns.planes.B` {columns 64, x_runs [[1344,1408],[4672,4864],[8192,8256],[9472,9664]]}; 119e9455 and afc23f5b rewrite that `why` prose again (the x 1344..1407 hole is reachable, caused by the missing Obj11 bridge). No clip, corridor, grid, rectangle or `music` moved; still no final newline. Aurora's reader (src/core/formats/donors/clip-manifest-doc.ts) keeps the RAW object and does not read `floorless_columns`, so the new plane-B block survives a paste untouched."
   },
   "fixture": {
     "path": "test/fixtures/clips/s2_ehz_cpz.clips.json",
-    "bytes": 12874,
-    "sha256": "24ce965a1afca7c3de7ee0fec05da62b0fdb3be3c41a642844275910dbb6b569",
-    "git_blob": "a9ca3ecf9fe730277d6bd3df50bea7d3459ec507"
+    "bytes": 15128,
+    "sha256": "f5e6d925832629aaca162396d568922f43ce918a3e0c9081c4fdc84f0e9c9c0f",
+    "git_blob": "64ab630ce376ba7e985ba540d943728d89e6d79b"
   },
-  "re_vendor": "node scripts/revendor.mjs test/fixtures/clips/s2_ehz_cpz.clips.json test/fixtures/clips/s2_ehz_cpz.clips.provenance.json <AEON_DIR> games/sonic4/data/clips/s2_ehz_cpz/clips.json <the commit git log names>"
+  "re_vendor": "node scripts/revendor.mjs test/fixtures/clips/s2_ehz_cpz.clips.json test/fixtures/clips/s2_ehz_cpz.clips.provenance.json <AEON_DIR> games/sonic4/data/clips/s2_ehz_cpz/clips.json <the commit git log names>",
+  "pin_history_current_last": [
+    "a9ca3ecf9fe730277d6bd3df50bea7d3459ec507, 67f7787d656e5ce7896649bfb1d138987c997875, anchor_overlay + per-clip music (row 221)",
+    "64ab630c, afc23f5b, floorless_columns plane B (rows 223+224, pin d3b98868)"
+  ]
 }

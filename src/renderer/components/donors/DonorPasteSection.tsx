@@ -21,7 +21,7 @@
 // and "unavailable" with the reason when the file carries no rows.
 //
 // ROW 213 OPEN (a) (aeon 71ae3433). The bake answers in the same JSON, so a
-// bake refusal (C1 naming its clip, an act-level C2/C3, the page budget) is
+// bake refusal (C4 naming its clip, an act-level C2/C3, the page budget) is
 // shown like a loader refusal, and a bake that crashed is shown as a crash of
 // the BAKE, never as "aeon's bake refused".
 
@@ -322,8 +322,10 @@ function PasteForm(): React.ReactElement {
 
 interface PerClip {
   clip: string; zone: string; attr_entries_alone: number; attr_entries_added: number; solid_cells: number;
-  marks_inside_src: number; marks_outside_src: number;
 }
+// (`marks_inside_src` / `marks_outside_src`, the per-clip crossover mark counts,
+// were REMOVED from aeon's clipact.json by LINES-EVERYWHERE (aeon 19978b00) with
+// the painted marks themselves; ROADMAP rows 223+224 stopped reading them.)
 
 const POOL_COLUMNS: Array<{ field: PoolRowField; label: string }> = [
   { field: 'tiles', label: 'tiles' },
@@ -414,8 +416,7 @@ function BakeReadout(): React.ReactElement | null {
       {per.map((p) => (
         <div key={p.clip} data-donors-readout-clip={p.clip} style={NOTE}>
           <strong style={{ color: T.textHi }}>{p.clip}</strong> ({p.zone}): {p.attr_entries_alone} attr entries alone,
-          {' '}{p.attr_entries_added} added to the clips before it; {p.solid_cells} solid collision cells;
-          {' '}crossover marks {p.marks_inside_src} inside the source, {p.marks_outside_src} cut off outside it.
+          {' '}{p.attr_entries_added} added to the clips before it; {p.solid_cells} solid collision cells.
         </div>
       ))}
     </div>

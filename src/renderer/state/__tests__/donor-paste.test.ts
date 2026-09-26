@@ -160,12 +160,12 @@ describe('a paste writes only what aeon accepted', () => {
   it('a REFUSAL at the bake writes nothing either, and carries the bake\'s own rule and the clip it names', async () => {
     const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
     let bakes = 0;
-    const p = ports(disk, { bake: (t) => (t.includes('ehz_x') ? (bakes++, aeonBaked('refuse_c1_bake_own')) : {}) });
+    const p = ports(disk, { bake: (t) => (t.includes('ehz_x') ? (bakes++, aeonBaked('refuse_c4_bake_own')) : {}) });
     await usePasteStore.getState().selectAct('s2_two_clip_pins', p);
     const o = await usePasteStore.getState().paste(CLIP, p);
     expect(bakes).toBe(1);
     expect(o).toMatchObject({ kind: 'refused', stage: 'bake' });
-    const doc = JSON.parse(BAKE_CASES.refuse_c1_bake_own.stdout);
+    const doc = JSON.parse(BAKE_CASES.refuse_c4_bake_own.stdout);
     expect(o.kind === 'refused' && o.refusals).toEqual(doc.refusals);
     expect(o.kind === 'refused' && o.text).toBe(doc.refusals[0].message);
     expect(p.writes).toEqual([]);
@@ -217,10 +217,10 @@ describe('a paste writes only what aeon accepted', () => {
 describe('the target act\'s re-bake note tells a bake refusal from a bake crash', () => {
   it('a refusal on disk is a REFUSED note naming aeon\'s rule, subjects and sentence; nothing is drawn', async () => {
     const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
-    const p = ports(disk, { bake: () => aeonBaked('refuse_c1_bake_own') });
+    const p = ports(disk, { bake: () => aeonBaked('refuse_c4_bake_own') });
     await usePasteStore.getState().selectAct('s2_two_clip_pins', p);
     const s = usePasteStore.getState();
-    const r = JSON.parse(BAKE_CASES.refuse_c1_bake_own.stdout).refusals[0] as { rule: string; subjects: { index: number; id: string }[]; message: string };
+    const r = JSON.parse(BAKE_CASES.refuse_c4_bake_own.stdout).refusals[0] as { rule: string; subjects: { index: number; id: string }[]; message: string };
     expect(s.baked).toBeNull();
     expect(s.bakeNoteKind).toBe('refused');
     expect(s.bakeNote).toContain(`${r.rule} (clip ${r.subjects[0].index} ${r.subjects[0].id}): ${r.message}`);

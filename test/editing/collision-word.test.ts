@@ -217,7 +217,7 @@ describe('paintCollisionRectBothPlanes preserves unowned bits, per destination',
     const plan = paintCollisionRectBothPlanes({
       x: args.x, y: args.y, w: args.w, h: args.h, word: args.word,
       aimedPlane: args.plane, otherPlane: args.other ?? null,
-      tileWidth: TILE_W, bothPlanes: false, aimedPlaneId: 'a',
+      tileWidth: TILE_W, bothPlanes: false,
     });
     expect(plan.other).toEqual([]);
     return plan.aimed;
@@ -263,7 +263,6 @@ describe('paintCollisionRectBothPlanes preserves unowned bits, per destination',
     const plan = paintCollisionRectBothPlanes({
       x: 0, y: 0, w: 1, h: 1, word: BRUSH,
       aimedPlane: aimed, otherPlane: other, tileWidth: TILE_W, bothPlanes: true,
-      aimedPlaneId: 'a',
     });
     expect(plan.aimed.length).toBe(4);
     expect(plan.other.length).toBe(4);

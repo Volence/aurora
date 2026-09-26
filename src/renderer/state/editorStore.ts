@@ -17,7 +17,6 @@ import {
   DEFAULT_BRUSH_ATTRIBUTES,
   type BrushPriority, type BrushAttributes,
 } from '../../core/editing/brush-word';
-import { crossoverBrushAuthors, type CrossoverBrush, type CrossoverSpanMode } from '../../core/collision/layer-transition';
 import type { UndoStack } from '../../core/editing/undo-stack';
 import { useArtStore } from './artStore';
 import { BoundEditHistory } from '../../core/editing/bound-edit-history';
@@ -260,48 +259,6 @@ interface EditorState {
    * looking at would be its own surprise.
    */
   collisionPaintBothPlanes: boolean;
-  /**
-   * THE LOOP CROSSOVER BRUSH — what a stroke does to the destination cell's
-   * layer-transition field (bits 15:14 of the per-plane word; the encoding
-   * lives in core/collision/layer-transition.ts and nowhere else).
-   *
-   * TRI-STATE, DEFAULTING TO `keep`, for `brush-word.ts`'s priority reasoning
-   * exactly: nothing in the shape picker depicts a crossover, so an author
-   * retouching a slope is saying nothing about layer handoff and the editor
-   * must not answer for them. `clear` and `hand-off` AUTHOR it, which is what
-   * keeps `keep` honest.
-   *
-   * `hand-off` rather than a pair of to-A/to-B values because PER PLANE THERE
-   * ARE ONLY TWO LEGAL VALUES: a plane-A cell may say "go to B" or nothing, and
-   * a plane-B cell "go to A" or nothing. The reverse is a SELF-MARK that aeon's
-   * bake hard-errors on. A brush that offers exactly the legal values cannot
-   * author an illegal one — the illegal state is unreachable rather than
-   * guarded — and one armed brush does the right thing on either plane, which
-   * is what makes a two-way loop two ordinary strokes.
-   */
-  collisionCrossoverBrush: CrossoverBrush;
-  /**
-   * HOW WIDE A CROSSOVER MARK IS — and the ONLY control in the collision
-   * facet that is invisible until it is needed.
-   *
-   * `'cell'` (the default) marks the whole 16px cell, which is what the
-   * crossover brush has always done and what a one-way mark wants. `'half'`
-   * marks the ONE 8px sub-column the cursor is over, which is the only width at
-   * which a TWO-WAY pair changes the player's path at all: aeon's trigger fires
-   * once per 8px column entered, a 16px cell is two of them, and a pair painted
-   * across both hands the player over and straight back. The whole argument,
-   * with the constants it is derived from, is in
-   * core/collision/layer-transition.ts's CrossoverSpan block.
-   *
-   * ⚠ IT IS NOT A NEW PAINTING UNIT AND MUST NOT BECOME ONE. The 16px cell is
-   * right for everything else in this facet and this changes nothing about it:
-   * a stroke still reshapes the whole cell, and only the two crossover bits go
-   * anywhere narrower. The owner's standing note is that the effects tooling is
-   * already "confusing and convoluted", so this control renders ONLY while the
-   * crossover brush is armed — a collision painter who never touches loops
-   * never sees it, and there is no mode to leave.
-   */
-  collisionCrossoverSpanMode: CrossoverSpanMode;
   collisionBrushSize: number; // brush width in 16px blocks; 1 = reuse, >1 = positional N×N area
 
   /**
@@ -557,22 +514,6 @@ interface EditorState {
    * menu is right there.
    */
   setCollisionPaintBothPlanes: (on: boolean) => void;
-  /**
-   * Arm the crossover brush. Leaving `keep` SURFACES THE CROSSOVER LENS
-   * (viewStore `showCrossover`) and toasts that it did — the third instance of
-   * the same feedback loop, wired to the rule (`crossoverBrushAuthors`) rather
-   * than to the chip, so the condition and the rule cannot drift.
-   *
-   * A crossover is the most invisible field the editor has ever let anyone
-   * paint: two bits that no shape, colour or overlay depicts, whose only
-   * observable effect is which of two collision planes the player is on three
-   * seconds later. Arming this without the lens is the state the owner was
-   * rescued from on the priority bit, one field further from anything visible.
-   */
-  setCollisionCrossoverBrush: (brush: CrossoverBrush) => void;
-  /** Set the crossover mark width. No lens-surfacing side effect: arming the
-   *  brush already did that, and this control cannot be reached without it. */
-  setCollisionCrossoverSpanMode: (mode: CrossoverSpanMode) => void;
   setCollisionBrushSize: (size: number) => void;
   setSelectedEffectsSceneId: (id: string | null) => void;
   setSelectedEffectsPresetId: (id: string | null) => void;
@@ -797,8 +738,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedCollisionSolidity: 'all',
   collisionPaintPlane: 'a',
   collisionPaintBothPlanes: false,
-  collisionCrossoverBrush: 'keep',
-  collisionCrossoverSpanMode: 'cell',
   collisionBrushSize: 1,
   selectedEffectsSceneId: null,
   selectedEffectsPresetId: null,
@@ -888,19 +827,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       'info',
     );
   },
-  setCollisionCrossoverBrush: (collisionCrossoverBrush) => {
-    set({ collisionCrossoverBrush });
-    if (!crossoverBrushAuthors(collisionCrossoverBrush)) return;
-    if (useViewStore.getState().overlays.showCrossover) return;
-    useViewStore.getState().setOverlay('showCrossover', true);
-    useToastStore.getState().addToast(
-      'Crossover lens on: the amber veil marks the cells that hand the player to the other '
-      + 'collision path. Nothing else on the map depicts them, and a loop painted on one plane '
-      + 'only works in one direction. Turn it off in View.',
-      'info',
-    );
-  },
-  setCollisionCrossoverSpanMode: (collisionCrossoverSpanMode) => set({ collisionCrossoverSpanMode }),
   setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(31, size | 0)) }),
   setSelectedEffectsSceneId: (id) => set({ selectedEffectsSceneId: id }),
   setSelectedEffectsPresetId: (id) => set({ selectedEffectsPresetId: id }),

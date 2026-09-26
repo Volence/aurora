@@ -6,18 +6,18 @@
     "repo": "git@github.com:Volence/aeon.git",
     "path": "engine/system/constants.emp",
     "branch_that_answers_currency": "origin/master",
-    "revision": "787a9980a474a344f25d96750b0b5dc5a0967c11",
-    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log --oneline c838a30f -- engine/system/constants.emp` names 787a9980 as the newest. Measured 2026-09-25 with aeon origin/master = c838a30f5b4166af90f791da5b0512ce9494ecff (after `git fetch -q origin`), the one revision this re-vendor pinned for all four stale aeon fixtures. The blob is the same at both. act_descriptor.emp is unchanged at c838a30f (blob cbf001fb, its own pin 4802c664), so the pair still agrees.",
-    "blob": "faa16c4e7a61e1748a91d1d3bee9459efc0916ca",
-    "last_changed_by": "787a9980 perf(page-cache): bounded-direct patch regime for a streaming act's first block (adds PAGECACHE_DIRECT_RESIDENT = $FF and PAGECACHE_DIRECT_BOUNDED = $01 with their comment block; 11 lines added, nothing else changed)",
-    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> <AEON_DIR> <path> 787a9980 — bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
-    "revision_published": "787a9980 is an ancestor of aeon origin/master (c838a30f), checked with `git merge-base --is-ancestor` (exit 0); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run."
+    "revision": "fe4a94ab30b484f264fd9cb62519021bf591bc9b",
+    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log -1 d3b98868 -- engine/system/constants.emp` names fe4a94ab at the ONE pin of ROADMAP rows 223+224 (LINES-EVERYWHERE, branch parcel/lines-everywhere-223-224): aeon origin/master d3b98868a9bca7573957b84092b4acd3c72c4ee6, read 2026-09-26T22:06Z after a fetch. act_descriptor.emp is re-vendored at the same pin (6b444e45), so the pair agrees.",
+    "blob": "d37c00bb12717fa697e5d6d8e306fb4bec501bb8",
+    "last_changed_by": "fe4a94ab constants: soft-budget ensure messages. Since the previous pin 787a9980, nine commits: e30fa05a (PAGE_AUDIT_FULL/TICK/IDLE + audit comment), 4496ce3b (PAGECACHE_DIRECT_PLAIN = $80), 242a1284 (PF_DEMAND_HELD_BIT/PF_DEMAND_HELD), 2a727b29 + af2b2307 + eb17a0d8 (LL_* layer-line constants, now at the end of the file), a974bc2e (the LAYER_PATH_A/B comment no longer names XOVER_*; XOVER_* were never declared in this file), 8d58a190 + fe4a94ab (BLOCK_DECOMP_SOFT, BLOCK_FILL_LEAD_ROWS/COLS + three ensures). No rule-4 leaf (SCREEN_WIDTH, SCREEN_HEIGHT, CAM_SCREEN_HALF_W, CAM_SCREEN_HALF_H, CAM_MAX_Y_STEP) moved.",
+    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> /home/volence/sonic_hacks/aeon engine/system/constants.emp fe4a94ab30b484f264fd9cb62519021bf591bc9b - bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
+    "revision_published": "fe4a94ab is an ancestor of aeon origin/master (d3b98868); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run."
   },
   "fixture": {
     "path": "test/fixtures/regions/act-constants/engine_constants.emp",
-    "bytes": 86999,
-    "sha256": "d3997e138fa8d466f0944a10d38e514b8aab2aa4f21d277eed13659d3cd26ff9",
-    "git_blob": "faa16c4e7a61e1748a91d1d3bee9459efc0916ca",
+    "bytes": 93229,
+    "sha256": "b0708cfa2b288781220e0430256ca681083bb5a05259a4e159e9c5b61295d561",
+    "git_blob": "d37c00bb12717fa697e5d6d8e306fb4bec501bb8",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
   },
   "paired_with": {
@@ -25,5 +25,9 @@
     "why": "The descriptor holds the derivations, this file holds their leaves. Neither half resolves a rule-4 constant alone."
   },
   "module_line_is_load_bearing": "This file declares `module engine.constants`, and the descriptor imports its leaves with `use engine.constants.{…}`. Aurora's reader checks those two agree before it trusts a value read out of this file, so a day when aeon moves these constants to another module fails loudly instead of resolving a name out of whatever file Aurora happened to open.",
-  "re_vendor": "node scripts/revendor.mjs test/fixtures/regions/act-constants/engine_constants.emp test/fixtures/regions/act-constants/engine_constants.provenance.json <AEON_DIR> engine/system/constants.emp <the commit that last touched the path, from `git log origin/master -- <path>`> — then update `last_changed_by` and `revision_is` here, re-vendor act_descriptor.emp at a revision that agrees, and re-run the full suite."
+  "re_vendor": "node scripts/revendor.mjs test/fixtures/regions/act-constants/engine_constants.emp test/fixtures/regions/act-constants/engine_constants.provenance.json <AEON_DIR> engine/system/constants.emp <the commit that last touched the path, from `git log origin/master -- <path>`> — then update `last_changed_by` and `revision_is` here, re-vendor act_descriptor.emp at a revision that agrees, and re-run the full suite.",
+  "pin_history_current_last": [
+    "faa16c4e7a61e1748a91d1d3bee9459efc0916ca, 787a9980a474a344f25d96750b0b5dc5a0967c11, PAGECACHE_DIRECT_RESIDENT/BOUNDED",
+    "d37c00bb, fe4a94ab, the nine commits in last_changed_by (rows 223+224, pin d3b98868)"
+  ]
 }

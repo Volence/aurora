@@ -7,9 +7,16 @@
 # `refuse_untagged_expect_worst`, which adds aeon's own --expect-worst (Aurora never
 # passes it; it is the one way to reach an untagged bake refusal without patching aeon).
 # Nothing below edits aeon's output. The mutations are aeon's own, from
-# tools/test_clip_bake_json.py at 71ae3433: manifest mutations of committed fixtures, and
-# for C1/C3 a donor tree PAINTED in place (backed up first and restored afterwards, so the
-# copy's donors are the converter's again when this exits).
+# tools/test_clip_bake_json.py (at 71ae3433; the C4 row as it reads at d3b98868): manifest
+# mutations of committed fixtures, and for C4/C3 a donor tree PAINTED in place (backed up
+# first and restored afterwards, so the copy's donors are the converter's again when this
+# exits).
+#
+# C1 ("the clip severs a crossover") WAS RETIRED by aeon's LINES-EVERYWHERE (19978b00) with
+# the painted crossover marks, and CP.XOVER_* with it. The bake's own clip-naming refusal is
+# now C4: a clip whose source rectangle carries the reserved bits 15:14 (a leftover mark),
+# painted here exactly as aeon's test_a_bake_refusal_names_its_rule_and_the_clip paints it
+# (2 << PLANE_RESERVED_SHIFT on plane A, 1 << PLANE_RESERVED_SHIFT on plane B, cell (40, 100)).
 import copy, json, os, shutil, subprocess, sys
 
 root = os.getcwd()
@@ -65,7 +72,7 @@ for name, base, m in plan:
 run("refuse_untagged_expect_worst", "games/sonic4/data/clips/s2_ehz_boot/clips.json",
     ["--expect-worst", str(fpo.load_budget_constants()["PAGE_FRAMES"] + 1)])
 
-# C1 / C3: the bake's OWN refusals, on a valid one-clip manifest over a painted EHZ tree.
+# C4 / C3: the bake's OWN refusals, on a valid one-clip manifest over a painted EHZ tree.
 TREE = "games/sonic4/data/donors/s2disasm/EHZ"
 BACKUP = f"{out}/EHZ.unpainted"
 shutil.rmtree(BACKUP, ignore_errors=True)
@@ -94,7 +101,7 @@ def restore():
 
 
 def one_clip(name, src):
-    doc = {"schema": 1, "units": "world_px", "id": "xover_cut", "act": {"grid_w": 1, "grid_h": 1},
+    doc = {"schema": 1, "units": "world_px", "id": "retired_mark", "act": {"grid_w": 1, "grid_h": 1},
            "clips": [{"id": "ehz_cut", "donor": "s2disasm", "zone": "EHZ",
                       "src_rect": dict(zip(("x", "y", "w", "h"), src)),
                       "dst_rect": {"x": 0, "y": 0, "w": src[2], "h": src[3]}}]}
@@ -104,10 +111,10 @@ def one_clip(name, src):
 
 
 try:
-    xo = ((40, 100), (100, 100))
-    paint({"collattr": {c: CP.XOVER_TO_B << CP.XOVER_SHIFT for c in xo},
-           "collattrb": {c: CP.XOVER_TO_A << CP.XOVER_SHIFT for c in xo}})
-    run("refuse_c1_bake_own", one_clip("refuse_c1_bake_own", (0, 0, 2048, 512)))
+    cells = ((40, 100),)
+    paint({"collattr": {c: 2 << CP.PLANE_RESERVED_SHIFT for c in cells},
+           "collattrb": {c: 1 << CP.PLANE_RESERVED_SHIFT for c in cells}})
+    run("refuse_c4_bake_own", one_clip("refuse_c4_bake_own", (0, 0, 2048, 512)))
     restore()
     paint({"collattr": {(10, 10): 0x18 | (CP.SOL_ALL << CP.PLANE_SOL_SHIFT)}})
     run("refuse_c3_act_level", one_clip("refuse_c3_act_level", (0, 0, 2048, 1024)))

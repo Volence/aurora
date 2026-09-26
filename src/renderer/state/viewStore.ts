@@ -28,13 +28,6 @@ export interface OverlayOptions {
    *  collision overlay shows one plane at a time by design. Derived from the two
    *  planes, never stored; see canvas/both-planes-lens.ts. */
   showSolidBothPlanes: boolean;
-  /** The per-16px-CELL LOOP CROSSOVER lens (aeon only): an amber veil over
-   *  cells whose word hands the player to the other collision path, and a RED
-   *  one where that mark exists on the shown plane but not the other — a
-   *  crossover that will work in one direction only. It is the ONLY depiction
-   *  of a field that changes no shape, colour, solidity or overlay; see
-   *  canvas/crossover-lens.ts. */
-  showCrossover: boolean;
   /** Occlusion-correct object previews (classic-only): re-draw high-priority
    *  map-tile PIXELS above low-priority sprite pieces — what the VDP shows —
    *  with the hidden portion kept discoverable as a translucent violet ghost.
@@ -68,7 +61,7 @@ export interface OverlayOptions {
    *
    *  ⚠ THE ONE KEY IN THIS RECORD THAT DEFAULTS TO `true`, and it departs from
    *  its neighbours on purpose. `showPriority`, `showScreenFrame`,
-   *  `showSolidBothPlanes`, `showCrossover` and `playAnimatedArt` are all OFF
+   *  `showSolidBothPlanes` and `playAnimatedArt` are all OFF
    *  because each is a REFERENCE THE AUTHOR ASKS FOR, laid over the thing he
    *  came to look at. The regions wash is not laid over the Regions facet's
    *  subject, it IS that subject: a facet that opened showing nothing would be
@@ -137,9 +130,6 @@ export const OVERLAY_KEYS_BY_ENGINE: Record<OpenEngine, readonly (keyof OverlayO
     // classic's viewport has one collision plane. Registered beside the
     // collision keys because it is a statement about them.
     'showSolidBothPlanes',
-    // AEON ONLY for the same structural reason, and armed automatically the
-    // moment the crossover brush stops being `keep`.
-    'showCrossover',
     // PROMOTED for the BgAnim band preview (ROADMAP item 42), per
     // docs/reviews/2026-08-22-preview-posture-ruling.md §2 Q3. The key, the
     // toggle plumbing and the OFF-by-default posture already existed and were
@@ -233,8 +223,6 @@ export const useViewStore = create<ViewState>((set) => ({
     // "Both planes" brush is switched on, because that stroke writes a plane
     // the author is not looking at (editorStore setCollisionPaintBothPlanes).
     showSolidBothPlanes: false,
-    // A lens: OFF until asked for — armed by `setCollisionCrossoverBrush`.
-    showCrossover: false,
     // NOT a lens: occlusion-correct previews are what the game shows, so the
     // default is ON; the toggle exists to compare against the flat composite.
     occludeSprites: true,

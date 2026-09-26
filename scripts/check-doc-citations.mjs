@@ -922,6 +922,15 @@ const EVIDENCE_GONE = 'the sentence records evidence that is ABSENT from every c
   + 'known and the marking does not claim to know. Deleting the path would erase the record of '
   + 'what was lost. It is not a licence: docs/captures/ is where evidence goes.';
 
+// A THIRD REASON, for a file DELETED WITH ITS FEATURE by a ruling: the document
+// names the instrument that was true when it was written, and the whole feature
+// (not only the file) no longer exists. See the rows added 2026-09-26.
+const RETIRED_WITH_ITS_FEATURE = 'the packet names an instrument (code, test or harness) of the '
+  + 'painted loop crossover, which the owner RETIRED on 2026-09-26 (aeon docs/decisions.jsonl '
+  + 'S2CLIP-PLANE-SWITCH); ROADMAP rows 223+224 deleted the file with the feature. The sentence '
+  + 'was true when written and is history; the file is in git at the parent of its deletion. '
+  + 'Editing the landed packet would retro-sweep committed history.';
+
 const EXEMPT = [
   { file: 'docs/reviews/2026-08-30-o31-dangling-bg-refs.md', token: 'scratchpad/shots-bg-dangling', why: EVIDENCE_LOST },
   { file: 'docs/reviews/2026-08-30-o21-bg-wrap-visibility.md', token: 'scratchpad/shots-bg-wrap', why: EVIDENCE_LOST },
@@ -1006,6 +1015,32 @@ const EXEMPT = [
        + 'row is read from; it offers nothing as evidence. The file is the boot-time source by '
        + 'design and untracked by contract (empyrean contract/LANE_STATUS.md), so it cannot be '
        + 'made openable and no repair is wanted.' },
+
+  // Added 2026-09-26 (ROADMAP rows 223+224, LINES-EVERYWHERE). SIXTEEN rows, one
+  // reason. The painted loop crossover was retired by an OWNER RULING (aeon
+  // docs/decisions.jsonl S2CLIP-PLANE-SWITCH), and its brush, lens, preview, audit
+  // and harnesses were deleted WITH it. These landed packets describe those files
+  // at the time they were the instrument; the record is right to name them and
+  // wrong to be edited ("committed history is not retro swept"). Each file is one
+  // `git show <parent of the deletion>:<path>` away, and the deleting commit names
+  // them all. NOT a licence: a new document citing one of these as a LIVE
+  // instrument is the defect this gate exists for.
+  { file: 'docs/reviews/2026-09-06-live-edit-bump.md', token: 'scratchpad/audit-coords-harness.mjs', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-06-live-edit-bump.md', token: 'scratchpad/loop-paint-harness.mjs', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-06-live-edit-bump.md', token: 'scratchpad/two-way-mark-harness.mjs', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-06-loops-audit-coords.md', token: 'scratchpad/audit-coords-harness.mjs', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-06-loops-audit-coords.md', token: 'scratchpad/loop-paint-harness.mjs', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-06-loops-audit-coords.md', token: 'test/collision/crossover-audit.test.ts', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-06-loops-audit-coords.md', token: 'test/collision/crossover-locus.test.ts', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-06-loops-audit-coords.md', token: 'test/collision/crossover-span.test.ts', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-06-loops-hover-half.md', token: 'scratchpad/loops-hover-half-harness.mjs', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-06-loops-hover-half.md', token: 'scratchpad/two-way-mark-harness.mjs', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-06-loops-hover-half.md', token: 'src/renderer/canvas/crossover-preview.ts', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-06-loops-hover-half.md', token: 'src/renderer/canvas/__tests__/crossover-preview.test.ts', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-09-collision-audit-notes.md', token: 'test/collision/crossover-span.test.ts', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-09-fixture-revision-stamp.md', token: 'scratchpad/crossover-paint-harness.mjs', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/reviews/2026-09-25-expiry-lists-census.md', token: 'src/core/collision/layer-transition.ts', why: RETIRED_WITH_ITS_FEATURE },
+  { file: 'docs/superpowers/notes/2026-09-06-aurora-lens-sweep.md', token: 'scratchpad/two-way-mark-harness.mjs', why: RETIRED_WITH_ITS_FEATURE },
 ];
 
 // ---------------------------------------------------------------------------

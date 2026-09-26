@@ -6,19 +6,19 @@
     "repo": "git@github.com:Volence/aeon.git",
     "path": "games/sonic4/data/levels/ojz/act1/act_descriptor.emp",
     "branch_that_answers_currency": "origin/master",
-    "revision": "5c4633c98032306941bed42e72c9f5104b035a5a",
-    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log origin/master -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` at aeon origin/master 91d4119cbc855a94adc05c74f7b45854d57b8af0 names 5c4633c9 first (a single-parent commit, parent 53c61c0e). Measured 2026-09-26 by the row-221 agent after a fetch; nothing touched the path between 5c4633c9 and that tip.",
-    "blob": "cb954af34a3fb58717a286cf362fecd9cad6fca7",
-    "last_changed_by": "5c4633c9 region music (S2CLIP-REGION-MUSIC step 5): Region.rg_song + Music_Service (reached origin/master in the merge 9883a9c1)",
-    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> ../aeon <path> 5c4633c98032306941bed42e72c9f5104b035a5a — bytes from `git show <rev>:<path>`, re-hashed on this side and compared to aeon's blob before the sidecar was written. Never the sibling working tree.",
-    "revision_published": "5c4633c9 is reachable from aeon origin/master (91d4119cbc855a94adc05c74f7b45854d57b8af0); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run.",
-    "what_changed_at_this_pin": "Region grew 26 -> 28 B. This file: a new `use games.sonic4.sound_ids.{SONG_COUNT}` import; `ojz_region()` gains a trailing `song: int = 0` parameter, a rule-9 ensure (0 <= song <= SONG_COUNT) and emits `rg_song: song, rg_pad_1b: 0`; `ojz_cut_row` copies `rg_song`/`rg_pad_1b`; `ojz_region_table_check` gains rule 9; the two fault messages name rule 9. None of the five rule-4 constants (REGION_MIN_SPAN, CENTRE_X_MIN/MAX, CENTRE_Y_MIN/MAX) or their derivations changed in this diff. engine_constants.emp is pinned at 787a9980, which is still the last commit touching engine/system/constants.emp at 91d4119c (same blob faa16c4e), so the pair agrees. (The previous prose here said the pair was pinned at 7d4d0ce6; the engine_constants sidecar already named 787a9980.)"
+    "revision": "6b444e458b6169eb1f3a1cb4dea39702b9a64769",
+    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log -1 d3b98868 -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` names 6b444e45 at the ONE pin of ROADMAP rows 223+224 (LINES-EVERYWHERE, branch parcel/lines-everywhere-223-224): aeon origin/master d3b98868a9bca7573957b84092b4acd3c72c4ee6, read 2026-09-26T22:06Z after a fetch.",
+    "blob": "6c6aaa89ab5493fd0040eee6144c0bdbd6fbf82e",
+    "last_changed_by": "6b444e45 OJZ act 1: the section-0 loop's layer switches become four authored layer lines (LINES-EVERYWHERE). Also since the previous pin 5c4633c9: 4496ce3b (resident plain copy: `pad_21` -> `act_nt_physical: OJZ_ACT_NT_PHYSICAL` + its `use`) and 2a727b29 (s2clip plane-switch: `LayerLine` import, `act_layer_lines` binding, layer_line_table_check).",
+    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> /home/volence/sonic_hacks/aeon <path> 6b444e458b6169eb1f3a1cb4dea39702b9a64769 - bytes from `git show <rev>:<path>`, re-hashed on this side and compared to aeon's blob before the sidecar was written. Never the sibling working tree.",
+    "revision_published": "6b444e45 is reachable from aeon origin/master (d3b98868a9bca7573957b84092b4acd3c72c4ee6); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run.",
+    "what_changed_at_this_pin": "Act gained `act_nt_physical` (was `pad_21`, no offset moves) and `act_layer_lines` at $2E (46 -> 50 B). This file: `use engine.structs.{Act, Sec, Region, LayerLine}`; new `use`s of OJZ_ACT1_LAYER_LINE_ROWS, OJZ_CLIP_LAYER_LINE_ROWS/ojz_clip_act_layer_lines, the LL_* constants and OJZ_ACT_NT_PHYSICAL; the Act literal binds `act_nt_physical` and `act_layer_lines`; a new trailing block (layer_line_table_check, its ensures, `OJZ_Act1_LayerLines`). None of the five rule-4 constants (REGION_MIN_SPAN, CENTRE_X_MIN/MAX, CENTRE_Y_MIN/MAX) or their derivations changed in this diff. engine_constants.emp is re-vendored at fe4a94ab, the last commit touching engine/system/constants.emp at the same pin, so the pair agrees."
   },
   "fixture": {
     "path": "test/fixtures/regions/act-constants/act_descriptor.emp",
-    "bytes": 81662,
-    "sha256": "319f7dd06e8cc3dac60ae8694188ea901150bef99b1d546dc3da8b22ed47c203",
-    "git_blob": "cb954af34a3fb58717a286cf362fecd9cad6fca7",
+    "bytes": 88108,
+    "sha256": "5654468108afbb2d8baa56ed24574d6375f5b96d8fd0c9dc4c3cfe376fea4935",
+    "git_blob": "6c6aaa89ab5493fd0040eee6144c0bdbd6fbf82e",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
   },
   "paired_with": {
@@ -26,5 +26,9 @@
     "why": "The chain LEAVES this file. CENTRE_X_MAX is written here as `ACT_W - SCREEN_WIDTH + CAM_SCREEN_HALF_W`, and SCREEN_WIDTH and CAM_SCREEN_HALF_W are not declared here at all: line 96 of this file is `use engine.constants.{SCREEN_WIDTH, SCREEN_HEIGHT, CAM_SCREEN_HALF_W, CAM_SCREEN_HALF_H, CAM_MAX_Y_STEP}`. A test that vendored only this half could not resolve a single one of the five rule-4 constants, so the pair is vendored together and re-vendored together.",
     "what_a_mismatched_pair_would_certify": "Nothing. A derivation read from one aeon commit evaluated over leaves read from another is a number no build ever computed."
   },
-  "re_vendor": "node scripts/revendor.mjs test/fixtures/regions/act-constants/act_descriptor.emp test/fixtures/regions/act-constants/act_descriptor.provenance.json <AEON_DIR> games/sonic4/data/levels/ojz/act1/act_descriptor.emp <the commit that last touched the path, from `git log origin/master -- <path>`> — then update `last_changed_by` and `revision_is` here, re-vendor engine_constants.emp at a revision that agrees, and re-run the full suite. ⚠ In zsh, brace the revision variable (`${REV}:<path>`) or the `:c` parameter modifier eats a character AND the `>` redirect has already truncated the fixture."
+  "re_vendor": "node scripts/revendor.mjs test/fixtures/regions/act-constants/act_descriptor.emp test/fixtures/regions/act-constants/act_descriptor.provenance.json <AEON_DIR> games/sonic4/data/levels/ojz/act1/act_descriptor.emp <the commit that last touched the path, from `git log origin/master -- <path>`> — then update `last_changed_by` and `revision_is` here, re-vendor engine_constants.emp at a revision that agrees, and re-run the full suite. ⚠ In zsh, brace the revision variable (`${REV}:<path>`) or the `:c` parameter modifier eats a character AND the `>` redirect has already truncated the fixture.",
+  "pin_history_current_last": [
+    "cb954af34a3fb58717a286cf362fecd9cad6fca7, 5c4633c98032306941bed42e72c9f5104b035a5a, Region 26 -> 28 B (row 221)",
+    "6c6aaa89, 6b444e45, act_nt_physical + act_layer_lines (rows 223+224, pin d3b98868)"
+  ]
 }

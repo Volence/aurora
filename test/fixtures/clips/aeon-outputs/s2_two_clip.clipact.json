@@ -22,7 +22,6 @@
       "id": "ehz_s2",
       "music": null,
       "region_id": "ehz_s2",
-      "severed_xover_reason": null,
       "src_rect": {
         "h": 1024,
         "w": 2048,
@@ -44,7 +43,6 @@
       "id": "cpz_s2",
       "music": null,
       "region_id": "cpz_s2",
-      "severed_xover_reason": null,
       "src_rect": {
         "h": 2048,
         "w": 2048,
@@ -67,9 +65,6 @@
         "attr_entries_added": 95,
         "attr_entries_alone": 95,
         "clip": "ehz_s2",
-        "marks_inside_src": 0,
-        "marks_outside_src": 0,
-        "severed_xover_reason": null,
         "solid_cells": 6184,
         "zone": "s2disasm/EHZ"
       },
@@ -77,9 +72,6 @@
         "attr_entries_added": 112,
         "attr_entries_alone": 148,
         "clip": "cpz_s2",
-        "marks_inside_src": 0,
-        "marks_outside_src": 0,
-        "severed_xover_reason": null,
         "solid_cells": 46788,
         "zone": "s2disasm/CPZ"
       }
@@ -111,7 +103,7 @@
       0
     ],
     "rung": "searched",
-    "seconds": 0.12,
+    "seconds": 0.086,
     "stats": {
       "refine_rounds": [
         {
@@ -127,7 +119,7 @@
           "sample_over_target_after": 0,
           "sample_over_target_before": 180,
           "sample_windows": 4096,
-          "seconds": 0.084,
+          "seconds": 0.057,
           "stride": [
             8,
             4

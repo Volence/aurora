@@ -8,8 +8,8 @@ import { serializeBgTiles, BG_WIDTH } from '../../../formats/bg-tiles';
 import { serializeTiles } from '../../../export/tile-dedup';
 import { serializeSectionMeta, parseSectionMeta } from '../../../formats/section-meta';
 import { serializeCollAttr, parseCollAttr } from '../../../formats/s4-collattr';
-import { cellTileIndices, cellCrossoverIndices } from '../../../collision/collision-cell';
-import { withCrossover, readCrossover } from '../../../collision/layer-transition';
+import { cellTileIndices } from '../../../collision/collision-cell';
+import { planeReservedBits, PLANE_RESERVED_SHIFT } from '../../../collision/reserved-bits';
 import { STRIP_ROWS, STRIP_COLS, WIDE_STRIP_SIZE } from '../../../formats/s4-strips';
 import { packCollisionCell } from '../../../collision/collision-cell-word';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../model/s4-types';
@@ -752,70 +752,72 @@ describe('buildAeonSavePlan: editable collision planes', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // ⚠ THE SUB-CELL ROUND TRIP — the question LOOPS-TWO-WAY-MARK could not
-  // answer from anywhere else.
-  //
-  // Aurora paints collision in 16px cells and every writer had, until
-  // 2026-09-04, written all four of a cell's 8px sub-tiles IDENTICALLY. The
-  // loop crossover breaks that on purpose: aeon's trigger fires once per 8px
-  // COLUMN, so a two-way mark must occupy ONE sub-tile column or it flips the
-  // player twice and nets to nothing (core/collision/layer-transition.ts).
-  //
-  // Everything upstream of here was already known to be 8px granular — aeon's
-  // bake indexes the sub-tile column directly, and the file is one word per
-  // sub-tile. NEITHER OF THOSE ESTABLISHES THE ROUND TRIP. If Aurora's own
-  // load→save normalised a cell to a single word anywhere — a resolve, a
-  // baseline fill, a `understood` fallback — a half-cell mark would work in the
-  // editor and be gone from the file, which is a feature that does nothing in
-  // the game and says nothing about it.
-  //
-  // So this drives the REAL load and the REAL save plan over a plane whose two
-  // sub-tile columns DISAGREE, and asserts the disagreement on the far side.
-  it('⚠ preserves a mark on ONE 8px sub-column of a cell: load, save, and the byte that differs', async () => {
+  // ⚠ THE SUB-CELL ROUND TRIP. Aurora paints collision in 16px cells, but the
+  // file is one word per 8px sub-tile and aeon's bake reads the sub-tile column
+  // directly, so a cell whose sub-tiles DISAGREE must survive load->save exactly.
+  // (This row used a half-cell loop crossover mark until the marks were retired,
+  // ROADMAP rows 223+224; it now uses two different SHAPES, which is the same
+  // property without the reserved bits the save now refuses.)
+  it('⚠ preserves a cell whose two 8px sub-columns DISAGREE: load, save, and the word that differs', async () => {
     const files = authoredFixture();
-    // Build the half-cell mark with the SAME function the brush uses, so the
-    // fixture cannot drift from what an author can actually paint.
     const a = Uint16Array.from(AUTHORED_A);
-    const b = Uint16Array.from(AUTHORED_B);
     const CELL_COL = 11, CELL_ROW = 7;
     const all = cellTileIndices(CELL_COL, CELL_ROW, SECTION_TILES_WIDE);
-    const marked = cellCrossoverIndices(CELL_COL, CELL_ROW, SECTION_TILES_WIDE, 'right');
-    const base = packCollisionCell({ shape: 0x11, xFlip: false, yFlip: false, solidity: 'all' });
-    for (const i of all) { a[i] = base; b[i] = base; }
-    for (const i of marked) {
-      a[i] = withCrossover(base, 'to-b');     // plane A hands you to B
-      b[i] = withCrossover(base, 'to-a');     // plane B hands you back
-    }
+    const right = all.filter((i) => i % SECTION_TILES_WIDE === CELL_COL * 2 + 1);
+    const left = all.filter((i) => !right.includes(i));
+    const wordL = packCollisionCell({ shape: 0x11, xFlip: false, yFlip: false, solidity: 'all' });
+    const wordR = packCollisionCell({ shape: 0x12, xFlip: true, yFlip: false, solidity: 'top' });
+    for (const i of left) a[i] = wordL;
+    for (const i of right) a[i] = wordR;
     files.set(COLL_A_PATH, serializeCollAttr(a));
-    files.set(COLL_B_PATH, serializeCollAttr(b));
-
-    // ANTI-VACUOUS, and this is the row that could actually have failed: the
-    // cell's sub-tiles genuinely disagree going IN. A fixture whose four
-    // sub-tiles were equal would round-trip under a normalising save too.
-    const unmarked = all.filter((i) => !marked.includes(i));
-    expect(marked.length).toBeGreaterThan(0);
-    expect(unmarked.length).toBeGreaterThan(0);
-    expect(new Set(marked.map((i) => i % SECTION_TILES_WIDE)).size).toBe(1);
-    expect(a[marked[0]!]).not.toBe(a[unmarked[0]!]);
+    // ANTI-VACUOUS: the cell genuinely disagrees going IN, on one sub-column.
+    expect(right.length).toBe(2);
+    expect(wordL).not.toBe(wordR);
 
     const out = await loadSaveApply(files);
     const backA = parseCollAttr(out.get(COLL_A_PATH)!);
-    const backB = parseCollAttr(out.get(COLL_B_PATH)!);
-    // The mark survived on exactly the sub-tiles it was written to, on BOTH
-    // planes, with the correct per-plane value — and NOT on the other half.
-    for (const i of marked) {
-      expect(readCrossover(backA[i])).toBe('to-b');
-      expect(readCrossover(backB[i])).toBe('to-a');
-    }
-    for (const i of unmarked) {
-      expect(readCrossover(backA[i])).toBe('none');
-      expect(readCrossover(backB[i])).toBe('none');
-    }
-    // And nothing else moved: the geometry is intact across the whole cell.
-    for (const i of all) {
-      expect(backA[i]! & ~(3 << 14)).toBe(base);
-      expect(backB[i]! & ~(3 << 14)).toBe(base);
-    }
+    for (const i of left) expect(backA[i]).toBe(wordL);
+    for (const i of right) expect(backA[i]).toBe(wordR);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ⚠ BITS 15:14 ARE RESERVED: THE SAVE REFUSES, IT DOES NOT ERASE.
+  // aeon refuses any non-zero value since LINES-EVERYWHERE (19978b00). A plane
+  // can still ARRIVE carrying them (an older Aurora's file; a session opened
+  // before aeon cleared its own marks). The load must keep them (no silent
+  // clear) and the save must refuse the whole act, naming the cell, and write
+  // nothing. Planted on a word of each plane at a known, non-zero index so the
+  // named coordinates are a measurement and not a default.
+  it('⚠ REFUSES to save an act whose plane carries bits 15:14, naming the cell, after a load that kept them', async () => {
+    const files = authoredFixture();
+    const a = Uint16Array.from(AUTHORED_A);
+    const b = Uint16Array.from(AUTHORED_B);
+    // Editor cell (col 37, row 5) on A, value 2; (col 200, row 90) on B, value 3.
+    const iA = 5 * SECTION_TILES_WIDE + 37;
+    const iB = 90 * SECTION_TILES_WIDE + 200;
+    a[iA] = (a[iA]! | (2 << PLANE_RESERVED_SHIFT)) & 0xFFFF;
+    b[iB] = (b[iB]! | (3 << PLANE_RESERVED_SHIFT)) & 0xFFFF;
+    files.set(COLL_A_PATH, serializeCollAttr(a));
+    files.set(COLL_B_PATH, serializeCollAttr(b));
+
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    const sec = r.project.zones.find((z) => z.id === 'ojz')!.acts.find((x) => x.id === 'act1')!.sections[0]!;
+    // THE LOAD KEPT THEM: nothing between the file and the model cleared them.
+    expect(planeReservedBits(sec.collisionEdit![iA])).toBe(2);
+    expect(planeReservedBits(sec.collisionEditB![iB])).toBe(3);
+
+    await expect(buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: r.legacyAtlasMerged }))
+      .rejects.toThrow(/refusing to save ojz\/act1: .*plane A editor cell \(37, 5\) = 16px cell \(col 18, row 2\).*plane B editor cell \(200, 90\).*Nothing was written/);
+    // And the refusal did not erase them either.
+    expect(planeReservedBits(sec.collisionEdit![iA])).toBe(2);
+    expect(planeReservedBits(sec.collisionEditB![iB])).toBe(3);
+  });
+
+  it('control: the SAME act with bits 15:14 clear saves (the refusal is about the bits, not the fixture)', async () => {
+    const out = await loadSaveApply(authoredFixture());
+    expect(out.get(COLL_A_PATH)!).toEqual(serializeCollAttr(AUTHORED_A));
   });
 
   it('leaves a .collattr.bin it could not read byte-identical, as a well-formed one is', async () => {

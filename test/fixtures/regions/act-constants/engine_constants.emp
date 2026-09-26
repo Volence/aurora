@@ -54,10 +54,10 @@ pub const CTYPE_AIR = 0
 // The two collision planes, named. `Sst.layer` (engine/objects/sst.emp, $2D) holds
 // one of these, and it is the SAME value Collision_GetType takes in d3.b: that proc's
 // `tst.b d3 / beq` IS this encoding — zero selects plane A, non-zero adds
-// TILE_CACHE_COLL_SIZE to reach plane B. They exist so a site that MAPS some other
-// encoding onto the layer byte (the loop crossover's XOVER_TO_A/XOVER_TO_B, see
-// docs/LOOP_CROSSOVER_ENCODING.md §3.2) can bind its mapping to the layer's own
-// authority with an `ensure` instead of restating 0 and 1 in a comment.
+// TILE_CACHE_COLL_SIZE to reach plane B. They exist so a site that WRITES the layer byte
+// (the layer lines, games/sonic4/player/player_common.emp Player_LayerLines, which store
+// these two names) or reads it as a flag (Player_DebugExit's priority derive) is bound to the
+// layer's own authority with an `ensure` instead of restating 0 and 1 in a comment.
 pub const LAYER_PATH_A = 0
 pub const LAYER_PATH_B = 1
 
@@ -431,15 +431,24 @@ pub const PAGE_NOT_RESIDENT  = $FF          // Page_Table sentinel + free-link t
 // identity, so physical == global for every resident page and residency is one compare
 // against PAGE_FRAMES_CLAMP << PAGE_FRAME_TILE_SHIFT. Ended (-> 0, refcounts rebuilt
 // from the nametable) by the act's first frame allocation after the bulk load.
+// DIRECT_PLAIN ($80, negative like RESIDENT) = the resident plain copy of 2026-09-26: the
+// RESIDENT conditions hold AND the act's words were baked PHYSICAL (Act.act_nt_physical),
+// so a run is a plain word copy with no map read at all. Both negative values share the
+// `bmi`; the patch runs tell them apart with one compare per RUN, never per word.
 pub const PAGECACHE_DIRECT_RESIDENT = $FF
+pub const PAGECACHE_DIRECT_PLAIN    = $80
 pub const PAGECACHE_DIRECT_BOUNDED  = $01
 // pf_flags bits (engine.structs PageFrame):
 pub const PF_PINNED_BIT      = 0            // never a victim (build-marked act-common page)
 pub const PF_EVICTABLE_BIT   = 1            // frame is an eviction candidate (assigned, refcount 0,
                                             // unpinned, stamped) — F-1 stamp eviction; set on
                                             // Unref 1->0 + speculative publish, cleared on Ref 0->1
+pub const PF_DEMAND_HELD_BIT = 2            // a DEMAND page published and protected from eviction until
+                                            // the first fill pass that ends without a demand stall
+                                            // (stressart-halts GPL-2 fix, 2026-09-26; PageCache_DemandHoldTick)
 pub const PF_PINNED          = 1 << PF_PINNED_BIT
 pub const PF_EVICTABLE       = 1 << PF_EVICTABLE_BIT
+pub const PF_DEMAND_HELD     = 1 << PF_DEMAND_HELD_BIT
 // The tile-index field of a nametable word (bits 0-10); bits 11-15 are pal/pri/flip.
 pub const NT_TILE_MASK       = $07FF
 pub const NT_ATTR_MASK       = $F800
@@ -449,15 +458,22 @@ pub const PAGE_FRAME_TILE_SHIFT = 6
 pub const PAGE_FRAME_TILE_MASK  = ART_POOL_PAGE_TILES - 1                // 63
 ensure((1 << PAGE_FRAME_TILE_SHIFT) == ART_POOL_PAGE_TILES,
        "PAGE_FRAME_TILE_SHIFT must equal log2(ART_POOL_PAGE_TILES)")
-// DEBUG residency audit cadence: recompute per-frame refcounts from the whole
-// Tile_Cache_Nametable every PAGECACHE_AUDIT_INTERVAL LOGIC TICKS during play.
-// Chosen large enough that the ~4800-word walk's one-tick cost is a rare,
-// identifiable spike (it perturbs ONLY the DEBUG shape's Lag_Frame_Count —
-// measure lag on the non-audit ticks). The gate lives in the level state's tick,
-// right after Tile_Cache_Fill returns (fix F5 — it used to be gated INSIDE the
-// fill, which charged the ~110,000-cycle pass to the routine the streaming arc
-// measures). The audit also runs unconditionally at level init.
+// DEBUG residency audit cadence: every invariant PageCache_Audit checks is checked
+// once per PAGECACHE_AUDIT_INTERVAL LOGIC TICKS during play (and in full at level
+// init). The level state calls PageCache_Audit(PAGE_AUDIT_TICK) once per tick, right
+// after Tile_Cache_Fill returns (fix F5 — it used to be gated INSIDE the fill). Since
+// audit-amortise (2026-09-26) the latched regimes audit the nametable in slices from
+// VSync_Wait's idle slot, with the interval tick finishing whatever idle time did not
+// reach, instead of one ~4800-word walk (203k-236k cycles, two DEBUG lag frames) on the
+// interval tick; the general regime keeps the atomic walk. page_cache.emp's
+// PageCache_Audit header and docs/research/2026-09-26-audit-amortise.md carry the why.
 pub const PAGECACHE_AUDIT_INTERVAL = 128
+// PageCache_Audit's d0 mode: FULL = everything in one call (Tile_Cache_Init's tail);
+// TICK = the level state's once-per-tick call (the engine owns counter and schedule);
+// IDLE = VSync_Wait's idle slot (nametable slices while the frame has room).
+pub const PAGE_AUDIT_FULL = 0
+pub const PAGE_AUDIT_TICK = 1
+pub const PAGE_AUDIT_IDLE = 2
 
 // Page-in request FIFO (Art-streaming P2a, engine.page_in). The dispatcher pops
 // one request per idle slice, resolving page_id -> source/dest via the act's
@@ -1057,6 +1073,24 @@ pub const BLOCK_COLL_SIZE       = BLOCK_COLL_PLANE_SIZE * TILE_CACHE_COLL_PLANES
 pub const BLOCK_RAW_SIZE        = BLOCK_NT_SIZE + BLOCK_COLL_SIZE         // 768 bytes
 pub const BLOCK_STAGE_SLOTS     = 16    // staged decompressed blocks (round-robin evict)
 pub const BLOCK_DECOMP_BUDGET   = 6     // max block decompresses per frame (columns + rows share)
+// THE SOFT BUDGET (perf/ehz-run-lag, 2026-09-27). Tile_Cache_Fill spends BLOCK_DECOMP_SOFT
+// decodes on a tick whose FILLED cache leads the visible screen by at least
+// BLOCK_FILL_LEAD_ROWS rows and BLOCK_FILL_LEAD_COLS columns on every side, and the full
+// BLOCK_DECOMP_BUDGET otherwise. Measured on the S2 clip's Emerald Hill run: every lag frame
+// was ONE tick doing 3-6 demand decodes (~11.5k cycles each) at a block-row or column crossing,
+// with the cache still a full margin ahead of the screen. A fixed lower budget fixed that and
+// broke max-diagonal flight (budget 3: fly diagonal 37 -> 72 lag frames and 62 visible rows
+// undrawn), because the fill has no catch-up headroom (VFILL_ROWS_PER_FRAME's note); the lead
+// test gives the deferral back the moment it costs anything.
+pub const BLOCK_DECOMP_SOFT     = 1
+pub const BLOCK_FILL_LEAD_ROWS  = TILE_CACHE_MARGIN_V / 2                 // 8
+pub const BLOCK_FILL_LEAD_COLS  = TILE_CACHE_MARGIN_H / 2                 // 10
+ensure(BLOCK_DECOMP_SOFT >= 1 && BLOCK_DECOMP_SOFT <= BLOCK_DECOMP_BUDGET,
+       "BLOCK_DECOMP_SOFT ({BLOCK_DECOMP_SOFT}) must be 1..BLOCK_DECOMP_BUDGET ({BLOCK_DECOMP_BUDGET}): 0 would stall a partial row or column forever while the lead holds, and above the hard budget the 'soft' tick would be the expensive one")
+ensure(BLOCK_FILL_LEAD_ROWS > CAM_MAX_Y_STEP / 8 && BLOCK_FILL_LEAD_ROWS < TILE_CACHE_MARGIN_V,
+       "BLOCK_FILL_LEAD_ROWS ({BLOCK_FILL_LEAD_ROWS}) must exceed one tick of the camera's vertical step in rows (CAM_MAX_Y_STEP 16 px = 2 rows; the lead is re-tested every tick, so a deferral can cost at most that before the hard budget returns) and stay below TILE_CACHE_MARGIN_V ({TILE_CACHE_MARGIN_V}): the fill keeps the lead AT the margin, so a threshold there puts the first tick that owes a row on the hard budget, which is the burst this exists to spread")
+ensure(BLOCK_FILL_LEAD_COLS > 16 / 8 && BLOCK_FILL_LEAD_COLS < TILE_CACHE_MARGIN_H,
+       "BLOCK_FILL_LEAD_COLS ({BLOCK_FILL_LEAD_COLS}) must exceed one tick of the camera's horizontal step in columns (camera.emp's CAM_MAX_X_STEP, 16 px = 2 columns) and stay below TILE_CACHE_MARGIN_H ({TILE_CACHE_MARGIN_H}), for the same reason as the rows")
 // Rows filled per frame cap. Must be >= CAM_MAX_Y_STEP/8 — build-asserted at the
 // CAM_MAX_Y_STEP definition below. 2 exactly MATCHES the 16 px/frame camera cap
 // (2*8 == 16): the fill keeps up with the worst case but has ZERO catch-up
@@ -1241,3 +1275,38 @@ pub const VDP_Shadow_len = 19
 pub const VDP_REG_PLANE_SIZE = $11
 ensure((PLANE_H_CELLS == 32 || PLANE_H_CELLS == 64 || PLANE_H_CELLS == 128) && (PLANE_V_CELLS == 32 || PLANE_V_CELLS == 64 || PLANE_V_CELLS == 128) && VDP_REG_PLANE_SIZE == (((PLANE_V_CELLS / 64 + PLANE_V_CELLS / 128) << 4) | (PLANE_H_CELLS / 64 + PLANE_H_CELLS / 128)),
        "BootData_VDPRegs writes reg $10 = VDP_REG_PLANE_SIZE = {VDP_REG_PLANE_SIZE}, but engine.constants says the planes are PLANE_H_CELLS x PLANE_V_CELLS = {PLANE_H_CELLS} x {PLANE_V_CELLS}, which encodes as {((PLANE_V_CELLS / 64 + PLANE_V_CELLS / 128) << 4) | (PLANE_H_CELLS / 64 + PLANE_H_CELLS / 128)} (VSZ bits 5:4, HSZ bits 1:0; 0 = 32, 1 = 64, 3 = 128; each size must be one of those three). If they disagree the VDP wraps the nametable at one size while the engine masks, strides and clamps at the other. THIS PIN RUNS FIRST AND HIDES THE REST: it is evaluated in the RAM-harvest pass, which stops the build before engine/level/section.emp and engine/level/plane_buffer.emp are reached, so after a plane-size change this is the only message you will see, and re-encoding VDP_REG_PLANE_SIZE as it asks is NOT the whole edit: the four plane-wrap family pins at the end of those two files, and the three at the end of engine/level/bg.emp, fire on the next build and list the 33 hand-spelled sites plus bg.emp's 4 (measured 2026-09-11). WHAT THIS PIN DOES NOT COVER: the VDP's own limit on the product of the two sizes (the combinations above 64 x 64 of area are not all legal, and nothing here checks which); the VRAM span a larger plane occupies (Plane A at VRAM_PLANE_A and Plane B at VRAM_PLANE_B must not overlap each other, the window, the SAT or the HScroll table, and no pin checks that); and the 33 hand-spelled engine sites, pinned per axis in engine/level/section.emp and engine/level/plane_buffer.emp, plus engine/level/bg.emp's own 4 sites, pinned at the end of that file (per axis, and its layout size on its own)")
+
+// LAYER LINES (S2CLIP-PLANE-SWITCH; LINES-EVERYWHERE 2026-09-26): the ONLY layer writer that
+// reaches level data (the painted crossover marks are retired). An act may carry a table of
+// layer-switch lines (engine/structs.emp `LayerLine`, named by Act.act_layer_lines), run every
+// frame by the game's player preamble with Sonic 2's Obj03 rule (games/sonic4/player/
+// player_common.emp Player_LayerLines). These are the bit numbers of LayerLine.ll_flags:
+// Obj03's subtype bits 7..2 re-packed, plus its layout x-flip. tools/layer_lines.py (the one
+// bake path, for both sources: an act's authored layer_lines.json and a Sonic 2 donor's
+// Obj03 layout) reads them from THIS file, so the producer and the consumer cannot disagree
+// about a bit.
+pub const LL_KEEP_PATH  = 0           // layout x-flip: leave the layer, set priority only
+pub const LL_GROUNDED   = 1           // Obj03 subtype bit 7: only while not ST_IN_AIR
+pub const LL_HORIZONTAL = 2           // subtype bit 2: a horizontal line (crossed on Y)
+pub const LL_FWD_B      = 3           // subtype bit 3: crossing right/down -> path B, else A
+pub const LL_BACK_B     = 4           // subtype bit 4: crossing left/up -> path B, else A
+pub const LL_FWD_HI     = 5           // subtype bit 5: crossing right/down -> high priority
+pub const LL_BACK_HI    = 6           // subtype bit 6: crossing left/up -> high priority
+// The widest horizontal-line segment a table may hold. A horizontal line is baked as
+// segments no wider than this so the runtime's window over the X-sorted table stays this
+// wide plus one frame's step (Player_LayerLines' header says why that is enough).
+pub const LL_SEG_W      = 64
+// The two sentinel keys every table starts and ends with. Signed word compares order every
+// key between them; the cursor walk and the scan stop on them without a bounds test.
+pub const LL_KEY_BEFORE = $8000
+pub const LL_KEY_AFTER  = $7FFF
+// A row's geometry, as the consumer's instructions spell it: the stride its addq.w/subq.w
+// step by and the displacements its reads use. Plain numbers HERE rather than sizeof/offsetof
+// at the read site on purpose: the read site (games/sonic4/player/player_common.emp) then
+// names no engine struct, so the standalone player lowering (sigil's port rigs, which carry
+// only the structs they list) needs nothing new. engine/structs.emp binds all four to
+// `LayerLine` itself with `ensure`s, so a re-laid row fails the build there.
+pub const LL_ROW        = 8           // sizeof(LayerLine)
+pub const LL_A_OFF      = 2           // offsetof(LayerLine, ll_a)
+pub const LL_B_OFF      = 4           // offsetof(LayerLine, ll_b)
+pub const LL_FLAGS_OFF  = 6           // offsetof(LayerLine, ll_flags)

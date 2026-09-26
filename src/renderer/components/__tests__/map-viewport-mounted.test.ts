@@ -76,7 +76,7 @@ import { documentBands, bandSlotBases } from '../../../core/formats/bg-override/
 import { packCollisionCell, unpackCollisionCell, selectedCollisionWord } from '../../../core/collision/collision-cell-word';
 import { collisionPaintWord } from '../../../core/editing/collision-word';
 import { SECTION_PLANE_WORDS } from '../../../core/collision/collision-cell-resolve';
-import { readCrossover, handOffFrom } from '../../../core/collision/layer-transition';
+import { planeReservedBits, PLANE_RESERVED_SHIFT } from '../../../core/collision/reserved-bits';
 import { snapMarquee, effectiveGranularity, type MapClipboard } from '../../../core/editing/map-clipboard';
 import { selectionToChunk } from '../../../core/editing/selection-to-chunk';
 import { chunkOriginAt } from '../../../core/editing/chunk-links';
@@ -3303,21 +3303,21 @@ function plantBlock(cc: number, cr: number, words: readonly number[]): void {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// COLLISION PAINT, THE THREE MODES map-coverage-3 LEFT: Alt's propagate, a
-// brush wider than one block, and the crossover brush with its half-cell span.
+// COLLISION PAINT, THE MODES map-coverage-3 LEFT: Alt's propagate and a brush
+// wider than one block. (A third, the loop crossover brush with its half-cell
+// span, was retired with the painted marks, ROADMAP rows 223+224; its four rows
+// were replaced by the reserved-bits row at the end of this block.)
 //
-// COVERAGE. `collisionPaintTargets`, `cellCrossoverIndices` and
-// `crossoverSpanForCursor` are pinned as pure functions. What nothing drove is
-// the handler that LATCHES each mode at the press and hands it to them: the
-// Alt bit off the pointer event, the brush size off the store, the crossover
-// brush and its span mode, and the drag cache that decides whether a move is
-// "the same cell".
+// COVERAGE. `collisionPaintTargets` is pinned as a pure function. What nothing
+// drove is the handler that LATCHES each mode at the press and hands it to it:
+// the Alt bit off the pointer event, the brush size off the store, and the drag
+// cache that decides whether a move is "the same cell".
 //
 // Expected cells are derived from the rule each module STATES (the docblock
 // sentence is quoted beside each derivation), never from the handler.
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe('collision paint: Alt propagates, a wide brush covers an area, and the crossover brush marks the half it is aimed at', () => {
+describe('collision paint: Alt propagates, a wide brush covers an area, and a press keeps the reserved bits it cannot write', () => {
   const PICK = 9;
   /** Two four-tile patterns no fixture block carries: the FG fill is FG_FILL.act1
    *  on every tile, so a block made of these matches only where it is planted. */
@@ -3336,24 +3336,17 @@ describe('collision paint: Alt propagates, a wide brush covers an area, and the 
     ed.setCollisionPaintPlane('a');
     ed.setCollisionPaintBothPlanes(false);
     ed.setCollisionBrushSize(1);
-    ed.setCollisionCrossoverBrush('keep');
-    ed.setCollisionCrossoverSpanMode('cell');
   });
 
   afterEach(() => {
     const ed = useEditorStore.getState();
     ed.setCollisionBrushSize(1);
-    ed.setCollisionCrossoverBrush('keep');
-    ed.setCollisionCrossoverSpanMode('cell');
     // The BRUSH-WORD-LATCH rows arm flips, a mirrored entry and another floor
     // type; the setters below are sticky store state and outlive this block.
     ed.pickCollisionShape(PICK, false);
     ed.setSelectedCollisionXFlip(false);
     ed.setSelectedCollisionYFlip(false);
     ed.setSelectedCollisionSolidity('all');
-    // Arming an authoring crossover brush turns the crossover lens on as a side
-    // effect (editorStore's setter). It is view state and outlives this block.
-    useViewStore.getState().setOverlay('showCrossover', false);
   });
 
   /** Every block of act1's section 0 whose four words are `words`, scanned
@@ -3450,7 +3443,7 @@ describe('collision paint: Alt propagates, a wide brush covers an area, and the 
   it('M4: the brush SIZE is LATCHED at the press: a size picked mid-drag leaves the stroke alone, and the next press takes it', async () => {
     // Hub ruling M4 (docs/reviews/2026-09-12-rulings-asked.md): "Latch it at the
     // press, like its neighbours." map-coverage-4 found the size read live per
-    // cell while Alt, both planes and the crossover brush were latched at the press.
+    // cell while Alt and both planes were latched at the press.
     const N = 3;
     const reach = (N - 1) / 2;
     const P = { cc: 4, cr: 4 };
@@ -3545,80 +3538,25 @@ describe('collision paint: Alt propagates, a wide brush covers an area, and the 
       .toEqual(cellSubTiles(Q.cc, Q.cr).map(() => collisionPaintWord(w2, fill)));
   });
 
-  it('HAND-OFF marks every sub-tile of the cell to leave the plane it is painted on: A hands to B, B to A', async () => {
-    // layer-transition.ts: "`hand-off` ... the SAME armed brush does the right
-    // thing on either plane" (handOffFrom).
-    expect(handOffFrom('a'), 'ANTI-VACUOUS: the two planes hand off in different directions')
-      .not.toBe(handOffFrom('b'));
-    expect(readCrossover(collWord(COLL_SHAPE.act1.a)), 'ANTI-VACUOUS: the fixture carries no mark').toBe('none');
-    useEditorStore.getState().setCollisionCrossoverBrush('hand-off');
+  it('⚠ a REAL press over a cell carrying bits 15:14 paints the shape and KEEPS the bits: never writes, never erases', async () => {
+    // reserved-bits.ts: Aurora "NEVER WRITES a non-zero value" and "NEVER
+    // SILENTLY CLEARS one either". Planted on plane A's cell (2, 1), value 2, the
+    // way a retired mark ARRIVES (an older file); cell (4, 1) is left clean.
+    const a = collPlane('act1', 'a');
+    for (const i of cellSubTiles(2, 1)) a[i] = (a[i]! | (2 << PLANE_RESERVED_SHIFT)) & 0xFFFF;
+    expect(planeReservedBits(collWord(COLL_SHAPE.act1.a)), 'ANTI-VACUOUS: the fixture word is clean').toBe(0);
     const s = await mountMap();
     s.on().onMouseDown(collCell(2, 1));
     win!.dispatch('mouseup', {});
-    const a = collPlane('act1', 'a');
-    expect(cellSubTiles(2, 1).map((i) => readCrossover(a[i])), 'plane A did not take the hand-off')
-      .toEqual(cellSubTiles(2, 1).map(() => handOffFrom('a')));
-    expect(cellSubTiles(2, 1).map((i) => unpackCollisionCell(a[i]).shape), 'the geometry did not land with the mark')
-      .toEqual(cellSubTiles(2, 1).map(() => PICK));
-
-    useEditorStore.getState().setCollisionPaintPlane('b');
     s.on().onMouseDown(collCell(4, 1));
     win!.dispatch('mouseup', {});
-    const b = collPlane('act1', 'b');
-    expect(cellSubTiles(4, 1).map((i) => readCrossover(b[i])),
-      'plane B took the mark that hands to itself, which the bake refuses')
-      .toEqual(cellSubTiles(4, 1).map(() => handOffFrom('b')));
-  });
-
-  it('HALF width marks only the 8px column under the cursor, both of its rows, and the geometry stays cell-wide', async () => {
-    // layer-transition.ts: "`'left'` / `'right'` name one sub-tile column",
-    // and collision-cell.ts: "(both of its rows ...)". The column is the 8px
-    // tile column the cursor is over: tile 5 is the RIGHT half of cell 2, tile 8
-    // the LEFT half of cell 4.
-    const ed = useEditorStore.getState();
-    ed.setCollisionCrossoverBrush('hand-off');
-    ed.setCollisionCrossoverSpanMode('half');
-    const s = await mountMap();
-    s.on().onMouseDown(tileAt(5, 2));
-    win!.dispatch('mouseup', {});
-    s.on().onMouseDown(tileAt(8, 2));
-    win!.dispatch('mouseup', {});
-    const a = collPlane('act1', 'a');
-    const touched = asc([...cellSubTiles(2, 1), ...cellSubTiles(4, 1)]);
-    expect(touched.filter((i) => readCrossover(a[i]) !== 'none'), 'the mark is not the column under the cursor')
-      .toEqual(asc([2 * W + 5, 3 * W + 5, 2 * W + 8, 3 * W + 8]));
-    expect(touched.map((i) => unpackCollisionCell(a[i]).shape), 'a half-width MARK narrowed the GEOMETRY as well')
-      .toEqual(touched.map(() => PICK));
-  });
-
-  it('a drag from one half of a cell to the other marks BOTH halves', async () => {
-    // MapViewport.tsx, at `cellKey`: "THE DRAG CACHE IS KEYED ON THE SPAN TOO.
-    // Without it, dragging from one half of a cell to the other inside a
-    // single stroke would be 'the same cursor cell, skip'".
-    const ed = useEditorStore.getState();
-    ed.setCollisionCrossoverBrush('hand-off');
-    ed.setCollisionCrossoverSpanMode('half');
-    const s = await mountMap();
-    s.on().onMouseDown(tileAt(4, 2));   // the left half of cell (2, 1)
-    s.on().onMouseMove(tileAt(5, 2));   // the right half of the SAME cell
-    win!.dispatch('mouseup', {});
-    const a = collPlane('act1', 'a');
-    expect(cellSubTiles(2, 1).filter((i) => readCrossover(a[i]) !== 'none'),
-      'the second half of the cell was skipped as the same cursor cell')
-      .toEqual(cellSubTiles(2, 1));
-  });
-
-  it('the crossover brush is LATCHED at the press: changing it mid-drag does not split the stroke', async () => {
-    useEditorStore.getState().setCollisionCrossoverBrush('hand-off');
-    const s = await mountMap();
-    s.on().onMouseDown(collCell(1, 1));
-    useEditorStore.getState().setCollisionCrossoverBrush('keep');
-    s.on().onMouseMove(collCell(2, 1));
-    win!.dispatch('mouseup', {});
-    const a = collPlane('act1', 'a');
-    expect(cellSubTiles(2, 1).map((i) => readCrossover(a[i])),
-      'a brush change mid-drag switched one gesture between marking and not')
-      .toEqual(cellSubTiles(2, 1).map(() => handOffFrom('a')));
+    expect(cellSubTiles(2, 1).map((i) => unpackCollisionCell(a[i]).shape), 'the press did not paint the shape')
+      .toEqual(cellSubTiles(2, 1).map(() => PICK));
+    expect(cellSubTiles(2, 1).map((i) => planeReservedBits(a[i])), 'the press ERASED the reserved bits')
+      .toEqual(cellSubTiles(2, 1).map(() => 2));
+    expect(cellSubTiles(4, 1).map((i) => planeReservedBits(a[i])), 'the press WROTE reserved bits into a clean cell')
+      .toEqual(cellSubTiles(4, 1).map(() => 0));
+    expect(cellSubTiles(4, 1).map((i) => unpackCollisionCell(a[i]).shape)).toEqual(cellSubTiles(4, 1).map(() => PICK));
   });
 });
 
@@ -4372,8 +4310,6 @@ describe('a stroke crossing a section boundary lands one command per section, un
     ed.setCollisionPaintPlane('a');
     ed.setCollisionPaintBothPlanes(true);
     ed.setCollisionBrushSize(1);
-    ed.setCollisionCrossoverBrush('keep');
-    ed.setCollisionCrossoverSpanMode('cell');
     const cr = 1;
     const lastCell = W / 2 - 1;
     const s = await mountMap();
@@ -4411,8 +4347,6 @@ describe('a stroke crossing a section boundary lands one command per section, un
     ed.setSelectedCollisionSolidity('all');
     ed.setCollisionPaintPlane('a');
     ed.setCollisionBrushSize(1);
-    ed.setCollisionCrossoverBrush('keep');
-    ed.setCollisionCrossoverSpanMode('cell');
     const cell = { cc: 3, cr: 1 };
     const p0 = tileCentre(0, 2 * cell.cc, 2 * cell.cr);
     const p1 = tileCentre(1, 2 * cell.cc, 2 * cell.cr);
@@ -4437,8 +4371,8 @@ describe('a stroke crossing a section boundary lands one command per section, un
 // it: every collision stroke row above keeps one plane for the whole drag.
 //
 // WHY A PLANE CAN CHANGE UNDER A HELD DRAG. `paintCollisionCell` reads
-// `collisionPaintPlane` from the store PER CELL. Alt, both planes and the
-// crossover brush are latched at the press, and the plane is not. The one UI
+// `collisionPaintPlane` from the store PER CELL. Alt, both planes, the size and
+// the word are latched at the press, and the plane is not. The one UI
 // writer of that field is the Collision palette's Plane A and B buttons
 // (`pickPlane`). A MOUSE click on one cannot land mid-drag: the release is
 // heard on the window and ends the stroke before the click exists. The
@@ -4517,8 +4451,6 @@ describe('a collision stroke whose plane changes mid-drag lands one command per 
     ed.setCollisionPaintPlane('a');
     ed.setCollisionPaintBothPlanes(false);
     ed.setCollisionBrushSize(1);
-    ed.setCollisionCrossoverBrush('keep');
-    ed.setCollisionCrossoverSpanMode('cell');
     log = [];
   });
 

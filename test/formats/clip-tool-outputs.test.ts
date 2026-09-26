@@ -11,7 +11,7 @@
  *     crash cases are aeon's real tracebacks.
  *   * `bake --json` (the same reader, row 213 open item (a)): aeon states the
  *     document is validate's shape; these rows hold that claim on aeon's real
- *     bake answers (loader refusals through the bake, the bake's own C1/C3, an
+ *     bake answers (loader refusals through the bake, the bake's own C4/C3, an
  *     untagged refusal, two acceptances, two crashes), and hold the bake to its
  *     OWN schema constant.
  *
@@ -287,11 +287,15 @@ describe('bake --json: the same three answers, from aeon\'s real bake', () => {
     });
   }
 
-  it('the bake\'s own refusals: C1 names the clip it cut, C3 and the untagged one are about the act as a whole', () => {
-    const c1 = readBakeJson(1, BAKE_CASES.refuse_c1_bake_own.stdout, '');
-    const d1 = doc('refuse_c1_bake_own').refusals[0];
-    expect(d1.subjects.length).toBe(1);
-    expect(c1.kind === 'refused' && subjectsLabel(c1.refusals[0].subjects)).toBe(`clip ${d1.subjects[0].index} ${d1.subjects[0].id}`);
+  // C4, not C1: aeon retired C1 ("the clip severs a crossover") with the painted marks
+  // (a974bc2e, LINES-EVERYWHERE); C4 (a clip carrying reserved bits 15:14) is the bake's
+  // own clip-naming refusal now. ROADMAP rows 223+224.
+  it('the bake\'s own refusals: C4 names the clip carrying a retired mark, C3 and the untagged one are about the act as a whole', () => {
+    const c4 = readBakeJson(1, BAKE_CASES.refuse_c4_bake_own.stdout, '');
+    const d4 = doc('refuse_c4_bake_own').refusals[0];
+    expect(d4.rule).toBe('C4');
+    expect(d4.subjects.length).toBe(1);
+    expect(c4.kind === 'refused' && subjectsLabel(c4.refusals[0].subjects)).toBe(`clip ${d4.subjects[0].index} ${d4.subjects[0].id}`);
     for (const k of ['refuse_c3_act_level', 'refuse_untagged_expect_worst']) {
       const v = readBakeJson(1, BAKE_CASES[k].stdout, '');
       expect(doc(k).refusals[0].subjects).toEqual([]);
@@ -307,7 +311,7 @@ describe('bake --json: the same three answers, from aeon\'s real bake', () => {
 
   it('what the reader cannot hold to the bake\'s contract is a crash, not a verdict', () => {
     const ok = BAKE_CASES.accept_s2_ehz_cpz;
-    const no = BAKE_CASES.refuse_c1_bake_own;
+    const no = BAKE_CASES.refuse_c4_bake_own;
     expect(readBakeJson(1, ok.stdout, '').kind).toBe('crashed');
     expect(readBakeJson(0, no.stdout, '').kind).toBe('crashed');
     const bumped = JSON.stringify({ ...JSON.parse(ok.stdout), schema: BAKE_JSON_SCHEMA + 1 });

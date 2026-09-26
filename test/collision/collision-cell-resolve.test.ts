@@ -138,7 +138,7 @@ const BOTH_PLANES: OverlayOptions = {
   showChunkGrid: false, showCollision: true, showCollisionAngles: false,
   showCollisionPathB: true, showBgPlane: false, showStart: false, showPriority: false,
   occludeSprites: false, playAnimatedArt: false,
-  showSolidBothPlanes: false, showCrossover: false,
+  showSolidBothPlanes: false,
   showScreenFrame: false,
   // OFF here, unlike the store default: nothing in this file is the Regions
   // facet, and a wash would be chrome over the subject under test.

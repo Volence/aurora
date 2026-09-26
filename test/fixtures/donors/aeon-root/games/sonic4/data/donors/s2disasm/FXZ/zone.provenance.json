@@ -5,11 +5,12 @@
   "aeon": {
     "repo": "git@github.com:Volence/aeon.git",
     "branch_that_answers_currency": "origin/master",
-    "revision": "f4f1a32e40b6377d557f4f67fd8cec9278d5df5a",
-    "revision_is": "aeon origin/master after a fetch on 2026-09-25, the tree the six real zones were converted from (an archive of that revision, never the live working tree)",
+    "revision": "d3b98868a9bca7573957b84092b4acd3c72c4ee6",
+    "revision_is": "aeon origin/master after a fetch on 2026-09-26 (ROADMAP rows 223+224, the ONE pin of that parcel), the tree the six real zones were converted from (an archive of that revision, never the live working tree). Previous: f4f1a32e (converter blob ed263a94, 2026-09-25).",
     "converter_path": "tools/s2_zone_convert.py",
-    "converter_blob": "ed263a94bda33f248f20753c61fe8530f46f64c9",
-    "revision_converter_last_commit": "413071f9ac6e917e01f567c51b99f39149f669a9"
+    "converter_blob": "94a6580feaca67192e01131c11639e3c4491eaf3",
+    "revision_converter_last_commit": "a974bc2ea5cf87fac4c90a2259c134f6a55c59f2",
+    "what_changed_at_this_pin": "a974bc2e (LINES-EVERYWHERE) is the only converter commit since 413071f9. Re-measured by a real `convert --all-six` in an archive of d3b98868 (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED): all six zone.json carry the SAME key-path set, which is the previous set minus `collision.crossover_marks` (nothing added). collision.format now reads \"... 15:14 reserved, always 0 ...\" where it read \"... 15:14 XOVER\". scripts/gen-donor-fixture.mjs updated to match and re-run."
   },
   "real_key_paths": [
     "collision.attr_entries",
@@ -20,7 +21,6 @@
     "collision.base_bank_note",
     "collision.cell_px",
     "collision.cell_px_note",
-    "collision.crossover_marks",
     "collision.distinct_shapes",
     "collision.files",
     "collision.format",

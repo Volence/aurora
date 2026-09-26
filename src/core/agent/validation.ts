@@ -1,5 +1,6 @@
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../model/s4-types';
 import type { NametableEntrySpec } from '../../shared/agent-protocol';
+import { planeReservedBits } from '../collision/reserved-bits';
 
 // All validators return null when valid, or a human-readable error string.
 
@@ -82,6 +83,17 @@ export function validateChunkCollisionPlane(
   const expected = (w / 2) * (h / 2);
   if (!Array.isArray(arr) || arr.length !== expected) {
     return `${name} length ${Array.isArray(arr) ? arr.length : typeof arr} != ${expected} (chunk is ${w}x${h} tiles = ${w / 2}x${h / 2} cells)`;
+  }
+  // BITS 15:14 ARE RESERVED (core/collision/reserved-bits.ts) and aeon refuses
+  // a non-zero value. A chunk's collision words travel WHOLE into a section when
+  // it is stamped (a stamp is a transfer, not a brush), so a chunk saved with
+  // them is a way to write them into the act. Refused here, naming the cell,
+  // rather than masked: silently dropping bits the caller sent is its own lie.
+  const bad = arr.findIndex((word) => planeReservedBits(word) !== 0);
+  if (bad >= 0) {
+    return `${name}[${bad}] = 0x${arr[bad]!.toString(16).toUpperCase().padStart(4, '0')} carries bits 15:14, `
+      + 'which are RESERVED (the painted loop crossover mark was retired on 2026-09-26 and aeon refuses '
+      + 'any non-zero value). Send the word with bits 15:14 clear.';
   }
   return null;
 }

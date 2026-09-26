@@ -7,11 +7,11 @@ import { effectiveXFlip } from './collision-palette-organize';
  *    bit  10   X-flip  (mirror horizontally → the other slope direction)
  *    bit  11   Y-flip  (flip vertically → floor↔ceiling, up↔down)
  *    bits 12-13 solidity (this plane's path): none/top/sides-bottom/all
- *    bits 14-15 LOOP CROSSOVER — NOT spare, and they have not been since
- *              `layer-transition.ts` claimed them. This line said "spare" until
- *              2026-09-03, and a stale "spare" is worse than no comment: it
- *              reads as an invitation. (Found by the aeon lane while answering
- *              a question I asked ON THE STRENGTH OF THIS TABLE.)
+ *    bits 14-15 RESERVED — NOT spare, and aeon REFUSES a non-zero value
+ *              (reserved-bits.ts). They were the painted loop crossover mark
+ *              from 2026-08-29 until LINES-EVERYWHERE retired it on 2026-09-26.
+ *              This line said "spare" until 2026-09-03, and a stale "spare" is
+ *              worse than no comment: it reads as an invitation.
  *  ⚠ THIS WORD IS A BAKE-TIME ARTIFACT AND IS NOT WHAT THE ENGINE READS, which
  *  is the sentence below and is easy to skim past — I did, on 2026-09-03, and
  *  told a peer lane "the cell word is 16 of 16 bits used, so there is no room"

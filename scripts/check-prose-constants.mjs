@@ -133,13 +133,6 @@ const EXEMPT = [
       + 'the wrong thing entirely. Only became visible when the fold learned FG_PAGE_FRAMES.',
   },
   {
-    file: 'src/main/editor-methods.ts', value: 12,
-    match: /section 3, cell \(col 12, row 40\)/,
-    why: 'an ILLUSTRATIVE COORDINATE inside a worked example of the reply format, not FG_PAGE_FRAMES. '
-      + 'The neighbouring 3 and 40 are equally made up; interpolating a frame count into an example '
-      + 'column index would state a relationship that does not exist.',
-  },
-  {
     file: 'src/main/editor-methods.ts', value: 4096,
     match: /Max 4096 cells per call/,
     why: 'NOT BG_LAYOUT_WORDS. Nothing in this module enforces 4096 cells, so this figure has '
@@ -195,8 +188,10 @@ const UNFOLDABLE = [
       + '16-bit mask, so a prose restatement would be hex anyway, which this gate does not read.',
   },
   {
-    name: 'CROSSOVER_OVERLAP_WITH_PACKED_FIELDS', file: 'src/core/collision/layer-transition.ts',
-    why: 'ANDs CROSSOVER_BITS (which does fold) against the same packCollisionCell object-argument '
+    // Was CROSSOVER_OVERLAP_WITH_PACKED_FIELDS in the retired layer-transition module; renamed
+    // with the reserved-bits seam (ROADMAP rows 223+224). Same shape, same reason.
+    name: 'RESERVED_OVERLAP_WITH_PACKED_FIELDS', file: 'src/core/collision/reserved-bits.ts',
+    why: 'ANDs PLANE_RESERVED_BITS (which does fold) against the same packCollisionCell object-argument '
       + 'call, so one operand is unavailable for the reason above. Also a mask.',
   },
   {
