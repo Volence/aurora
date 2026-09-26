@@ -8,6 +8,10 @@
 // whose wording understates its reach is a defect even when the code is right,
 // because the wording is the half a reader acts on.
 //
+// (2026-09-26, ROADMAP rows 223+224: the Loop row is gone and bits 15:14 are
+// RESERVED; the only thing that can still live there is a RETIRED loop
+// crossover mark, and the titles say exactly that. The rows below still hold.)
+//
 // SOURCE-GREP, deliberately: these are strings in JSX with no seam to call. The
 // weakness is stated rather than hidden — this cannot prove the buttons are
 // WIRED to those titles; `scratchpad/collision-destructive-harness.mjs` presses

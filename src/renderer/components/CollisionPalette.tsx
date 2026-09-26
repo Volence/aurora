@@ -417,9 +417,9 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
           {/* Both of these ACT AND THEN DROP FOCUS (d-27) — see actAndDropFocus.
               A bare Space used to re-fire the wipe on the button the last click
               left focused; it no longer reaches either writer. */}
-          <button onClick={(e) => actAndDropFocus(e, resetToEngine)} title={`Reset section ${activeSection} collision (this plane) to the engine baseline, including any retired loop mark (bits 15:14). Undoable.`}
+          <button onClick={(e) => actAndDropFocus(e, resetToEngine)} title={`Reset section ${activeSection} collision (this plane) to the engine baseline, including any retired loop crossover mark (bits 15:14). Undoable.`}
             style={styles.subtleBtn}>Reset</button>
-          <button onClick={(e) => actAndDropFocus(e, clearSection)} title={`Erase ALL collision in section ${activeSection} (this plane), including any retired loop mark (bits 15:14). Undoable.`}
+          <button onClick={(e) => actAndDropFocus(e, clearSection)} title={`Erase ALL collision in section ${activeSection} (this plane), including any retired loop crossover mark (bits 15:14). Undoable.`}
             style={styles.subtleBtn}>Clear</button>
         </div>
       )}
