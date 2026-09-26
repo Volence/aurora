@@ -282,19 +282,8 @@ export const usePasteStore = create<PasteState>((set, get) => {
           return o;
         }
         const verdict = readValidateJson(v.exitCode, v.stdout, v.stderr);
-        if (verdict.kind === 'crashed') {
-          const o: PasteOutcome = {
-            kind: 'crashed', stage: 'validate', why: verdict.why, exitCode: verdict.exitCode,
-            stdout: verdict.stdout, stderr: verdict.stderr, text: `${verdict.why}\n${toolText(v)}`.trim(), command: v.command,
-          };
-          set({ outcome: o });
-          return o;
-        }
-        if (verdict.kind === 'refused') {
-          const o: PasteOutcome = {
-            kind: 'refused', stage: 'validate', refusals: verdict.refusals, warnings: verdict.warnings,
-            text: verdict.refusals.map((n) => n.message).join('\n'), command: v.command,
-          };
+        if (verdict.kind !== 'accepted') {
+          const o = judgedOutcome('validate', v, verdict);
           set({ outcome: o });
           return o;
         }
