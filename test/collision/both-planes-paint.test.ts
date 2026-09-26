@@ -27,7 +27,7 @@ import {
   COLLISION_CELL_UNOWNED_MASK, COLLISION_CELL_OWNED_MASK, unownedCollisionBits,
 } from '../../src/core/editing/collision-word';
 import { packCollisionCell, unpackCollisionCell } from '../../src/core/collision/collision-cell-word';
-import { readCrossover, withCrossover, isSelfMark, type Crossover } from '../../src/core/collision/layer-transition';
+import { planeReservedBits, PLANE_RESERVED_SHIFT } from '../../src/core/collision/reserved-bits';
 
 // Two DISTINCT non-zero unowned-bit patterns, derived from the mask rather than
 // typed. If the mask ever narrows to a single bit these stop being distinct and
@@ -175,62 +175,36 @@ describe('buildBothPlanesEntries: the defect this module exists to prevent', () 
   });
 });
 
-describe('the crossover half of a both-planes stroke', () => {
-  it('⚠ each plane gets ITS OWN handoff value: the two-way pair, not a copy', () => {
-    // THE ROW. Copying the aimed plane's value onto the other writes TO_B into
-    // plane B's own word, which is a SELF-MARK: a provable no-op that aeon's
-    // bake refuses with a HARD BUILD ERROR (rule R2). One value computed once
-    // and broadcast is wrong for two independent reasons — this one and the
-    // unowned-bit one above.
+// The RESERVED bits 15:14 under a both-planes stroke. Until 2026-09-26 this
+// block tested the loop crossover's per-plane hand-off pair; the marks are
+// retired (ROADMAP rows 223+224) and the bits are reserved, so the two
+// properties left are the ones "refuses, not erases" needs: a stroke never
+// WRITES them, and never silently CLEARS them.
+describe('the reserved bits 15:14 under a both-planes stroke', () => {
+  it('⚠ a brush word carrying 15:14 writes NEITHER plane\'s 15:14', () => {
     const a = new Uint16Array([0]);
     const b = new Uint16Array([0]);
+    const dirty = (BRUSH | (3 << PLANE_RESERVED_SHIFT)) & 0xFFFF;
     const { aimed, other } = buildBothPlanesEntries({
-      aimedPlaneWords: a, otherPlaneWords: b, indices: [0], brushWord: BRUSH,
-      bothPlanes: true, aimedPlaneId: 'a', crossover: 'hand-off',
+      aimedPlaneWords: a, otherPlaneWords: b, indices: [0], brushWord: dirty, bothPlanes: true,
     });
-    expect(readCrossover(aimed[0]!.newColl)).toBe('to-b');
-    expect(readCrossover(other[0]!.newColl)).toBe('to-a');
-    // Said as the rule, so the row fails on the defect and not only on equality.
-    expect(isSelfMark('a', readCrossover(aimed[0]!.newColl) as Crossover)).toBe(false);
-    expect(isSelfMark('b', readCrossover(other[0]!.newColl) as Crossover)).toBe(false);
+    // Anti-vacuous: the stroke did write both planes.
+    expect(aimed.length).toBe(1);
+    expect(other.length).toBe(1);
+    expect(planeReservedBits(aimed[0]!.newColl)).toBe(0);
+    expect(planeReservedBits(other[0]!.newColl)).toBe(0);
   });
 
-  it('aimed at plane B, the pair is the mirror image', () => {
-    const a = new Uint16Array([0]);
-    const b = new Uint16Array([0]);
+  it('CONTROL: a stroke KEEPS each plane\'s own existing 15:14 (no silent erase), and the shape really changed', () => {
+    const a = new Uint16Array([((BRUSH ^ 1) | (2 << PLANE_RESERVED_SHIFT)) & 0xFFFF]);
+    const b = new Uint16Array([((BRUSH ^ 1) | (1 << PLANE_RESERVED_SHIFT)) & 0xFFFF]);
     const { aimed, other } = buildBothPlanesEntries({
-      aimedPlaneWords: b, otherPlaneWords: a, indices: [0], brushWord: BRUSH,
-      bothPlanes: true, aimedPlaneId: 'b', crossover: 'hand-off',
+      aimedPlaneWords: a, otherPlaneWords: b, indices: [0], brushWord: BRUSH, bothPlanes: true,
     });
-    expect(readCrossover(aimed[0]!.newColl)).toBe('to-a');
-    expect(readCrossover(other[0]!.newColl)).toBe('to-b');
-  });
-
-  it('CONTROL: `keep` leaves an existing crossover on BOTH planes alone', () => {
-    // The converse of the row above: a builder that authored on every stroke
-    // would pass it, and would silently rewrite every loop an author edits the
-    // shape of.
-    const a = new Uint16Array([withCrossover(BRUSH ^ 1, 'to-b')]);
-    const b = new Uint16Array([withCrossover(BRUSH ^ 1, 'to-a')]);
-    const { aimed, other } = buildBothPlanesEntries({
-      aimedPlaneWords: a, otherPlaneWords: b, indices: [0], brushWord: BRUSH,
-      bothPlanes: true, aimedPlaneId: 'a', crossover: 'keep',
-    });
-    expect(readCrossover(aimed[0]!.newColl)).toBe('to-b');
-    expect(readCrossover(other[0]!.newColl)).toBe('to-a');
-    // ...and the shape really did change, so this is not "nothing happened".
+    expect(planeReservedBits(aimed[0]!.newColl)).toBe(2);
+    expect(planeReservedBits(other[0]!.newColl)).toBe(1);
     expect(aimed[0]!.newColl & 0x3FFF).toBe(BRUSH & 0x3FFF);
-  });
-
-  it('`clear` erases the mark on both planes', () => {
-    const a = new Uint16Array([withCrossover(BRUSH, 'to-b')]);
-    const b = new Uint16Array([withCrossover(BRUSH, 'to-a')]);
-    const { aimed, other } = buildBothPlanesEntries({
-      aimedPlaneWords: a, otherPlaneWords: b, indices: [0], brushWord: BRUSH,
-      bothPlanes: true, aimedPlaneId: 'a', crossover: 'clear',
-    });
-    expect(readCrossover(aimed[0]!.newColl)).toBe('none');
-    expect(readCrossover(other[0]!.newColl)).toBe('none');
+    expect(other[0]!.newColl & 0x3FFF).toBe(BRUSH & 0x3FFF);
   });
 });
 

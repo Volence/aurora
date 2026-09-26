@@ -77,4 +77,17 @@ describe('validateChunkCollisionPlane', () => {
     expect(validateChunkCollisionPlane('collisionB', Array(3).fill(0), 4, 4)).toMatch(/collisionB/);
     expect(validateChunkCollisionPlane('collisionB', Array(3).fill(0), 4, 4)).toMatch(/4/);
   });
+  // BITS 15:14 ARE RESERVED (ROADMAP rows 223+224). A chunk's words travel WHOLE
+  // into a section when it is stamped, so save_chunk is a road to write them;
+  // it refuses, naming the cell, rather than masking the bits off in silence.
+  it('⚠ REFUSES a word carrying bits 15:14, naming the field, the index and the word', () => {
+    for (const bit of [0x4000, 0x8000, 0xC000]) {
+      const words = [0x3007, 0x3007, 0x3007 | bit, 0x3007];
+      expect(validateChunkCollisionPlane('collisionA', words, 4, 4))
+        .toMatch(new RegExp(`collisionA\\[2\\] = 0x${(0x3007 | bit).toString(16).toUpperCase()} carries bits 15:14.*RESERVED`));
+    }
+  });
+  it('CONTROL: the same words with bits 15:14 clear are accepted', () => {
+    expect(validateChunkCollisionPlane('collisionA', [0x3007, 0x3007, 0x3007, 0x3FFF], 4, 4)).toBeNull();
+  });
 });

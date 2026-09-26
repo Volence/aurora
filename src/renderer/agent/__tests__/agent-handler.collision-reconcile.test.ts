@@ -6,17 +6,20 @@
 //
 //   • FORM  — `word` (fill) XOR `words` (per cell) — from `mcp-collision-read`
 //   • PLANE — 'a' | 'b' | 'both'                   — from `lp2-loop-paint`
-//   • CROSSOVER — keep (absent) | clear | hand-off — from `lp2-loop-paint`
 //
-// The handler is the only place all three meet, and the only place that decides
+// (A third axis, CROSSOVER, was retired with the painted loop marks on
+// 2026-09-26, ROADMAP rows 223+224: the handler now REFUSES it, [h2], and bits
+// 15:14 are reserved. Its hand-off rows, [h2]/[h3] before, were deleted.)
+//
+// The handler is the only place the axes meet, and the only place that decides
 // WHICH ARRAY IS THE AIMED ONE — the mistake a builder-level test cannot make,
 // because the builder takes the array and the id as two separate arguments and
 // believes whatever it is told. Packet:
 // docs/reviews/2026-08-29-paint-collision-reconcile.md.
 //
 // ⚠ ANTI-VACUOUS: bits 15:14 are zero in every shipped plane file, so each row
-// SEEDS its destination cells with a non-zero, PER-PLANE-DIFFERENT crossover
-// before painting, and the seed is asserted before the paint.
+// SEEDS its destination cells with a non-zero, PER-PLANE-DIFFERENT value in the
+// reserved bits 15:14 before painting, and the seed is asserted before the paint.
 //
 // ⚠ THE UNDO STEP IS ASSERTED, not assumed: `plane: "both"` writing two planes
 // in ONE command is the property that makes the feature safe, and an
@@ -35,8 +38,8 @@ import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../core/model/s4-t
 import { packCollisionCell } from '../../../core/collision/collision-cell-word';
 import { cellTileIndices } from '../../../core/collision/collision-cell';
 import {
-  readCrossover, withCrossover, handOffFrom, isSelfMark, type Crossover,
-} from '../../../core/collision/layer-transition';
+  planeReservedBits, PLANE_RESERVED_SHIFT, PLANE_RESERVED_BITS,
+} from '../../../core/collision/reserved-bits';
 import { unownedCollisionBits, COLLISION_CELL_UNOWNED_MASK } from '../../../core/editing/collision-word';
 import { levelDocId } from '../../shell/tabs';
 
@@ -90,16 +93,17 @@ function setCell(plane: Uint16Array, cc: number, cr: number, word: number): void
 }
 const hex = (w: number) => `$${w.toString(16).toUpperCase().padStart(4, '0')}`;
 const show = (cc: number, cr: number) =>
-  `(${cc},${cr}) A=${hex(cellWord(planeA(), cc, cr))}/${readCrossover(cellWord(planeA(), cc, cr))}`
-  + ` B=${hex(cellWord(planeB(), cc, cr))}/${readCrossover(cellWord(planeB(), cc, cr))}`;
+  `(${cc},${cr}) A=${hex(cellWord(planeA(), cc, cr))} B=${hex(cellWord(planeB(), cc, cr))}`;
+/** A word with bits 15:14 = v: how a retired mark ARRIVES (nothing in Aurora writes one). */
+const withReserved = (word: number, v: number): number =>
+  ((word & ~PLANE_RESERVED_BITS) | (v << PLANE_RESERVED_SHIFT)) & 0xFFFF;
 
 const CELLS: [number, number][] = [[0, 0], [1, 0], [0, 1], [1, 1]];
 
 /** How many 8px sub-tiles one 16px cell covers. DERIVED from the expansion the
- *  writers use, never typed as 4 — `painted` counts sub-tile entries and
- *  `auditCrossovers` deliberately reads the planes at TILE resolution (see its
- *  docblock), so every count below is `cells * SUBTILES` rather than a number
- *  copied out of a passing run. */
+ *  writers use, never typed as 4 — `painted` counts sub-tile entries and the
+ *  reserved-bits audit reads the planes at TILE resolution, so every count below
+ *  is `cells * SUBTILES` rather than a number copied out of a passing run. */
 const SUBTILES = cellTileIndices(0, 0, SECTION_TILES_WIDE).length;
 
 function open(): void {
@@ -112,14 +116,15 @@ function open(): void {
 }
 
 /** Seed the 2x2 region on BOTH planes with different shapes AND different
- *  crossovers, so no row can pass by broadcasting one plane's answer. */
+ *  reserved values (A: 2, B: 1), so no row can pass by broadcasting one plane's
+ *  answer. */
 function seed(): void {
   for (const [cc, cr] of CELLS) {
-    setCell(planeA(), cc, cr, withCrossover(solid(11), 'to-b'));
-    setCell(planeB(), cc, cr, withCrossover(solid(22), 'to-a'));
+    setCell(planeA(), cc, cr, withReserved(solid(11), 2));
+    setCell(planeB(), cc, cr, withReserved(solid(22), 1));
   }
-  expect(readCrossover(cellWord(planeA(), 0, 0))).toBe('to-b');
-  expect(readCrossover(cellWord(planeB(), 0, 0))).toBe('to-a');
+  expect(planeReservedBits(cellWord(planeA(), 0, 0))).toBe(2);
+  expect(planeReservedBits(cellWord(planeB(), 0, 0))).toBe(1);
   expect(unownedCollisionBits(cellWord(planeA(), 0, 0))).not.toBe(0);
 }
 
@@ -150,10 +155,10 @@ describe('[h1] paint_collision: words + plane:"both"', () => {
       expect(cellWord(planeA(), cc, cr) & ~COLLISION_CELL_UNOWNED_MASK).toBe(WORDS[i]);
       expect(cellWord(planeB(), cc, cr) & ~COLLISION_CELL_UNOWNED_MASK).toBe(WORDS[i]);
     }
-    // ⚠ each plane KEPT ITS OWN crossover. A single merge broadcast to both
-    // would have made B's equal A's, and every shipped act would hide it.
-    expect(readCrossover(cellWord(planeA(), 0, 0))).toBe('to-b');
-    expect(readCrossover(cellWord(planeB(), 0, 0))).toBe('to-a');
+    // ⚠ each plane KEPT ITS OWN reserved bits: not erased, and not copied (a
+    // single merge broadcast to both would have made B's equal A's).
+    expect(planeReservedBits(cellWord(planeA(), 0, 0))).toBe(2);
+    expect(planeReservedBits(cellWord(planeB(), 0, 0))).toBe(1);
   });
 
   it('is ONE undo step, and undoing it restores BOTH planes in full', async () => {
@@ -197,111 +202,51 @@ describe('[h1] paint_collision: words + plane:"both"', () => {
     expect(r.painted).toBe(2 * SUBTILES);          // the 2 written cells
     expect(r.paintedOther).toBe(2 * SUBTILES);
     // The null cells are untouched in EVERY bit, on both planes.
-    expect(cellWord(planeA(), 1, 0)).toBe(withCrossover(solid(11), 'to-b'));
-    expect(cellWord(planeB(), 1, 0)).toBe(withCrossover(solid(22), 'to-a'));
+    expect(cellWord(planeA(), 1, 0)).toBe(withReserved(solid(11), 2));
+    expect(cellWord(planeB(), 1, 0)).toBe(withReserved(solid(22), 1));
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// [h2] words x crossover
+// [h2] the RETIRED crossover parameters are refused, and the reply reports
+// the reserved bits as an ERROR (ROADMAP rows 223+224)
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('[h2] paint_collision: words + crossover', () => {
-  it('an OMITTED crossover keeps every cell\'s own: never clears it', async () => {
-    const r = await ask({ ...base, plane: 'a', words: WORDS }) as { crossover: string };
-    console.log(`[h2k] reply crossover=${r.crossover}  ${show(0, 0)}`);
-    expect(r.crossover).toBe('keep');
-    expect(readCrossover(cellWord(planeA(), 0, 0))).toBe('to-b');
-    // …and the picture really did change, so this is not a "wrote nothing" green.
+describe('[h2] paint_collision: retired crossover params, and the reserved-bits audit', () => {
+  for (const extra of [{ crossover: 'hand-off' }, { crossover: 'keep' }, { crossoverSpan: 'left' }]) {
+    it(`⚠ REFUSES ${JSON.stringify(extra)} by name and writes nothing`, async () => {
+      const beforeA = Array.from(planeA());
+      const beforeB = Array.from(planeB());
+      await expect(ask({ ...base, plane: 'both', words: WORDS, ...extra } as never))
+        .rejects.toThrow(/RETIRED.*layer_lines\.json.*Nothing was painted/);
+      expect(Array.from(planeA())).toEqual(beforeA);
+      expect(Array.from(planeB())).toEqual(beforeB);
+    });
+  }
+
+  it('CONTROL: the same paint without the retired key goes through', async () => {
+    const r = await ask({ ...base, plane: 'both', words: WORDS }) as { painted: number };
+    expect(r.painted).toBe(CELLS.length * SUBTILES);
+  });
+
+  it('⚠ the reply carries reservedBitsAudit as an ERROR naming the seeded cells, which the paint neither wrote nor cleared', async () => {
+    const r = await ask({ ...base, plane: 'a', words: WORDS }) as
+      { reservedBitsAudit: { reservedA: number; reservedB: number; severity: string; note: string | null } };
+    console.log(`[h2a] audit=${JSON.stringify(r.reservedBitsAudit)}`);
+    expect(r.reservedBitsAudit.severity).toBe('error');
+    expect(r.reservedBitsAudit.reservedA).toBe(CELLS.length * SUBTILES);
+    expect(r.reservedBitsAudit.reservedB).toBe(CELLS.length * SUBTILES);
+    expect(r.reservedBitsAudit.note).toMatch(/section 0 plane A editor cell \(0, 0\)/);
+    // The picture changed; the reserved bits did not (no silent erase).
     expect(cellWord(planeA(), 0, 0) & ~COLLISION_CELL_UNOWNED_MASK).toBe(WORDS[0]);
+    expect(planeReservedBits(cellWord(planeA(), 0, 0))).toBe(2);
   });
 
-  it('hand-off marks each WRITTEN cell and no skipped one, on the aimed plane', async () => {
-    // Clear the crossover on the cells that will be WRITTEN so "hand-off
-    // landed" cannot be read off the seed; leave (1,0) — the null cell —
-    // carrying the seed value.
-    for (const [cc, cr] of CELLS) {
-      if (cc === 1 && cr === 0) continue;
-      setCell(planeA(), cc, cr, withCrossover(cellWord(planeA(), cc, cr), 'none'));
-    }
-    expect(readCrossover(cellWord(planeA(), 0, 0))).toBe('none');
-
-    const words = [solid(1), null, solid(3), solid(4)];
-    await ask({ ...base, plane: 'a', words, crossover: 'hand-off' });
-    console.log(`[h2h] ${CELLS.map(([cc, cr]) =>
-      `(${cc},${cr})=${readCrossover(cellWord(planeA(), cc, cr))}`).join(' ')}`);
-
-    const expected = handOffFrom('a');
-    expect(readCrossover(cellWord(planeA(), 0, 0))).toBe(expected);
-    expect(readCrossover(cellWord(planeA(), 0, 1))).toBe(expected);
-    expect(readCrossover(cellWord(planeA(), 1, 1))).toBe(expected);
-    expect(readCrossover(cellWord(planeA(), 1, 0))).toBe('to-b');   // skipped, untouched
-    expect(isSelfMark('a', expected)).toBe(false);
-  });
-
-  it('clear erases the written cells\' crossover and spares the skipped one', async () => {
-    await ask({ ...base, plane: 'a', words: [solid(1), null, solid(3), solid(4)], crossover: 'clear' });
-    console.log(`[h2c] ${CELLS.map(([cc, cr]) =>
-      `(${cc},${cr})=${readCrossover(cellWord(planeA(), cc, cr))}`).join(' ')}`);
-    expect(readCrossover(cellWord(planeA(), 0, 0))).toBe('none');
-    expect(readCrossover(cellWord(planeA(), 1, 1))).toBe('none');
-    // "null = leave this cell alone" outranks the crossover axis.
-    expect(readCrossover(cellWord(planeA(), 1, 0))).toBe('to-b');
-  });
-
-  it('aimed at plane B, hand-off writes B\'s legal value: never a self-mark', async () => {
-    for (const [cc, cr] of CELLS) setCell(planeB(), cc, cr, solid(22));
-    await ask({ ...base, plane: 'b', words: WORDS, crossover: 'hand-off' });
-    const got = readCrossover(cellWord(planeB(), 0, 0));
-    console.log(`[h2b] aimed at B: ${show(0, 0)}`);
-    expect(got).toBe(handOffFrom('b'));
-    // `reserved` is not a Crossover, so narrow before asking about self-marks —
-    // and assert the narrowing, since a `reserved` here would be a real defect.
-    expect(got).not.toBe('reserved');
-    expect(isSelfMark('b', got as Crossover)).toBe(false);
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// [h3] words x both x hand-off — the two-way pair, per cell, one call
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe('[h3] paint_collision: words + both + hand-off', () => {
-  it('gives each plane the OTHER plane\'s value, per written cell', async () => {
-    for (const [cc, cr] of CELLS) {
-      setCell(planeA(), cc, cr, solid(11));
-      setCell(planeB(), cc, cr, solid(22));
-    }
-    const words = [solid(1), null, solid(3), solid(4)];
-    const r = await ask({ ...base, plane: 'both', words, crossover: 'hand-off' }) as
-      { crossover: string; crossoverAudit: { pairs: number; oneWay: number; selfMarks: number; severity: string } };
-    console.log(`[h3] crossover=${r.crossover} audit=${JSON.stringify(r.crossoverAudit)}\n`
-      + CELLS.map(([cc, cr]) => '    ' + show(cc, cr)).join('\n'));
-
-    for (const [cc, cr] of [[0, 0], [0, 1], [1, 1]] as [number, number][]) {
-      expect(readCrossover(cellWord(planeA(), cc, cr))).toBe(handOffFrom('a'));
-      expect(readCrossover(cellWord(planeB(), cc, cr))).toBe(handOffFrom('b'));
-    }
-    expect(readCrossover(cellWord(planeA(), 1, 0))).toBe('none');   // the null cell
-    expect(readCrossover(cellWord(planeB(), 1, 0))).toBe('none');
-    // The audit rides back, and sees three complete two-way PAIRS and no
-    // one-way half — which is the whole reason one call writes both halves.
-    expect(r.crossoverAudit.selfMarks).toBe(0);
-    // The audit reads at TILE resolution, so 3 written CELLS are 3*SUBTILES.
-    expect(r.crossoverAudit.pairs).toBe(3 * SUBTILES);
-    expect(r.crossoverAudit.oneWay).toBe(0);
-  });
-
-  it('the CONTROL that makes the row above mean something: one plane only is ONE-WAY', async () => {
-    for (const [cc, cr] of CELLS) {
-      setCell(planeA(), cc, cr, solid(11));
-      setCell(planeB(), cc, cr, solid(22));
-    }
-    const r = await ask({ ...base, plane: 'a', words: WORDS, crossover: 'hand-off' }) as
-      { crossoverAudit: { pairs: number; oneWay: number; severity: string } };
-    console.log(`[h3c] one plane only → audit=${JSON.stringify(r.crossoverAudit)}`);
-    expect(r.crossoverAudit.pairs).toBe(0);
-    expect(r.crossoverAudit.oneWay).toBe(CELLS.length * SUBTILES);
+  it('CONTROL: on a clean section the audit is ok with no note', async () => {
+    for (const [cc, cr] of CELLS) { setCell(planeA(), cc, cr, solid(11)); setCell(planeB(), cc, cr, solid(22)); }
+    const r = await ask({ ...base, plane: 'both', words: WORDS }) as
+      { reservedBitsAudit: { reservedA: number; reservedB: number; severity: string; note: string | null } };
+    expect(r.reservedBitsAudit).toEqual({ reservedA: 0, reservedB: 0, severity: 'ok', note: null });
   });
 });
 
@@ -321,11 +266,11 @@ describe('[h4] the refusals', () => {
     // …and 'a' on the same rectangle works, so this is not "the read is broken".
     const ok = await ask({
       kind: 'get-collision-region', section: 0, plane: 'a', x: 0, y: 0, w: 2, h: 2,
-    }) as { words: (number | null)[]; crossoverCells: number };
+    }) as { words: (number | null)[]; reservedCells: number };
     console.log(`[h4] plane "a" on the same rect: words=${JSON.stringify(ok.words)} `
-      + `crossoverCells=${ok.crossoverCells}`);
+      + `reservedCells=${ok.reservedCells}`);
     expect(ok.words).toHaveLength(4);
-    expect(ok.crossoverCells).toBe(4);
+    expect(ok.reservedCells).toBe(4);
   });
 
   it('paint_collision still refuses both forms at once, under plane:"both"', async () => {
@@ -335,12 +280,11 @@ describe('[h4] the refusals', () => {
     expect(Array.from(planeA())).toEqual(beforeA);         // and wrote nothing
   });
 
-  it('paint_collision still refuses NEITHER form: a crossover alone is not a paint', async () => {
+  it('paint_collision still refuses NEITHER form', async () => {
     const beforeA = Array.from(planeA());
-    await expect(ask({ ...base, plane: 'both', crossover: 'hand-off' }))
+    await expect(ask({ ...base, plane: 'both' } as never))
       .rejects.toThrow(/neither was given/);
     expect(Array.from(planeA())).toEqual(beforeA);
-    expect(readCrossover(cellWord(planeA(), 0, 0))).toBe('to-b');   // untouched
   });
 
   it('a words array of the wrong length is refused before anything is written', async () => {
@@ -355,24 +299,23 @@ describe('[h4] the refusals', () => {
 // [h5] The round trip, end to end on the handler
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('[h5] read → write over itself is exact, crossovers and all', () => {
+describe('[h5] read → write over itself is exact, reserved bits and all', () => {
   it('restores the region byte for byte and needs no second call to do it', async () => {
     const before = Array.from(planeA());
     const read = await ask({
       kind: 'get-collision-region', section: 0, plane: 'a', x: 0, y: 0, w: 2, h: 2,
-    }) as { words: (number | null)[]; crossoverCells: number };
-    expect(read.crossoverCells).toBe(4);                    // anti-vacuous
-    // Scribble over it, then put it back with the read's own `words`.
-    await ask({ ...base, plane: 'a', word: 0, crossover: 'clear' });
+    }) as { words: (number | null)[]; reservedCells: number };
+    expect(read.reservedCells).toBe(4);                     // anti-vacuous
+    // Scribble over it (air), then put it back with the read's own `words`.
+    await ask({ ...base, plane: 'a', word: 0 });
     expect(Array.from(planeA())).not.toEqual(before);
+    // The scribble changed the picture and KEPT the reserved bits (no erase).
+    expect(planeReservedBits(cellWord(planeA(), 0, 0))).toBe(2);
     const r = await ask({ ...base, plane: 'a', words: read.words }) as { painted: number };
     console.log(`[h5] restored painted=${r.painted}  ${show(0, 0)}`);
-    // ⚠ THE PICTURE comes back; the CROSSOVER does not, because a crossover
-    // does not travel inside `words` — the `clear` above genuinely removed it,
-    // and only `crossover: 'hand-off'` can put it back.
-    expect(cellWord(planeA(), 0, 0) & ~COLLISION_CELL_UNOWNED_MASK)
-      .toBe(withCrossover(solid(11), 'to-b') & ~COLLISION_CELL_UNOWNED_MASK);
-    expect(readCrossover(cellWord(planeA(), 0, 0))).toBe('none');
+    // The whole region is back byte for byte: the picture from `words`, the
+    // reserved bits because no paint ever touched them.
+    expect(Array.from(planeA())).toEqual(before);
   });
 
   it('with the region left ALONE, the same round trip is a byte-exact no-op', async () => {
