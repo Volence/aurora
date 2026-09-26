@@ -19,6 +19,11 @@
 // per_clip_fields; no pages total (a shared page counts for every rectangle
 // that touches it), no per-clip camera window (aeon reports the act's only),
 // and "unavailable" with the reason when the file carries no rows.
+//
+// ROW 213 OPEN (a) (aeon 71ae3433). The bake answers in the same JSON, so a
+// bake refusal (C1 naming its clip, an act-level C2/C3, the page budget) is
+// shown like a loader refusal, and a bake that crashed is shown as a crash of
+// the BAKE, never as "aeon's bake refused".
 
 import React from 'react';
 import { CollapsibleSection, SectionBody, NumberField } from '../ui';
@@ -153,6 +158,8 @@ function WarningList({ warnings }: { warnings: ClipNote[] }): React.ReactElement
   );
 }
 
+const STAGE_NAME = { validate: 'manifest loader', bake: 'bake' } as const;
+
 function outcomeView(o: PasteOutcome): React.ReactElement {
   switch (o.kind) {
     case 'pasted':
@@ -163,35 +170,27 @@ function outcomeView(o: PasteOutcome): React.ReactElement {
         </div>
       );
     case 'refused':
-      if (o.stage === 'validate') {
-        return (
-          <div data-donors-outcome="refused" data-donors-stage="validate">
-            <div style={{ ...WARN, marginBottom: T.s1 }}>
-              aeon&apos;s manifest loader refused this paste, so nothing was written:
-            </div>
-            {o.refusals.map((r, i) => (
-              <div key={i} data-donors-refusal-note={r.rule ?? ''}>
-                <NoteHead note={r} kind="refusal" />
-                <pre data-donors-refusal style={PRE}>{r.message}</pre>
-              </div>
-            ))}
-            <WarningList warnings={o.warnings} />
-          </div>
-        );
-      }
+      // The loader and the bake answer in one shape (row 213 and its open item (a)), so both
+      // show the rule, who it is about, and aeon's sentence; only the tool's name differs.
       return (
-        <div data-donors-outcome="refused" data-donors-stage="bake">
+        <div data-donors-outcome="refused" data-donors-stage={o.stage}>
           <div style={{ ...WARN, marginBottom: T.s1 }}>
-            aeon&apos;s bake refused this paste, so nothing was written:
+            aeon&apos;s {STAGE_NAME[o.stage]} refused this paste, so nothing was written:
           </div>
-          <pre data-donors-refusal style={PRE}>{o.text}</pre>
+          {o.refusals.map((r, i) => (
+            <div key={i} data-donors-refusal-note={r.rule ?? ''}>
+              <NoteHead note={r} kind="refusal" />
+              <pre data-donors-refusal style={PRE}>{r.message}</pre>
+            </div>
+          ))}
+          <WarningList warnings={o.warnings} />
         </div>
       );
     case 'crashed':
       return (
-        <div data-donors-outcome="crashed">
+        <div data-donors-outcome="crashed" data-donors-stage={o.stage}>
           <div style={{ ...WARN, marginBottom: T.s1 }}>
-            aeon&apos;s manifest loader CRASHED ({o.exitCode === null ? 'no exit code' : `exit ${o.exitCode}`}), so this paste
+            aeon&apos;s {STAGE_NAME[o.stage]} CRASHED ({o.exitCode === null ? 'no exit code' : `exit ${o.exitCode}`}), so this paste
             was not judged and nothing was written. This is not a refusal: {o.why}.
           </div>
           <pre data-donors-crash-stderr style={PRE}>{o.stderr.trim() || '(nothing on stderr)'}</pre>
@@ -394,7 +393,8 @@ function PoolRowsView({ clipact }: { clipact: Record<string, unknown> }): React.
 function BakeReadout(): React.ReactElement | null {
   const baked = usePasteStore((s) => s.baked);
   const bakeNote = usePasteStore((s) => s.bakeNote);
-  if (bakeNote) return <div data-donors-bake-note style={{ ...WARN, whiteSpace: 'pre-wrap' }}>{bakeNote}</div>;
+  const bakeNoteKind = usePasteStore((s) => s.bakeNoteKind);
+  if (bakeNote) return <div data-donors-bake-note={bakeNoteKind ?? ''} style={{ ...WARN, whiteSpace: 'pre-wrap' }}>{bakeNote}</div>;
   if (!baked) return <Hint style={{ marginBottom: 0 }}>aeon&apos;s per-clip readout appears here once the act has a clip.</Hint>;
   const c = baked.clipact as {
     collision?: { attr_entries?: number; cap?: number; per_clip?: PerClip[] };

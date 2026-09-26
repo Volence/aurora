@@ -28,9 +28,9 @@ describe('the argv is fixed per verb', () => {
     expect(clipToolArgv('validate', '/p', '/t/clips.json', '/t/baked')).toEqual(
       ['python3', 'tools/clip_manifest.py', 'validate', '/t/clips.json', '--donor-root', '/p/games/sonic4/data/donors', '--json']);
   });
-  it('bake names clip_act_bake.py and a temp --out, never the project', () => {
+  it('bake names clip_act_bake.py, a temp --out (never the project), and --json AFTER the path (aeon 71ae3433)', () => {
     expect(clipToolArgv('bake', '/p', '/t/clips.json', '/t/baked')).toEqual(
-      ['python3', 'tools/clip_act_bake.py', 'bake', '/t/clips.json', '--out', '/t/baked']);
+      ['python3', 'tools/clip_act_bake.py', 'bake', '/t/clips.json', '--out', '/t/baked', '--json']);
   });
 });
 

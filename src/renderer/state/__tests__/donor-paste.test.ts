@@ -9,6 +9,10 @@
  *     subjects, and a loader that CRASHED (exit 1, no JSON) is its own outcome,
  *     never a refusal. The loader's stdout in these rows is aeon's REAL output
  *     (test/fixtures/clips/aeon-outputs/validate-json.cases.json), not typed here;
+ *   * aeon's BAKE answers in the same --json (row 213 open item (a)): a bake
+ *     refusal carries its rule and clip, a bake that CRASHED is a crash of the
+ *     bake, and the target act's re-bake note says which. The bake's stdout is
+ *     aeon's real output too (bake-json.cases.json beside it);
  *   * undo puts back the exact prior bytes, or removes a file the paste created,
  *     and refuses when the file moved since the paste wrote it;
  *   * a guarded-write conflict writes nothing and says why.
@@ -31,6 +35,13 @@ function aeonSaid(name: string): Partial<ClipToolResult> {
   const c = CASES[name];
   return { ok: c.exit === 0, exitCode: c.exit, stdout: c.stdout, stderr: c.stderr };
 }
+/** aeon's real bake --json runs (row 213 open item (a)): test/fixtures/clips/aeon-outputs/bake-json.cases.json. */
+const BAKE_CASES = JSON.parse(readFileSync(resolve(__dirname, '../../../../test/fixtures/clips/aeon-outputs/bake-json.cases.json'), 'utf8')) as
+  Record<string, { exit: number; stdout: string; stderr: string }>;
+function aeonBaked(name: string): Partial<ClipToolResult> {
+  const c = BAKE_CASES[name];
+  return { ok: c.exit === 0, exitCode: c.exit, stdout: c.stdout, stderr: c.stderr };
+}
 
 interface Disk { files: Map<string, { text: string; mtimeMs: number }>; clock: number }
 
@@ -46,7 +57,7 @@ function ports(disk: Disk, opts: {
     async clipTool(_root, verb, text) {
       seen.push({ verb, text });
       const base: ClipToolResult = {
-        verb, ok: true, exitCode: 0, stdout: verb === 'validate' ? CASES.accept_s2_ehz_cpz.stdout : 'clip act baked', stderr: '',
+        verb, ok: true, exitCode: 0, stdout: (verb === 'validate' ? CASES : BAKE_CASES).accept_s2_ehz_cpz.stdout, stderr: '',
         command: `python3 ${verb}`,
       };
       const over = verb === 'validate' ? opts.validate?.(text) : opts.bake?.(text);
@@ -146,14 +157,39 @@ describe('a paste writes only what aeon accepted', () => {
     expect(p.writes.length).toBe(1);
   });
 
-  it('a REFUSAL at the bake writes nothing either', async () => {
+  it('a REFUSAL at the bake writes nothing either, and carries the bake\'s own rule and the clip it names', async () => {
     const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
     let bakes = 0;
-    const p = ports(disk, { bake: (t) => (t.includes('ehz_x') ? (bakes++, { ok: false, exitCode: 1, stdout: 'C2 over 255' }) : {}) });
+    const p = ports(disk, { bake: (t) => (t.includes('ehz_x') ? (bakes++, aeonBaked('refuse_c1_bake_own')) : {}) });
     await usePasteStore.getState().selectAct('s2_two_clip_pins', p);
     const o = await usePasteStore.getState().paste(CLIP, p);
     expect(bakes).toBe(1);
     expect(o).toMatchObject({ kind: 'refused', stage: 'bake' });
+    const doc = JSON.parse(BAKE_CASES.refuse_c1_bake_own.stdout);
+    expect(o.kind === 'refused' && o.refusals).toEqual(doc.refusals);
+    expect(o.kind === 'refused' && o.text).toBe(doc.refusals[0].message);
+    expect(p.writes).toEqual([]);
+    expect(usePasteStore.getState().undoStack.length).toBe(0);
+  });
+
+  it('a bake that CRASHED (exit 1, no JSON: aeon\'s traceback) is a crash of the BAKE carrying stderr, NOT a refusal, and writes nothing', async () => {
+    const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk, { bake: (t) => (t.includes('ehz_x') ? aeonBaked('crash_not_json') : {}) });
+    await usePasteStore.getState().selectAct('s2_two_clip_pins', p);
+    const o = await usePasteStore.getState().paste(CLIP, p);
+    expect(o).toMatchObject({ kind: 'crashed', stage: 'bake', exitCode: 1 });
+    expect(o.kind === 'crashed' && o.stderr).toBe(BAKE_CASES.crash_not_json.stderr);
+    expect(o.kind === 'crashed' && o.why).toMatch(/aeon's bake .*NOT judged/);
+    expect(p.writes).toEqual([]);
+    expect(usePasteStore.getState().undoStack.length).toBe(0);
+  });
+
+  it('a bake that exited 0 with a tree but NO JSON is a crash: the tree is not used and nothing is written', async () => {
+    const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk, { bake: (t) => (t.includes('ehz_x') ? { stdout: 'clip act baked: 872 pool tiles' } : {}) });
+    await usePasteStore.getState().selectAct('s2_two_clip_pins', p);
+    const o = await usePasteStore.getState().paste(CLIP, p);
+    expect(o).toMatchObject({ kind: 'crashed', stage: 'bake', exitCode: 0 });
     expect(p.writes).toEqual([]);
   });
 
@@ -175,6 +211,40 @@ describe('a paste writes only what aeon accepted', () => {
     expect(o.kind).toBe('conflict');
     expect(p.writes).toEqual([]);
     expect(disk.files.get(PINS_PATH)!.text).toBe(`${PINS} `);
+  });
+});
+
+describe('the target act\'s re-bake note tells a bake refusal from a bake crash', () => {
+  it('a refusal on disk is a REFUSED note naming aeon\'s rule, subjects and sentence; nothing is drawn', async () => {
+    const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk, { bake: () => aeonBaked('refuse_c1_bake_own') });
+    await usePasteStore.getState().selectAct('s2_two_clip_pins', p);
+    const s = usePasteStore.getState();
+    const r = JSON.parse(BAKE_CASES.refuse_c1_bake_own.stdout).refusals[0] as { rule: string; subjects: { index: number; id: string }[]; message: string };
+    expect(s.baked).toBeNull();
+    expect(s.bakeNoteKind).toBe('refused');
+    expect(s.bakeNote).toContain(`${r.rule} (clip ${r.subjects[0].index} ${r.subjects[0].id}): ${r.message}`);
+  });
+
+  it('a crash on disk is a CRASHED note carrying stderr that says it is not a refusal, never "refuses"', async () => {
+    const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk, { bake: () => aeonBaked('crash_missing_path') });
+    await usePasteStore.getState().selectAct('s2_two_clip_pins', p);
+    const s = usePasteStore.getState();
+    expect(s.baked).toBeNull();
+    expect(s.bakeNoteKind).toBe('crashed');
+    expect(s.bakeNote).toMatch(/CRASHED \(exit 1\).*This is not a refusal/);
+    expect(s.bakeNote).not.toMatch(/refuses/);
+    expect(s.bakeNote).toContain(BAKE_CASES.crash_missing_path.stderr.trim());
+  });
+
+  it('an accepted re-bake draws the act and carries no note', async () => {
+    const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk, { bake: () => aeonBaked('accept_w2') });
+    await usePasteStore.getState().selectAct('s2_two_clip_pins', p);
+    const s = usePasteStore.getState();
+    expect(s.baked).not.toBeNull();
+    expect([s.bakeNote, s.bakeNoteKind]).toEqual([null, null]);
   });
 });
 

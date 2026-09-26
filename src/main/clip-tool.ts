@@ -15,7 +15,7 @@
 // Exactly two verbs reach a subprocess, each with a FIXED argv:
 //
 //   validate  python3 tools/clip_manifest.py validate <candidate> --donor-root <root>/games/sonic4/data/donors --json
-//   bake      python3 tools/clip_act_bake.py bake <candidate> --out <temp>/baked
+//   bake      python3 tools/clip_act_bake.py bake <candidate> --out <temp>/baked --json
 //
 // The renderer supplies only the project root (which must hold both tools) and
 // the candidate manifest TEXT. The text goes to a file in a fresh temp
@@ -35,6 +35,12 @@
 // core/formats/donors/clip-validate-json.ts. This module does not interpret it:
 // exit 1 with no JSON on stdout is aeon's documented CRASH (a traceback), and
 // telling that from a refusal is the reader's job, in one place.
+//
+// bake runs with `--json` too (aeon 71ae3433, row 213 open item (a)): the same
+// document shape, read by the same module. A bake refusal can come after the
+// tree is written (aeon's `ok: false` means "do not use that tree"); this
+// module reads the tree only on exit 0, and the renderer uses it only when the
+// reader says the bake accepted.
 
 import { spawn as nodeSpawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -94,7 +100,7 @@ export function clipToolArgv(verb: ClipToolVerb, basePath: string, candidate: st
   if (verb === 'validate') {
     return ['python3', CLIP_TOOLS.validate, 'validate', candidate, '--donor-root', join(basePath, DONOR_ROOT_REL), '--json'];
   }
-  return ['python3', CLIP_TOOLS.bake, 'bake', candidate, '--out', outDir];
+  return ['python3', CLIP_TOOLS.bake, 'bake', candidate, '--out', outDir, '--json'];
 }
 
 function gridOf(manifestText: string): { w: number; h: number } | null {
