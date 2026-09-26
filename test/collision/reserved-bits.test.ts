@@ -1,7 +1,7 @@
 // BITS 15:14 OF THE PER-PLANE CELL WORD ARE RESERVED: THE SEAM, AND THE TWO
 // THINGS AURORA MUST NEVER DO WITH THEM.
 //
-// Replaces layer-transition.test.ts (ROADMAP rows 223+224, 2026-09-26). That
+// Replaces the retired `layer-transition` test file (ROADMAP rows 223+224, 2026-09-26). That
 // file pinned the loop crossover's encoding against aeon's anchor document;
 // the marks are retired (owner ruling S2CLIP-PLANE-SWITCH, aeon 19978b00) and
 // the anchor is SUPERSEDED. What stays pinned:

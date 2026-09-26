@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useEditorStore, executeCommand } from '../state/editorStore';
+import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { useProjectStore, getActiveLevel } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
 import { angleDegrees } from '../../core/collision/collision-model';
@@ -146,6 +147,9 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
   const setBothPlanes = useEditorStore((s) => s.setCollisionPaintBothPlanes);
   // Re-read on every live edit so the audit follows the strokes, not the mount.
   const liveEdit = useEditorStore((s) => s.liveEditVersion);
+  // ...and on every COMMITTED edit (a command, an undo, a redo): Clear, Reset and
+  // "Clear retired marks" are commands that do not advance `liveEditVersion`.
+  const historyVersion = useHistoryVersion();
   const brush = useEditorStore((s) => s.collisionBrushSize);
   const setBrush = useEditorStore((s) => s.setCollisionBrushSize);
   const activeSection = useEditorStore((s) => s.activeSectionIndex);
@@ -312,10 +316,13 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
   // THE RESERVED-BITS AUDIT: a non-zero bits 15:14 (a retired loop crossover
   // mark) is an ERROR aeon refuses; see core/collision/reserved-bits-audit.ts.
   //
-  // Recomputed on every live edit rather than on a timer, and deliberately
-  // NOT memoised on the plane arrays: they are mutated in place by the paint
-  // path, so a reference-identity memo would show the audit from before the
-  // stroke. `liveEditNonce` is the app's own "something changed" signal.
+  // Recomputed on every live edit AND every committed edit rather than on a
+  // timer, and deliberately NOT memoised on the plane arrays: they are mutated
+  // in place, so a reference-identity memo would show the audit from before the
+  // write. `liveEditVersion` is the stroke clock and `useHistoryVersion` the
+  // command clock. (Keyed on the live clock alone, the note outlived the
+  // "Clear retired marks" command that removed its cause: measured by
+  // scratchpad/lines-everywhere-harness.mjs row C2 on 2026-09-26, red.)
   const auditSection = useProjectStore((s) => getActiveLevel(s)?.sections[activeSection] ?? null);
   const audit = useMemo(
     // `activeSection` rather than `auditSection.index`: it is the index this
@@ -324,7 +331,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
       ? auditReservedBits(auditSection.collisionEdit, auditSection.collisionEditB, SECTION_TILES_WIDE, activeSection)
       : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [auditSection, liveEdit],
+    [auditSection, liveEdit, historyVersion],
   );
   const auditNote = audit ? reservedAuditMessage(audit) : null;
   const auditSeverity = audit ? reservedAuditSeverity(audit) : 'ok';

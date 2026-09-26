@@ -7,7 +7,7 @@
 // From 2026-08-29 until 2026-09-26 these two bits were the painted LOOP
 // CROSSOVER mark (1 = hand the player to path A, 2 = to path B, 3 illegal), and
 // Aurora had a brush, a lens, a preview, an audit and agent parameters for it
-// (all in this file's predecessor, `layer-transition.ts`). The OWNER then ruled
+// (all in this file's predecessor, the `layer-transition` module). The OWNER then ruled
 // (aeon `docs/decisions.jsonl` S2CLIP-PLANE-SWITCH, answered 2026-09-26T16:27:40Z,
 // chose `line-table`) that layer-switch LINES are the engine's ONLY layer-switch
 // mechanism, and aeon's LINES-EVERYWHERE parcel (aeon 19978b00) retired the marks.
@@ -35,12 +35,14 @@
 //    `core/editing/collision-word.ts`), undo and redo. Erasing someone's data to
 //    make a refusal go away is the defect "Aurora refuses, not erases" forbids.
 //  • It REPORTS them as an ERROR (`reserved-bits-audit.ts`) naming the cells,
-//    and the aeon save REFUSES to write a plane that carries them, naming the
-//    cells, so a stale value can never be carried to aeon by a save.
-//  • The ONE gesture that clears them is explicit and names what it does: the
+//    and the aeon save REFUSES the whole save while any plane it would write
+//    carries them, naming the cells, so a stale value can never be carried to
+//    aeon by a save.
+//  • The gesture that clears them is explicit and names what it does: the
 //    audit's "Clear retired marks" action (`clearReservedBitsEntries`), which
-//    zeroes bits 15:14 ONLY, as one undo step. (Painting air or "Clear section"
-//    also removes them, because those write a bare word on purpose.)
+//    zeroes bits 15:14 ONLY, as one undo step. (The palette's "Clear" and
+//    "Reset" also remove them, because they replace whole words on purpose and
+//    say so in their titles; painting air does NOT, air is a shape.)
 //
 // ═══ WHICH WORD. A FACT THAT OUTLIVES THE CROSSOVER ═══
 //

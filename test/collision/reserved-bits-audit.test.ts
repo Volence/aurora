@@ -1,7 +1,7 @@
 // THE RESERVED-BITS AUDIT: any non-zero bits 15:14 is an ERROR, named by cell.
 //
-// Replaces crossover-audit.test.ts, crossover-audit-bounds.test.ts and
-// crossover-locus.test.ts (ROADMAP rows 223+224): the loop-mark classes those
+// Replaces the retired `crossover-audit`, `crossover-audit-bounds` and
+// `crossover-locus` test files (ROADMAP rows 223+224): the loop-mark classes those
 // drove (self-marks, one-way, cancelling pairs) are gone with the marks, and
 // aeon now REFUSES every non-zero value, so there is one class and it is an
 // error. The properties that survive, each asserted here:

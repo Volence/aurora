@@ -5,7 +5,7 @@
 // — the ONE call MapViewport makes — actually calls the both-planes lens, gates
 // it on its own toggle, and aggregates what it drew.
 //
-// (This file was loop-lens-wiring.test.ts and also drove the loop CROSSOVER
+// (This file was the `loop-lens-wiring` test and also drove the loop CROSSOVER
 // lens. That lens was retired with the painted marks, ROADMAP rows 223+224, and
 // its rows were deleted with it; the both-planes rows are unchanged.)
 //

@@ -19,7 +19,9 @@
 //   hover      HB.*   the hover bar (writeHoverReadout, styles.hoverBar)
 //   stamp      SG.*   the stamp ghost during a link hover; CL.* the Chunk links panel
 //   paste      PG.*   the paste ghost (art, the tile-set gate, collision shading)
-//   collision  XO.*   the collision hover preview and its crossover rects
+//   collision  XO.*   RETIRED 2026-09-26 (ROADMAP rows 223+224): every row drove the
+//              loop crossover's hover rects, and the crossover brush is gone;
+//              see `collisionPart`, which prints XO.RETIRED and runs no row.
 //   plane      F1.*   map-coverage-6 F-1. RETIRED 2026-09-12 by hub ruling M1
 //              (the Plane buttons drop focus); see `planePart` below, which
 //              now prints F1.RETIRED and runs no row.
@@ -27,11 +29,11 @@
 //              arm of resolveEscape, BAND.* the band preview, OBS.DPR
 //
 // EXPECTATIONS COME FROM THE CODE, NOT FROM A SCREENSHOT.
-//   * Four modules of the tree under test are bundled with esbuild and CALLED:
-//     crossover-preview.ts (crossoverPreviewRects), collision-cell.ts
-//     (crossoverSpanForCursor), bganim-preview.ts (bandPreviewStates,
-//     editorPanToCameraPx, bandStepKey, bandSlotSource), map-clipboard.ts
-//     (pasteBaseStep). No plant ever touches these four files.
+//   * Two modules of the tree under test are bundled with esbuild and CALLED:
+//     bganim-preview.ts (bandPreviewStates, editorPanToCameraPx, bandStepKey,
+//     bandSlotSource) and map-clipboard.ts (pasteBaseStep). No plant ever
+//     touches these files. (The crossover preview and span modules it also
+//     bundled were deleted with the crossover brush, ROADMAP rows 223+224.)
 //   * Literals that live in React/canvas files (colours, the ghost alpha, the
 //     hover bar's background, the readout templates) are read with a regex
 //     that must match exactly once, FROM THE COMMITTED HEAD (`git show
@@ -137,11 +139,9 @@ async function loadOracle() {
     const r = esb.buildSync({ entryPoints: [`${RUN.root}/${p}`], bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'error' });
     return import(`data:text/javascript;base64,${Buffer.from(r.outputFiles[0].text).toString('base64')}`);
   };
-  const xoPrev = await bundle('src/renderer/canvas/crossover-preview.ts');
-  const cell = await bundle('src/core/collision/collision-cell.ts');
   const band = await bundle('src/core/formats/bg-override/bganim-preview.ts');
   const clip = await bundle('src/core/editing/map-clipboard.ts');
-  for (const [m, k] of [[xoPrev, 'crossoverPreviewRects'], [cell, 'crossoverSpanForCursor'], [band, 'bandPreviewStates'],
+  for (const [m, k] of [[band, 'bandPreviewStates'],
     [band, 'editorPanToCameraPx'], [band, 'bandStepKey'], [band, 'bandSlotSource'], [clip, 'pasteBaseStep']]) {
     if (typeof m[k] !== 'function') throw new Error(`ORACLE: the bundle exports no ${k}`);
   }
@@ -167,9 +167,9 @@ async function loadOracle() {
   const GUIDE_GRAB_PX = +fromHead('src/renderer/canvas/effects-guides.ts', /export const GUIDE_GRAB_PX = (\d+);/, 'GUIDE_GRAB_PX')[1];
   const FRAME_GRAB_PX = +fromHead('src/renderer/canvas/screen-frame.ts', /export const SCREEN_FRAME_GRAB_PX = (\d+);/, 'SCREEN_FRAME_GRAB_PX')[1];
   return {
-    xoPrev, cell, band, clip, alpha: alphas[0], GUIDE_GRAB_PX, FRAME_GRAB_PX,
+    band, clip, alpha: alphas[0], GUIDE_GRAB_PX, FRAME_GRAB_PX,
     SELECTION_MARQUEE: colour('SELECTION_MARQUEE'), MAP_MARQUEE_FILL: colour('MAP_MARQUEE_FILL'),
-    CROSSOVER_FILL: colour('CROSSOVER_FILL'), COLLISION_PREVIEW_PRIMARY: colour('COLLISION_PREVIEW_PRIMARY'),
+    COLLISION_PREVIEW_PRIMARY: colour('COLLISION_PREVIEW_PRIMARY'),
     COLLISION_PREVIEW_FILL: colour('COLLISION_PREVIEW_FILL'),
     SCREEN_FRAME_LINE: colour('SCREEN_FRAME_LINE'), EFFECTS_GUIDE_LINE: colour('EFFECTS_GUIDE_LINE'),
     EFFECTS_GUIDE_ACTIVE: colour('EFFECTS_GUIDE_ACTIVE'),
@@ -1162,124 +1162,20 @@ async function pastePart(d, O, S) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PART collision. The collision hover preview and its crossover rects.
+// PART collision. RETIRED 2026-09-26 (ROADMAP rows 223+224).
 // ═══════════════════════════════════════════════════════════════════════════
-async function collisionPart(d, O) {
-  const { c } = d;
-  await neutral(d);
-  const fc = await d.realClick(d.FACET('Collision'));
-  await sleep(700);
-  if ((await d.st()).tool !== 'paint-collision') await d.chord('c');
-  await d.setView(0, 0, 4);
-  const G = await d.geometry('collision');
-  const shapeBtn = await d.realClick(String.raw`([...document.querySelectorAll('button')].filter((b) => /^#\d+/.test(b.title || '') && b.getBoundingClientRect().width > 0)[2] || null)`, { scroll: true });
-  await d.realClick(d.BTN_IN('Brush', '1'));
-  const loopHand = await d.realClick(String.raw`(() => { const l = [...document.querySelectorAll('span')].find((s) => s.textContent.trim() === 'Loop' && s.nextElementSibling && s.nextElementSibling.tagName === 'BUTTON');
-    return l ? [...l.parentElement.querySelectorAll('button')].find((b) => /^Hand /.test(b.textContent.trim())) || null : null; })()`);
-  const half = await d.realClick(d.BTN_IN('Mark', 'Half (8px)'));
-  const brush = await c.json('window.__dbg.aeon.armCollisionBrush({})');
-  const markVisible = await c.evalExpr(`!!(${d.BTN_IN('Mark', 'Half (8px)')})`);
-  check('XO.0', 'PREMISE: the Collision facet by a real click, paint-collision armed, a shape picked, the Loop brush on Hand-off and the Mark width on Half, all by real clicks (the Mark row renders only while the brush authors)',
-    !!(fc && fc.hitOk) && (await d.st()).tool === 'paint-collision' && !!(shapeBtn && shapeBtn.hitOk) && !!(loopHand && loopHand.hitOk) && !!(half && half.hitOk)
-      && brush.crossover === 'hand-off' && brush.crossoverSpanMode === 'half' && markVisible,
-    `dpr ${G.R.dpr}; brush ${J(brush)}; aims ${J({ fc, shapeBtn, loopHand, half })}`);
-  // The cell and its halves, aimed at integers; the span and the rects derived
-  // by the tree's own functions from the INTEGER aim's tile column.
-  const cell = { cc: 3, cr: 2 };
-  const aimL = d.aimWorld(G, cell.cc * 16 + 4, cell.cr * 16 + 8);
-  const aimR = d.aimWorld(G, cell.cc * 16 + 12, cell.cr * 16 + 8);
-  const cellTL = d.clientOf(G, cell.cc * 16, cell.cr * 16);
-  const cellRect = { x: cellTL.x, y: cellTL.y, w: 16 * G.V.zoom, h: 16 * G.V.zoom };
-  const clipRect = { x: cellRect.x - 10, y: cellRect.y - 10, w: cellRect.w + 20, h: cellRect.h + 20 };
-  const derive = (aimP) => {
-    const w = d.worldAt(G, aimP.x, aimP.y);
-    const col = Math.floor(w.x / 8); const row = Math.floor(w.y / 8);
-    const span = O.cell.crossoverSpanForCursor('half', col);
-    const rects = O.xoPrev.crossoverPreviewRects({ targets: [{ cellCol: col >> 1, cellRow: row >> 1 }], span, width: 256, offsetX: 0, offsetY: 0 })
-      .map((r) => { const p = d.clientOf(G, r.x, r.y); return { x: p.x, y: p.y, w: r.w * G.V.zoom, h: r.h * G.V.zoom }; });
-    return { col, row, span, rects };
-  };
-  const orange = (q) => !!q && q.a >= 100 && q.r - q.b >= 80;
-  const halves = (L, shot, ref) => {
-    const out = { left: { n: 0, or: 0, dor: 0 }, right: { n: 0, or: 0, dor: 0 } };
-    for (let yy = Math.floor(cellRect.y) + 3; yy < cellRect.y + cellRect.h - 3; yy++) {
-      for (let xx = Math.floor(cellRect.x) + 3; xx < cellRect.x + cellRect.w - 3; xx++) {
-        const cx = xx + 0.5; const mid = cellRect.x + cellRect.w / 2;
-        if (Math.abs(cx - mid) < 3) continue;
-        const side = cx < mid ? out.left : out.right;
-        const q = d.lp(L, xx, yy); side.n++; if (orange(q)) side.or++;
-        const s0 = ref.px(xx, yy); const s1 = shot.px(xx, yy);
-        if (s0 && s1 && (s1.r - s1.b) - (s0.r - s0.b) >= 40) side.dor++;
-      }
-    }
-    return out;
-  };
-  // REF: the pointer on a far cell (the preview follows the pointer, not this cell).
-  await d.hoverTo(d.aimWorld(G, cell.cc * 16 + 16 * 6 + 8, cell.cr * 16 + 16 * 3 + 8));
-  const ref = await d.grab(clipRect, 'xo-ref-other-cell');
-  await d.hoverTo(aimL);
-  const eL = derive(aimL);
-  const LL = await d.layerPixels('map-preview-canvas', clipRect);
-  const sL = await d.grab(clipRect, 'xo-hover-left-half');
-  const hL = halves(LL, sL, ref);
-  // The orange box on the layer against the union of the derived rects.
-  const box = (L) => { let x0 = 1e9; let y0 = 1e9; let x1 = -1e9; let y1 = -1e9;
-    for (let j = 0; j < L.h; j++) for (let i = 0; i < L.w; i++) { const o = (j * L.w + i) * 4; const q = { r: L.px[o], g: L.px[o + 1], b: L.px[o + 2], a: L.px[o + 3] };
-      if (orange(q)) { x0 = Math.min(x0, L.x0 + i); y0 = Math.min(y0, L.y0 + j); x1 = Math.max(x1, L.x0 + i + 1); y1 = Math.max(y1, L.y0 + j + 1); } }
-    return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }; };
-  const union = (rs) => ({ x: Math.min(...rs.map((r) => r.x)), y: Math.min(...rs.map((r) => r.y)), w: Math.max(...rs.map((r) => r.x + r.w)) - Math.min(...rs.map((r) => r.x)), h: Math.max(...rs.map((r) => r.y + r.h)) - Math.min(...rs.map((r) => r.y)) });
-  const near = (a, b) => !!a && !!b && Math.abs(a.x - b.x) <= 1.5 && Math.abs(a.y - b.y) <= 1.5 && Math.abs(a.w - b.w) <= 2 && Math.abs(a.h - b.h) <= 2;
-  // ⚠ DEV RUN 2: an "orange bounding box" also caught the shape ghost's 3 px
-  // solid-edge frame round the whole cell. The span is judged per COLUMN of the
-  // cell's interior (4 px in from every edge, clear of that frame) instead.
-  const profile = (L, u) => {
-    const x0 = Math.ceil(cellRect.x) + 4; const x1 = Math.floor(cellRect.x + cellRect.w) - 4;
-    const y0 = Math.ceil(cellRect.y) + 4; const y1 = Math.floor(cellRect.y + cellRect.h) - 4;
-    let inCols = 0; let inOk = 0; let outCols = 0; let outOk = 0; const bad = [];
-    for (let xx = x0; xx < x1; xx++) {
-      const cx = xx + 0.5; let n = 0; let or = 0;
-      for (let yy = y0; yy < y1; yy++) { n++; if (orange(d.lp(L, xx, yy))) or++; }
-      const inside = cx >= u.x + 1.5 && cx <= u.x + u.w - 1.5; const outside = cx < u.x - 1 || cx > u.x + u.w + 1;
-      if (inside) { inCols++; if (or / n >= 0.9) inOk++; else if (bad.length < 6) bad.push({ xx, frac: +(or / n).toFixed(2) }); }
-      if (outside) { outCols++; if (or === 0) outOk++; else if (bad.length < 6) bad.push({ xx, frac: +(or / n).toFixed(2) }); }
-    }
-    return { inCols, inOk, outCols, outOk, bad };
-  };
-  const uL = union(eL.rects); const pL = profile(LL, uL); const cL = compositeMatch(d, LL, ref, sL, clipRect);
-  check('XO.a', `LEFT HALF hovered: crossoverSpanForCursor('half', col ${eL.col}) = ${J(eL.span)}; every interior column inside crossoverPreviewRects' box is CROSSOVER_FILL on the layer, no column outside it is, and the screen is the layer over the reference`,
-    eL.span === 'left' && pL.inCols > 0 && pL.inOk === pL.inCols && pL.outCols > 0 && pL.outOk === pL.outCols && cL.ratio >= 0.99,
-    `aim ${J(aimL)}; derived rects ${J(eL.rects)} (union ${J(uL)}); column profile ${J(pL)}; halves ${J(hL)}; screen = over(layer, reference) ${J(cL)}; captures ${ref.path}, ${sL.path}`);
-  await d.hoverTo(aimR);
-  const eR = derive(aimR);
-  const LR = await d.layerPixels('map-preview-canvas', clipRect);
-  const sR = await d.grab(clipRect, 'xo-hover-right-half');
-  const hR = halves(LR, sR, ref);
-  const uR = union(eR.rects); const pR = profile(LR, uR); const cR = compositeMatch(d, LR, ref, sR, clipRect);
-  check('XO.b', `RIGHT HALF hovered: the span is ${J(eR.span)} and the fill moves to the columns of the right half's rects, the screen still the layer over the reference`,
-    eR.span === 'right' && pR.inCols > 0 && pR.inOk === pR.inCols && pR.outCols > 0 && pR.outOk === pR.outCols && cR.ratio >= 0.99,
-    `aim ${J(aimR)}; derived rects ${J(eR.rects)} (union ${J(uR)}); column profile ${J(pR)}; halves ${J(hR)}; screen ${J(cR)}; capture ${sR.path}`);
-  // CONTROL: Keep (the brush does not author), the preview itself still drawn.
-  const keep = await d.realClick(d.BTN_IN('Loop', 'Keep'));
-  await d.hoverTo(aimL);
-  const LK = await d.layerPixels('map-preview-canvas', clipRect);
-  const sK = await d.grab(clipRect, 'xo-hover-keep');
-  const hK = halves(LK, sK, ref);
-  // The primary outline: COLLISION_PREVIEW_PRIMARY on the cell's border (the
-  // stroke is 1.5 px inset 0.75 px: the first pixel inside each edge).
-  let pN = 0; let pOk = 0; const pBad = [];
-  const P = O.COLLISION_PREVIEW_PRIMARY;
-  // ⚠ DEV RUN 2: the stroke is laid OVER the scope outline and the shape
-  // ghost's edge, so the pixel is the primary colour composited, e.g. (127,188,245)
-  // at 255: within 12 of COLLISION_PREVIEW_PRIMARY, alpha at least 0.9.
-  const sampleEdge = (xx, yy) => { const q = d.lp(LK, xx, yy); pN++; if (q && q.a >= Math.round(0.9 * 255) && dist(q, P) <= 12) pOk++; else if (pBad.length < 4) pBad.push({ xx, yy, q }); };
-  for (let xx = Math.ceil(cellRect.x) + 4; xx < cellRect.x + cellRect.w - 4; xx += 3) { sampleEdge(xx, Math.floor(cellRect.y)); sampleEdge(xx, Math.ceil(cellRect.y + cellRect.h) - 1); }
-  for (let yy = Math.ceil(cellRect.y) + 4; yy < cellRect.y + cellRect.h - 4; yy += 3) { sampleEdge(Math.floor(cellRect.x), yy); sampleEdge(Math.ceil(cellRect.x + cellRect.w) - 1, yy); }
-  const brush2 = await c.json('window.__dbg.aeon.armCollisionBrush({})');
-  check('XO.c', 'CONTROL: Loop on Keep (crossoverBrushAuthors false): no crossover fill anywhere in the hovered cell',
-    !!(keep && keep.hitOk) && brush2.crossover === 'keep' && hK.left.or === 0 && hK.right.or === 0 && compositeMatch(d, LK, ref, sK, clipRect).ratio >= 0.99,
-    `brush ${J(brush2)}; halves ${J(hK)}; screen ${J(compositeMatch(d, LK, ref, sK, clipRect))}; capture ${sK.path}`);
-  check('XO.p', 'the collision hover preview itself is drawn at the hovered cell: the COLLISION_PREVIEW_PRIMARY outline on its four edges (HEAD colour)',
-    pN > 0 && pOk / pN >= 0.9, `cell ${J(cellRect)}; primary edge pixels ${pOk}/${pN}; first misses ${J(pBad)}`);
+//
+// Every XO row armed the Loop brush on Hand-off and the Mark width on Half and
+// measured the crossover rects the hover preview drew. The owner ruled layer-
+// switch LINES the only mechanism (aeon docs/decisions.jsonl S2CLIP-PLANE-SWITCH)
+// and the brush, its Mark row and its preview were removed, so the premise row
+// XO.0 can no longer be met by any click. Retired explicitly rather than tuned
+// green; the rows are in git history at this file's parent revision. The
+// collision palette's runtime state (no Loop row, no crossover lens) is checked
+// by `npm run harness:lines-everywhere`.
+async function collisionPart() {
+  note('XO.RETIRED', 'the XO rows drove the loop crossover brush and its hover rects, removed in ROADMAP rows 223+224. '
+    + 'No row runs here; see npm run harness:lines-everywhere.');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1341,7 +1237,7 @@ async function retiredPlanePartF1(d) {
   const brush1 = await c.json('window.__dbg.aeon.armCollisionBrush({})');
   const plane1 = brush1.plane;
   check('F1.a', 'after a REAL click on Plane A, focus is on that button (the Plane buttons do not call actAndDropFocus) and the plane is A',
-    !!(aBtn && aBtn.hitOk) && !!f1 && f1.tag === 'BUTTON' && f1.text === 'A' && f1.row === 'Plane' && plane1 === 'a' && brush1.crossover === 'keep',
+    !!(aBtn && aBtn.hitOk) && !!f1 && f1.tag === 'BUTTON' && f1.text === 'A' && f1.row === 'Plane' && plane1 === 'a',
     `dpr ${G.R.dpr}; facet ${J(fc && fc.hitOk)}; shape ${J(shape && shape.hitOk)}; Keep ${J(keepAim && keepAim.hitOk)}; brush 1 ${J(brushAim && brushAim.hitOk)}; aim ${J(aBtn)}; activeElement ${J(f1)}; brush ${J(brush1)}; cells from ${J(found)}`);
   // 2. A press held on the map, moved one cell.
   const c1 = cellAim(0); const c2 = cellAim(1); const c3 = cellAim(2); const c4 = cellAim(3);

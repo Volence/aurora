@@ -2,7 +2,7 @@
 //
 // ═══ WHY THIS REPLACED THE LOOP AUDIT ═══
 //
-// Until 2026-09-26 this was `crossover-audit.ts`: a paint-time check of the
+// Until 2026-09-26 this was the `crossover-audit` module: a paint-time check of the
 // painted loop crossover marks (self-marks, the reserved value 3, one-way marks,
 // two-way pairs that cancel). The owner ruled that layer-switch LINES are the
 // engine's only layer-switch mechanism (aeon `docs/decisions.jsonl`
@@ -170,8 +170,8 @@ export function reservedAuditMessage(a: ReservedBitsAudit): string | null {
 
 /**
  * THE CLAIM `get_collision_region`'s MCP description makes about what aeon does
- * with a non-zero 15:14, as a constant so `test/collision/crossover-reserved-
- * bake-claim.test.ts` can re-derive it from aeon's published
+ * with a non-zero 15:14, as a constant so
+ * `test/collision/crossover-reserved-bake-claim.test.ts` can re-derive it from aeon's published
  * `tools/collision_pipeline.py` and fail when the two part. Its
  * machine-findable spelling is "aeon's bake enforces it" (or, if aeon ever drops
  * the raise, "aeon's bake does not enforce it").

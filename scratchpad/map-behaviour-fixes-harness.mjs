@@ -638,7 +638,6 @@ async function collisionSetup(d, label) {
   const facet = await d.realClick(d.FACET('Collision'));
   await sleep(700);
   if ((await d.st()).tool !== 'paint-collision') await d.chord('c');
-  const keep = await d.realClick(d.BTN_IN('Loop', 'Keep'), { scroll: true });
   const brush1 = await d.realClick(d.BTN_IN('Brush', '1'), { scroll: true });
   const planeA = await d.realClick(d.BTN_IN('Plane', 'A'), { scroll: true });
   const shape = await d.realClick(SHAPE_N(3), { scroll: true });
@@ -646,9 +645,10 @@ async function collisionSetup(d, label) {
   const G = await d.geometry(label);
   const brush = await brushRead(d);
   const tool = (await d.st()).tool;
-  const hits = { facet: !!facet?.hitOk, keep: !!keep?.hitOk, brush1: !!brush1?.hitOk, planeA: !!planeA?.hitOk, shape: !!shape?.hitOk };
+  // (A `Loop` -> `Keep` click was here; the Loop row went with the crossover brush, ROADMAP rows 223+224.)
+  const hits = { facet: !!facet?.hitOk, brush1: !!brush1?.hitOk, planeA: !!planeA?.hitOk, shape: !!shape?.hitOk };
   const ok = hits.facet && hits.brush1 && hits.planeA && hits.shape && tool === 'paint-collision'
-    && brush.plane === 'a' && brush.crossover === 'keep' && brush.bothPlanes === false && brush.word !== 0;
+    && brush.plane === 'a' && brush.bothPlanes === false && brush.word !== 0;
   return { G, brush, tool, hits, ok };
 }
 
