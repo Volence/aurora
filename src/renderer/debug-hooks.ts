@@ -1853,6 +1853,7 @@ interface DonorProbeState {
   paste: {
     acts: string[] | null; target: { actId: string; path: string; clips: string[]; onDisk: boolean } | null;
     busy: boolean; outcome: unknown; undo: number; redo: number; baked: boolean; bakeNote: string | null;
+    bakeNoteKind: string | null;
   };
   draft: { clipId: string; dst: unknown; mode: string; reason: string };
   focusedDocId: string | null;
@@ -1882,7 +1883,7 @@ function donorProbeState(): DonorProbeState {
         actId: p.target.actId, path: p.target.path, clips: p.target.doc.clips.map((c) => c.id), onDisk: p.target.onDisk !== null,
       } : null,
       busy: p.busy, outcome: p.outcome, undo: p.undoStack.length, redo: p.redoStack.length,
-      baked: p.baked !== null, bakeNote: p.bakeNote,
+      baked: p.baked !== null, bakeNote: p.bakeNote, bakeNoteKind: p.bakeNoteKind,
     },
     draft: { clipId: dr.clipId, dst: dr.dst, mode: dr.mode, reason: dr.reason },
     focusedDocId: focusedDocId(),
