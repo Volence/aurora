@@ -29,6 +29,18 @@
 //     tools/clip_rom_bake.py `region_plan`), so writing it would name a
 //     rectangle in a document that does not exist. It is READ absent-capable:
 //     aeon's own s2_two_clip_pins carries it on no clip.
+//
+// ═══ THE ONE FIELD A PASTE COPIES: `music` (ROADMAP row 222) ══════════════
+//
+// A clip's `music` is OPTIONAL (absent = no song), and aeon's R3 holds every
+// clip of one ZONE, which it keys by the pair (donor, zone), to the SAME value,
+// absent included: tools/clip_manifest.py compares `raw.get("music") or None`
+// clip against clip within a (donor, zone). So a new clip of a zone the act
+// already carries has exactly one value R3 accepts: the song those clips name.
+// `withClip` copies it (`zoneMusic`). It never invents one: a zone new to the
+// act, or one whose clips name no song, gets no `music`; a zone whose clips
+// already disagree (a manifest R3 refuses before this paste) gets none either,
+// because there is no value to vouch for. Choosing a song is not a paste's job.
 
 import { jsonFileText } from '../canonical-json';
 import { REGIONS_SCHEMA } from '../regions/document';
@@ -66,6 +78,8 @@ export interface ClipView {
   /** Absent in the file is null here, never a derived name. */
   regionId: string | null;
   unalignedDstReason: string | null;
+  /** The clip's `music` (a SONG_* name); absent or empty in the file is null, as aeon reads it. */
+  music: string | null;
 }
 
 export interface CorridorView { id: string; dst: ClipRect; floorY: number }
@@ -117,6 +131,7 @@ function view(raw: Record<string, unknown>, label: string): ClipManifestDoc {
       regionId: typeof c.region_id === 'string' && c.region_id !== '' ? c.region_id : null,
       unalignedDstReason: typeof c.unaligned_dst_reason === 'string' && c.unaligned_dst_reason !== ''
         ? c.unaligned_dst_reason : null,
+      music: typeof c.music === 'string' && c.music !== '' ? c.music : null,
     };
   });
   const corrRaw = Array.isArray(raw.corridors) ? raw.corridors : [];
@@ -168,11 +183,27 @@ export interface NewClip {
 }
 
 /**
+ * The song aeon's R3 will hold a new clip of (donor, zone) to: the `music` every
+ * clip of that pair already in `doc` names, when they all name the same one.
+ * Null when the act has no clip of the pair, when those clips name no song, or
+ * when they disagree (then R3 already refuses the manifest, and no value is one
+ * Aurora can vouch for).
+ */
+export function zoneMusic(doc: ClipManifestDoc, donor: string, zone: string): string | null {
+  const songs = new Set(doc.clips.filter((c) => c.donor === donor && c.zone === zone).map((c) => c.music));
+  if (songs.size !== 1) return null;
+  const [only] = songs;
+  return only;
+}
+
+/**
  * The manifest with `clip` appended. A NEW document: the input is not touched,
  * so an undo can hold the old one and be sure of it.
  *
  * Keys in aeon's documented order (clip_manifest.py THE FORMAT), and nothing
- * Aurora cannot vouch for: no `region_id`, no `palette`.
+ * Aurora cannot vouch for: no `region_id`, no `palette`. `music` is written
+ * only when the clip's zone already names one in this act, and then it is that
+ * song (`zoneMusic`, aeon's R3).
  */
 export function withClip(doc: ClipManifestDoc, clip: NewClip): ClipManifestDoc {
   const raw = structuredClone(doc.raw);
@@ -184,6 +215,8 @@ export function withClip(doc: ClipManifestDoc, clip: NewClip): ClipManifestDoc {
     dst_rect: { ...clip.dst },
   };
   if (clip.unalignedDstReason) entry.unaligned_dst_reason = clip.unalignedDstReason;
+  const music = zoneMusic(doc, clip.donor, clip.zone);
+  if (music !== null) entry.music = music;
   const clips = Array.isArray(raw.clips) ? raw.clips : [];
   raw.clips = [...clips, entry];
   return view(raw, 'clips.json');
