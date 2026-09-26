@@ -1,0 +1,112 @@
+{
+  "accept_s2_ehz_cpz": {
+    "argv": [
+      "bake",
+      "<path>",
+      "--out",
+      "<dir>",
+      "--json"
+    ],
+    "exit": 0,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": true,\n  \"refusals\": [],\n  \"schema\": 1,\n  \"warnings\": [\n    {\n      \"message\": \"W3 act section 5 holds 2 zones: 'ehz_act1' (s2disasm/EHZ), 'cpz_act1' (s2disasm/CPZ). One section carries ONE local tile map \\u2014 a single 11-bit space capped at 2047 entries (ojz_strip_gen.build_section_local_map) \\u2014 and a mixed section needs the sum of both zones' tiles in it. The bake prints the map size per section and refuses past the cap.\",\n      \"rule\": \"W3\",\n      \"subjects\": [\n        {\n          \"id\": \"ehz_act1\",\n          \"index\": 0,\n          \"kind\": \"clip\"\n        },\n        {\n          \"id\": \"cpz_act1\",\n          \"index\": 1,\n          \"kind\": \"clip\"\n        }\n      ]\n    }\n  ]\n}\n"
+  },
+  "accept_w2": {
+    "argv": [
+      "bake",
+      "<path>",
+      "--out",
+      "<dir>",
+      "--json"
+    ],
+    "exit": 0,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": true,\n  \"refusals\": [],\n  \"schema\": 1,\n  \"warnings\": [\n    {\n      \"message\": \"W2 clip 'ehz_s2': src_rect (x=4096 y=0 w=2048 h=8) does not meet s2disasm@EHZ's painted bounding box (x 0..10976, y 8..1024 px) \\u2014 this clip is entirely blank.\",\n      \"rule\": \"W2\",\n      \"subjects\": [\n        {\n          \"id\": \"ehz_s2\",\n          \"index\": 0,\n          \"kind\": \"clip\"\n        }\n      ]\n    }\n  ]\n}\n"
+  },
+  "crash_missing_path": {
+    "argv": [
+      "bake",
+      "<path>",
+      "--out",
+      "<dir>",
+      "--json"
+    ],
+    "exit": 1,
+    "stderr": "Traceback (most recent call last):\n  File \"/home/volence/.cache/bake213-aeon/tools/clip_act_bake.py\", line 1218, in <module>\n    sys.exit(main())\n             ~~~~^^\n  File \"/home/volence/.cache/bake213-aeon/tools/clip_act_bake.py\", line 1214, in main\n    return handler(args[1:])\n  File \"/home/volence/.cache/bake213-aeon/tools/clip_act_bake.py\", line 1103, in _mode_bake\n    doc, rc = bake_json(path, out_dir, expect)\n              ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/volence/.cache/bake213-aeon/tools/clip_act_bake.py\", line 1071, in bake_json\n    act, _st, _m, v1, _v2 = bake(manifest_path, out_dir, expect_worst,\n                            ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n                                 donor_root=donor_root, log=None,\n                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n                                 warning_records=warnings, refuse_budget=False)\n                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/volence/.cache/bake213-aeon/tools/clip_act_bake.py\", line 973, in bake\n    act = clip_manifest.load(manifest_path, donor_root=donor_root,\n                             warn=(lambda m: log(f\"  WARNING: {m}\")) if log else None,\n                             warning_records=warning_records)\n  File \"/home/volence/.cache/bake213-aeon/tools/clip_manifest.py\", line 822, in load\n    with open(path) as fh:\n         ~~~~^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/home/volence/.cache/bake213-bj/no_such_file.json'\n",
+    "stdout": ""
+  },
+  "crash_not_json": {
+    "argv": [
+      "bake",
+      "<path>",
+      "--out",
+      "<dir>",
+      "--json"
+    ],
+    "exit": 1,
+    "stderr": "Traceback (most recent call last):\n  File \"/home/volence/.cache/bake213-aeon/tools/clip_act_bake.py\", line 1218, in <module>\n    sys.exit(main())\n             ~~~~^^\n  File \"/home/volence/.cache/bake213-aeon/tools/clip_act_bake.py\", line 1214, in main\n    return handler(args[1:])\n  File \"/home/volence/.cache/bake213-aeon/tools/clip_act_bake.py\", line 1103, in _mode_bake\n    doc, rc = bake_json(path, out_dir, expect)\n              ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/volence/.cache/bake213-aeon/tools/clip_act_bake.py\", line 1071, in bake_json\n    act, _st, _m, v1, _v2 = bake(manifest_path, out_dir, expect_worst,\n                            ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n                                 donor_root=donor_root, log=None,\n                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n                                 warning_records=warnings, refuse_budget=False)\n                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/volence/.cache/bake213-aeon/tools/clip_act_bake.py\", line 973, in bake\n    act = clip_manifest.load(manifest_path, donor_root=donor_root,\n                             warn=(lambda m: log(f\"  WARNING: {m}\")) if log else None,\n                             warning_records=warning_records)\n  File \"/home/volence/.cache/bake213-aeon/tools/clip_manifest.py\", line 823, in load\n    raw = json.load(fh)\n  File \"/usr/lib/python3.14/json/__init__.py\", line 298, in load\n    return loads(fp.read(),\n        cls=cls, object_hook=object_hook,\n        parse_float=parse_float, parse_int=parse_int,\n        parse_constant=parse_constant, object_pairs_hook=object_pairs_hook, **kw)\n  File \"/usr/lib/python3.14/json/__init__.py\", line 352, in loads\n    return _default_decoder.decode(s)\n           ~~~~~~~~~~~~~~~~~~~~~~~^^^\n  File \"/usr/lib/python3.14/json/decoder.py\", line 345, in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.14/json/decoder.py\", line 361, in raw_decode\n    obj, end = self.scan_once(s, idx)\n               ~~~~~~~~~~~~~~^^^^^^^^\njson.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 3 (char 2)\n",
+    "stdout": ""
+  },
+  "refuse_c1_bake_own": {
+    "argv": [
+      "bake",
+      "<path>",
+      "--out",
+      "<dir>",
+      "--json"
+    ],
+    "exit": 1,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": false,\n  \"refusals\": [\n    {\n      \"message\": \"C1 clip 'ehz_cut': its source rectangle takes 2 crossover mark(s) from s2disasm/EHZ and leaves 2 behind. A crossover sends the player to the other collision plane and something else has to send them back (docs/LOOP_CROSSOVER_ENCODING.md \\u00a73.3); a marquee that keeps one end of a loop and drops the other produces a one-way trip onto a plane whose geometry is not there. The encoding does NOT record which marks belong to one loop, so this refusal cannot tell a severed loop from two unrelated ones and errs toward refusing. If you know the ones left behind are a different loop, say so in \\\"severed_xover_reason\\\" on this clip and it will be carried into clipact.json.\",\n      \"rule\": \"C1\",\n      \"subjects\": [\n        {\n          \"id\": \"ehz_cut\",\n          \"index\": 0,\n          \"kind\": \"clip\"\n        }\n      ]\n    }\n  ],\n  \"schema\": 1,\n  \"warnings\": []\n}\n"
+  },
+  "refuse_c3_act_level": {
+    "argv": [
+      "bake",
+      "<path>",
+      "--out",
+      "<dir>",
+      "--json"
+    ],
+    "exit": 1,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": false,\n  \"refusals\": [\n    {\n      \"message\": \"C3 this act interns 1 height profile(s) that collision_pipeline.rotate_profile REFUSES, so the ROM's wall-probe table (heightmaps_rot.bin, emit_tables) cannot be built for it: attr 25 heights=[2, 4, 6, 8, 10, 12, 14, 16, 16, 14, 12, 10, 8, 6, 4, 2] (rotate_profile: row 0 solid span touches neither edge (heights=[2, 4, 6, 8, 10, 12, 14, 16, 16, 14, 12, 10, 8, 6, 4, 2])). In the S2 bank the only shape like this is $18, a symmetric 45-degree peak whose upper rows have a solid run touching neither edge \\u2014 one signed byte per row cannot say that. tools/import_s2_collision.py RULED it for the bank (keep the run's width, anchor RIGHT) but that ruling deliberately does not reach emit_tables, because turning a build refusal into a silent value on every act's path is not a change to make for a clip. Marquee around the shape, or make the case for rotate_profile_ruled in emit_tables with this clip as the evidence.\",\n      \"rule\": \"C3\",\n      \"subjects\": []\n    }\n  ],\n  \"schema\": 1,\n  \"warnings\": []\n}\n"
+  },
+  "refuse_r12_after_w2": {
+    "argv": [
+      "bake",
+      "<path>",
+      "--out",
+      "<dir>",
+      "--json"
+    ],
+    "exit": 1,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": false,\n  \"refusals\": [\n    {\n      \"message\": \"R12 clip 'cpz_s2': the paste shifts the clip by (-2056, 0) px, and collision is only correct when BOTH axes shift by a multiple of 16. DERIVED, not a convention: a collision cell's height profile is 16 bytes covering a 16-px block, and the runtime picks the column with `andi.w #$F, d0` on the WORLD x (games/sonic4/player/player_sensors.emp probe_core); the row is picked the same way in y (`lsr.w #1` of the tile row, engine/level/collision_lookup.emp). Shift the data by 8 px and every probe reads the wrong half of the profile while the ART, which is one word per 8-px cell, moves correctly \\u2014 so this fails as ground that is 8 px out of place, not as anything that looks broken in a screenshot. Move src_rect or dst_rect so the difference is a multiple of 16 in both axes.\",\n      \"rule\": \"R12\",\n      \"subjects\": [\n        {\n          \"id\": \"cpz_s2\",\n          \"index\": 1,\n          \"kind\": \"clip\"\n        }\n      ]\n    }\n  ],\n  \"schema\": 1,\n  \"warnings\": [\n    {\n      \"message\": \"W2 clip 'ehz_s2': src_rect (x=4096 y=0 w=2048 h=8) does not meet s2disasm@EHZ's painted bounding box (x 0..10976, y 8..1024 px) \\u2014 this clip is entirely blank.\",\n      \"rule\": \"W2\",\n      \"subjects\": [\n        {\n          \"id\": \"ehz_s2\",\n          \"index\": 0,\n          \"kind\": \"clip\"\n        }\n      ]\n    }\n  ]\n}\n"
+  },
+  "refuse_r7": {
+    "argv": [
+      "bake",
+      "<path>",
+      "--out",
+      "<dir>",
+      "--json"
+    ],
+    "exit": 1,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": false,\n  \"refusals\": [\n    {\n      \"message\": \"R7 clip 'cpz_s2': src 2048x2048 != dst 1024x2048. A clip is a paste; nothing in this pipeline rescales nametable cells.\",\n      \"rule\": \"R7\",\n      \"subjects\": [\n        {\n          \"id\": \"cpz_s2\",\n          \"index\": 1,\n          \"kind\": \"clip\"\n        }\n      ]\n    }\n  ],\n  \"schema\": 1,\n  \"warnings\": []\n}\n"
+  },
+  "refuse_untagged_expect_worst": {
+    "argv": [
+      "bake",
+      "<path>",
+      "--out",
+      "<dir>",
+      "--expect-worst",
+      "13",
+      "--json"
+    ],
+    "exit": 1,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": false,\n  \"refusals\": [\n    {\n      \"message\": \"--expect-worst 13 but the act's worst camera window needs 8 page frame(s)\",\n      \"rule\": null,\n      \"subjects\": []\n    }\n  ],\n  \"schema\": 1,\n  \"warnings\": []\n}\n"
+  }
+}

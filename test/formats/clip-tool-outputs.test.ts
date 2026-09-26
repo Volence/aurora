@@ -9,6 +9,11 @@
  *     are three answers, and the crash (exit 1, no JSON) is never a refusal.
  *     The expected rule and subjects are read from aeon's own stdout, and the
  *     crash cases are aeon's real tracebacks.
+ *   * `bake --json` (the same reader, row 213 open item (a)): aeon states the
+ *     document is validate's shape; these rows hold that claim on aeon's real
+ *     bake answers (loader refusals through the bake, the bake's own C1/C3, an
+ *     untagged refusal, two acceptances, two crashes), and hold the bake to its
+ *     OWN schema constant.
  *
  * Currency rows pin each fixture's bytes to its marker's sha256, and the tool
  * that produced it by blob at aeon origin/master (through git objects, never
@@ -20,7 +25,10 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { POOL_ROW_FIELDS, readPoolRows } from '../../src/core/formats/donors/clipact-pool';
-import { readValidateJson, subjectsLabel, VALIDATE_JSON_SCHEMA } from '../../src/core/formats/donors/clip-validate-json';
+import { clipToolArgv } from '../../src/main/clip-tool';
+import {
+  BAKE_JSON_SCHEMA, readBakeJson, readValidateJson, subjectsLabel, VALIDATE_JSON_SCHEMA,
+} from '../../src/core/formats/donors/clip-validate-json';
 import { peerRepo, resolveRev, readAtRev } from '../support/peer-repo';
 
 const DIR = resolve(__dirname, '../fixtures/clips/aeon-outputs');
@@ -34,7 +42,8 @@ interface Marker {
   fixture: { path: string; sha256: string; command: string };
   generator?: { path: string };
 }
-const MARKERS = ['s2_ehz_cpz.clipact', 's2_two_clip.clipact', 'validate-json.cases'].map((stem) =>
+const BAKE_CASES = JSON.parse(readFileSync(resolve(DIR, 'bake-json.cases.json'), 'utf8')) as Record<string, { exit: number; stdout: string; stderr: string; argv: string[] }>;
+const MARKERS = ['s2_ehz_cpz.clipact', 's2_two_clip.clipact', 'validate-json.cases', 'bake-json.cases'].map((stem) =>
   JSON.parse(readFileSync(resolve(DIR, `${stem}.provenance.json`), 'utf8')) as Marker);
 const REAL = ['s2_ehz_cpz', 's2_two_clip'];
 
@@ -214,6 +223,104 @@ describe('validate --json: accepted, refused and CRASHED are three answers', () 
     expect(readValidateJson(null, '', '').kind).toBe('crashed');
     // An aeon that predates --json: exit 1 and its usage text, not JSON.
     expect(readValidateJson(1, "ERROR: unknown argument '--json'\nUsage: ...\n", '').kind).toBe('crashed');
+  });
+});
+
+describe('bake --json: the same three answers, from aeon\'s real bake', () => {
+  const refusalCases = Object.keys(BAKE_CASES).filter((k) => k.startsWith('refuse_'));
+  const acceptCases = Object.keys(BAKE_CASES).filter((k) => k.startsWith('accept_'));
+  const crashCases = Object.keys(BAKE_CASES).filter((k) => k.startsWith('crash_'));
+  const doc = (k: string) => JSON.parse(BAKE_CASES[k].stdout) as {
+    schema: number; ok: boolean; refusals: { rule: string | null; subjects: { kind: string; index: number; id: string | null }[]; message: string }[]; warnings: unknown[];
+  };
+
+  it('the vendored set holds every kind, incl. a refusal the BAKE raises itself and an untagged one (so no row below is vacuous)', () => {
+    expect(refusalCases.length).toBeGreaterThanOrEqual(5);
+    expect(acceptCases.length).toBeGreaterThanOrEqual(2);
+    expect(crashCases.length).toBe(2);
+    const rules = refusalCases.map((k) => doc(k).refusals[0].rule);
+    expect(rules.some((r) => r !== null && /^C\d$/.test(r))).toBe(true);
+    expect(rules).toContain(null);
+  });
+
+  it('every case ran with Aurora\'s own bake argv (src/main/clip-tool.ts), bar the one that adds aeon\'s --expect-worst', () => {
+    const aurora = clipToolArgv('bake', '/p', '<path>', '<dir>').slice(2);
+    for (const [k, c] of Object.entries(BAKE_CASES)) {
+      if (k === 'refuse_untagged_expect_worst') {
+        expect(c.argv.filter((a) => !aurora.includes(a))).toEqual(['--expect-worst', expect.stringMatching(/^\d+$/)]);
+      } else expect(c.argv, k).toEqual(aurora);
+    }
+  });
+
+  for (const k of refusalCases) {
+    it(`${k}: a REFUSAL, carrying aeon's rule, subjects, message and warnings as the bake printed them`, () => {
+      const c = BAKE_CASES[k];
+      expect(c.exit).toBe(1);
+      expect(doc(k).schema).toBe(BAKE_JSON_SCHEMA);
+      const v = readBakeJson(c.exit, c.stdout, c.stderr);
+      expect(v.kind).toBe('refused');
+      if (v.kind !== 'refused') return;
+      expect(v.refusals).toEqual(doc(k).refusals);
+      expect(v.warnings).toEqual(doc(k).warnings);
+    });
+  }
+
+  for (const k of acceptCases) {
+    it(`${k}: ACCEPTED, with the bake's warnings as it printed them`, () => {
+      const c = BAKE_CASES[k];
+      expect(c.exit).toBe(0);
+      expect(doc(k).warnings.length).toBeGreaterThan(0);
+      expect(readBakeJson(c.exit, c.stdout, c.stderr)).toEqual({ kind: 'accepted', warnings: doc(k).warnings });
+    });
+  }
+
+  for (const k of crashCases) {
+    it(`${k}: exit 1 with NO JSON is a CRASH of the bake carrying aeon's traceback, never a refusal`, () => {
+      const c = BAKE_CASES[k];
+      expect(c.exit).toBe(1);
+      expect(c.stdout.trim()).toBe('');
+      expect(c.stderr).toMatch(/Traceback/);
+      const v = readBakeJson(c.exit, c.stdout, c.stderr);
+      expect(v.kind).toBe('crashed');
+      expect(v.kind === 'crashed' && v.stderr).toBe(c.stderr);
+      expect(v.kind === 'crashed' && v.why).toMatch(/aeon's bake exited 1 and printed no JSON.*NOT judged/);
+    });
+  }
+
+  it('the bake\'s own refusals: C1 names the clip it cut, C3 and the untagged one are about the act as a whole', () => {
+    const c1 = readBakeJson(1, BAKE_CASES.refuse_c1_bake_own.stdout, '');
+    const d1 = doc('refuse_c1_bake_own').refusals[0];
+    expect(d1.subjects.length).toBe(1);
+    expect(c1.kind === 'refused' && subjectsLabel(c1.refusals[0].subjects)).toBe(`clip ${d1.subjects[0].index} ${d1.subjects[0].id}`);
+    for (const k of ['refuse_c3_act_level', 'refuse_untagged_expect_worst']) {
+      const v = readBakeJson(1, BAKE_CASES[k].stdout, '');
+      expect(doc(k).refusals[0].subjects).toEqual([]);
+      expect(v.kind === 'refused' && subjectsLabel(v.refusals[0].subjects)).toBe('the act as a whole');
+    }
+  });
+
+  it('a loader refusal through the bake is the loader\'s own record (the shared refusal_record)', () => {
+    // R7 on s2_two_clip is what validate-json.cases.json's refuse_r7 also trips; the
+    // two mutations halve and set w to 1024, the same value on this fixture.
+    expect(doc('refuse_r7').refusals).toEqual(JSON.parse(CASES.refuse_r7.stdout).refusals);
+  });
+
+  it('what the reader cannot hold to the bake\'s contract is a crash, not a verdict', () => {
+    const ok = BAKE_CASES.accept_s2_ehz_cpz;
+    const no = BAKE_CASES.refuse_c1_bake_own;
+    expect(readBakeJson(1, ok.stdout, '').kind).toBe('crashed');
+    expect(readBakeJson(0, no.stdout, '').kind).toBe('crashed');
+    const bumped = JSON.stringify({ ...JSON.parse(ok.stdout), schema: BAKE_JSON_SCHEMA + 1 });
+    expect(readBakeJson(0, bumped, '').kind).toBe('crashed');
+    // The human mode's last line, with exit 0: an aeon without bake --json would not say this, but it is not JSON.
+    expect(readBakeJson(0, 'clip act baked: 872 pool tiles in 14 pages', '').kind).toBe('crashed');
+    expect(readBakeJson(null, '', '').kind).toBe('crashed');
+    // An aeon that predates bake --json (71ae3433): exit 1 and its usage text.
+    expect(readBakeJson(1, "ERROR: unknown argument '--json'\nUsage: ...\n", '').kind).toBe('crashed');
+    // A refusal entry without subjects: malformed, so a crash.
+    const noSubjects = JSON.parse(no.stdout);
+    delete noSubjects.refusals[0].subjects;
+    expect(readBakeJson(1, JSON.stringify(noSubjects), '').kind).toBe('crashed');
   });
 });
 
