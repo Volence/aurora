@@ -20,6 +20,7 @@
         "y": 0
       },
       "id": "ehz_act1",
+      "music": "SONG_S2_EHZ",
       "region_id": null,
       "severed_xover_reason": null,
       "src_rect": {
@@ -41,6 +42,7 @@
         "y": 256
       },
       "id": "cpz_act1",
+      "music": "SONG_S2_CPZ",
       "region_id": null,
       "severed_xover_reason": null,
       "src_rect": {
@@ -293,7 +295,7 @@
       0
     ],
     "rung": "shipped",
-    "seconds": 0.121,
+    "seconds": 0.044,
     "stats": {
       "shipped_worst_pin0": 11
     }
