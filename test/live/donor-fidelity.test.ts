@@ -42,6 +42,10 @@
 //       parses to the rule and the clip the mutation touched, and a manifest
 //       that is not JSON comes back as a CRASH (exit 1, no JSON), never a
 //       refusal.
+//   F7  (row 213 open (a)) the same three answers from the REAL `bake --json`,
+//       through Aurora's argv: a committed act is ACCEPTED with its tree read
+//       back, aeon's R7 mutation is REFUSED by the bake naming the clip, and a
+//       manifest that is not JSON is a CRASH of the bake, never a refusal.
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawnSync } from 'node:child_process';
@@ -56,7 +60,7 @@ import {
   newClipManifest, parseClipManifest, serializeClipManifest, suggestDestination, withClip, gridToHold,
 } from '../../src/core/formats/donors/clip-manifest-doc';
 import { makeSpawnRunner, runClipTool as runTool, type Runner } from '../../src/main/clip-tool';
-import { readValidateJson } from '../../src/core/formats/donors/clip-validate-json';
+import { readBakeJson, readValidateJson } from '../../src/core/formats/donors/clip-validate-json';
 import { readPoolRows } from '../../src/core/formats/donors/clipact-pool';
 import { parseNametable } from '../../src/core/formats/s4-nametable';
 import { parseCollAttr } from '../../src/core/formats/s4-collattr';
@@ -318,6 +322,39 @@ describe('F5, F6: aeon\'s row-213 answers, from its real tools, through Aurora\'
     expect(cv.kind).toBe('crashed');
     expect(cv.kind === 'crashed' && cv.stderr).toMatch(/Traceback/);
   }, 120_000);
+
+  it('F7: the real bake --json, through Aurora\'s argv: accepted with its tree, R7 refused naming the clip, not-JSON a CRASH', async (ctx) => {
+    const s = need(ctx);
+    if (!s) return;
+    const okText = readFileSync(join(s.copy, 'games/sonic4/data/clips/s2_ehz_cpz/clips.json'), 'utf8');
+    const ok = await runTool(s.copy, 'bake', okText, s.runner);
+    expect(ok.command).toMatch(/--json$/);
+    const ov = readBakeJson(ok.exitCode, ok.stdout, ok.stderr);
+    expect(ov.kind, `${ok.stdout}\n${ok.stderr}`).toBe('accepted');
+    expect(ok.baked?.clipact).toBeTruthy();
+
+    const doc = JSON.parse(readFileSync(join(s.copy, 'games/sonic4/data/clips/s2_two_clip/clips.json'), 'utf8')) as {
+      clips: Array<{ id: string; dst_rect: { w: number } }>;
+    };
+    doc.clips[1].dst_rect.w = Math.floor(doc.clips[1].dst_rect.w / 2); // aeon's own R7 mutation (tools/test_clip_bake_json.py)
+    const no = await runTool(s.copy, 'bake', JSON.stringify(doc, null, 2), s.runner);
+    expect(no.exitCode).toBe(1);
+    expect(no.baked).toBeUndefined();
+    const nv = readBakeJson(no.exitCode, no.stdout, no.stderr);
+    expect(nv.kind, `${no.stdout}\n${no.stderr}`).toBe('refused');
+    expect(nv.kind === 'refused' && nv.refusals.map((n) => ({ rule: n.rule, subjects: n.subjects }))).toEqual([
+      { rule: 'R7', subjects: [{ kind: 'clip', index: 1, id: doc.clips[1].id }] },
+    ]);
+
+    const crash = await runTool(s.copy, 'bake', '{ this is not json', s.runner);
+    expect(crash.exitCode).toBe(1);
+    expect(crash.stdout.trim()).toBe('');
+    const cv = readBakeJson(crash.exitCode, crash.stdout, crash.stderr);
+    expect(cv.kind).toBe('crashed');
+    expect(cv.kind === 'crashed' && cv.stderr).toMatch(/Traceback/);
+    process.stdout.write(`donor-fidelity F7 @ aeon ${s.rev}: accepted (${ov.kind === 'accepted' ? ov.warnings.map((w) => w.rule).join(',') || 'no warnings' : '-'}), `
+      + `refused ${nv.kind === 'refused' ? nv.refusals[0].rule : '-'}, crash exit ${crash.exitCode}\n`);
+  }, 300_000);
 });
 
 // Referenced so a reader of this file sees where the copy's path comes from.
