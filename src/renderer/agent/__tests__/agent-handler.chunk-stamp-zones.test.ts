@@ -148,3 +148,31 @@ describe('stamp_chunk of a chunk saved in one zone, into another (KNOWN, BLOCKED
     expect(reply.stamped, 'a stamp inside the chunk\'s own zone did not report success').toBe(true);
   });
 });
+
+// BITS 15:14 ARE RESERVED (ROADMAP rows 223+224): save_chunk refuses a collision
+// word carrying them, ON EACH PLANE, through the handler. The validator's own
+// unit rows name `collisionA` only; the handler calls it once per plane, so the
+// plane-B call could be dropped with every unit row still green (overseer review
+// of 223+224, the one-plane shape). One row per plane, the other plane clean.
+describe('save_chunk refuses bits 15:14 on EITHER collision plane, through the handler', () => {
+  const clean = 0x3007;
+  it.each(['collisionA', 'collisionB'] as const)('⚠ REFUSES a %s word carrying 15:14 (the other plane clean) and adds no chunk', async (field) => {
+    const before = useProjectStore.getState().project!.chunkLibrary.length;
+    const other = field === 'collisionA' ? 'collisionB' : 'collisionA';
+    await expect(handleAgentRequest({
+      kind: 'save-chunk', name: 'marked', w: W, h: H,
+      entries: SAVED.map((tile) => ({ tile, pal: 0 })),
+      [field]: [clean | 0x8000], [other]: [clean],
+    } as never)).rejects.toThrow(new RegExp(`${field}\\[0\\] = 0xB007 carries bits 15:14`));
+    expect(useProjectStore.getState().project!.chunkLibrary.length).toBe(before);
+  });
+
+  it('CONTROL: both planes clean is accepted', async () => {
+    const reply = await handleAgentRequest({
+      kind: 'save-chunk', name: 'clean', w: W, h: H,
+      entries: SAVED.map((tile) => ({ tile, pal: 0 })),
+      collisionA: [clean], collisionB: [clean],
+    } as never) as { id: string };
+    expect(typeof reply.id).toBe('string');
+  });
+});
