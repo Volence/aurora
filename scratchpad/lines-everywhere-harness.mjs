@@ -55,6 +55,7 @@ if (AEONDIR === siblingDefaultPathOrUnresolved('aeon') || existsSync(join(AEONDI
 }
 const ACT = join(AEONDIR, 'games/sonic4/data/editor/ojz/act1');
 const PLANE_A = join(ACT, 'section_0.collattr.bin');
+const PLANE_B = join(ACT, 'section_0.collattrb.bin');
 const LINES = join(ACT, 'layer_lines.json');
 const PORT = Number(process.env.PORT ?? 9364);   // canvas-cdp-harness's session() port
 const W = 256;                                     // sub-tile row stride of an aeon section
@@ -158,6 +159,15 @@ async function main() {
     planted.writeUInt16BE(((w & ~(3 << SHIFT)) | (2 << SHIFT)) & 0xFFFF, i * 2);
   }
   writeFileSync(PLANE_A, planted);
+  // ...AND ONE WORD OF PLANE B, value 1, at a different cell. Every row below
+  // asserts plane B on its own too: a guard that looked at plane A only passed
+  // every plane-A row (overseer review of rows 223+224, the one-plane shape).
+  const originalB = readFileSync(PLANE_B);
+  const wordB = 7 * W + 100;
+  const plantedB = Buffer.from(originalB);
+  plantedB.writeUInt16BE(((plantedB.readUInt16BE(wordB * 2) & ~(3 << SHIFT)) | (1 << SHIFT)) & 0xFFFF, wordB * 2);
+  writeFileSync(PLANE_B, plantedB);
+  note('plant B', `${PLANE_B}: word ${wordB} set to bits 15:14 = 1; sha ${sha(originalB)} -> ${sha(plantedB)}`);
   note('plant', `${PLANE_A}: words ${J(words)} set to bits 15:14 = 2; sha ${sha(original)} -> ${sha(planted)}; `
     + `layer_lines.json ${linesBefore ? `present, sha ${sha(linesBefore)}` : 'ABSENT'}`);
   check('0a', 'ANTI-VACUOUS: the copy\'s act carries a layer_lines.json (the file Aurora must leave alone)', linesBefore !== null);
@@ -183,6 +193,8 @@ async function main() {
         // B1: the load KEPT the planted bits.
         const kept = await c.json(`[${words.join(',')}].map((i) => window.__dbg.aeon.reservedBitsAt(0, 'a', i))`);
         check('B1', 'the load KEPT the planted bits 15:14 (nothing cleared them on the way in)', J(kept) === J([2, 2]), J(kept));
+        const keptB = await c.json(`window.__dbg.aeon.reservedBitsAt(0, 'b', ${wordB})`);
+        check('B1b', 'the load KEPT the planted plane-B bits too', keptB === 1, J(keptB));
 
         // A: the Collision facet by a real click.
         const fc = await realClick(c, FACET('Collision'));
@@ -209,8 +221,11 @@ async function main() {
         // B2: the palette's error names the planted cell.
         const noteText = await until(() => c.json(`(${NOTE})?.textContent ?? null`), 5000);
         check('B2', 'the palette shows the reserved-bits ERROR naming the planted editor cell (41, 3)',
-          !!noteText && /2 collision words \(A: 2\)/.test(noteText) && /section 0 plane A editor cell \(41, 3\)/.test(noteText),
+          !!noteText && /3 collision words \(A: 2, B: 1\)/.test(noteText) && /section 0 plane A editor cell \(41, 3\)/.test(noteText),
           J(noteText));
+
+        check('B2b', 'the same ERROR names the plane-B cell (100, 7) on its own line of evidence',
+          !!noteText && /section 0 plane B editor cell \(100, 7\)/.test(noteText), J(noteText));
 
         // B3: a real Ctrl+S refuses; the planted file's bytes do not move. A save
         // writes only DIRTY acts, so the act is first made dirty by a real stroke
@@ -234,10 +249,11 @@ async function main() {
         await ctrlS(c);
         await sleep(2500);
         const afterRefusal = readFileSync(PLANE_A);
+        const afterRefusalB = readFileSync(PLANE_B);
         const err = await c.json('window.__dbg.aeon.state()').catch(() => null);
         const toasts = await c.json('window.__dbg.aeon.toasts()').catch(() => []);
         check('B3', 'a real Ctrl+S REFUSES: the plane file on the copy is byte-identical to the plant, and the save failed',
-          sha(afterRefusal) === sha(planted) && toasts.some((t) => /Save failed/.test(t.message)),
+          sha(afterRefusal) === sha(planted) && sha(afterRefusalB) === sha(plantedB) && toasts.some((t) => /Save failed/.test(t.message)),
           `sha ${sha(afterRefusal)} (plant ${sha(planted)}); toasts ${J(toasts)}; state ${J(err)}`);
         const errAfter = cw.errors.length;
         await key(c, 'z', 'KeyZ', 90, 2);   // undo the dirtying stroke (a real Ctrl+Z)
@@ -255,6 +271,10 @@ async function main() {
         check('C1', 'a REAL click on "Clear retired marks" zeroed bits 15:14 of the planted words and kept their shape',
           !!cb?.hitOk && !!cleared && J(shapesAfter) === J(shapesBefore) && audit?.severity === 'ok',
           `click ${J(cb)}; bits ${J(cleared)}; shape ${J(shapesBefore)} -> ${J(shapesAfter)}; audit ${J(audit && { A: audit.reservedA, B: audit.reservedB, severity: audit.severity })}`);
+        const bitsB = await c.json(`window.__dbg.aeon.reservedBitsAt(0, 'b', ${wordB})`);
+        const shapeB = await c.json(`window.__dbg.aeon.collisionAt(0, 'b', ${wordB}) & 0x3FFF`);
+        check('C1b', 'the same click zeroed the plane-B word\'s bits 15:14 and kept its shape',
+          bitsB === 0 && shapeB === (plantedB.readUInt16BE(wordB * 2) & 0x3FFF), `bits ${J(bitsB)}; shape ${J(shapeB)}`);
         const noteGone = await c.json(`${NOTE} === null`);
         check('C2', 'the error note is gone once the marks are cleared', noteGone === true);
 
@@ -266,6 +286,10 @@ async function main() {
         check('C3', 'a real Ctrl+S then SAVED: the plane file on the copy no longer carries bits 15:14 at the planted words, and every other word equals the original',
           !!saved && J(bitsLeft) === J([0, 0]) && saved.equals(original),
           saved ? `sha ${sha(saved)}; original ${sha(original)}; bits ${J(bitsLeft)}` : 'the file did not change in 15s');
+        const savedB = await until(() => { const b = readFileSync(PLANE_B); return sha(b) !== sha(plantedB) ? b : null; }, 15000, 250);
+        check('C3b', 'the save wrote plane B too: no bits 15:14 at the planted word, every other word equals the original',
+          !!savedB && ((savedB.readUInt16BE(wordB * 2) >> SHIFT) & 3) === 0 && savedB.equals(originalB),
+          savedB ? `sha ${sha(savedB)}; original ${sha(originalB)}` : 'the file did not change in 15s');
         const linesAfter = existsSync(LINES) ? readFileSync(LINES) : null;
         check('C4', 'layer_lines.json (a file Aurora does not know) is byte-identical after the save',
           !!linesBefore && !!linesAfter && linesAfter.equals(linesBefore),
@@ -290,6 +314,7 @@ async function main() {
   } finally {
     // Leave the copy as it was found: the ORIGINAL bytes (never the plant).
     writeFileSync(PLANE_A, original);
+    writeFileSync(PLANE_B, originalB);
     note('restore', `${PLANE_A} restored to sha ${sha(original)}`);
   }
   console.log(`\n=== lines-everywhere: ${passes} PASS, ${fails.length} FAIL ===`);

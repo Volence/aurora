@@ -815,6 +815,31 @@ describe('buildAeonSavePlan: editable collision planes', () => {
     expect(planeReservedBits(sec.collisionEditB![iB])).toBe(3);
   });
 
+  // ⚠ ONE PLANE AT A TIME. The row above plants on BOTH planes, so a refusal that
+  // looked at plane A only still refused there (and its message still named B,
+  // because the audit reports both planes): overseer review of rows 223+224
+  // planted `reservedA > 0` in save.ts and that row stayed green. Each plane
+  // must refuse ON ITS OWN, with the other one clean.
+  it.each([
+    { plane: 'A', path: COLL_A_PATH, base: AUTHORED_A, col: 37, row: 5, v: 2 },
+    { plane: 'B', path: COLL_B_PATH, base: AUTHORED_B, col: 200, row: 90, v: 3 },
+  ])('⚠ REFUSES when ONLY plane $plane carries bits 15:14 (the other plane clean), naming the cell, writing nothing', async ({ plane, path, base, col, row, v }) => {
+    const files = authoredFixture();
+    const p = Uint16Array.from(base);
+    const i = row * SECTION_TILES_WIDE + col;
+    p[i] = (p[i]! | (v << PLANE_RESERVED_SHIFT)) & 0xFFFF;
+    files.set(path, serializeCollAttr(p));
+    const before = new Map([...files].map(([k, b]) => [k, Uint8Array.from(b)]));
+    // Anti-vacuous: the OTHER plane really is clean, so only `plane` can trigger it.
+    const other = parseCollAttr(files.get(plane === 'A' ? COLL_B_PATH : COLL_A_PATH)!);
+    expect(other.every((w) => planeReservedBits(w) === 0)).toBe(true);
+
+    await expect(loadSaveApply(files)).rejects.toThrow(new RegExp(
+      `refusing to save ojz/act1: .*plane ${plane} editor cell \\(${col}, ${row}\\).*Nothing was written`));
+    // Nothing was written: every file is byte-identical to what was on disk.
+    for (const [k, b] of before) expect(files.get(k), k).toEqual(b);
+  });
+
   it('control: the SAME act with bits 15:14 clear saves (the refusal is about the bits, not the fixture)', async () => {
     const out = await loadSaveApply(authoredFixture());
     expect(out.get(COLL_A_PATH)!).toEqual(serializeCollAttr(AUTHORED_A));
