@@ -137,6 +137,9 @@ describe('computeActBudget', () => {
     expect(all).toMatch(/LOWER BOUND/);
     expect(all).toMatch(/CONSERVATIVE BY AN UNQUANTIFIED AMOUNT/);
     expect(all).toMatch(/PINNED/);
+    // The second never-a-victim class since aeon GPL-A3 (b8752518): a DEMAND-HELD
+    // frame is not a candidate while its hold stands (page_cache.emp's header).
+    expect(all).toMatch(/DEMAND-HELD/);
   });
 
   it('types no figure into its own prose', () => {

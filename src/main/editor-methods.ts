@@ -142,7 +142,8 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + `flip-aware unique-tile counts per section and per VRAM color group, and unquantified[], `
       + `which you should read: the tile count sums the two color groups separately so a tile in `
       + `both is counted twice (conservative by an amount nobody has measured), and frames can be `
-      + `PINNED, which leaves fewer than ${FG_PAGE_FRAMES} to cover a moving view by an amount `
+      + `PINNED or (transiently) DEMAND-HELD, neither ever evicted, which leaves fewer than `
+      + `${FG_PAGE_FRAMES} to cover a moving view by an amount `
       + `aeon has not measured either.` },
   { name: 'set_palette', kind: 'set-palette', result: 'json',
     params: { line: z.number().int().min(1).max(3), colors: z.array(z.number().int()).length(16) },
