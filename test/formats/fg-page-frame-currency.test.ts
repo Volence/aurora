@@ -49,9 +49,10 @@
  * twice: the reading stays CONSERVATIVE BY AN AMOUNT NOBODY HAS QUANTIFIED.
  * Answering the fragmentation question did not make the figure equivalent, and
  * "fragmentation cannot refuse you" must not travel as "your number is right".
- * Pinning is the other open one: a pinned frame is never an eviction candidate,
- * so the capacity covering a moving view is the UNPINNED frame count, which aeon
- * has open with no measurement behind it. Both are carried to the author in the
+ * Pinning is the other open one: a pinned frame (and, while its hold stands, a
+ * demand-held one) is never an eviction candidate, so the capacity covering a
+ * moving view is the count of frames that are neither, which aeon has open with
+ * no measurement behind it. Both are carried to the author in the
  * reply's `unquantified[]`; neither is closed here.
  */
 
@@ -84,8 +85,13 @@ const CEILING_IN_ENGINE = /^pub const POOL_TILE_CEILING\s*=\s*(\d+)/m;
  * reads stayed correct. That is what this pattern catches.
  */
 const FRAMES_FORMULA = /^pub const PAGE_FRAMES\s*=\s*POOL_TILE_CEILING\s*\/\s*ART_POOL_PAGE_TILES\s*$/m;
-/** The sentence the `unquantified[]` pinning caveat rests on. */
-const PINNING_RULE = /a page whose refcount is 0 and is not pinned is an eviction\s*\n?\/\/\s*candidate/;
+/**
+ * The sentence the `unquantified[]` pinning caveat rests on: page_cache.emp's
+ * module header, as GPL-A3 (aeon b8752518) re-worded it when liveness masks
+ * replaced the refcounts. Until then it read "a page whose refcount is 0 and is
+ * not pinned is an eviction candidate"; this pattern does NOT match that text.
+ */
+const PINNING_RULE = /an assigned, unpinned, unheld frame\s*\n?\/\/\s*that no cache word names is an eviction candidate/;
 
 const aeon = peerRepo('aeon');
 const tip = aeon === null ? null : resolveRev(aeon, AEON_TIP);
@@ -205,18 +211,20 @@ describe('FG page geometry is still what aeon declares', () => {
 
   it('pinning is still a thing, so the caveat about it is still true', (ctx) => {
     if (unmeasurable(ctx)) return;
-    // check_budget TELLS AN AUTHOR that pinned frames leave fewer than the full
-    // count to cover a moving view. That is a claim about aeon's behaviour, and a
-    // claim with no gate is how the last two wrong numbers survived. If pinning
-    // ever goes away, the caveat becomes a false warning rather than a true one.
+    // check_budget TELLS AN AUTHOR that pinned and demand-held frames leave fewer
+    // than the full count to cover a moving view. That is a claim about aeon's
+    // behaviour, and a claim with no gate is how the last two wrong numbers
+    // survived. If pinning or the hold ever goes away, the caveat becomes a false
+    // warning rather than a true one.
     expect(
       PINNING_RULE.test(textAt(PAGE_CACHE)),
       `${NOT_OURS}\n`
-      + `  page_cache.emp no longer states the pinning/eviction rule at ${tip}.\n`
+      + `  page_cache.emp no longer states the eviction-candidate rule ("an assigned,\n`
+      + `  unpinned, unheld frame that no cache word names is an eviction candidate") at ${tip}.\n`
       + `  Read it:   git -C <aeon> show ${tip}:${PAGE_CACHE}\n`
-      + '  src/core/agent/budget.ts tells an author that a pinned frame is never an\n'
-      + '  eviction candidate, so the frames covering a moving view are fewer than the\n'
-      + '  carved count. Re-read the engine and re-word that caveat, or drop it.',
+      + '  src/core/agent/budget.ts tells an author that pinned and demand-held frames\n'
+      + '  are never eviction candidates, so the frames covering a moving view are fewer\n'
+      + '  than the carved count. Re-read the engine and re-word that caveat, or drop it.',
     ).toBe(true);
   });
 });
