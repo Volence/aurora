@@ -1452,7 +1452,11 @@ let trackedFails = fails;
         + 'or the read is wrong; an empty population cannot be reported as clean.');
     }
     for (const [name, cmd] of scripts) {
-      const m = /(scratchpad\/[\w.-]+\.mjs)/.exec(String(cmd));
+      // `/` is in the class (row 217): without it a rig in a scratchpad
+      // SUBDIRECTORY was not matched and fell to the `continue` below, so
+      // `harness:handover-band` (scratchpad/handover/) was never judged.
+      // Measured: that file with every PASS/FAIL word removed exited 0.
+      const m = /(scratchpad\/[\w./-]+\.mjs)/.exec(String(cmd));
       if (!m) continue;                       // not a scratchpad rig; G9 says nothing about it
       const rel = m[1];
       let src = null;
@@ -1468,7 +1472,7 @@ let trackedFails = fails;
       // Until row 217 it asked whether the file's raw TEXT contained the word,
       // so a comment satisfied it, and during rows 195/196's red-first proof a
       // comment did: the printer lost the word and G9 stayed green.
-      // Measured 2026-09-27 over all 197 registered files, and over plants:
+      // Measured 2026-09-27 over all 198 registered files, and over plants:
       //   raw text ............. 0 red; a comment-only FAIL stays green
       //   comments stripped .... 0 red; `let FAIL_COUNT` or `/FAIL/` stays green
       //   inside any literal ... 0 red; all three plants go red   <- this
