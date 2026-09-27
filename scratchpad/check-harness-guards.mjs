@@ -75,6 +75,11 @@
 //       it deliberately does NOT cover.
 //
 //   G9  (O50) A file a `harness:*` script NAMES must be able to print a FAIL.
+//       WHAT IT CHECKS (row 217): the file's source contains `PASS` and `FAIL`
+//       each inside a string or template literal, as the TypeScript parser
+//       reads it. Comments, identifiers and regex literals do not count. It
+//       does NOT check that the literal reaches a print, or that the branch
+//       printing it is reachable. The rule's own block has the measurement.
 //       G6 governs the other direction — a harness-like file no script can
 //       reach. This one governs the file a script DOES reach, and it exists
 //       because the two are indistinguishable from outside: a diagnostic and a
@@ -113,6 +118,7 @@ import { readFileSync } from 'node:fs';
 import { walkContained, hasStandingOver } from './lib/repo-walk.mjs';
 import { execFileSync } from 'node:child_process';
 import { join, relative } from 'node:path';
+import ts from 'typescript';
 
 const DIR = new URL('.', import.meta.url).pathname.replace(/\/$/, '');
 const GUARD_REL = './lib/harness-guard.mjs';
@@ -1414,10 +1420,6 @@ if (exemptions.length) {
   console.log(`\nDECLARED EXEMPTIONS (${exemptions.length}) — printed every run, on purpose:`);
   for (const e of exemptions) console.log(`  ${e}`);
 }
-if (unmeasurable.length) {
-  console.log(`\nUNMEASURABLE (${unmeasurable.length}) — a file this check could not classify is NOT a pass:`);
-  for (const u of unmeasurable) console.log(`  ${u}`);
-}
 // ── tracked vs untracked ───────────────────────────────────────────────────
 //
 // An UNTRACKED launcher is exactly as dangerous as a tracked one -- it is a real
@@ -1450,7 +1452,11 @@ let trackedFails = fails;
         + 'or the read is wrong; an empty population cannot be reported as clean.');
     }
     for (const [name, cmd] of scripts) {
-      const m = /(scratchpad\/[\w.-]+\.mjs)/.exec(String(cmd));
+      // `/` is in the class (row 217): without it a rig in a scratchpad
+      // SUBDIRECTORY was not matched and fell to the `continue` below, so
+      // `harness:handover-band` (scratchpad/handover/) was never judged.
+      // Measured: that file with every PASS/FAIL word removed exited 0.
+      const m = /(scratchpad\/[\w./-]+\.mjs)/.exec(String(cmd));
       if (!m) continue;                       // not a scratchpad rig; G9 says nothing about it
       const rel = m[1];
       let src = null;
@@ -1461,12 +1467,38 @@ let trackedFails = fails;
           + 'pointing at a file that is not there is not a pass.');
         continue;
       }
-      // ⚠ THE LIMIT, STATED: this asks whether the file can PRINT both words,
-      // not whether an assertion is reachable. A rig whose FAIL branch is dead
-      // still passes G9. It catches the shape that actually occurs — a
-      // report-only probe, which prints neither — and claims nothing beyond it.
-      const canPass = src.includes('PASS');
-      const canFail = src.includes('FAIL');
+      // WHAT THIS ASSERTS: each word appears inside a string or template
+      // literal of the parsed file (substring match, so `FAILED` counts).
+      // Until row 217 it asked whether the file's raw TEXT contained the word,
+      // so a comment satisfied it, and during rows 195/196's red-first proof a
+      // comment did: the printer lost the word and G9 stayed green.
+      // Measured 2026-09-27 over all 198 registered files, and over plants:
+      //   raw text ............. 0 red; a comment-only FAIL stays green
+      //   comments stripped .... 0 red; `let FAIL_COUNT` or `/FAIL/` stays green
+      //   inside any literal ... 0 red; all three plants go red   <- this
+      //   literal inside a console/stdout print call ... 5 red, all real gates
+      //     that print through a wrapper (`log(...)`) or a variable, so a
+      //     false alarm; rejected, because it would need data flow to be right.
+      // ⚠ THE LIMIT, STATED: a literal is not a print. A `'FAIL'` that is
+      // never printed, or a FAIL branch that is dead, still passes G9.
+      // A file the parser cannot read without errors is UNMEASURABLE, not
+      // judged: a misparse could hide a literal or invent one.
+      const sf = ts.createSourceFile(rel, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+      if (sf.parseDiagnostics.length) {
+        unmeasurable.push(`G9 ${rel}: named by \`${name}\` but does not parse `
+          + `(${sf.parseDiagnostics.length} diagnostic(s)), so its string literals cannot be read. NOT a pass.`);
+        continue;
+      }
+      const literals = [];
+      (function collect(node) {
+        if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)
+          || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+          literals.push(node.text);
+        }
+        ts.forEachChild(node, collect);
+      })(sf);
+      const canPass = literals.some((s) => s.includes('PASS'));
+      const canFail = literals.some((s) => s.includes('FAIL'));
       if (!canPass || !canFail) {
         const missing = [!canPass && 'PASS', !canFail && 'FAIL'].filter(Boolean).join(' and ');
         fails.push(`G9 ${rel}: registered as \`${name}\` but never prints ${missing}, so no run of it `
@@ -1515,6 +1547,15 @@ if (trackedAtTheEnd) {
 // Cannot ask git -> cannot split -> treat every failure as fatal, `trackedFails`
 // keeping its `= fails` initialiser. Never the other way: an unanswerable
 // question does not become a pass. The reason is reported once, by the helper.
+
+// Printed HERE, after G9, not with the census above: G9 runs later and pushes
+// to `unmeasurable` too, and before row 217 its entries were counted in the
+// headline and the exit code but never printed (measured: a planted parse
+// error gave `1 unmeasurable`, exit 1, and no line naming the file).
+if (unmeasurable.length) {
+  console.log(`\nUNMEASURABLE (${unmeasurable.length}) — a file this check could not classify is NOT a pass:`);
+  for (const u of unmeasurable) console.log(`  ${u}`);
+}
 
 if (untrackedFails.length) {
   console.log(`\nUNGUARDED BUT UNTRACKED (${untrackedFails.length}) — present in THIS working tree only.`);

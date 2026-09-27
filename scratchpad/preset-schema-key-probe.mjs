@@ -46,9 +46,11 @@ const row = (label, ok, detail) => {
   if (!ok) failures++;
   // The pass word below is the one check-harness-guards G9 looks for; it read
   // `ok` until 2026-09-25 (ROADMAP row 196), so the 2026-09-12 packet quotes
-  // `ok` rows (same rows, new word). DO NOT spell that word anywhere else in
-  // this file, comments included: G9 is a source grep, and a second spelling
-  // would satisfy it even if the row printer lost it.
+  // `ok` rows (same rows, new word). DO NOT spell that word in any other
+  // string literal in this file: G9 counts a word found in any string or
+  // template literal, so a second spelling would satisfy it even if the row
+  // printer lost it. Comments no longer count (ROADMAP row 217). The fail
+  // word already has a second spelling, in the summary line at the bottom.
   console.log(`${ok ? 'PASS' : 'FAIL'} ${label}${detail ? `\n       ${detail}` : ''}`);
 };
 const firstLine = (e) => String(e?.message ?? e).split('\n').slice(0, 2).join(' | ');
