@@ -4,12 +4,12 @@
   "aeon": {
     "repo": "git@github.com:Volence/aeon.git",
     "branch_that_answers_currency": "origin/master",
-    "revision": "11238bb3e69e01277c037ed37e91da5b95cbac67",
-    "revision_is": "the ONE pin of ROADMAP row 226 (REVENDOR-AEON-AFTER-LINES, branch parcel/revendor-226): aeon origin/master 11238bb3e69e01277c037ed37e91da5b95cbac67 read 2026-09-27T00:42:24Z after a fetch, taken as the pin itself. Since the previous capture (d3b98868): 8673364a moved tools/clip_act_bake.py (the C4 refusal message now points at aurora's 'Clear retired marks' button instead of the retired crossover 'None' brush) and tools/collision_pipeline.py (retired_mark_message and the bake_plane_cell refusal reworded the same way; no constant moved). tools/clip_manifest.py, tools/fg_page_order.py and the three clips.json inputs did not move. Blobs at the pin: clip_act_bake 3a38aae7, clip_manifest 9a07d19a, collision_pipeline dbbe59de, fg_page_order 68e303fc, s2_ehz_cpz clips.json 64ab630c, s2_two_clip clips.json 2ff33b48, s2_ehz_boot clips.json 73ac4006.",
+    "revision": "88bd34147b4616d52d6659960aa92dc45124ee2a",
+    "revision_is": "the ONE pin of ROADMAP row 227 (REVENDOR-AEON-WOVEN-MTZ-CPZ, branch row227-revendor-aeon): aeon origin/master 88bd34147b4616d52d6659960aa92dc45124ee2a read 2026-09-27T08:51:23Z after a fetch, taken as the pin itself. Since the previous capture (11238bb3): f6a71aeb moved tools/clip_act_bake.py (zone_separation's gap is measured between the two zones' NEAREST COLUMNS, not their outer spans, and columns holding both zones give minus their count; the woven act s2_mtz_cpz had read as a -496-cell overlap), and 210eef66/3feb206c moved tools/clip_manifest.py (zone_has_plane_b: a ONE-PATH zone, no plane-B solidity anywhere in its converted tree, Sonic 2's Metropolis, is pasted with plane A on BOTH planes in _clip_collision, so K6 reads both planes again; new _clip_at helper; K6 docstring). tools/collision_pipeline.py, tools/fg_page_order.py and the three clips.json inputs did not move. Blobs at the pin: clip_act_bake b8e97ebc, clip_manifest 03fa4314, collision_pipeline dbbe59de, fg_page_order 68e303fc, s2_ehz_cpz clips.json 64ab630c, s2_two_clip clips.json 2ff33b48, s2_ehz_boot clips.json 73ac4006.",
     "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, or any inputs[].path's blob differs from its inputs[].blob, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob, inputs[].blob and revision here",
-    "materialised_by": "git -C <aeon> archive 11238bb3 | tar -x into a scratch directory under $HOME/.cache (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
+    "materialised_by": "git -C <aeon> archive 88bd3414 | tar -x into a scratch directory under $HOME/.cache (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
     "tool_path": "tools/clip_act_bake.py",
-    "tool_blob": "3a38aae7638ced36059411a6ffd33e6a08b292d7",
+    "tool_blob": "b8e97ebc6a59f0d46f3719ca6a4123abbc2d919f",
     "inputs_are": "the manifests the generator reads (the bases of its `plan`, and s2_ehz_boot for the --expect-worst case, named in fixture.command); tools/clip_manifest.py, which builds every refusal record and raises the loader refusals the bake passes through; tools/collision_pipeline.py, which supplies the paint constants (PLANE_RESERVED_SHIFT for C4, PLANE_SOL_SHIFT/SOL_ALL for C3); tools/fg_page_order.py, whose PAGE_FRAMES sets the --expect-worst value. NOT pinned: the bake's other imports and the donor conversion.",
     "inputs": [
       {
@@ -26,7 +26,7 @@
       },
       {
         "path": "tools/clip_manifest.py",
-        "blob": "9a07d19aa2696e5f1c8cfb9cd47b701aad9f3667"
+        "blob": "03fa43143c6031ee463e17e7379a160ca6fbc4fd"
       },
       {
         "path": "tools/collision_pipeline.py",
@@ -37,13 +37,13 @@
         "blob": "68e303fc9567e91270301e0c6d9266fc4868b4ad"
       }
     ],
-    "what_changed_at_this_pin": "Re-captured at 11238bb3: 9/9 cases, exit codes, rules and subjects unchanged. CONTENT CHANGE: refuse_c4_bake_own's message (8673364a) now ends \"Clear the marks in the source tree with aurora's 'Clear retired marks' button (the collision palette's error note; it zeroes bits 15:14 on both planes of the active section and keeps shape, flips and solidity), then save; ...\" where it said \"Clear the marks in aurora (the crossover 'None' brush); ...\". The two crash tracebacks differ in copy path and line numbers only (clip_act_bake.py +2 lines). Every other case byte-identical."
+    "what_changed_at_this_pin": "Re-captured at 88bd3414: 9/9 cases, exit codes, rules, subjects and messages unchanged (the C4 message is still the 'Clear retired marks' one). The two crash tracebacks differ in copy path and line numbers only (clip_act_bake.py +12, clip_manifest.py +3). Normalising both gives diff exit 0."
   },
   "fixture": {
     "path": "test/fixtures/clips/aeon-outputs/bake-json.cases.json",
     "command": "EMPYREAN_SUITE_ROOT=<suite> python3 test/fixtures/clips/aeon-outputs/gen_bake_json.py <scratch>/bj <this file>, run from the materialised copy: nine real subprocesses of `python3 tools/clip_act_bake.py bake <path> --out <dir> --json` (Aurora's argv), one of them (games/sonic4/data/clips/s2_ehz_boot/clips.json with --expect-worst PAGE_FRAMES+1) with aeon's own extra flag; each {exit, stdout, stderr, argv} verbatim, argv with the path and out dir written as placeholders",
     "why_these": "two acceptances (s2_ehz_cpz with its W3; s2_two_clip with a W2), a loader refusal through the bake (R7, one clip), R12 kept under a W2, the bake's OWN refusals (C4 naming its clip on a valid manifest over a donor painted with the reserved bits 15:14; C3 about the act, no subjects; C1 was retired by aeon a974bc2e), an untagged bake refusal (rule null, from --expect-worst), and the two CRASHES aeon documents (not JSON; a missing path): exit 1, empty stdout, a traceback. Not captured: FG_PAGE_BUDGET, reachable only by patching aeon's PAGE_FRAMES (aeon's own gate does it in-process); the reader reads its rule as it reads any other string.",
-    "sha256": "646a94ba073374e8711d508bcd2f2cb36db64d3c05be592231c7941793cc5cac"
+    "sha256": "bf739cf4cc7f791d25311bb5051aa391e503f5422c5f6e698e5d1eb4bc44b68b"
   },
   "generator": {
     "path": "test/fixtures/clips/aeon-outputs/gen_bake_json.py",
