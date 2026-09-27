@@ -63,11 +63,19 @@ export function canonicalTileHash(pixels: Uint8Array): string {
  *      AMOUNT NOBODY HAS MEASURED. Answering the fragmentation question did not
  *      make this figure equivalent to aeon's.
  *   2. THE PACKING WASTE, which is why the bound is a bound.
- *   3. PINNING. `engine/level/page_cache.emp`: "a page whose refcount is 0 and is
- *      not pinned is an eviction candidate". A pinned frame is never a victim, so
- *      the capacity that must cover a MOVING view is the UNPINNED frame count,
- *      which is fewer than `pageFrames` by a number aeon has open and has not
- *      measured. Do not invent one.
+ *   3. PINNING AND DEMAND HOLDS. `engine/level/page_cache.emp` (module header,
+ *      since GPL-A3): "an assigned, unpinned, unheld frame that no cache word
+ *      names is an eviction candidate". TWO classes are therefore never a victim:
+ *      PINNED frames (a build-marked act-common page, for the rest of the act)
+ *      and DEMAND-HELD frames. The hold is transient: PageCache_Publish sets it
+ *      when a DEMAND page lands, so a second eviction cannot take the page before the stalled fill
+ *      names it; it ends when an eviction choice sees the frame live (liveness
+ *      protects it from then on), or when PageCache_DemandHoldTick releases every
+ *      hold after the first fill pass that saw the page resident and ended without
+ *      a demand stall. So the capacity that must cover a MOVING view is the count
+ *      of frames that are neither pinned nor demand-held, which is fewer than
+ *      `pageFrames` by a number aeon has open and has not measured. Do not invent
+ *      one.
  *
  * FRAGMENTATION IS NOT ON THAT LIST AND IS CLOSED: the frames are fixed-size, so
  * there are no variable-size holes and any free frame takes any page.
@@ -135,10 +143,11 @@ function unquantified(pageFramesAtLeast: number): string[] {
     + 'both groups is counted twice here and once there. Nothing in Aurora measures the '
     + 'overcount, so the margin this buys you is unknown in size.',
 
-    `UNMEASURED, AND IT REDUCES THE CAPACITY: a page frame can be PINNED, and a pinned frame is `
-    + `never an eviction candidate, so the frames available to cover a moving view are fewer `
-    + `than the ${FG_PAGE_FRAMES} the window is carved into. aeon has this open with no `
-    + `measurement behind it; do not assume a number for it.`,
+    `UNMEASURED, AND IT REDUCES THE CAPACITY: a page frame can be PINNED (for the rest of the `
+    + `act) or DEMAND-HELD (transiently: from a demanded page's arrival until the fill that stalled on `
+    + `it has moved on), and neither is ever an eviction candidate, so the frames available to `
+    + `cover a moving view are fewer than the ${FG_PAGE_FRAMES} the window is carved into. aeon `
+    + `has this open with no measurement behind it; do not assume a number for it.`,
 
     `NOT A HAZARD, AND CLOSED: fragmentation cannot refuse an act whose page count fits. The `
     + `frames are fixed ${FG_PAGE_TILES}-tile slots, so there are no variable-size holes and `
