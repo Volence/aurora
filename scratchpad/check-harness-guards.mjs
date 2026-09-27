@@ -1420,10 +1420,6 @@ if (exemptions.length) {
   console.log(`\nDECLARED EXEMPTIONS (${exemptions.length}) — printed every run, on purpose:`);
   for (const e of exemptions) console.log(`  ${e}`);
 }
-if (unmeasurable.length) {
-  console.log(`\nUNMEASURABLE (${unmeasurable.length}) — a file this check could not classify is NOT a pass:`);
-  for (const u of unmeasurable) console.log(`  ${u}`);
-}
 // ── tracked vs untracked ───────────────────────────────────────────────────
 //
 // An UNTRACKED launcher is exactly as dangerous as a tracked one -- it is a real
@@ -1547,6 +1543,15 @@ if (trackedAtTheEnd) {
 // Cannot ask git -> cannot split -> treat every failure as fatal, `trackedFails`
 // keeping its `= fails` initialiser. Never the other way: an unanswerable
 // question does not become a pass. The reason is reported once, by the helper.
+
+// Printed HERE, after G9, not with the census above: G9 runs later and pushes
+// to `unmeasurable` too, and before row 217 its entries were counted in the
+// headline and the exit code but never printed (measured: a planted parse
+// error gave `1 unmeasurable`, exit 1, and no line naming the file).
+if (unmeasurable.length) {
+  console.log(`\nUNMEASURABLE (${unmeasurable.length}) — a file this check could not classify is NOT a pass:`);
+  for (const u of unmeasurable) console.log(`  ${u}`);
+}
 
 if (untrackedFails.length) {
   console.log(`\nUNGUARDED BUT UNTRACKED (${untrackedFails.length}) — present in THIS working tree only.`);
