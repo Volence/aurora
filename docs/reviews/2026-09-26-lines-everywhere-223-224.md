@@ -185,7 +185,7 @@ way. Every guard was re-checked one plane at a time:
 | harness planted mark | no: plane A only | plane-B word (section 0, editor cell (100, 7), value 1): rows B1b, B2b, C1b, C3b, and B3 also requires the B file unchanged. 22/22 (a86d3ba5) | palette `const b = ... clearReservedBitsEntries(section.collisionEditB) ...` -> `const b = [] // MUTATION` in a rebuilt app: **6 FAIL of 22** (C1b, and C1/C2/C3/C3b/D1 downstream); restored, rebuilt, 22/22 |
 
 Targeted totals after the addendum: `src/core/project/aeon`, `test/collision`, `agent-handler.chunk-stamp-zones`,
-`test/agent/paint-collision`: 40 files, 417 passed, 0 failed, 0 skipped. Harness `root:` / `pinned:` unchanged
+and the three paint-collision test files (`test/agent/paint-collision.test.ts`, `test/agent/paint-collision-cells.test.ts`, `test/agent/paint-collision-reconcile.test.ts`) as vitest filter arguments: 40 files, 417 passed, 0 failed, 0 skipped. Harness `root:` / `pinned:` unchanged
 (this worktree).
 
 ## 7. Suite, fidelity, harness
