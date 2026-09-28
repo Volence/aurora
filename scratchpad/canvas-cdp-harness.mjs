@@ -756,12 +756,16 @@ async function drain(c, limit = 30) {
 // ---------------------------------------------------------------------------
 // One app session: launch, run, tear down. Every restart-dependent row uses one.
 // ---------------------------------------------------------------------------
-async function session(label, body) {
+// `opts.electronArgs`: extra Chromium switches placed BEFORE the app entry, for a
+// harness that must launch at a forced scale (`--force-device-scale-factor=1.5`,
+// classic-canvas-dpr-harness.mjs). Absent, the launch line is byte-for-byte the
+// one every other importer has always had.
+async function session(label, body, opts = {}) {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target — a previous Electron is alive.`);
   console.log(`\n=== session: ${label} (port ${PORT} verified free) ===`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
-  const child = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN], {
+  const child = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, ...(opts.electronArgs ?? []), MAIN], {
     cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
   });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
