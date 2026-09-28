@@ -20,8 +20,9 @@
 //   - the loop glyph has NO stroke at all (a filled disc and a glyph), so it has nothing
 //     to snap; the census row below fails if one is ever added.
 //
-// Even-width strokes (the 2 CSS px selection box and crosshair) keep half-covered edges
-// by the shared rule; nothing here claims whole device pixels for them.
+// ROW 238 RULING (2026-09-28): every one of these strokes has BOTH edges on whole device
+// pixels at every dpr; an even device width (the 2 CSS px selection box and crosshair)
+// centres on a whole device pixel. The expectations come from canvas/__tests__/grid-edges.ts.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -36,6 +37,7 @@ import { drawObjects, drawStart, drawPriority, drawCollision } from '../classic-
 import { DETAIL_CELL_PX } from '../../../../core/collision/collision-angle-mark';
 import type { LevelDoc } from '../../../../core/level-classic/model';
 import { monoMeasureText } from '../../../../test/mono-measure';
+import { expectedCentre, edgesWhole } from '../../../canvas/__tests__/grid-edges';
 
 const DPRS = [1, 1.25, 1.35, 1.5, 2, 3];
 /** Fractional zooms and cameras ON PURPOSE: an integral case cannot tell a snap from none. */
@@ -47,9 +49,7 @@ const VIEWS = [
   { zoom: 3.3, x: 250.4, y: 99.9 },
 ];
 const EPS = 1e-6;
-const frac = (v: number): number => v - Math.floor(v);
 const isWhole = (v: number): boolean => Math.abs(v - Math.round(v)) < EPS;
-const onHalf = (v: number): boolean => Math.abs(frac(v) - 0.5) < EPS;
 
 /** A recorder under classic's own draw transform, with the two calls it lacks. */
 function underWorld(dpr: number, v: { zoom: number; x: number; y: number }): Recording {
@@ -70,10 +70,13 @@ function expectRectOnGrid(s: DeviceStroke, world: { x: number; y: number; w: num
   cssWidth: number, v: { zoom: number; x: number; y: number }, dpr: number): void {
   expect(s.kind).toBe('rect');
   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
-  for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toBe(true); expect(onHalf(y), `corner y ${y}`).toBe(true); }
+  for (const [x, y] of s.pts) {
+    expect(edgesWhole(x, s.width), `side at x ${x}: an edge off the device grid`).toBe(true);
+    expect(edgesWhole(y, s.width), `side at y ${y}: an edge off the device grid`).toBe(true);
+  }
   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
-  expect(Math.min(...xs)).toBeCloseTo(Math.round(dev(world.x, v.x, v, dpr)) + 0.5, 9);
-  expect(Math.min(...ys)).toBeCloseTo(Math.round(dev(world.y, v.y, v, dpr)) + 0.5, 9);
+  expect(Math.min(...xs)).toBeCloseTo(expectedCentre(dev(world.x, v.x, v, dpr), cssWidth, dpr), 9);
+  expect(Math.min(...ys)).toBeCloseTo(expectedCentre(dev(world.y, v.y, v, dpr), cssWidth, dpr), 9);
   expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(Math.round(world.w * v.zoom * dpr), 9);
   expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(Math.round(world.h * v.zoom * dpr), 9);
 }
@@ -86,11 +89,11 @@ function expectSegmentsOnGrid(s: DeviceStroke, cssWidth: number, dpr: number): v
   for (let i = 0; i < s.pts.length; i += 2) {
     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
     if (Math.abs(y1 - y0) < EPS) {
-      expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+      expect(edgesWhole(y0, s.width), `horizontal segment row ${y0}: an edge off the device grid`).toBe(true);
       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0}, ${x1}`).toBe(true);
     } else {
       expect(Math.abs(x1 - x0) < EPS, `segment ${i / 2} is neither horizontal nor vertical`).toBe(true);
-      expect(onHalf(x0), `vertical segment column ${x0}`).toBe(true);
+      expect(edgesWhole(x0, s.width), `vertical segment column ${x0}: an edge off the device grid`).toBe(true);
       expect(isWhole(y0) && isWhole(y1), `vertical segment ends ${y0}, ${y1}`).toBe(true);
     }
   }
@@ -116,9 +119,9 @@ describe('segmentsOnDeviceGrid: the shared rule for a straight world segment', (
           const [grid, diag] = r.strokes;
           expectSegmentsOnGrid(grid, w, dpr);
           // Where: snapStroke's row / column on the unsnapped device coordinate.
-          expect(grid.pts[0][1]).toBeCloseTo(Math.round(dev(50.7, v.y, v, dpr)) + 0.5, 9);
+          expect(grid.pts[0][1]).toBeCloseTo(expectedCentre(dev(50.7, v.y, v, dpr), w, dpr), 9);
           expect(grid.pts[0][0]).toBeCloseTo(Math.round(dev(100.3, v.x, v, dpr)), 9);
-          expect(grid.pts[2][0]).toBeCloseTo(Math.round(dev(77.6, v.x, v, dpr)) + 0.5, 9);
+          expect(grid.pts[2][0]).toBeCloseTo(expectedCentre(dev(77.6, v.x, v, dpr), w, dpr), 9);
           // The diagonal is drawn where it was, at its unsnapped width.
           expect(diag.width).toBeCloseTo(w * dpr, 9);
           expect(diag.pts[0][0]).toBeCloseTo(dev(10, v.x, v, dpr), 9);
@@ -187,8 +190,8 @@ describe('drawStart: the crosshair is on the device grid', () => {
         const cross = marks.filter((s) => s.pts.length === 4);
         expect(cross.length, 'no crosshair was drawn: the row measures nothing').toBe(1);
         expectSegmentsOnGrid(cross[0], 2, dpr);
-        expect(cross[0].pts[0][1]).toBeCloseTo(Math.round(dev(40.6, v.y, v, dpr)) + 0.5, 9);
-        expect(cross[0].pts[2][0]).toBeCloseTo(Math.round(dev(80.3, v.x, v, dpr)) + 0.5, 9);
+        expect(cross[0].pts[0][1]).toBeCloseTo(expectedCentre(dev(40.6, v.y, v, dpr), 2, dpr), 9);
+        expect(cross[0].pts[2][0]).toBeCloseTo(expectedCentre(dev(80.3, v.x, v, dpr), 2, dpr), 9);
       });
     }
   }
@@ -253,13 +256,20 @@ describe('drawCollision: the angle mark', () => {
         const [[x0, y0], [x1, y1]] = s.pts;
         const horizontal = Math.abs(y1 - y0) < EPS, vertical = Math.abs(x1 - x0) < EPS;
         expect(horizontal || vertical, 'a flat floor\'s mark is axis-aligned').toBe(true);
-        expect(onHalf(horizontal ? y0 : x0), 'its row/column is a device half-pixel').toBe(true);
+        expect(edgesWhole(horizontal ? y0 : x0, s.width), 'both of its edges are whole device px').toBe(true);
         expect(isWhole(horizontal ? x0 : y0) && isWhole(horizontal ? x1 : y1), 'its ends are whole device px').toBe(true);
         expect(isWhole(s.width), 'its width is whole device px').toBe(true);
       }
-      // The core and the casing share a centre line (one snap, two widths).
+      // The BAR's core (1.25 CSS px) and casing (3) are both ODD device widths at every
+      // dpr, so they share one centre line.
       expect(core[0].pts[0][1]).toBeCloseTo(casing[0].pts[0][1], 9);
-      expect(core[1].pts[0][0]).toBeCloseTo(casing[1].pts[0][0], 9);
+      // The STEM's core is 1.25 x ARROW_WIDTH_SCALE = 2 CSS px (EVEN at every dpr) and
+      // its casing 3 x 1.6 = 4.8 CSS px (rounds to 5: ODD at every dpr). Under the
+      // ruling's parity-aware centring they cannot both have whole-pixel edges AND share
+      // a centre: they sit exactly half a device px apart, so the casing shows one more
+      // device px on one side than the other. Held here as a measured consequence, not
+      // hidden; the packet reports it.
+      expect(Math.abs(core[1].pts[0][0] - casing[1].pts[0][0]), 'stem core vs casing centre, device px').toBeCloseTo(0.5, 9);
     });
   }
 

@@ -14,7 +14,7 @@ import { columnSolidRun } from '../../../core/collision/collision-render';
 import { angleNeedle } from './collision-needle';
 import { angleMarkFromColumns, drawAngleMark, MIN_CELL_PX_FOR_MARK } from '../../../core/collision/collision-angle-mark';
 import type { MarkDrawCtx } from '../../../core/collision/collision-angle-mark';
-import { snapStroke, snapLength, strokeRectOnDeviceGrid, segmentsOnDeviceGrid } from '../../canvas/device-grid';
+import { snapStrokeEdges, snapLength, strokeRectOnDeviceGrid, segmentsOnDeviceGrid } from '../../canvas/device-grid';
 import { objectFrameRect } from '../../../core/level-classic/object-sprite';
 import { objectArtKey } from '../../../core/project/profiles/object-subtype-rules';
 import { s1ObjectIsInvisible, s1ObjectName } from '../../../core/project/profiles/s1-objects';
@@ -168,7 +168,7 @@ export function drawCollision(
   // Crisp surface line along each column's collidable edge, ON THE DEVICE GRID (row
   // 237 (b)): drawn under the canvas's CSS transform and snapped through
   // canvas/device-grid.ts, as strokeRectOnDeviceGrid is. Its row goes on the device
-  // half-pixel nearest the surface (snapStroke), its ends on whole device px
+  // half-pixel nearest the surface (snapStrokeEdges, odd width), its ends on whole device px
   // (snapLength, so the 16 segments of a cell tile it with no gap), its width
   // `deviceStrokeWidth(1, dpr)`: 1 device px at 1, 1.5 and 2, 3 at 3. Drawn in world
   // units it sat centred ON a device row boundary whenever the surface did, and
@@ -179,7 +179,7 @@ export function drawCollision(
   ctx.save();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.strokeStyle = COLLISION_SURFACE_LINE;
-  ctx.lineWidth = snapStroke(0, 1, dpr).width;
+  ctx.lineWidth = snapStrokeEdges(0, 1, dpr).width;
   for (let i = 0; i < 256; i++) {
     const cell = chunk.cells[i];
     // Block 0 first, because that is the order the engine tests in: FindFloor
@@ -199,7 +199,9 @@ export function drawCollision(
       if (!run) continue;
       let surfaceY = h >= 0 ? run.y : run.y + run.h;
       if (cell.yf) surfaceY = 16 - surfaceY;
-      const lineY = snapStroke(cssY(cy + surfaceY), 1, dpr).at;
+      // snapStrokeEdges (row 238's parity-aware centring): a 1 px line is an odd device
+      // width at every dpr, so this is the same half-pixel snapStroke gave.
+      const lineY = snapStrokeEdges(cssY(cy + surfaceY), 1, dpr).at;
       ctx.beginPath();
       ctx.moveTo(snapLength(cssX(cx + c), dpr), lineY);
       ctx.lineTo(snapLength(cssX(cx + c + 1), dpr), lineY);
@@ -605,8 +607,8 @@ export function drawObjects(
     }
     if (isSel) {
       // Highlight box around the drawn frame, drawn last so it sits on top.
-      // On the device grid (row 238 (c)): 2 CSS px, an even device width at 1 and
-      // 1.5, so by the shared rule each edge half-covers a device column.
+      // On the device grid (row 238 (c)): 2 CSS px, an even device width, centred on a
+      // whole device pixel so both edges are whole device pixels.
       ctx.strokeStyle = OBJECT_SELECTED_STROKE;
       const pad = 2 * invZoom;
       strokeRectOnDeviceGrid(ctx, selRect.left - pad, selRect.top - pad, selRect.width + pad * 2, selRect.height + pad * 2, 2, dpr);
@@ -655,8 +657,8 @@ export function drawStart(
   ctx.stroke();
   // The crosshair ON THE DEVICE GRID (row 238 (c)). The ring above is a curve and is
   // drawn where it was: the shared rule has no whole-pixel answer for a circle. The
-  // crosshair is 2 CSS px, an even device width at 1 and 1.5, so each of its edges
-  // half-covers a device row or column, as every 2 px line does by the shared rule.
+  // crosshair is 2 CSS px, an even device width, centred on a whole device pixel so
+  // both of its edges are whole device pixels (`snapStrokeEdges`).
   const cross = segmentsOnDeviceGrid(ctx, dpr);
   cross.strokeStyle = START_MARKER;
   cross.lineWidth = 2 * invZoom;

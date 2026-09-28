@@ -800,10 +800,10 @@ export default function MapViewport() {
       // is mapped to CSS px from the camera this block already holds and stroked by
       // `strokeCssRectOnDeviceGrid` under the canvas's CSS transform, so the dash is
       // stated in CSS px there (4 CSS px, as it always was).
-      // A 2 px line is an EVEN device width (2 device px at 1 and 1.5), so by the
-      // shared rule its centre sits on a device half-pixel and its two edges each
-      // half-cover a device column: the look `canvas/device-grid.ts` gives every 2 px
-      // line, not whole device pixels.
+      // A 2 px line is an EVEN device width (2 device px at 1 and 1.5), so the helper
+      // centres it on a whole device pixel and both of its edges are whole device
+      // pixels: at dpr 1 the same two columns the world-unit `2 / zoom` stroke covered
+      // on an integer edge (`snapStrokeEdges`, canvas/device-grid.ts).
       ctx.setLineDash([4, 4]);
       strokeCssRectOnDeviceGrid(ctx, (mx - mvpX) * mZoom, (my - mvpY) * mZoom, mw * mZoom, mh * mZoom, 2, dpr);
       ctx.setLineDash([]);
@@ -857,8 +857,8 @@ export default function MapViewport() {
             ctx.globalAlpha = 1;
           }
           ctx.strokeStyle = SELECTION_MARQUEE;
-          // On the device grid, as the marquee above is (row 238 (a)); the same
-          // even-width caveat applies.
+          // On the device grid, as the marquee above is (row 238 (a)): both edges on
+          // whole device pixels.
           strokeCssRectOnDeviceGrid(ctx, (sx - svpX) * sZoom, (sy - svpY) * sZoom, sw * sZoom, sh * sZoom, 2, dpr);
           ctx.restore();
         }

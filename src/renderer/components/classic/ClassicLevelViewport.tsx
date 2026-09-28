@@ -977,7 +977,8 @@ export default function ClassicLevelViewport() {
       ctx.strokeStyle = STAMP_PREVIEW_STROKE;
       for (const c of stroke.values()) {
         ctx.fillRect(c.x * CHUNK_PX, c.y * CHUNK_PX, CHUNK_PX, CHUNK_PX);
-        // On the device grid (row 237 (b)), 2 CSS px as before.
+        // On the device grid (row 237 (b)), 2 CSS px as before, both edges on whole
+        // device pixels since row 238 (237 first left each edge half-covered).
         strokeRectOnDeviceGrid(ctx, c.x * CHUNK_PX, c.y * CHUNK_PX, CHUNK_PX, CHUNK_PX, 2, dpr);
       }
     }
@@ -1012,7 +1013,8 @@ export default function ClassicLevelViewport() {
         // different box than the one that gets written.
         const r = rectFromCorners(cstroke.anchor, cstroke.current);
         // On the device grid (row 237 (b)), 1.5 CSS px as before, which the shared
-        // rule draws as an even (2 device px) width.
+        // rule draws as an even (2 device px) width, centred on a whole device pixel
+        // since row 238 so both edges are whole device pixels.
         ctx.strokeStyle = COLLISION_PREVIEW_PRIMARY;
         strokeRectOnDeviceGrid(
           ctx,

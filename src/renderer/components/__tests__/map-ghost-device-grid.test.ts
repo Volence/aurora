@@ -11,10 +11,10 @@
 // to the ghost-layer canvas:
 //
 //   - the width is `deviceStrokeWidth(2, dpr)` device px (2 at 1, 1.25, 1.35 and 1.5,
-//     4 at 2, 6 at 3: an EVEN width, so by the shared rule each edge half-covers a
-//     device column; whole device pixels are NOT claimed for these two);
-//   - every corner is on a device half-pixel, the one `snapStroke` picks for where the
-//     unsnapped stroke was centred, and the size is a whole number of device px;
+//     4 at 2, 6 at 3: always an EVEN width);
+//   - BOTH edges of every side are on whole device pixels (the row 238 ruling; an even
+//     width centres on a whole device pixel), at the parity-aware centre nearest where
+//     the unsnapped stroke was, and the size is a whole number of device px;
 //   - the marquee keeps its 4 CSS px dash (stated in the CSS frame it now strokes in).
 //
 // Fractional cameras and zooms ON PURPOSE: an integral case cannot tell a snap from none.
@@ -33,6 +33,7 @@ import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { documentHistoryHub } from '../../state/history-hub';
 import { recordingContext, type Recording, type DeviceStroke } from '../../canvas/__tests__/chrome-recorder';
 import { deviceStrokeWidth } from '../../canvas/device-grid';
+import { expectedCentre, edgesWhole } from '../../canvas/__tests__/grid-edges';
 import { SELECTION_MARQUEE } from '../../canvas/canvas-colors';
 import type { Section } from '../../../core/model/s4-types';
 
@@ -83,9 +84,6 @@ function view(m: Mounted, v: { x: number; y: number; zoom: number }): void {
   m.h.setProps({});
 }
 
-const EPS = 1e-6;
-const frac = (v: number): number => v - Math.floor(v);
-const onHalf = (v: number): boolean => Math.abs(frac(v) - 0.5) < EPS;
 
 /** The outline's device rect, from the four recorded corners. */
 function box(s: DeviceStroke): { l: number; t: number; w: number; h: number } {
@@ -98,13 +96,15 @@ function expectOnGrid(s: DeviceStroke, world: { x: number; y: number; w: number;
   v: { x: number; y: number; zoom: number }, dpr: number): void {
   expect(s.kind).toBe('rect');
   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+  // THE ROW 238 RULING: both edges of every side on whole device pixels. 2 CSS px is an
+  // even device width at every dpr, so each side is centred on a whole device pixel.
   for (const [x, y] of s.pts) {
-    expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).toBe(true);
-    expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).toBe(true);
+    expect(edgesWhole(x, s.width), `the side at x ${x} has an edge off the device grid`).toBe(true);
+    expect(edgesWhole(y, s.width), `the side at y ${y} has an edge off the device grid`).toBe(true);
   }
   const b = box(s);
-  expect(b.l).toBeCloseTo(Math.round((world.x - v.x) * v.zoom * dpr) + 0.5, 9);
-  expect(b.t).toBeCloseTo(Math.round((world.y - v.y) * v.zoom * dpr) + 0.5, 9);
+  expect(b.l).toBeCloseTo(expectedCentre((world.x - v.x) * v.zoom * dpr, 2, dpr), 9);
+  expect(b.t).toBeCloseTo(expectedCentre((world.y - v.y) * v.zoom * dpr, 2, dpr), 9);
   expect(b.w).toBeCloseTo(Math.round(world.w * v.zoom * dpr), 9);
   expect(b.h).toBeCloseTo(Math.round(world.h * v.zoom * dpr), 9);
 }

@@ -30,6 +30,7 @@ import { recordingContext, type Recording } from '../../../canvas/__tests__/chro
 import { deviceStrokeWidth } from '../../../canvas/device-grid';
 import { COLLISION_SURFACE_LINE } from '../../../canvas/canvas-colors';
 import { strokeRectOnDeviceGrid, drawCollision } from '../classic-overlays';
+import { expectedCentre, edgesWhole } from '../../../canvas/__tests__/grid-edges';
 import type { LevelDoc } from '../../../../core/level-classic/model';
 
 const DPRS = [1, 1.25, 1.35, 1.5, 2, 3];
@@ -56,6 +57,26 @@ function underWorld(dpr: number, v: { zoom: number; x: number; y: number }): Rec
 }
 const matrixOf = (r: Recording) => { const t = r.ctx.getTransform(); return [t.a, t.b, t.c, t.d, t.e, t.f]; };
 
+describe('ROW 238 RULING: an EVEN-width outline has both edges on whole device pixels', () => {
+  // The rows the ruling names: 2 CSS px (the stamp-drag preview) and 1.5 CSS px (the
+  // collision marquee, drawn 2 device px wide) at dpr 1, 1.5 and 2. Each of the four
+  // sides must start and end on a device boundary; row 237 centred them on a half-pixel,
+  // which half-covered one column at each edge.
+  for (const cssWidth of [2, 1.5]) {
+    for (const dpr of [1, 1.5, 2]) {
+      it(`${cssWidth} CSS px at dpr ${dpr}: every side's two edges are whole device px`, () => {
+        const r = underWorld(dpr, { zoom: 1.5, x: 10.25, y: 3.5 });
+        strokeRectOnDeviceGrid(r.ctx, 3072, 512, 256, 256, cssWidth, dpr);
+        const s = r.strokes[0];
+        expect(deviceStrokeWidth(cssWidth, dpr) % 2, 'fixture: this row is about an even device width').toBe(0);
+        const xs = [...new Set(s.pts.map((p) => p[0]))], ys = [...new Set(s.pts.map((p) => p[1]))];
+        for (const x of xs) expect(edgesWhole(x, s.width), `vertical side at ${x}`).toBe(true);
+        for (const y of ys) expect(edgesWhole(y, s.width), `horizontal side at ${y}`).toBe(true);
+      });
+    }
+  }
+});
+
 describe('strokeRectOnDeviceGrid: a world rect outlined on whole device pixels', () => {
   for (const cssWidth of [1, 2, 1.5]) {
     for (const dpr of DPRS) {
@@ -70,12 +91,18 @@ describe('strokeRectOnDeviceGrid: a world rect outlined on whole device pixels',
           const s = r.strokes[0];
           expect(s.kind).toBe('rect');
           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
-          for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toBe(true); expect(onHalf(y), `corner y ${y}`).toBe(true); }
-          // Where: snapStroke's rule on the unsnapped edge's device coordinate.
+          // ROW 238 RULING: BOTH edges of every side on whole device pixels. Row 237
+          // asserted every corner on a half-pixel, which for an EVEN device width (2 px,
+          // and 1.5 px drawn as 2) IS the half-covered edge the ruling calls a defect;
+          // the corner is now parity-aware (canvas/__tests__/grid-edges.ts).
+          for (const [x, y] of s.pts) {
+            expect(edgesWhole(x, s.width), `the side at x ${x} (width ${s.width}) has an edge off the device grid`).toBe(true);
+            expect(edgesWhole(y, s.width), `the side at y ${y} (width ${s.width}) has an edge off the device grid`).toBe(true);
+          }
           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * v.zoom * dpr;
           const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
-          expect(Math.min(...xs)).toBeCloseTo(Math.round(devL) + 0.5, 9);
-          expect(Math.min(...ys)).toBeCloseTo(Math.round(devT) + 0.5, 9);
+          expect(Math.min(...xs)).toBeCloseTo(expectedCentre(devL, cssWidth, dpr), 9);
+          expect(Math.min(...ys)).toBeCloseTo(expectedCentre(devT, cssWidth, dpr), 9);
           expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(Math.round(ws * v.zoom * dpr), 9);
           expect(matrixOf(r), 'the helper left a different transform behind').toEqual(before);
         });
