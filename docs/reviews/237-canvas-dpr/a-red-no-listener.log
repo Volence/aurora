@@ -1,0 +1,333 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b
+
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts (15 tests | 15 failed) 7ms
+     × arms exactly one listener, on the query naming the scale the display has now 2ms
+     × a move off that scale calls back with the NEW scale, and re-arms on the new scale's query 0ms
+     × THE RE-ARM: a second, third and fourth move are each heard once, with their own scale 0ms
+     × unsubscribe before any move removes the listener, and a move then calls nothing 0ms
+     × unsubscribe AFTER re-arms removes the CURRENT listener, not only the first one armed 0ms
+     × unsubscribe is safe to call twice 0ms
+     × two subscribers are independent: unsubscribing one leaves the other hearing 0ms
+     × a device ratio of undefined arms on the 1dppx query (deviceScale's fallback) 0ms
+     × a device ratio of 0 arms on the 1dppx query (deviceScale's fallback) 0ms
+     × a device ratio of -2 arms on the 1dppx query (deviceScale's fallback) 0ms
+     × a device ratio of NaN arms on the 1dppx query (deviceScale's fallback) 0ms
+     × a device ratio of Infinity arms on the 1dppx query (deviceScale's fallback) 0ms
+     × a device ratio of 2 arms on the 1dppx query (deviceScale's fallback) 0ms
+     × a device ratio of null arms on the 1dppx query (deviceScale's fallback) 0ms
+     × no display at all (no window, or a window with no matchMedia) is a no-op that still unsubscribes 2ms
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts (21 tests | 2 failed) 364ms
+     ✓ at 1 the store is floor(CSS box x 1) device px, and the CSS box is that over 1  325ms
+     ✓ at 1.25 the store is floor(CSS box x 1.25) device px, and the CSS box is that over 1.25 2ms
+     ✓ at 1.35 the store is floor(CSS box x 1.35) device px, and the CSS box is that over 1.35 1ms
+     ✓ at 1.5 the store is floor(CSS box x 1.5) device px, and the CSS box is that over 1.5 1ms
+     ✓ at 2 the store is floor(CSS box x 2) device px, and the CSS box is that over 2 2ms
+     ✓ at 3 the store is floor(CSS box x 3) device px, and the CSS box is that over 3 2ms
+     ✓ a device ratio of undefined sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of 0 sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of -2 sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of NaN sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of Infinity sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of 2 sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of null sizes the store at one device px per CSS px 1ms
+     ✓ at 1 every draw starts from the device transform with smoothing off 2ms
+     ✓ at 1.5 every draw starts from the device transform with smoothing off 1ms
+     ✓ at 2 every draw starts from the device transform with smoothing off 1ms
+     × each move re-sizes the store to floor(CSS box x the new scale) and redraws at that scale 8ms
+     × holds one listener while mounted and none after unmount 3ms
+     ✓ at 1 a right-click either side of x=256 eyedrops the chunk under it 2ms
+     ✓ at 1.5 a right-click either side of x=256 eyedrops the chunk under it 2ms
+     ✓ at 2 a right-click either side of x=256 eyedrops the chunk under it 2ms
+ ❯ src/renderer/components/__tests__/map-device-scale.test.ts (19 tests | 2 failed) 471ms
+     ✓ at a scale factor of 1 the store is the CSS box times the factor  450ms
+     ✓ at a scale factor of 1.25 the store is the CSS box times the factor 1ms
+     ✓ at a scale factor of 1.35 the store is the CSS box times the factor 1ms
+     ✓ at a scale factor of 2 the store is the CSS box times the factor 1ms
+     ✓ at a scale factor of 3 the store is the CSS box times the factor 1ms
+     ✓ a scale factor that changes between draws is picked up on the next draw 1ms
+     × a scale change with NO resize and NO repaint re-sizes both canvases (row 237) 3ms
+     × unmounting the map removes its scale listener (row 237) 2ms
+     ✓ a device ratio of undefined falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of 0 falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of -2 falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of NaN falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of Infinity falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of 2 falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of null falls back to one CSS pixel per device pixel 1ms
+     ✓ CANNOT MEASURE the drawing transform, and says so rather than implying it 1ms
+     ✓ F7 with no cursor ever seen issues no warp and says why 1ms
+     ✓ F7 after a real hover warps to that point 1ms
+     ✓ a hover AT the corner warps, because the corner is a position and not an absence 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 19 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > arms exactly one listener, on the query naming the scale the display has now
+TypeError: onDeviceScaleChange is not a function
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:34:5
+     32|   it('arms exactly one listener, on the query naming the scale the dis…
+     33|     const { host, fake } = display(1.25);
+     34|     onDeviceScaleChange(() => undefined, host);
+       |     ^
+     35|     expect(fake.queries()).toEqual(['(resolution: 1.25dppx)']);
+     36|     expect(fake.listeners()).toEqual([{ media: '(resolution: 1.25dppx)…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/19]⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > a move off that scale calls back with the NEW scale, and re-arms on the new scale's query
+TypeError: onDeviceScaleChange is not a function
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:42:5
+     40|     const { host, fake } = display(1);
+     41|     const heard: number[] = [];
+     42|     onDeviceScaleChange((d) => heard.push(d), host);
+       |     ^
+     43|     expect(fake.setScale(1.5), 'the move fired nothing: the listener w…
+     44|     expect(heard).toEqual([1.5]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/19]⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > THE RE-ARM: a second, third and fourth move are each heard once, with their own scale
+TypeError: onDeviceScaleChange is not a function
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:52:5
+     50|     const { host, fake } = display(1);
+     51|     const heard: number[] = [];
+     52|     onDeviceScaleChange((d) => heard.push(d), host);
+       |     ^
+     53|     for (const d of [1.5, 2, 1, 1.35]) fake.setScale(d);
+     54|     expect(heard).toEqual([1.5, 2, 1, 1.35]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/19]⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > unsubscribe before any move removes the listener, and a move then calls nothing
+TypeError: onDeviceScaleChange is not a function
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:64:17
+     62|     const { host, fake } = display(1);
+     63|     const heard: number[] = [];
+     64|     const off = onDeviceScaleChange((d) => heard.push(d), host);
+       |                 ^
+     65|     off();
+     66|     expect(fake.totalListeners()).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/19]⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > unsubscribe AFTER re-arms removes the CURRENT listener, not only the first one armed
+TypeError: onDeviceScaleChange is not a function
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:74:17
+     72|     const { host, fake } = display(1);
+     73|     const heard: number[] = [];
+     74|     const off = onDeviceScaleChange((d) => heard.push(d), host);
+       |                 ^
+     75|     fake.setScale(1.5);
+     76|     fake.setScale(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/19]⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > unsubscribe is safe to call twice
+TypeError: onDeviceScaleChange is not a function
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:87:17
+     85|   it('unsubscribe is safe to call twice', () => {
+     86|     const { host, fake } = display(1);
+     87|     const off = onDeviceScaleChange(() => undefined, host);
+       |                 ^
+     88|     off();
+     89|     off();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/19]⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > two subscribers are independent: unsubscribing one leaves the other hearing
+TypeError: onDeviceScaleChange is not a function
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:97:18
+     95|     const a: number[] = [];
+     96|     const b: number[] = [];
+     97|     const offA = onDeviceScaleChange((d) => a.push(d), host);
+       |                  ^
+     98|     onDeviceScaleChange((d) => b.push(d), host);
+     99|     fake.setScale(1.5);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/19]⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of undefined arms on the 1dppx query (deviceScale's fallback)
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of 0 arms on the 1dppx query (deviceScale's fallback)
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of -2 arms on the 1dppx query (deviceScale's fallback)
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of NaN arms on the 1dppx query (deviceScale's fallback)
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of Infinity arms on the 1dppx query (deviceScale's fallback)
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of 2 arms on the 1dppx query (deviceScale's fallback)
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of null arms on the 1dppx query (deviceScale's fallback)
+TypeError: onDeviceScaleChange is not a function
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:110:7
+    108|     it(`a device ratio of ${String(hostile)} arms on the 1dppx query (…
+    109|       const { host, fake } = display(hostile);
+    110|       onDeviceScaleChange(() => undefined, host);
+       |       ^
+    111|       expect(fake.queries()).toEqual(['(resolution: 1dppx)']);
+    112|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/19]⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > no display at all (no window, or a window with no matchMedia) is a no-op that still unsubscribes
+AssertionError: expected [Function] to not throw an error but 'TypeError: (0 , __vite_ssr_import_1__…' was thrown
+
+- Expected:
+undefined
+
++ Received:
+"TypeError: (0 , __vite_ssr_import_1__.onDeviceScaleChange) is not a function"
+
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:116:68
+    114|
+    115|   it('no display at all (no window, or a window with no matchMedia) is…
+    116|     expect(() => onDeviceScaleChange(() => undefined, null)()).not.toT…
+       |                                                                    ^
+    117|     expect(() => onDeviceScaleChange(() => undefined, { devicePixelRat…
+    118|     // And with the default host in this node suite, where there is no…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/19]⎯
+
+ FAIL  src/renderer/components/__tests__/map-device-scale.test.ts > VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a scale change with NO resize and NO repaint re-sizes both canvases (row 237)
+AssertionError: the move to 1.5 reached no listener: expected 0 to be greater than 0
+ ❯ src/renderer/components/__tests__/map-device-scale.test.ts:288:78
+    286|     const resizes = win!.observers().length;
+    287|     for (const d of [1.5, 2, 1.25]) {
+    288|       expect(s.display!.setScale(d), `the move to ${d} reached no list…
+       |                                                                              ^
+    289|       const want = { width: Math.round(VIEWPORT.width * d), height: Ma…
+    290|       expect(size(map), `map canvas after the move to ${d}`).toEqual(w…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/19]⎯
+
+ FAIL  src/renderer/components/__tests__/map-device-scale.test.ts > VIEWPORT-NO-DPR: the map backing store is sized in device pixels > unmounting the map removes its scale listener (row 237)
+AssertionError: the map never armed a scale listener: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/renderer/components/__tests__/map-device-scale.test.ts:298:81
+    296|   it('unmounting the map removes its scale listener (row 237)', async …
+    297|     const s = await mountMap(1, true);
+    298|     expect(s.display!.totalListeners(), 'the map never armed a scale l…
+       |                                                                                 ^
+    299|     mounted!.unmount();
+    300|     mounted = null;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/19]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > row 237 (a): a scale change with no resize re-sizes the store > each move re-sizes the store to floor(CSS box x the new scale) and redraws at that scale
+AssertionError: the move to 1.5 reached no listener: expected 0 to be greater than 0
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:240:78
+    238|     for (const d of [1.5, 2, 1.25]) {
+    239|       s.calls.length = 0;
+    240|       expect(s.display!.setScale(d), `the move to ${d} reached no list…
+       |                                                                              ^
+    241|       s.paint();
+    242|       const w = Math.floor(VIEWPORT.width * d);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/19]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > row 237 (a): a scale change with no resize re-sizes the store > holds one listener while mounted and none after unmount
+AssertionError: the canvas never armed a scale listener: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:255:84
+    253|   it('holds one listener while mounted and none after unmount', async …
+    254|     const s = await mountClassic(1, true);
+    255|     expect(s.display!.totalListeners(), 'the canvas never armed a scal…
+       |                                                                                    ^
+    256|     mounted!.unmount();
+    257|     mounted = null;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/19]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  19 failed | 36 passed (55)
+   Start at  04:26:14
+   Duration  1.24s (transform 2.07s, setup 1.81s, import 151ms, tests 842ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (3 module(s) reported).
+
+failure-class: 19 failure record(s) in 3 file(s) (19 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        5   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED    14   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/canvas/__tests__/device-scale-change.test.ts
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > arms exactly one listener, on the query naming the scale the display has now
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > a move off that scale calls back with the NEW scale, and re-arms on the new scale's query
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > THE RE-ARM: a second, third and fourth move are each heard once, with their own scale
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > unsubscribe before any move removes the listener, and a move then calls nothing
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > unsubscribe AFTER re-arms removes the CURRENT listener, not only the first one armed
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > unsubscribe is safe to call twice
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > two subscribers are independent: unsubscribing one leaves the other hearing
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of undefined arms on the 1dppx query (deviceScale's fallback)
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of 0 arms on the 1dppx query (deviceScale's fallback)
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of -2 arms on the 1dppx query (deviceScale's fallback)
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of NaN arms on the 1dppx query (deviceScale's fallback)
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of Infinity arms on the 1dppx query (deviceScale's fallback)
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of 2 arms on the 1dppx query (deviceScale's fallback)
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] onDeviceScaleChange: one listener, re-armed for each new scale > a device ratio of null arms on the 1dppx query (deviceScale's fallback)
+        TypeError: onDeviceScaleChange is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [ASSERTION] onDeviceScaleChange: one listener, re-armed for each new scale > no display at all (no window, or a window with no matchMedia) is a no-op that still unsubscribes
+        AssertionError: expected [Function] to not throw an error but 'TypeError: (0 , __vite_ssr_import_1__…' was thrown
+        why this bucket: name is AssertionError
+
+  src/renderer/components/__tests__/map-device-scale.test.ts
+    [ASSERTION] VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a scale change with NO resize and NO repaint re-sizes both canvases (row 237)
+        AssertionError: the move to 1.5 reached no listener: expected 0 to be greater than 0
+        why this bucket: name is AssertionError
+    [ASSERTION] VIEWPORT-NO-DPR: the map backing store is sized in device pixels > unmounting the map removes its scale listener (row 237)
+        AssertionError: the map never armed a scale listener: expected +0 to be 1 // Object.is equality
+        why this bucket: name is AssertionError
+
+  src/renderer/components/classic/__tests__/classic-device-scale.test.ts
+    [ASSERTION] row 237 (a): a scale change with no resize re-sizes the store > each move re-sizes the store to floor(CSS box x the new scale) and redraws at that scale
+        AssertionError: the move to 1.5 reached no listener: expected 0 to be greater than 0
+        why this bucket: name is AssertionError
+    [ASSERTION] row 237 (a): a scale change with no resize re-sizes the store > holds one listener while mounted and none after unmount
+        AssertionError: the canvas never armed a scale listener: expected +0 to be 1 // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 5 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 3 of 3 module(s) this run selected finished.

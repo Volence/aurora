@@ -35,7 +35,7 @@ import {
   worldToCollisionCell, rectFromCorners, COLLISION_CELL_PX,
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
-import { deviceScale } from '../../canvas/device-grid';
+import { deviceScale, onDeviceScaleChange } from '../../canvas/device-grid';
 import {
   buildHiPriChunkCanvas, drawAnimatedArt, drawCollision, drawObjects, drawPriority, drawStart,
   GHOST_MARKER_BOUNDS, type SpriteOcclusion,
@@ -1052,11 +1052,12 @@ export default function ClassicLevelViewport() {
   // handler reads `clientX - rect.left` in CSS px through `screenToWorld`.
   //
   // A SCALE CHANGE WITH NO RESIZE (the window dragged to a display with another
-  // factor) does not re-run this: no surface in this codebase listens for one, and
-  // MapViewport only re-reads the factor when something else makes it redraw. A
-  // browser ZOOM change does re-run it, because it changes the container's CSS rect.
-  // Until the next resize the store keeps its old factor and the draw uses that same
-  // factor (sizeRef.dpr), so it stays self-consistent, only not sharp.
+  // factor) re-runs it too (ROADMAP row 237): the CSS box does not change, so the
+  // ResizeObserver never fires, and until row 237 the store kept its old factor until
+  // the next resize (self-consistent, since the draw uses sizeRef.dpr, but soft). The
+  // shared listener in canvas/device-grid.ts calls measure() on each move, the same
+  // listener MapViewport uses. A browser ZOOM change was always covered, because it
+  // changes the container's CSS rect.
   useEffect(() => {
     const measure = () => {
       const canvas = canvasRef.current;
@@ -1084,7 +1085,11 @@ export default function ClassicLevelViewport() {
     if (!container) return;
     const ro = new ResizeObserver(measure);
     ro.observe(container);
-    return () => ro.disconnect();
+    const offScale = onDeviceScaleChange(measure);
+    return () => {
+      ro.disconnect();
+      offScale();
+    };
   }, [redraw, status]);
 
   // ---- pan / zoom / stamp --------------------------------------------------
