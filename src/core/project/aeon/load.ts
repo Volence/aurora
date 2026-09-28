@@ -77,6 +77,7 @@ import {
   createSection, SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE,
 } from '../../model/s4-types';
 import { migrateChunkTilesIntoTileset } from '../../art/atlas-migration';
+import { snapshotChunkLibraryMarks, type ChunkMarksAtLoad } from '../../collision/chunk-library-reserved';
 import type {
   S4Project,
   Zone,
@@ -1115,6 +1116,7 @@ async function loadFullProject(
 
   // Load chunk library
   let chunkLibrary: ChunkDef[] = [];
+  let chunkLibraryMarksAtLoad = new Map<string, ChunkMarksAtLoad>();
   let chunkTiles: Tile[] = [];
   if (config.chunkLibraryPath) {
     try {
@@ -1166,6 +1168,10 @@ async function loadFullProject(
     } catch {
       // no chunk library
     }
+    // Marks (bits 15:14) already in chunks.json, recorded so the save can tell
+    // them from marks this session brings in (ROADMAP row 225; the save refuses
+    // only the latter). Taken before anything can edit the library.
+    chunkLibraryMarksAtLoad = snapshotChunkLibraryMarks(chunkLibrary);
 
     // Load the legacy chunk-tiles atlas (chunks_tiles.bin) — used only as
     // migration input below; it is never put on the project object.
@@ -1303,6 +1309,7 @@ async function loadFullProject(
       zones,
       objectLibrary,
       chunkLibrary,
+      chunkLibraryMarksAtLoad,
       bgLibrary,
       bgLibraryUnresolved,
       basePath,

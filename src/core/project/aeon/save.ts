@@ -49,6 +49,7 @@ import { serializeTiles } from '../../export/tile-dedup';
 import type { S4Project } from '../../model/s4-types';
 import { SECTION_TILES_WIDE } from '../../model/s4-types';
 import { auditReservedBits, reservedAuditMessage } from '../../collision/reserved-bits-audit';
+import { chunkLibraryReservedAudits, chunkReservedMessage } from '../../collision/chunk-library-reserved';
 import type { SaveCompare } from './save-skip';
 
 /** One planned write. `compare` tells the save glue how to decide whether the
@@ -270,9 +271,23 @@ export async function buildAeonSavePlan(
       SECTION_TILES_WIDE, i);
     return a.reservedA + a.reservedB > 0 ? [a] : [];
   });
-  if (reservedAudits.length > 0) {
+  // THE CHUNK LIBRARY, ON THE SAME PATH (ROADMAP row 225, the side finding of
+  // (c)). chunks.json is written below from `project.chunkLibrary`, and a mark
+  // there used to go to disk unchecked, refused only once stamped into a
+  // section. It is checked HERE, with the sections, so the refusal happens
+  // before anything is planned and the same "Nothing was written." holds. Only
+  // when this plan would write the library (the condition below), and only a
+  // mark this session brought in: one already in chunks.json at load is the
+  // undecided case collision/chunk-library-reserved.ts describes.
+  const libraryAudits = config.chunkLibraryPath && project.chunkLibrary.length > 0
+    ? chunkLibraryReservedAudits(project.chunkLibrary, project.chunkLibraryMarksAtLoad)
+    : [];
+  if (reservedAudits.length > 0 || libraryAudits.length > 0) {
     throw new Error(`refusing to save ${zoneId}/${actId}: `
-      + reservedAudits.map((a) => reservedAuditMessage(a)).join(' | ')
+      + [
+        ...reservedAudits.map((a) => reservedAuditMessage(a)),
+        ...libraryAudits.map((a) => chunkReservedMessage(a)),
+      ].join(' | ')
       + ' Nothing was written.');
   }
 
