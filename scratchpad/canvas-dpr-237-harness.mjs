@@ -56,15 +56,27 @@
 //        device row for its top edge. At zoom 2 with an integer camera the unsnapped
 //        edge sits ON a device boundary at 1.5 (an even CSS x times 1.5 is an integer):
 //        master drew 3 device px centred there, half-covering C-2 and C+1.
-//        m.s.1 column C-2 untouched on every sampled row (nothing past one partial column).
-//        m.s.2 column C-1 changed on every sampled row and NEVER at full strength: the
-//              half-covered outer column the shared rule gives every EVEN-width line.
-//              ⚠ So the ghost edge is NOT on whole device pixels, and this row says so
-//              rather than claiming it. The brief asked for whole device pixels here; a
-//              2 CSS px stroke is 2 device px at 1 and 1.5 (deviceStrokeWidth's parity
-//              rule), centred on a half-pixel, which cannot give them. See the packet.
+//        ROW 238 RULING (2026-09-28): BOTH EDGES ON WHOLE DEVICE PIXELS. A 2 CSS px line
+//        is an even device width, centred on the whole pixel C, so it covers exactly
+//        columns C-1 and C:
+//        m.s.1 column C-2 untouched on every sampled row (the outer edge is the C-2|C-1
+//              boundary: nothing bleeds past it).
+//        m.s.2 column C-1 at full strength on every sampled row.
 //        m.s.3 column C at full strength on every sampled row.
-//        m.s.4-6 the same three for the top edge (rows R-2, R-1, R).
+//        m.s.4 column C+1 NEVER at full strength (the inner edge is the C|C+1 boundary;
+//              C+1 is the ghost's art, so "untouched" cannot be asked of it).
+//        m.s.5-8 the same four for the top edge (rows R-2, R-1, R, R+1).
+//        m.s1.9 (dpr 1, only with EDGE_BASELINE): the left and top edge windows are
+//              PIXEL-IDENTICAL to the baseline build's (master's crisp world-unit
+//              `2 / zoom` outline). Without EDGE_BASELINE the row says NOT MEASURED.
+//   b.s  (ROW 238) also the classic STAMP-DRAG PREVIEW (2 CSS px): a real left press on
+//        cell A shows it, a real Escape cancels the gesture before the real release (so
+//        nothing is stamped; b.s.5 proves cell A is unchanged). Against the hover-on shot:
+//        b.s.6 X-2 unchanged, b.s.7 X-1 and X at full strength, b.s.8 X+1 never at full
+//        strength, and b.s.9-11 the same on the top edge. RED on row 237's helper: its
+//        half-pixel centre put X-1 and X+1 at half coverage. b.s1.12 (dpr 1, EDGE_BASELINE)
+//        pixel identity with the baseline build's world-unit preview.
+//        EDGE_OUT=<file> writes this build's dpr-1 windows for use as a baseline.
 //
 // Every mouse event is a real `Input.dispatchMouseEvent` at an INTEGER client pixel,
 // and every expectation is derived back from that integer. No number crosses sessions.
@@ -85,6 +97,28 @@ const PARTS = new Set((process.env.PARTS ?? 'ac,am,bs,ms').split(',').map((s) =>
 const STROKE_SCALES = (process.env.STROKE_SCALES ?? '1.5').split(',').map((s) => Number(s.trim()));
 const SHOT_DIR = process.env.SHOT_DIR ?? `${ROOT}/scratchpad/shots-canvas-dpr-237`;
 const TAG = process.env.TAG ?? 'run';
+// Row 238's dpr-1 pixel identity: EDGE_OUT writes this build's dpr-1 edge windows,
+// EDGE_BASELINE compares against a file another build wrote.
+const EDGE_OUT = process.env.EDGE_OUT ?? null;
+const EDGE_BASELINE = process.env.EDGE_BASELINE ?? null;
+const edgeWindows = {};
+let edgeBaseline = null;
+if (EDGE_BASELINE) {
+  const { readFileSync } = await import('node:fs');
+  edgeBaseline = JSON.parse(readFileSync(EDGE_BASELINE, 'utf8'));
+}
+/** The dpr-1 identity row: loud NOT MEASURED without a baseline, never a silent pass. */
+function identityRow(id, what, key, win) {
+  edgeWindows[key] = win;
+  if (!edgeBaseline) { console.log(`NOT MEASURED  ${id}  ${what}: EDGE_BASELINE unset`); return; }
+  const base = edgeBaseline[key];
+  if (!base) { check(id, `${what}: UNMEASURABLE, the baseline has no ${key}`, false); return; }
+  const diff = (a, b) => a.reduce((n, px, i) => n + (px.join() === (b[i] ?? []).join() ? 0 : 1), 0);
+  const dv = win.v.length === base.v.length ? diff(win.v, base.v) : -1;
+  const dh = win.h.length === base.h.length ? diff(win.h, base.h) : -1;
+  check(id, what, dv === 0 && dh === 0,
+    `left window ${win.v.length} px, ${dv} differ; top window ${win.h.length} px, ${dh} differ (baseline ${EDGE_BASELINE}${edgeBaseline.tag ? `, tag ${edgeBaseline.tag}` : ''})`);
+}
 mkdirSync(SHOT_DIR, { recursive: true });
 const J = (v) => JSON.stringify(v);
 
@@ -323,6 +357,21 @@ async function partStrokes(scale) {
     const on = (await c.send('Page.captureScreenshot', { format: 'png' })).data;
     writeFileSync(`${SHOT_DIR}/${TAG}-scale${scale}-hover-off.png`, Buffer.from(off, 'base64'));
     writeFileSync(`${SHOT_DIR}/${TAG}-scale${scale}-hover-on.png`, Buffer.from(on, 'base64'));
+    // ROW 238: the stamp-DRAG preview. A real press starts the gesture (the preview is
+    // drawn from the in-progress stroke), a real Escape cancels it (ClassicLevelViewport's
+    // keydown: no command), and only then the real release, which has nothing to commit.
+    const cellA0 = await c.json(`window.__dbg.classic.layoutCell(${bnd.col - 1}, ${bnd.row}, "fg")`);
+    await mouseEv(c, 'mousePressed', hx, hy, 'left', 1);
+    await sleep(500);
+    const press = (await c.send('Page.captureScreenshot', { format: 'png' })).data;
+    writeFileSync(`${SHOT_DIR}/${TAG}-scale${scale}-drag-press.png`, Buffer.from(press, 'base64'));
+    const esc = { key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 };
+    await c.send('Input.dispatchKeyEvent', { type: 'keyDown', ...esc });
+    await c.send('Input.dispatchKeyEvent', { type: 'keyUp', ...esc });
+    await sleep(200);
+    await mouseEv(c, 'mouseReleased', hx, hy, 'left', 0);
+    await sleep(300);
+    const cellA1 = await c.json(`window.__dbg.classic.layoutCell(${bnd.col - 1}, ${bnd.row}, "fg")`);
     await mouseEv(c, 'mouseMoved', 4, 4);
     note(`${P}`, 'hover', `(${hx},${hy}) -> world ${J(hw)} cell ${J(hoverCell)} (cell A is ${bnd.col - 1},${bnd.row}); shots ${TAG}-scale${scale}-hover-{off,on}.png`);
     if (hoverCell.col !== bnd.col - 1 || hoverCell.row !== bnd.row) throw new Error('the hover aim is not in cell A: UNMEASURABLE');
@@ -381,6 +430,30 @@ async function partStrokes(scale) {
       `Y-1 changed on ${rws[2].changed}/${SPAN} columns; anti-vacuous: the hover drew at this edge: ${edgeDrawnH}`);
     check(`${P}.4`, 'top edge: device row Y is the stroke at full strength on every sampled column',
       shotIsDevice && rws[3].full === SPAN, `Y full-strength on ${rws[3].full}/${SPAN} columns`);
+
+    // ── ROW 238: the 2 CSS px stamp-drag preview, against the hover-on shot ──────────
+    check(`${P}.5`, 'READ ONLY: the press/Escape/release left cell A holding what it held (nothing stamped)',
+      cellA0 === cellA1 && cellA0 === bnd.A, `cell A before ${cellA0}, after ${cellA1}, expected ${bnd.A}`);
+    const vP = await read(press, winV), hP = await read(press, winH);
+    const dCol = (k) => { let changed = 0, fullN = 0; for (let y = 0; y < winV.h; y++) { const i = y * winV.w + k; if (!same(vOn.px[i], vP.px[i])) changed++; if (inBand(vP.px[i])) fullN++; } return { changed, full: fullN }; };
+    const dRow = (k) => { let changed = 0, fullN = 0; for (let x = 0; x < winH.w; x++) { const i = k * winH.w + x; if (!same(hOn.px[i], hP.px[i])) changed++; if (inBand(hP.px[i])) fullN++; } return { changed, full: fullN }; };
+    const dc = [0, 1, 2, 3, 4, 5, 6].map(dCol), dr = [0, 1, 2, 3, 4, 5, 6].map(dRow);
+    note(`${P}`, 'drag preview, left edge per device column (vs hover on)', fmt(dc, 'X'));
+    note(`${P}`, 'drag preview, top edge per device row (vs hover on)', fmt(dr, 'Y'));
+    note(`${P}`, 'one device row across the left edge, X-3..X+3, drag press', hexs(vP.px.slice(mid * 7, mid * 7 + 7)));
+    check(`${P}.6`, 'drag preview, left edge: X-2 is unchanged by the press on every sampled row (the outer edge is the X-2|X-1 boundary)',
+      shotIsDevice && dc[1].changed === 0 && dc[3].full === SPAN, `X-2 changed ${dc[1].changed}/${SPAN}; anti-vacuous X full ${dc[3].full}/${SPAN}`);
+    check(`${P}.7`, 'drag preview, left edge: X-1 and X are the stroke at full strength on every sampled row (BOTH edges on whole device px)',
+      shotIsDevice && dc[2].full === SPAN && dc[3].full === SPAN, `X-1 full ${dc[2].full}/${SPAN}, X full ${dc[3].full}/${SPAN}`);
+    check(`${P}.8`, 'drag preview, left edge: X+1 is never at full strength (the inner edge is the X|X+1 boundary)',
+      shotIsDevice && dc[4].full === 0, `X+1 full ${dc[4].full}/${SPAN}`);
+    check(`${P}.9`, 'drag preview, top edge: Y-2 is unchanged by the press on every sampled column',
+      shotIsDevice && dr[1].changed === 0 && dr[3].full === SPAN, `Y-2 changed ${dr[1].changed}/${SPAN}; anti-vacuous Y full ${dr[3].full}/${SPAN}`);
+    check(`${P}.10`, 'drag preview, top edge: Y-1 and Y at full strength on every sampled column',
+      shotIsDevice && dr[2].full === SPAN && dr[3].full === SPAN, `Y-1 full ${dr[2].full}/${SPAN}, Y full ${dr[3].full}/${SPAN}`);
+    check(`${P}.11`, 'drag preview, top edge: Y+1 never at full strength',
+      shotIsDevice && dr[4].full === 0, `Y+1 full ${dr[4].full}/${SPAN}`);
+    if (scale === 1) identityRow(`${P}.12`, 'dpr 1: the drag preview\'s edge windows are PIXEL-IDENTICAL to the baseline build\'s', 'bs-drag', { v: vP.px, h: hP.px });
   }, { electronArgs: [`--force-device-scale-factor=${scale}`] });
 }
 
@@ -511,22 +584,25 @@ async function partMapStrokes(scale) {
     const mid = Math.floor(winV.h / 2);
     note(P, 'one device row across the left edge, C-3..C+3, hover off', hexs(vOff.px.slice(mid * 7, mid * 7 + 7)));
     note(P, 'one device row across the left edge, C-3..C+3, hover on ', hexs(vOn.px.slice(mid * 7, mid * 7 + 7)));
-    check(`${P}.1`, 'left edge: device column C-2 is untouched by the hover on every sampled row',
+    check(`${P}.1`, 'left edge: device column C-2 is untouched by the hover on every sampled row (the outer edge is the C-2|C-1 boundary)',
       shotIsDevice && cols[1].changed === 0 && cols[3].full === SPAN,
       `C-2 changed on ${cols[1].changed}/${SPAN}; anti-vacuous: C full on ${cols[3].full}/${SPAN}; screenshot in device px: ${shotIsDevice} (${vOn.natW}x${vOn.natH})`);
-    check(`${P}.2`, 'left edge: device column C-1 is changed on every sampled row and never at full strength (the half-covered column of an even-width line: NOT whole device px, by the shared rule)',
-      shotIsDevice && cols[2].changed === SPAN && cols[2].full === 0,
-      `C-1 changed ${cols[2].changed}/${SPAN}, full ${cols[2].full}/${SPAN}`);
+    check(`${P}.2`, 'left edge: device column C-1 is the stroke at full strength on every sampled row (BOTH edges on whole device px)',
+      shotIsDevice && cols[2].full === SPAN, `C-1 full ${cols[2].full}/${SPAN}`);
     check(`${P}.3`, 'left edge: device column C is the stroke at full strength on every sampled row',
       shotIsDevice && cols[3].full === SPAN, `C full on ${cols[3].full}/${SPAN}`);
-    check(`${P}.4`, 'top edge: device row R-2 is untouched by the hover on every sampled column',
+    check(`${P}.4`, 'left edge: device column C+1 is never at full strength (the inner edge is the C|C+1 boundary)',
+      shotIsDevice && cols[4].full === 0, `C+1 full ${cols[4].full}/${SPAN}`);
+    check(`${P}.5`, 'top edge: device row R-2 is untouched by the hover on every sampled column',
       shotIsDevice && rws[1].changed === 0 && rws[3].full === SPAN,
       `R-2 changed on ${rws[1].changed}/${SPAN}; anti-vacuous: R full on ${rws[3].full}/${SPAN}`);
-    check(`${P}.5`, 'top edge: device row R-1 is changed on every sampled column and never at full strength (half-covered, by the shared rule)',
-      shotIsDevice && rws[2].changed === SPAN && rws[2].full === 0,
-      `R-1 changed ${rws[2].changed}/${SPAN}, full ${rws[2].full}/${SPAN}`);
-    check(`${P}.6`, 'top edge: device row R is the stroke at full strength on every sampled column',
+    check(`${P}.6`, 'top edge: device row R-1 is the stroke at full strength on every sampled column',
+      shotIsDevice && rws[2].full === SPAN, `R-1 full ${rws[2].full}/${SPAN}`);
+    check(`${P}.7`, 'top edge: device row R is the stroke at full strength on every sampled column',
       shotIsDevice && rws[3].full === SPAN, `R full on ${rws[3].full}/${SPAN}`);
+    check(`${P}.8`, 'top edge: device row R+1 is never at full strength',
+      shotIsDevice && rws[4].full === 0, `R+1 full ${rws[4].full}/${SPAN}`);
+    if (scale === 1) identityRow(`${P}.9`, 'dpr 1: the ghost outline\'s edge windows are PIXEL-IDENTICAL to the baseline build\'s', 'ms', { v: vOn.px, h: hOn.px });
     await mouseEv(c, 'mouseMoved', 4, 4);
   }, { electronArgs: [`--force-device-scale-factor=${scale}`] });
 }
@@ -540,6 +616,10 @@ try {
 } catch (e) {
   aborted = e;
   console.log(`\nHARNESS ABORTED: ${e.stack ?? e.message}`);
+}
+if (EDGE_OUT && !aborted) {
+  writeFileSync(EDGE_OUT, JSON.stringify({ tag: TAG, ...edgeWindows }));
+  console.log(`      edge windows written to ${EDGE_OUT}: ${Object.keys(edgeWindows).join(', ') || 'NONE (no dpr-1 part ran)'}`);
 }
 const bad = rows.filter((r) => !r.pass);
 console.log(`\n${rows.length - bad.length}/${rows.length} checks passed${aborted ? ' (RUN ABORTED: the rows above are a prefix, not a result)' : ''}`);
