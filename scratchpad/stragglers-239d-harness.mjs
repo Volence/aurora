@@ -13,7 +13,9 @@
 //       both inset, over the erase fill).
 //   m   OverlayRenderer's angle mark (site 3): the angles toggle, over a flat floor
 //       the app's own collision-mark report names. The vertical STEM is read (casing
-//       then core), at zoom 2 (the compact tier: stem only).
+//       then core), at zoom 2 (the compact tier: stem only). Since ROADMAP row 240 (c) its
+//       casing is its core plus the bar's margin, and `.stem.margins` classifies every
+//       pixel across it to measure its two casing margins in device px.
 //   b   OverlayRenderer's no-preview object box (site 3): the objects toggle, over an
 //       object the app draws as a box (found by looking for the box's own colour).
 //   l   the priority lens (site 4): the lens toggle, at a marked tile whose left
@@ -121,6 +123,14 @@ const ARROW = (() => {
   if (!m) throw new Error('ARROW_WIDTH_SCALE not found: UNMEASURABLE');
   return Number(m[1]);
 })();
+/**
+ * The stem's core and casing, CSS px (ROADMAP row 240 (c), overseer ruling 2026-09-28): the
+ * core is the bar's 1.25 at ARROW_WIDTH_SCALE, and the casing is that core plus the BAR's
+ * own casing margin, (3 - 1.25) / 2, on each side, so the stem is concentric in its casing.
+ * Before the ruling the casing was 3 x ARROW_WIDTH_SCALE and sat half a device px off.
+ */
+const STEM_CORE_CSS = 1.25 * ARROW;
+const STEM_CASING_CSS = STEM_CORE_CSS + (3 - 1.25);
 
 /**
  * `deviceStrokeWidth`'s parity rule, restated (canvas/device-grid.ts): the integer nearest
@@ -219,6 +229,43 @@ async function edgeRows(c, g, id, what, offB64, onB64, vertical, E, along, alter
   if (groups.in) check(`${id}.in`, `${what}: the columns INSIDE the stroke are the fill-only composite (nothing past the inner edge)`, ok(groups.in), say(groups.in));
   identity(`${id}.id`, `${what}: the on-shot cross-section`, on.px.map(hex), sameAsBaseline);
   return best;
+}
+
+/**
+ * THE STEM'S TWO CASING MARGINS, MEASURED ON SCREEN (ROADMAP row 240 (c)). Not from the
+ * predicted spans `edgeRows` scores: each pixel across the stem, device offsets lo..hi
+ * from E on every sampled line, is CLASSIFIED against the off shot's same pixel as
+ * core-over-casing (`C`), casing only (`K`), unchanged (`.`) or none of those (`?`), and
+ * each line must read `.* K+ C+ K+ .*`. Its left and right margins are the two `K` runs.
+ * The row passes only when EVERY line parses, both margins are equal on every line, and
+ * they equal `want`, derived from `deviceStrokeWidth`'s rule (never from this build).
+ */
+async function stemMarginRow(c, g, id, offB64, onB64, vertical, E, along, lo, hi, want, derivation) {
+  const offsets = [];
+  for (let o = lo; o <= hi; o++) offsets.push(o);
+  const pts = [];
+  for (const a of along) for (const o of offsets) pts.push(vertical ? [E + o, a] : [a, E + o]);
+  const off = await c.evalExpr(`${SHOT_PIXELS}(${J(offB64)}, ${J(pts)})`);
+  const on = await c.evalExpr(`${SHOT_PIXELS}(${J(onB64)}, ${J(pts)})`);
+  const shotIsDevice = on.natW === Math.round(g.innerWidth * g.dpr) && on.natH === Math.round(g.innerHeight * g.dpr);
+  const lines = along.map((a, t) => offsets.map((o, k) => {
+    const i = t * offsets.length + k;
+    const u = off.px[i], v = on.px[i];
+    const cas = over(u, C.casing);
+    if (close(v, over(cas, C.tick))) return 'C';
+    if (close(v, cas)) return 'K';
+    if (close(v, u)) return '.';
+    return '?';
+  }).join(''));
+  const parsed = lines.map((l) => /^\.*(K+)(C+)(K+)\.*$/.exec(l));
+  const bad = lines.filter((l, t) => !parsed[t] || parsed[t][1].length !== parsed[t][3].length || parsed[t][1].length !== want);
+  const counts = {};
+  for (const m of parsed) if (m) { const k = `${m[1].length}/${m[3].length} (core ${m[2].length})`; counts[k] = (counts[k] ?? 0) + 1; }
+  note(id, `stem cross-sections E${lo}..E+${hi}, one per sampled ${vertical ? 'row' : 'column'} (C core, K casing, . unchanged)`,
+    `${J([...new Set(lines)])}; left/right margins: ${J(counts)}`);
+  check(id, `the stem's casing shows ${want} device px on EACH side of its core (${derivation}), on every one of ${lines.length} sampled lines`,
+    shotIsDevice && lines.length >= 8 && want > 0 && bad.length === 0,
+    `${bad.length} line(s) off: ${J(bad.slice(0, 4))}; screenshot in device px: ${shotIsDevice}`);
 }
 
 /**
@@ -446,8 +493,8 @@ async function partScale(scale) {
           `camera (${CX},${CY}); mark ${J(pick)}; report ${J({ active: rep.active, suppressed: rep.suppressed, tier: rep.tier, drawn: rep.drawn })}; searched ${seen.cameras} cameras; shots ${TAG}-scale${scale}-mark-{off,on}.png`);
         const X = vertical ? dx(pick.ax, CX) : dy(pick.ay, CY);
         const E = Math.round(X);
-        const [wc] = widths(3 * ARROW, g.dpr);
-        const cores = widths(1.25 * ARROW, g.dpr);
+        const [wc] = widths(STEM_CASING_CSS, g.dpr);
+        const cores = widths(STEM_CORE_CSS, g.dpr);
         const [cl, ch] = strokeSpan(X, wc).map((v) => v - E);
         const a0 = vertical ? (Math.min(pick.ay, pick.tipy) - CY) * Z : (Math.min(pick.ax, pick.tipx) - CX) * Z;
         const a1 = vertical ? (Math.max(pick.ay, pick.tipy) - CY) * Z : (Math.max(pick.ax, pick.tipx) - CX) * Z;
@@ -457,8 +504,10 @@ async function partScale(scale) {
           const [kl, kh] = strokeSpan(X, wk).map((v) => v - E);
           return { name: `casing ${wc}, core ${wk}`, layers: [{ col: C.casing, span: [cl, ch] }, { col: C.tick, span: [kl, kh] }] };
         });
-        await edgeRows(c, g, `${id}.stem`, `angle mark stem (${vertical ? 'vertical' : 'horizontal'}; casing ${3 * ARROW} CSS px, core ${1.25 * ARROW})`, mOff, mOn, vertical, E, along, alts,
+        await edgeRows(c, g, `${id}.stem`, `angle mark stem (${vertical ? 'vertical' : 'horizontal'}; casing ${STEM_CASING_CSS} CSS px, core ${STEM_CORE_CSS})`, mOff, mOn, vertical, E, along, alts,
           { out: [cl - 2, cl - 1, ch, ch + 1], stroke: [...Array(ch - cl).keys()].map((k) => cl + k) }, 8);
+        await stemMarginRow(c, g, `${id}.stem.margins`, mOff, mOn, vertical, E, along, cl - 3, ch + 3,
+          (wc - cores[0]) / 2, `casing ${wc}, core ${cores[0]} device px (deviceStrokeWidth, a tie thinner)`);
       }
       await c.evalExpr('window.__dbg.setOverlay("showCollisionAngles", false)');
       await c.evalExpr('window.__dbg.setOverlay("showCollision", false)');
