@@ -24,6 +24,15 @@
 // bake refusal (C4 naming its clip, an act-level C2/C3, the page budget) is
 // shown like a loader refusal, and a bake that crashed is shown as a crash of
 // the BAKE, never as "aeon's bake refused".
+//
+// ROW 229 (aeon d796ad94). A woven act's clipact.json also carries shaft rows
+// and one fill row. The look call (overseer, under the owner's 2026-09-18
+// permission for this lane): each gets its own section in the same grid, below
+// the corridors, headed by a full-width row, with the same four columns and the
+// same tooltips; rows are labelled by the file's own ids. The tile sum is
+// checked over every list the page shows. A pool list the page does not read
+// is named ("pool.per_X is in this file and not shown") and the sum reads
+// "cannot check: unshown rows", never a mismatch accusation against aeon.
 
 import React from 'react';
 import { CollapsibleSection, SectionBody, NumberField } from '../ui';
@@ -336,12 +345,26 @@ const POOL_COLUMNS: Array<{ field: PoolRowField; label: string }> = [
 
 const NUM: React.CSSProperties = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
 
+type PoolKind = 'clip' | 'corridor' | 'shaft' | 'fill';
+
+/** The two sections row 229 adds below the corridors; each is headed by a full-width row when it has rows. */
+const POOL_SECTIONS: Array<{ kind: 'shaft' | 'fill'; heading: string }> = [
+  { kind: 'shaft', heading: 'shafts' },
+  { kind: 'fill', heading: 'fill' },
+];
+
 /**
- * Each clip's and corridor's pool cost, as aeon's bake counted it. The column
- * tooltips are the file's own per_clip_fields. Nothing is totalled but the one
- * sum aeon states (added tiles plus the blank make the act's tiles).
+ * Each clip's, corridor's, shaft's and fill's pool cost, as aeon's bake counted
+ * it. The column tooltips are the file's own per_clip_fields. Nothing is
+ * totalled but the one sum aeon states (added tiles plus the blank make the
+ * act's tiles), and that only over rows the page shows.
+ *
+ * THE FILL ROW HAS NO RECT, but every column here is a count aeon writes for it
+ * (sliced by the fill's cell mask), so no cell of it depends on geometry and
+ * none reads as a placeholder. A column that DID depend on a rectangle would
+ * have to read as not applicable for the fill, with a tooltip, never 0.
  */
-function PoolRowsView({ clipact }: { clipact: Record<string, unknown> }): React.ReactElement {
+export function PoolRowsView({ clipact }: { clipact: Record<string, unknown> }): React.ReactElement {
   const pr = readPoolRows(clipact);
   if (pr.state === 'unavailable') {
     return (
@@ -350,14 +373,28 @@ function PoolRowsView({ clipact }: { clipact: Record<string, unknown> }): React.
       </div>
     );
   }
-  const rows: Array<{ kind: 'clip' | 'corridor'; row: PoolRow }> = [
+  const rows: Array<{ kind: PoolKind; row: PoolRow }> = [
     ...pr.perClip.map((row) => ({ kind: 'clip' as const, row })),
     ...pr.perCorridor.map((row) => ({ kind: 'corridor' as const, row })),
   ];
+  const sectionRows: Record<'shaft' | 'fill', PoolRow[]> = { shaft: pr.perShaft, fill: pr.perFill };
   const cell: React.CSSProperties = { ...NOTE, padding: `0 ${T.s1}` };
+  const rowCells = (kind: PoolKind, row: PoolRow, label: string) => (
+    <React.Fragment key={`${kind}:${row.index}`}>
+      <div role="cell" data-donors-pool-row={`${kind}:${row.index}`} data-donors-pool-id={row.id}
+           style={{ ...cell, color: T.textHi, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {label}
+      </div>
+      {POOL_COLUMNS.map((c) => (
+        <div key={c.field} role="cell" data-donors-pool-cell={`${kind}:${row.index}:${c.field}`} style={{ ...cell, ...NUM }}>
+          {row[c.field]}
+        </div>
+      ))}
+    </React.Fragment>
+  );
   return (
     <div data-donors-pool-rows="present" style={{ display: 'flex', flexDirection: 'column', gap: T.s1 }}>
-      <div role="table" aria-label="Pool cost per clip and corridor" style={{
+      <div role="table" aria-label="Pool cost per clip, corridor, shaft and fill" style={{
         display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) repeat(4, auto)', columnGap: T.s2,
         border: `1px solid ${T.border}`, borderRadius: T.rSm, padding: T.s1,
       }}>
@@ -366,23 +403,25 @@ function PoolRowsView({ clipact }: { clipact: Record<string, unknown> }): React.
           <div key={c.field} role="columnheader" title={pr.fields[c.field]} data-donors-pool-head={c.field}
                style={{ ...cell, ...NUM, textDecoration: 'underline dotted', cursor: 'help' }}>{c.label}</div>
         ))}
-        {rows.map(({ kind, row }) => (
-          <React.Fragment key={`${kind}:${row.index}`}>
-            <div role="cell" data-donors-pool-row={`${kind}:${row.index}`} data-donors-pool-id={row.id}
-                 style={{ ...cell, color: T.textHi, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {kind === 'corridor' ? `corridor ${row.id}` : row.id}
+        {rows.map(({ kind, row }) => rowCells(kind, row, kind === 'corridor' ? `corridor ${row.id}` : row.id))}
+        {POOL_SECTIONS.filter((sec) => sectionRows[sec.kind].length > 0).map((sec) => (
+          <React.Fragment key={sec.kind}>
+            <div role="rowheader" data-donors-pool-section={sec.kind}
+                 style={{ ...cell, gridColumn: '1 / -1', marginTop: T.s1, borderTop: `1px solid ${T.border}`, color: T.textHi }}>
+              {sec.heading}
             </div>
-            {POOL_COLUMNS.map((c) => (
-              <div key={c.field} role="cell" data-donors-pool-cell={`${kind}:${row.index}:${c.field}`} style={{ ...cell, ...NUM }}>
-                {row[c.field]}
-              </div>
-            ))}
+            {sectionRows[sec.kind].map((row) => rowCells(sec.kind, row, row.id))}
           </React.Fragment>
         ))}
       </div>
+      {pr.unshown.map((k) => (
+        <div key={k} data-donors-pool-unshown={k} style={WARN}>pool.{k} is in this file and not shown.</div>
+      ))}
       <div data-donors-pool-note style={NOTE}>
-        Tiles leave out the blank tile every act carries: the added column plus 1 makes the act&apos;s {pr.poolTiles}.
-        Pages touched counts a shared page once for EACH rectangle that touches it, so that column is not a share
+        Tiles leave out the blank tile every act carries: {pr.tilesSum.state === 'cannot-check'
+          ? <span data-donors-pool-sum="cannot-check">the added column cannot be checked against the act&apos;s {pr.poolTiles} (cannot check: unshown rows, {pr.tilesSum.why}).</span>
+          : <span data-donors-pool-sum={pr.tilesSum.state}>the added column plus 1 makes the act&apos;s {pr.poolTiles}.</span>}
+        {' '}Pages touched counts a shared page once for EACH row that touches it, so that column is not a share
         of the act&apos;s {pr.poolPages} pages and is not totalled. The worst camera window is counted for the act only.
       </div>
       {pr.broken.length > 0 && (
