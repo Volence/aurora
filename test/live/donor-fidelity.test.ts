@@ -37,7 +37,8 @@
 //       aeon's stated invariants (sum(tiles_added) + 1 == pool.tiles,
 //       sum(pages_exclusive) <= pool.pages, each row's added <= tiles and own
 //       <= touched), and the file's per_clip_fields is the one the vendored
-//       unit fixture carries;
+//       unit fixture carries; since row 229 the rows include per_shaft and
+//       per_fill (s2_woven has both) and the tile sum runs over all four lists;
 //   F6  (row 213) a REAL `validate --json` refusal, through Aurora's argv,
 //       parses to the rule and the clip the mutation touched, and a manifest
 //       that is not JSON comes back as a CRASH (exit 1, no JSON), never a
@@ -261,7 +262,9 @@ describe('F2..F4: what Aurora writes is what aeon accepts and composes', () => {
 describe('F5, F6: aeon\'s row-213 answers, from its real tools, through Aurora\'s channel', () => {
   const VENDORED = resolve(__dirname, '../fixtures/clips/aeon-outputs');
 
-  for (const act of ['s2_ehz_cpz', 's2_two_clip', 's2_two_clip_pins', 's2_ehz_boot']) {
+  // s2_woven (row 229): the committed act with shafts and a fill, so its rows include
+  // pool.per_shaft and pool.per_fill and aeon's tile sum runs over all four lists.
+  for (const act of ['s2_ehz_cpz', 's2_two_clip', 's2_two_clip_pins', 's2_ehz_boot', 's2_woven']) {
     it(`F5: ${act}: a real bake's per-clip rows read in full and keep aeon's stated invariants`, async (ctx) => {
       const s = need(ctx);
       if (!s) return;
@@ -274,14 +277,16 @@ describe('F5, F6: aeon\'s row-213 answers, from its real tools, through Aurora\'
       expect(r.ok, `${r.stdout}\n${r.stderr}\n${r.couldNotRun ?? ''}`).toBe(true);
       const clipact = JSON.parse(r.baked!.clipact) as Record<string, unknown> & {
         pool: { tiles: number; pages: number; per_clip: unknown[]; per_corridor: unknown[]; per_clip_fields: Record<string, string> };
-        clips: unknown[]; corridors: unknown[];
+        clips: unknown[]; corridors: unknown[]; shafts?: unknown[];
       };
       const rows = readPoolRows(clipact);
       expect(rows.state, rows.state === 'unavailable' ? rows.why : '').toBe('present');
       if (rows.state !== 'present') return;
-      const all = [...rows.perClip, ...rows.perCorridor];
+      const all = [...rows.perClip, ...rows.perCorridor, ...rows.perShaft, ...rows.perFill];
       expect(rows.perClip.length).toBe(clipact.clips.length);
       expect(rows.perCorridor.length).toBe(clipact.corridors.length);
+      expect(rows.perShaft.length).toBe((clipact.shafts ?? []).length);
+      expect(rows.unshown).toEqual([]);
       expect(all.reduce((a, x) => a + x.tiles_added, 0) + 1).toBe(clipact.pool.tiles);
       expect(all.reduce((a, x) => a + x.pages_exclusive, 0)).toBeLessThanOrEqual(clipact.pool.pages);
       for (const x of all) {
@@ -289,7 +294,10 @@ describe('F5, F6: aeon\'s row-213 answers, from its real tools, through Aurora\'
         expect(x.pages_exclusive).toBeLessThanOrEqual(x.pages_touched);
       }
       expect(rows.broken).toEqual([]);
-      const vendored = JSON.parse(readFileSync(join(VENDORED, 's2_ehz_cpz.clipact.json'), 'utf8')) as { pool: { per_clip_fields: unknown } };
+      // An act with shafts or a fill carries aeon's reworded tiles_added meaning, so it is held
+      // to its OWN vendored capture when there is one (s2_woven), the others to s2_ehz_cpz's.
+      const vendoredAct = existsSync(join(VENDORED, `${act}.clipact.json`)) ? act : 's2_ehz_cpz';
+      const vendored = JSON.parse(readFileSync(join(VENDORED, `${vendoredAct}.clipact.json`), 'utf8')) as { pool: { per_clip_fields: unknown } };
       expect(clipact.pool.per_clip_fields, 'aeon\'s per_clip_fields moved: re-vendor test/fixtures/clips/aeon-outputs (see each file\'s .provenance.json)')
         .toEqual(vendored.pool.per_clip_fields);
       const touched = all.reduce((a, x) => a + x.pages_touched, 0);
