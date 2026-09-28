@@ -179,7 +179,7 @@ const SHOT_PIXELS = String.raw`((b64, pts) => new Promise((res, rej) => {
  *             candidate width set; the row passes if one alternative predicts every pixel
  *   groups    { out: [...offsets], stroke: [...], in: [...] }
  */
-async function edgeRows(c, g, id, what, offB64, onB64, vertical, E, along, alternatives, groups) {
+async function edgeRows(c, g, id, what, offB64, onB64, vertical, E, along, alternatives, groups, minN = 12) {
   const offsets = [...new Set(Object.values(groups).flat())].sort((a, b) => a - b);
   const pts = [];
   for (const o of offsets) for (const a of along) pts.push(vertical ? [E + o, a] : [a, E + o]);
@@ -207,9 +207,9 @@ async function edgeRows(c, g, id, what, offB64, onB64, vertical, E, along, alter
   note(id, `one line across it, E${offsets[0]}..E+${offsets[offsets.length - 1]}, off`, line(off));
   note(id, `one line across it, E${offsets[0]}..E+${offsets[offsets.length - 1]}, on `, line(on));
   OUT[id] = { offsets, n, on: on.px.map(hex) };
-  const sd = `screenshot in device px: ${shotIsDevice} (${on.natW}x${on.natH})`;
+  const sd = `screenshot in device px: ${shotIsDevice} (${on.natW}x${on.natH}); ${n} sampled (at least ${minN} required)`;
   const bad = (os) => best.miss.filter((x) => os.includes(x.o) && x.m > 0);
-  const ok = (os) => shotIsDevice && n >= 12 && bad(os).length === 0;
+  const ok = (os) => shotIsDevice && n >= minN && bad(os).length === 0;
   const say = (os) => `${os.map((o) => `E${o >= 0 ? '+' : ''}${o}`).join(',')} mismatched ${J(bad(os))}; ${sd}`;
   if (groups.out) check(`${id}.out`, `${what}: the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)`, ok(groups.out), say(groups.out));
   if (groups.stroke) check(`${id}.stroke`, `${what}: the stroke's own columns are the whole-pixel composite (both edges whole)`, ok(groups.stroke), say(groups.stroke));
@@ -361,21 +361,70 @@ async function partScale(scale) {
       const id = `${P}.m`;
       await c.evalExpr('window.__dbg.setOverlay("showCollision", true)');
       await c.evalExpr('window.__dbg.setOverlay("showCollisionAngles", true)');
-      // Look for a flat floor (horizontal bar, vertical stem, known open side) the app's
-      // own report names, over a few cameras.
-      let pick = null, cam = null;
-      for (const [CX, CY] of [[0, 0], [0, 256], [256, 256], [512, 256], [0, 512], [256, 512], [768, 512], [1024, 768]]) {
-        await setView(CX, CY);
-        const rep = await c.json('window.__dbg.aeon.collisionMarks()');
-        const vw = cssW / Z, vh = cssH / Z;
-        const ok = (r) => r.normalKnown && Math.abs(r.bar1y - r.bar2y) < 1e-9 && Math.abs(r.tipx - r.ax) < 1e-9
-          && Number.isInteger(r.ax * 2) && r.ax - CX > 24 && r.ax - CX < vw - 24 && Math.min(r.ay, r.tipy) - CY > 24 && Math.max(r.ay, r.tipy) - CY < vh - 24;
-        pick = (rep.rows ?? []).find(ok) ?? null;
-        if (pick) { cam = [CX, CY]; break; }
+      // An AXIS-ALIGNED stem the app's own report names (a vertical stem: a floor or
+      // ceiling mark; a horizontal one: a wall's), with a known open side, searched over a
+      // grid of cameras across section 0. Aeon's flat ground carries no angle (no mark at
+      // all), so most marks on screen are slopes, which the rule leaves diagonal.
+      let pick = null, cam = null, vertical = true;
+      const seen = { cameras: 0, marks: 0 };
+      const vw = cssW / Z, vh = cssH / Z;
+      search:
+      for (let CY = 0; CY <= 2048 - vh; CY += 256) {
+        for (let CX = 0; CX <= 2048 - vw; CX += 256) {
+          await c.evalExpr(`window.__dbg.setView(${CX}, ${CY}, ${Z})`); await sleep(220);
+          const rep = await c.json('window.__dbg.aeon.collisionMarks()');
+          seen.cameras++; seen.marks += (rep.rows ?? []).length;
+          const inView = (r) => Math.min(r.ax, r.tipx) - CX > 24 && Math.max(r.ax, r.tipx) - CX < vw - 24
+            && Math.min(r.ay, r.tipy) - CY > 24 && Math.max(r.ay, r.tipy) - CY < vh - 24;
+          for (const r of rep.rows ?? []) {
+            if (!r.normalKnown || !inView(r)) continue;
+            if (Math.abs(r.tipx - r.ax) < 1e-9) { pick = r; vertical = true; cam = [CX, CY]; break search; }
+            if (Math.abs(r.tipy - r.ay) < 1e-9) { pick = r; vertical = false; cam = [CX, CY]; break search; }
+          }
+        }
+      }
+      note(id, 'real axis-aligned marks in section 0', pick ? J(pick) : `none over ${seen.cameras} cameras (${seen.marks} marks reported, every one slanted)`);
+      if (!pick) {
+        // AUTHORED FIXTURE, SAID SO: section 0 draws no axis-aligned mark (aeon's flat
+        // ground carries the odd "no angle" byte). So an air cell is poked, in memory
+        // only, with each shape the bank gives an AXIS-ALIGNED angle byte (read from the
+        // copy's own angles.bin, base dir first as the loader probes), through the app's
+        // own word packing (`armCollisionBrush`), until the app's report names its mark.
+        const bank = ['base/angles.bin', 'angles.bin'].map((f) => `${AEONDIR}/games/sonic4/data/collision/${f}`).find((f) => existsSync(f));
+        const angles = bank ? [...readFileSync(bank)] : [];
+        const shapes = angles.map((v, i) => ((v & 0xff) % 0x40 === 0 && i > 0 ? i : -1)).filter((i) => i > 0).slice(0, 40);
+        const CX = 512, CY = 512;
+        await c.evalExpr(`window.__dbg.setView(${CX}, ${CY}, ${Z})`); await sleep(300);
+        const W = 256;
+        let cell = null;
+        // The right half of the view: the collision legend (a DOM box over the map) sits
+        // at its left and grows a row when the angles are switched on.
+        for (let cr = Math.ceil((CY + 64) / 16); cr < (CY + vh - 64) / 16 && !cell; cr++) {
+          for (let cc = Math.ceil((CX + vw * 0.55) / 16); cc < (CX + vw - 64) / 16; cc++) {
+            const around = [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]].map(([x, y]) => ((cr + y) * 2) * W + (cc + x) * 2);
+            const words = [];
+            for (const i of around) words.push(await c.json(`window.__dbg.aeon.collisionAt(0, 'a', ${i})`));
+            if (words.every((w) => w === 0)) { cell = { cc, cr }; break; }
+          }
+        }
+        for (const shape of cell ? shapes : []) {
+          const { word } = await c.json(`window.__dbg.aeon.armCollisionBrush({ shape: ${shape}, solidity: 'all' })`);
+          for (const [x, y] of [[0, 0], [1, 0], [0, 1], [1, 1]]) await c.json(`window.__dbg.aeon.collisionPoke(0, 'a', ${(cell.cr * 2 + y) * W + cell.cc * 2 + x}, ${word})`);
+          await c.evalExpr(`window.__dbg.setView(${CX}, ${CY + 1}, ${Z})`); await sleep(200);
+          await c.evalExpr(`window.__dbg.setView(${CX}, ${CY}, ${Z})`); await sleep(300);
+          const rep = await c.json('window.__dbg.aeon.collisionMarks()');
+          const r = (rep.rows ?? []).find((q) => q.ax >= cell.cc * 16 && q.ax <= cell.cc * 16 + 16 && q.ay >= cell.cr * 16 && q.ay <= cell.cr * 16 + 16);
+          if (r && r.normalKnown && (Math.abs(r.tipx - r.ax) < 1e-9 || Math.abs(r.tipy - r.ay) < 1e-9)) {
+            pick = r; vertical = Math.abs(r.tipx - r.ax) < 1e-9; cam = [CX, CY];
+            note(id, 'authored fixture', `shape ${shape} (angle byte 0x${angles[shape].toString(16)}), word 0x${word.toString(16)}, poked into air cell ${J(cell)} of plane A`);
+            break;
+          }
+        }
+        if (!pick) note(id, 'authored fixture', `no shape of ${J(shapes)} (bank ${bank}) drew an axis-aligned mark in air cell ${J(cell)}`);
       }
       await c.evalExpr('window.__dbg.setOverlay("showCollisionAngles", false)');
       if (!pick) {
-        check(`${id}.0`, 'PREMISE: the collision-mark report names a flat floor with a vertical stem in view', false, 'none found over 8 cameras: UNMEASURABLE');
+        check(`${id}.0`, 'PREMISE: an axis-aligned stem is on screen (a real one, or the authored fixture)', false, 'UNMEASURABLE on screen');
       } else {
         const [CX, CY] = cam;
         await setView(CX, CY); await park();
@@ -384,22 +433,24 @@ async function partScale(scale) {
         const rep = await c.json('window.__dbg.aeon.collisionMarks()');
         const mOn = await shotB64(c);
         save('mark-off', mOff); save('mark-on', mOn);
-        check(`${id}.0`, 'PREMISE: a flat floor\'s mark is drawn at the compact tier (stem only) at zoom 2',
+        check(`${id}.0`, `PREMISE: an axis-aligned (${vertical ? 'vertical' : 'horizontal'}) stem is drawn at the compact tier (stem only) at zoom 2`,
           rep.active && !rep.suppressed && rep.tier === 'compact' && (rep.rows ?? []).some((r) => r.ax === pick.ax && r.ay === pick.ay),
-          `camera (${CX},${CY}); mark ${J(pick)}; report ${J({ active: rep.active, suppressed: rep.suppressed, tier: rep.tier, drawn: rep.drawn })}; shots ${TAG}-scale${scale}-mark-{off,on}.png`);
-        const X = dx(pick.ax, CX);
+          `camera (${CX},${CY}); mark ${J(pick)}; report ${J({ active: rep.active, suppressed: rep.suppressed, tier: rep.tier, drawn: rep.drawn })}; searched ${seen.cameras} cameras; shots ${TAG}-scale${scale}-mark-{off,on}.png`);
+        const X = vertical ? dx(pick.ax, CX) : dy(pick.ay, CY);
         const E = Math.round(X);
         const [wc] = widths(3 * ARROW, g.dpr);
         const cores = widths(1.25 * ARROW, g.dpr);
         const [cl, ch] = strokeSpan(X, wc).map((v) => v - E);
-        const y0 = (Math.min(pick.ay, pick.tipy) - CY) * Z, y1 = (Math.max(pick.ay, pick.tipy) - CY) * Z;
-        const along = sampleLine(oy, y0 + 2, y1 - 2, g.dpr);
+        const a0 = vertical ? (Math.min(pick.ay, pick.tipy) - CY) * Z : (Math.min(pick.ax, pick.tipx) - CX) * Z;
+        const a1 = vertical ? (Math.max(pick.ay, pick.tipy) - CY) * Z : (Math.max(pick.ax, pick.tipx) - CX) * Z;
+        // The stem is only NORMAL_LEN (6.5 world px, 13 CSS at zoom 2) long: 1 CSS px clear of each end.
+        const along = sampleLine(vertical ? oy : ox, a0 + 1, a1 - 1, g.dpr);
         const alts = cores.map((wk) => {
           const [kl, kh] = strokeSpan(X, wk).map((v) => v - E);
           return { name: `casing ${wc}, core ${wk}`, layers: [{ col: C.casing, span: [cl, ch] }, { col: C.tick, span: [kl, kh] }] };
         });
-        await edgeRows(c, g, `${id}.stem`, `angle mark stem (vertical; casing ${3 * ARROW} CSS px, core ${1.25 * ARROW})`, mOff, mOn, true, E, along, alts,
-          { out: [cl - 2, cl - 1, ch, ch + 1], stroke: [...Array(ch - cl).keys()].map((k) => cl + k) });
+        await edgeRows(c, g, `${id}.stem`, `angle mark stem (${vertical ? 'vertical' : 'horizontal'}; casing ${3 * ARROW} CSS px, core ${1.25 * ARROW})`, mOff, mOn, vertical, E, along, alts,
+          { out: [cl - 2, cl - 1, ch, ch + 1], stroke: [...Array(ch - cl).keys()].map((k) => cl + k) }, 8);
       }
       await c.evalExpr('window.__dbg.setOverlay("showCollisionAngles", false)');
       await c.evalExpr('window.__dbg.setOverlay("showCollision", false)');
