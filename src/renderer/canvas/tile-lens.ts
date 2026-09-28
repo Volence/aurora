@@ -39,6 +39,8 @@
 // stroke appears where the region simply continues off-screen. Classic passes
 // the whole chunk and is therefore bit-identical to the loop this replaced.
 
+import { segmentsOnDeviceGrid, type SegmentPathCtx } from './device-grid';
+
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
 export interface TileLensSpec {
@@ -63,6 +65,15 @@ export interface TileLensSpec {
   edge: string;
   /** One SCREEN px in world units — the ctx is scaled by zoom. */
   invZoom: number;
+  /**
+   * The canvas's device scale, when the caller wants the boundary strokes ON THE DEVICE
+   * GRID (ROADMAP row 238 (c), the Sonic 1 priority lens): they then go through
+   * `segmentsOnDeviceGrid` (canvas/device-grid.ts), each edge on the device half-pixel
+   * `snapStroke` picks and its ends on whole device px. Absent, the strokes are drawn in
+   * world units exactly as before; aeon's lenses pass nothing, so their picture is
+   * unchanged by row 238.
+   */
+  dpr?: number;
 }
 
 /** What one call actually painted, so a caller can publish a real count. */
@@ -107,20 +118,23 @@ export function drawTileLens(ctx: Ctx, spec: TileLensSpec): TileLensDrawn {
   }
 
   // Boundary strokes: each marked tile's sides whose neighbour is KNOWN-unmarked.
-  ctx.strokeStyle = spec.edge;
-  ctx.lineWidth = 1 * invZoom;
-  ctx.beginPath();
+  const path: SegmentPathCtx = spec.dpr === undefined
+    ? (ctx as unknown as SegmentPathCtx)
+    : segmentsOnDeviceGrid(ctx, spec.dpr);
+  path.strokeStyle = spec.edge;
+  path.lineWidth = 1 * invZoom;
+  path.beginPath();
   for (let ty = r0; ty < r1; ty++) {
     for (let tx = c0; tx < c1; tx++) {
       if (!on(tx, ty)) continue;
       const x = originX + tx * T;
       const y = originY + ty * T;
-      if (ty > 0 && !on(tx, ty - 1)) { ctx.moveTo(x, y); ctx.lineTo(x + T, y); drawn.segments++; }
-      if (ty < rows - 1 && !on(tx, ty + 1)) { ctx.moveTo(x, y + T); ctx.lineTo(x + T, y + T); drawn.segments++; }
-      if (tx > 0 && !on(tx - 1, ty)) { ctx.moveTo(x, y); ctx.lineTo(x, y + T); drawn.segments++; }
-      if (tx < cols - 1 && !on(tx + 1, ty)) { ctx.moveTo(x + T, y); ctx.lineTo(x + T, y + T); drawn.segments++; }
+      if (ty > 0 && !on(tx, ty - 1)) { path.moveTo(x, y); path.lineTo(x + T, y); drawn.segments++; }
+      if (ty < rows - 1 && !on(tx, ty + 1)) { path.moveTo(x, y + T); path.lineTo(x + T, y + T); drawn.segments++; }
+      if (tx > 0 && !on(tx - 1, ty)) { path.moveTo(x, y); path.lineTo(x, y + T); drawn.segments++; }
+      if (tx < cols - 1 && !on(tx + 1, ty)) { path.moveTo(x + T, y); path.lineTo(x + T, y + T); drawn.segments++; }
     }
   }
-  ctx.stroke();
+  path.stroke();
   return drawn;
 }

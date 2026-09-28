@@ -21,6 +21,12 @@ function mockCtx() {
   const ctx = {
     lineWidth: 0, font: '', textAlign: '' as CanvasTextAlign, fillStyle: '', strokeStyle: '',
     save() {}, restore() {}, translate() {}, scale() {}, beginPath() {}, fill() {}, stroke() {}, setLineDash() {},
+    // Row 238 (c): the marker and selection outlines, the crosshair and the lens edges
+    // are stroked on the device grid, which reads the matrix in force and strokes
+    // under the canvas's CSS transform. An identity matrix at dpr 1 keeps this
+    // stand-in's world coordinates what they were.
+    getTransform() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
+    setTransform() {},
     // The overlay measures its labels now (ROADMAP 5.1 item 17), so a stand-in
     // context has to answer measureText. `monoMeasureText` reports the metric the
     // real app resolves, read at the stub's own font.
@@ -50,7 +56,7 @@ describe('drawObjects detached-bitmap guard', () => {
   it('does not throw and skips drawImage when the sprite bitmap is detached (width 0)', () => {
     const { ctx, calls } = mockCtx();
     const sprites = new Map<string, ObjectSprite>([['16', sprite(0)]]); // closed bitmap ($10 = 16)
-    expect(() => drawObjects(ctx, docWithObject(0x10), 1, sprites, '')).not.toThrow();
+    expect(() => drawObjects(ctx, docWithObject(0x10), 1, 1, sprites, '')).not.toThrow();
     expect(calls.drawImage).toBe(0);   // never blit a detached source
     expect(calls.fillRect).toBeGreaterThan(0); // fell back to the hex box
   });
@@ -58,14 +64,14 @@ describe('drawObjects detached-bitmap guard', () => {
   it('draws the sprite when its bitmap is live (width > 0)', () => {
     const { ctx, calls } = mockCtx();
     const sprites = new Map<string, ObjectSprite>([['16', sprite(16)]]);
-    drawObjects(ctx, docWithObject(0x10), 1, sprites, '');
+    drawObjects(ctx, docWithObject(0x10), 1, 1, sprites, '');
     expect(calls.drawImage).toBe(1);
   });
 
   it('falls back to the ring markers (no drawImage) for a detached ring sprite ($25)', () => {
     const { ctx, calls } = mockCtx();
     const sprites = new Map<string, ObjectSprite>([['37', sprite(0)]]); // $25 = 37
-    expect(() => drawObjects(ctx, docWithObject(0x25), 1, sprites, '')).not.toThrow();
+    expect(() => drawObjects(ctx, docWithObject(0x25), 1, 1, sprites, '')).not.toThrow();
     expect(calls.drawImage).toBe(0);
     expect(calls.arc).toBeGreaterThan(0); // ring circle markers drawn instead
   });
@@ -73,7 +79,7 @@ describe('drawObjects detached-bitmap guard', () => {
   it('draws a ghost marker (labelled box, no hex) for an invisible id with no sprite', () => {
     const { ctx, calls } = mockCtx();
     // $49 Waterfall Sound Effect — an invisible/trigger id with no linked art.
-    drawObjects(ctx, docWithObject(0x49), 1, new Map(), '');
+    drawObjects(ctx, docWithObject(0x49), 1, 1, new Map(), '');
     expect(calls.drawImage).toBe(0); // no sprite
     expect(calls.fillRect).toBeGreaterThan(0); // muted ghost box drawn
     expect(calls.fillText).toBeGreaterThan(0); // labelled with the object name
@@ -84,11 +90,11 @@ describe('drawObjects detached-bitmap guard', () => {
     // Monitor $26 subtype 6 → composed key "38:6". A sprite published under the bare
     // id ("38") must NOT be picked up (subtype rule keys by subtype).
     const wrongKey = new Map<string, ObjectSprite>([['38', sprite(16)]]);
-    drawObjects(ctx, { objects: [{ x: 50, y: 50, id: 0x26, subtype: 6, xflip: false, yflip: false, respawn: false }] } as unknown as LevelDoc, 1, wrongKey, 'ghz');
+    drawObjects(ctx, { objects: [{ x: 50, y: 50, id: 0x26, subtype: 6, xflip: false, yflip: false, respawn: false }] } as unknown as LevelDoc, 1, 1, wrongKey, 'ghz');
     expect(calls.drawImage).toBe(0); // bare-id sprite ignored — falls back to hex box
     const rightKey = new Map<string, ObjectSprite>([['38:6', sprite(16)]]);
     const r2 = mockCtx();
-    drawObjects(r2.ctx, { objects: [{ x: 50, y: 50, id: 0x26, subtype: 6, xflip: false, yflip: false, respawn: false }] } as unknown as LevelDoc, 1, rightKey, 'ghz');
+    drawObjects(r2.ctx, { objects: [{ x: 50, y: 50, id: 0x26, subtype: 6, xflip: false, yflip: false, respawn: false }] } as unknown as LevelDoc, 1, 1, rightKey, 'ghz');
     expect(r2.calls.drawImage).toBe(1); // composed sprite drawn
   });
 });
@@ -206,7 +212,12 @@ describe('drawCollision angle mark', () => {
     // the cell centre HERE only because the fixture floor is exactly half
     // height; the discriminating row for the anchor is in
     // collision-angle-mark.test.ts, which uses a shallow slope.
-    expect(core[STEM_ROOT].y).toBeCloseTo(8, 10);
+    //
+    // Since row 238 (c) the mark is stroked under the canvas's CSS transform (on the
+    // device grid where it is axis-aligned; this $E0 mark is diagonal and is not
+    // moved), so its points are recorded in CSS px: world y 8 under this fixture's
+    // matrix (scale DETAIL_SCALE, no translation, dpr 1) is 8 x DETAIL_SCALE.
+    expect(core[STEM_ROOT].y).toBeCloseTo(8 * DETAIL_SCALE, 10);
   });
 
   // THE SIZE RULE REACHES CLASSIC TOO. Between the density gate and
@@ -286,7 +297,13 @@ function priorityCtx() {
   const lines: { x: number; y: number }[] = [];
   const ctx = {
     lineWidth: 0, fillStyle: '', strokeStyle: '',
-    beginPath() {}, stroke() {},
+    beginPath() {}, stroke() {}, save() {}, restore() {},
+    // Row 238 (c): the marker and selection outlines, the crosshair and the lens edges
+    // are stroked on the device grid, which reads the matrix in force and strokes
+    // under the canvas's CSS transform. An identity matrix at dpr 1 keeps this
+    // stand-in's world coordinates what they were.
+    getTransform() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
+    setTransform() {},
     fillRect(x: number, y: number, w: number, h: number) { rects.push({ x, y, w, h }); },
     moveTo(x: number, y: number) { lines.push({ x, y }); },
     lineTo(x: number, y: number) { lines.push({ x, y }); },
@@ -318,10 +335,10 @@ function priorityDoc(xf: boolean, yf: boolean, allLow = false): LevelDoc {
 describe('drawPriority', () => {
   it('veils exactly the high tile: at TL unflipped, mirrored to TR when the CHUNK cell is x-flipped', () => {
     const plain = priorityCtx();
-    drawPriority(plain.ctx, priorityDoc(false, false), 0, 0, 1, 1);
+    drawPriority(plain.ctx, priorityDoc(false, false), 0, 0, 1, 1, 1);
     expect(plain.rects).toEqual([{ x: 0, y: 0, w: 8, h: 8 }]); // TL tile of cell (0,0)
     const flipped = priorityCtx();
-    drawPriority(flipped.ctx, priorityDoc(true, false), 0, 0, 1, 1);
+    drawPriority(flipped.ctx, priorityDoc(true, false), 0, 0, 1, 1, 1);
     // The flip trap: the chunk-cell xf mirrors the ARRANGEMENT, so the single
     // high tile lands in the TR quadrant (x=8), not still at x=0.
     expect(flipped.rects).toEqual([{ x: 8, y: 0, w: 8, h: 8 }]);
@@ -329,29 +346,37 @@ describe('drawPriority', () => {
 
   it('outlines the lone high tile on its interior boundaries only', () => {
     const { ctx, lines } = priorityCtx();
-    drawPriority(ctx, priorityDoc(false, true), 0, 0, 1, 1);
+    drawPriority(ctx, priorityDoc(false, true), 0, 0, 1, 1, 1);
     // yf puts the high tile at BL of cell (0,0) = tile (0,1): y=8..16, x=0..8.
     // Its left side sits ON the chunk perimeter → skipped; the other 3 stroke.
+    //
+    // ON THE DEVICE GRID since row 238 (c), at dpr 1 under an identity matrix: each
+    // edge's row or column is snapStroke's round(v) + 0.5 and its ends are whole px.
+    // So the top edge (y 8) is drawn on 8.5 from x 0 to 8, the bottom (y 16) on 16.5,
+    // and the right side (x 8) on 8.5 from y 8 to 16. Before row 238 these were the
+    // raw world edges (x in {0, 8}, y in {8, 16}); the row still holds which three
+    // sides stroke and that nothing else does.
     expect(lines.length).toBe(6); // 3 segments × (moveTo + lineTo)
-    for (const p of lines) {
-      expect(p.x === 0 || p.x === 8).toBe(true);
-      expect(p.y === 8 || p.y === 16).toBe(true);
-    }
+    expect(lines).toEqual([
+      { x: 0, y: 8.5 }, { x: 8, y: 8.5 },
+      { x: 0, y: 16.5 }, { x: 8, y: 16.5 },
+      { x: 8.5, y: 8 }, { x: 8.5, y: 16 },
+    ]);
   });
 
   it('draws NOTHING when every tile is low priority (anti-vacuous)', () => {
     const { ctx, rects, lines } = priorityCtx();
-    drawPriority(ctx, priorityDoc(false, false, true), 0, 0, 1, 1);
+    drawPriority(ctx, priorityDoc(false, false, true), 0, 0, 1, 1, 1);
     expect(rects).toEqual([]);
     expect(lines).toEqual([]);
   });
 
   it('draws nothing for air ($00) and offsets veils by the layout cell', () => {
     const air = priorityCtx();
-    drawPriority(air.ctx, priorityDoc(false, false), 3, 2, 0, 1);
+    drawPriority(air.ctx, priorityDoc(false, false), 3, 2, 0, 1, 1);
     expect(air.rects).toEqual([]);
     const placed = priorityCtx();
-    drawPriority(placed.ctx, priorityDoc(false, false), 3, 2, 1, 1);
+    drawPriority(placed.ctx, priorityDoc(false, false), 3, 2, 1, 1, 1);
     expect(placed.rects).toEqual([{ x: 3 * 256, y: 2 * 256, w: 8, h: 8 }]);
   });
 });

@@ -119,6 +119,100 @@ export function strokeRectOnDeviceGrid(
   ctx.restore();
 }
 
+/** The path calls `segmentsOnDeviceGrid` answers: the shape of `MarkDrawCtx`. */
+export interface SegmentPathCtx {
+  strokeStyle: string;
+  lineWidth: number;
+  beginPath(): void;
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  stroke(): void;
+}
+
+/**
+ * A path context, in the CURRENT user space of `ctx` (the world, under an axis-aligned
+ * `setTransform(dpr) / scale(zoom) / translate(-cam)`), whose straight segments are
+ * stroked ON THE DEVICE GRID by the same rule as `strokeRectOnDeviceGrid` (ROADMAP row
+ * 238 (c)): each segment is drawn under the canvas's CSS transform, and
+ *
+ *   - a HORIZONTAL segment's row goes on `snapStroke(y, w).at`, a VERTICAL one's column
+ *     on `snapStroke(x, w).at`, its two ends on `snapLength`, and its width is
+ *     `deviceStrokeWidth(w, dpr)` device px, where `w` is the `lineWidth` set (in the
+ *     caller's world units) mapped to CSS px;
+ *   - a DIAGONAL segment is drawn where it was, at its unsnapped CSS width. The shared
+ *     rule is about device rows and columns, and a slanted line crosses both; it cannot
+ *     be given whole device pixels, and no rule for it is invented here.
+ *
+ * A segment counts as horizontal or vertical when its other axis moves less than 1e-6
+ * CSS px, because the directions reaching this function come from `Math.cos` /
+ * `Math.sin` (collision-needle.ts `angleNeedle`), where a quarter turn leaves ~6e-17
+ * rather than zero.
+ *
+ * `strokeStyle` and `lineWidth` are forwarded as state; `ctx`'s transform, dash and
+ * everything else are left exactly as they were found. The world-to-CSS mapping is read
+ * once, when this is called.
+ */
+export function segmentsOnDeviceGrid(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  dpr: number,
+): SegmentPathCtx {
+  const m = ctx.getTransform();
+  const cssX = (wx: number): number => (wx * m.a + m.e) / dpr;
+  const cssY = (wy: number): number => (wy * m.d + m.f) / dpr;
+  let segs: [number, number, number, number][] = [];
+  let pen: [number, number] | null = null;
+  const out: SegmentPathCtx = {
+    strokeStyle: '',
+    lineWidth: 1,
+    beginPath() { segs = []; pen = null; },
+    moveTo(x, y) { pen = [cssX(x), cssY(y)]; },
+    lineTo(x, y) {
+      const next: [number, number] = [cssX(x), cssY(y)];
+      if (pen) segs.push([pen[0], pen[1], next[0], next[1]]);
+      pen = next;
+    },
+    stroke() {
+      const w = (out.lineWidth * Math.abs(m.a)) / dpr;
+      const snapped = snapStroke(0, w, dpr).width;
+      // ONE PATH PER WIDTH, so a caller's single stroke (the priority lens's many
+      // boundary segments) stays one stroke: the snapped segments first, then any
+      // diagonal ones.
+      const diagonal: [number, number, number, number][] = [];
+      ctx.save();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.strokeStyle = out.strokeStyle;
+      ctx.lineWidth = snapped;
+      ctx.beginPath();
+      let axisAligned = 0;
+      for (const seg of segs) {
+        const [x0, y0, x1, y1] = seg;
+        if (Math.abs(y1 - y0) < 1e-6) {
+          const at = snapStroke(y0, w, dpr).at;
+          ctx.moveTo(snapLength(x0, dpr), at);
+          ctx.lineTo(snapLength(x1, dpr), at);
+          axisAligned++;
+        } else if (Math.abs(x1 - x0) < 1e-6) {
+          const at = snapStroke(x0, w, dpr).at;
+          ctx.moveTo(at, snapLength(y0, dpr));
+          ctx.lineTo(at, snapLength(y1, dpr));
+          axisAligned++;
+        } else {
+          diagonal.push(seg);
+        }
+      }
+      if (axisAligned > 0) ctx.stroke();
+      if (diagonal.length > 0) {
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        for (const [x0, y0, x1, y1] of diagonal) { ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); }
+        ctx.stroke();
+      }
+      ctx.restore();
+    },
+  };
+  return out;
+}
+
 /**
  * How many DEVICE pixels this display puts inside one CSS pixel, right now.
  *
