@@ -7,8 +7,11 @@
 //     the canvas mirror of --warning; no new colour), tagged with the rule. A
 //     paste refusal's subjects are placed on the manifest aeon judged (the act
 //     plus the pasted clip), a re-bake refusal's on the act on disk. A pair rule
-//     gives two outlines. A subject not on the pane draws nothing here and is
-//     named "not on this pane" in the refusal text (refused-subjects.ts).
+//     gives two outlines. A refused SHAFT is outlined at its dst_rect the same
+//     way (row 233 (a), ruled); the pane draws no standing shaft, so it shows
+//     one only while a refusal names it. A subject not on the pane (the fill, a
+//     shaft past the act) draws nothing here and is named "not on this pane"
+//     in the refusal text (refused-subjects.ts).
 //
 // Cleared with the refusal: a paste refusal by the next paste, an edit of the
 // draft or marquee, or leaving the page (donor-paste.ts `clearRefusal`); a

@@ -14,6 +14,7 @@ import { resolve } from 'node:path';
 import { parseClipManifest } from '../../src/core/formats/donors/clip-manifest-doc';
 import { FILL_SUBJECT_LABEL, readBakeJson, readValidateJson, type ClipNote } from '../../src/core/formats/donors/clip-validate-json';
 import { resolveRefusedSubjects, subjectsLabelOnPane } from '../../src/core/formats/donors/refused-subjects';
+import { SECTION_PIXEL_SIZE } from '../../src/core/model/s4-types';
 
 const DIR = resolve(__dirname, '../fixtures/clips');
 type Case = { exit: number; stdout: string; stderr: string; manifest?: unknown };
@@ -72,7 +73,7 @@ describe('a refusal\'s subjects, placed on the pane\'s manifest', () => {
     expect({ placed: got.placed.length, offPane: got.offPane.length }).toEqual({ placed: 0, offPane: 1 });
   });
 
-  it('a subject of a kind the pane does not draw (aeon\'s shaft, K9) is OFF the pane, never placed on a corridor at that index', () => {
+  it('a shaft subject is looked up among the act\'s SHAFTS, never on a corridor at that index (s2_ehz_cpz has corridors and no shafts)', () => {
     // aeon's real R10 clip+corridor answer with the corridor subject's kind read as aeon's
     // `shaft` (an R10 overlap can name a shaft, clip_manifest.py's `_subject_of`): same
     // index, so a lookup in the wrong list would land on s2_ehz_cpz's corridor 0.
@@ -85,36 +86,99 @@ describe('a refusal\'s subjects, placed on the pane\'s manifest', () => {
     expect(resolveRefusedSubjects(r, doc).offPane.map((o) => o.subject)).toEqual([shaft]);
   });
 
-  // ROW 232: aeon's REAL K8/K9 refusals on the woven act, placed on the manifest aeon
-  // judged (each case's `manifest`, recorded by gen_validate_json.py).
+  // ROWS 232/233: aeon's REAL K8/K9 refusals on the woven act, placed on the manifest aeon
+  // judged (each case's `manifest`, recorded by gen_validate_json.py). Row 233 (a), RULED:
+  // a refused shaft is outlined at its dst_rect like a clip or corridor; one whose dst_rect
+  // is not on the pane keeps "(not on this pane)"; the fill is never outlined.
   const judged = (k: string) => parseClipManifest(JSON.stringify(VALIDATE[k].manifest));
+  type WovenRaw = { act: { grid_w: number; grid_h: number }; clips: Array<{ id: string; dst_rect: RawRect }>; shafts: Array<{ id: string; dst_rect: RawRect }> };
+  const rawJudged = (k: string) => VALIDATE[k].manifest as WovenRaw;
 
-  it('a real K9 pair (a clip and a shaft sharing an id): the CLIP is outlined at its own rectangle, the shaft is named off the pane', () => {
+  it('a real K9 pair (a clip and a shaft sharing an id): BOTH are outlined, the clip at its rectangle and the shaft at ITS dst_rect', () => {
     const k = 'refuse_k9_shaft_dup_clip_id';
     const r = refusalsOf('validate', VALIDATE[k]);
     const [clip, shaft] = r[0].subjects;
     expect([clip.kind, shaft.kind]).toEqual(['clip', 'shaft']);
     // Anti-vacuous: the shaft's index is ALSO a clip's index on this manifest, and that clip
-    // carries the same id, so a lookup that ignored the kind would outline the clip twice.
+    // carries the same id, so a lookup that ignored the kind would outline the clip twice;
+    // and the two rectangles differ, so two outlines at one place cannot pass for this.
     const doc = judged(k);
+    const raw = rawJudged(k);
     expect(doc.clips[shaft.index].id).toBe(shaft.id);
+    expect(raw.shafts[shaft.index].dst_rect).not.toEqual(raw.clips[clip.index].dst_rect);
     const got = resolveRefusedSubjects(r, doc);
-    const raw = VALIDATE[k].manifest as { clips: Array<{ dst_rect: RawRect }> };
-    expect(got.placed.map((p) => ({ rule: p.rule, subject: p.subject, rect: p.rect })))
-      .toEqual([{ rule: r[0].rule, subject: clip, rect: raw.clips[clip.index].dst_rect }]);
-    expect(got.offPane).toEqual([{ rule: r[0].rule, subject: shaft }]);
-    expect(subjectsLabelOnPane(r[0].subjects, doc)).toBe(`clip ${clip.index} ${clip.id} and shaft ${shaft.index} ${shaft.id} (not on this pane)`);
+    expect(got.placed.map((p) => ({ rule: p.rule, subject: p.subject, rect: p.rect }))).toEqual([
+      { rule: r[0].rule, subject: clip, rect: raw.clips[clip.index].dst_rect },
+      { rule: r[0].rule, subject: shaft, rect: raw.shafts[shaft.index].dst_rect },
+    ]);
+    expect(got.offPane).toEqual([]);
+    expect(subjectsLabelOnPane(r[0].subjects, doc)).toBe(`clip ${clip.index} ${clip.id} and shaft ${shaft.index} ${shaft.id}`);
   });
 
-  it('a real K9 (one shaft) and a real K8 (the fill): nothing outlined, each subject named off the pane, none dropped', () => {
-    for (const k of ['refuse_k9_shaft_ledge_pitch', 'refuse_k8_fill_no_why']) {
-      const r = refusalsOf('validate', VALIDATE[k]);
-      expect(r[0].subjects.length, k).toBe(1);
-      const got = resolveRefusedSubjects(r, judged(k));
-      expect({ placed: got.placed, offPane: got.offPane }, k).toEqual({ placed: [], offPane: [{ rule: r[0].rule, subject: r[0].subjects[0] }] });
-    }
-    const fill = refusalsOf('validate', VALIDATE.refuse_k8_fill_no_why)[0];
-    expect(subjectsLabelOnPane(fill.subjects, judged('refuse_k8_fill_no_why'))).toBe(`${FILL_SUBJECT_LABEL} (not on this pane)`);
+  it('a real K9 on one shaft (ledge pitch): the shaft is outlined at its dst_rect, tagged K9, and named plainly', () => {
+    const k = 'refuse_k9_shaft_ledge_pitch';
+    const r = refusalsOf('validate', VALIDATE[k]);
+    const [shaft] = r[0].subjects;
+    expect(r[0].subjects.map((s) => s.kind)).toEqual(['shaft']);
+    const got = resolveRefusedSubjects(r, judged(k));
+    expect({ placed: got.placed, offPane: got.offPane }).toEqual({
+      placed: [{ rule: r[0].rule, subject: shaft, rect: rawJudged(k).shafts[shaft.index].dst_rect }], offPane: [],
+    });
+    expect(subjectsLabelOnPane(r[0].subjects, judged(k))).toBe(`shaft ${shaft.index} ${shaft.id}`);
+  });
+
+  it('a malformed shaft BEFORE the refused one does not shift it: shafts are indexed as aeon counts them', () => {
+    // A plant on the manifest aeon judged: shafts[0] made a non-object (aeon would refuse it
+    // first, but the pane must still read the file). The refused shaft keeps its own index.
+    const k = 'refuse_k9_shaft_ledge_pitch';
+    const r = refusalsOf('validate', VALIDATE[k]);
+    const [shaft] = r[0].subjects;
+    expect(shaft.index).toBeGreaterThan(0);
+    const raw = structuredClone(rawJudged(k)) as unknown as { shafts: unknown[] };
+    raw.shafts[0] = 'not a shaft';
+    const got = resolveRefusedSubjects(r, parseClipManifest(JSON.stringify(raw)));
+    expect(got.placed.map((p) => p.rect)).toEqual([rawJudged(k).shafts[shaft.index].dst_rect]);
+  });
+
+  it('a shaft whose dst_rect the pane cannot read is named off the pane, and the manifest still opens', () => {
+    // A plant: the refused shaft's dst_rect removed (aeon's K9 "is missing 'dst_rect'").
+    // A clip or corridor with no rectangle makes the manifest unreadable; a shaft never
+    // did before row 233, and reading shafts must not start refusing such a file.
+    const k = 'refuse_k9_shaft_ledge_pitch';
+    const r = refusalsOf('validate', VALIDATE[k]);
+    const raw = structuredClone(rawJudged(k)) as unknown as { shafts: Array<Record<string, unknown>> };
+    delete raw.shafts[r[0].subjects[0].index].dst_rect;
+    const doc = parseClipManifest(JSON.stringify(raw));
+    expect(resolveRefusedSubjects(r, doc)).toEqual({ placed: [], offPane: [{ rule: r[0].rule, subject: r[0].subjects[0] }] });
+  });
+
+  it('a real K9 on a shaft wholly past the act: NOT outlined, named "(not on this pane)"', () => {
+    const k = 'refuse_k9_shaft_past_act';
+    const r = refusalsOf('validate', VALIDATE[k]);
+    const [shaft] = r[0].subjects;
+    expect(r[0].subjects.map((s) => s.kind)).toEqual(['shaft']);
+    // Anti-vacuous: the shaft IS in the judged manifest at that index with that id (so a
+    // lookup finds it), and its rectangle lies wholly outside the pane's world, which is
+    // the act's grid in sections (DonorTargetPane's worldW x worldH).
+    const doc = judged(k);
+    const raw = rawJudged(k);
+    const dst = raw.shafts[shaft.index].dst_rect;
+    expect(raw.shafts[shaft.index].id).toBe(shaft.id);
+    const paneW = raw.act.grid_w * SECTION_PIXEL_SIZE;
+    const paneH = raw.act.grid_h * SECTION_PIXEL_SIZE;
+    expect(dst.x >= paneW || dst.y >= paneH || dst.x + dst.w <= 0 || dst.y + dst.h <= 0).toBe(true);
+    const got = resolveRefusedSubjects(r, doc);
+    expect({ placed: got.placed, offPane: got.offPane }).toEqual({ placed: [], offPane: [{ rule: r[0].rule, subject: shaft }] });
+    expect(subjectsLabelOnPane(r[0].subjects, doc)).toBe(`shaft ${shaft.index} ${shaft.id} (not on this pane)`);
+  });
+
+  it('a real K8 (the fill) is still never outlined: named off the pane, not dropped', () => {
+    const k = 'refuse_k8_fill_no_why';
+    const r = refusalsOf('validate', VALIDATE[k]);
+    expect(r[0].subjects.length).toBe(1);
+    const got = resolveRefusedSubjects(r, judged(k));
+    expect({ placed: got.placed, offPane: got.offPane }).toEqual({ placed: [], offPane: [{ rule: r[0].rule, subject: r[0].subjects[0] }] });
+    expect(subjectsLabelOnPane(r[0].subjects, judged(k))).toBe(`${FILL_SUBJECT_LABEL} (not on this pane)`);
   });
 
   it('an act-level refusal (C3, no subjects) places nothing and names nothing off the pane', () => {

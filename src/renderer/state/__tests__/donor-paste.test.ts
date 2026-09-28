@@ -446,24 +446,44 @@ describe('the target pane outlines what a refusal names (row 213 (b))', () => {
     expect(got.map((x) => [x.rect, x.tag])).toEqual([[raw.clips[0].dst_rect, 'R10'], [raw.clips[0].dst_rect, 'R10']]);
   });
 
-  it('row 232: aeon\'s real K9 pair on the woven act (a clip and a shaft) is a REFUSAL; the clip is outlined, the shaft named off the pane', async () => {
-    // The act on disk is the manifest aeon judged in validate-json.cases.json's
-    // refuse_k9_shaft_dup_clip_id (its `manifest`); the paste appends CLIP after its
-    // clips, so every index aeon named still points where aeon meant.
-    const k = 'refuse_k9_shaft_dup_clip_id';
-    const act = CASES[k].manifest as { clips: Array<{ id: string; dst_rect: unknown }> };
-    const WOVEN_PATH = 'games/sonic4/data/clips/s2_woven/clips.json';
+  // Rows 232/233: the act on disk is the manifest aeon judged in validate-json.cases.json
+  // (the case's `manifest`); the paste appends CLIP after its clips, so every index aeon
+  // named still points where aeon meant.
+  const WOVEN_PATH = 'games/sonic4/data/clips/s2_woven/clips.json';
+  type Woven = { clips: Array<{ id: string; dst_rect: unknown }>; shafts: Array<{ id: string; dst_rect: unknown }> };
+  async function wovenRefusal(k: string) {
+    const act = CASES[k].manifest as Woven;
     const disk: Disk = { files: new Map([[WOVEN_PATH, { text: JSON.stringify(act, null, 2), mtimeMs: 7 }]]), clock: 100 };
     const p = ports(disk, { validate: (t) => (t.includes('ehz_x') ? aeonSaid(k) : {}) });
     await usePasteStore.getState().selectAct('s2_woven', p);
     const o = await usePasteStore.getState().paste(CLIP, p);
     const r = JSON.parse(CASES[k].stdout).refusals[0] as { rule: string; subjects: Array<{ kind: string; index: number; id: string }> };
+    return { act, o, p, r };
+  }
+
+  it('row 233 (a): aeon\'s real K9 pair on the woven act (a clip and a shaft) is a REFUSAL with TWO outlines, the clip\'s and the shaft\'s, both named plainly', async () => {
+    const { act, o, p, r } = await wovenRefusal('refuse_k9_shaft_dup_clip_id');
     const [clip, shaft] = r.subjects;
+    expect([clip.kind, shaft.kind]).toEqual(['clip', 'shaft']);
     expect(o.kind === 'crashed' ? o.text : o.kind).toBe('refused');
-    expect(outlinesNow()).toEqual([{ rect: act.clips[clip.index].dst_rect, tone: 'warning', dashed: true, tag: r.rule }]);
+    expect(outlinesNow()).toEqual([
+      { rect: act.clips[clip.index].dst_rect, tone: 'warning', dashed: true, tag: r.rule },
+      { rect: act.shafts[shaft.index].dst_rect, tone: 'warning', dashed: true, tag: r.rule },
+    ]);
     // The words DonorPasteSection shows beside the refusal (its data-donors-note-subjects span).
     expect(o.kind === 'refused' && subjectsLabelOnPane(o.refusals[0].subjects, o.judged))
-      .toBe(`clip ${clip.index} ${clip.id} and shaft ${shaft.index} ${shaft.id} (not on this pane)`);
+      .toBe(`clip ${clip.index} ${clip.id} and shaft ${shaft.index} ${shaft.id}`);
+    expect(p.writes).toEqual([]);
+  });
+
+  it('row 233 (a): aeon\'s real K9 on a shaft wholly past the act draws NO outline and names the shaft "(not on this pane)"', async () => {
+    const { o, p, r } = await wovenRefusal('refuse_k9_shaft_past_act');
+    const [shaft] = r.subjects;
+    expect(shaft.kind).toBe('shaft');
+    expect(o.kind === 'crashed' ? o.text : o.kind).toBe('refused');
+    expect(outlinesNow()).toEqual([]);
+    expect(o.kind === 'refused' && subjectsLabelOnPane(o.refusals[0].subjects, o.judged))
+      .toBe(`shaft ${shaft.index} ${shaft.id} (not on this pane)`);
     expect(p.writes).toEqual([]);
   });
 
