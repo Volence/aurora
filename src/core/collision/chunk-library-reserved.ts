@@ -11,10 +11,10 @@
 // ═══ WHICH MARKS ARE REFUSED: THE ONES THIS SESSION BROUGHT IN ═══
 //
 // A mark that was ALREADY in chunks.json when the project was opened is NOT
-// refused here. Whether it should block every save (the library is per-project,
-// so it would block every act, and no gesture clears a library chunk's bits
-// 15:14 today) is an open question for a ruling, so that case keeps the
-// behaviour it had before this module: written back unchanged. A mark is "already
+// refused here: it is written back unchanged (RULED 2026-09-28 by the overseer,
+// ROADMAP row 225: the library is per-project, so refusing would block every
+// act; no gesture clears a library chunk's bits 15:14; aeon reads no library
+// chunk collision, and a stamp is refused by 225(c)). A mark is "already
 // there" when the chunk with that id had the same width and height at load and
 // the SAME value of bits 15:14 at that word. Any other mark (a new chunk, a new
 // cell, a changed value, a resized chunk) is refused. `atLoad` absent means

@@ -277,8 +277,8 @@ export async function buildAeonSavePlan(
   // section. It is checked HERE, with the sections, so the refusal happens
   // before anything is planned and the same "Nothing was written." holds. Only
   // when this plan would write the library (the condition below), and only a
-  // mark this session brought in: one already in chunks.json at load is the
-  // undecided case collision/chunk-library-reserved.ts describes.
+  // mark this session brought in: one already in chunks.json at load is written
+  // back unchanged (ruled 2026-09-28; collision/chunk-library-reserved.ts).
   const libraryAudits = config.chunkLibraryPath && project.chunkLibrary.length > 0
     ? chunkLibraryReservedAudits(project.chunkLibrary, project.chunkLibraryMarksAtLoad)
     : [];

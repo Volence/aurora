@@ -648,8 +648,8 @@ export interface S4Project {
    * The library chunks whose collision already carried reserved bits 15:14 in
    * chunks.json when the project was opened, as the load read them, by id
    * (collision/chunk-library-reserved.ts). The save refuses a library mark NOT
-   * in this record; one that is in it keeps its pre-refusal behaviour pending a
-   * ruling (ROADMAP row 225). Ordinarily empty.
+   * in this record; one that is in it is written back unchanged (RULED
+   * 2026-09-28 by the overseer, ROADMAP row 225). Ordinarily empty.
    *
    * OPTIONAL ON PURPOSE, and absent is the STRICT reading: no record means no
    * mark counts as already on disk, so every library mark is refused. A second

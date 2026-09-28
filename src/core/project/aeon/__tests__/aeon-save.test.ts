@@ -1191,11 +1191,14 @@ describe('row 225(c): a mark copied by paste or chunk stamp is still audited and
 // the same way a section cell is: before anything is planned, naming the chunk
 // and the cell, ending "Nothing was written.".
 //
-// A mark that was ALREADY in chunks.json when the project was opened is the
-// undecided case (whether it should block an unrelated save is an open question
-// for a ruling, since no gesture clears a library chunk's bits 15:14 today). Its
-// row below pins TODAY'S behaviour, written back unchanged, so a ruling either
-// way turns exactly one row red.
+// A mark that was ALREADY in chunks.json when the project was opened does NOT
+// block the save: it is written back unchanged, including on a chunk edited this
+// session (RULED 2026-09-28 by the overseer). Reasons: the library is
+// project-wide, so refusing it would block every act's save; no editor gesture
+// clears a library chunk's bits 15:14; aeon does not read library chunk
+// collision (no chunks.json reader in ojz_strip_gen.py at aeon 4c828e3b), so a
+// chunk matters only once stamped, which 225(c) refuses; and the real OJZ
+// library has 0 marked words of 9088.
 // ═══════════════════════════════════════════════════════════════════════════
 describe('row 225 side finding: a mark in the chunk LIBRARY is refused by the save', () => {
   const LIB = 'data/ojz/chunks.json';
@@ -1264,7 +1267,7 @@ describe('row 225 side finding: a mark in the chunk LIBRARY is refused by the sa
     expect(err).not.toMatch(/cell \(col 0, row 0\)/);
   });
 
-  it('UNDECIDED, TODAY\'S BEHAVIOUR PINNED: a mark already in chunks.json at load is written back unchanged, not refused', async () => {
+  it('RULED 2026-09-28: a mark already in chunks.json at load does not block the save and is written back unchanged', async () => {
     const x = await loaded(libFixture([{ id: 'old', name: 'Old', a: [MARKED, 0, 0, 0] }]));
     const lib = await libWritten(x);
     expect(lib?.[0]!.collisionA[0]).toBe(MARKED);
