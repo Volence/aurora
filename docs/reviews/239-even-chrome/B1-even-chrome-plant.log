@@ -1,0 +1,256 @@
+
+> aurora@0.1.0 harness:even-chrome-239
+> node scratchpad/even-chrome-239-harness.mjs
+
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a
+
+=== session: e1: even-width chrome at --force-device-scale-factor=1 (port 9364 verified free) ===
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /home/volence/.cache/aurora-tmp-239/aurora-harness-profiles/even-chrome-239-harness-1282716-ee892786 — see HAZARD 6
+      provenance  app entry /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a/dist/main/index.mjs; aeon COPY /home/volence/.cache/aeon-copy-239-p1
+      e1  aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  e1.0  PREMISE: dpr 1 took, the map canvas sits on whole device px, the probe's two guides and the frame are drawn, a 2 CSS px line is 2 device px
+        geometry {"dpr":1,"left":284,"top":106,"width":816,"height":742,"innerWidth":1400,"innerHeight":872}; guides {"active":true,"sceneId":"even_chrome_probe","rows":[60,200]}; frame {"active":true,"rect":{"x":0,"y":0,"w":320,"h":224}}
+PASS  e1.g.0  PREMISE: a real mouse move onto layer 1's row hovers layer 1
+        aim (724,306); guides hoverIndex 1 dragIndex null; shots plantR1-scale1-guide-{off,on}.png
+      e1.g  hovered guide (horizontal), per device row E-3..E+3 over 60 sampled columns: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 60, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.g  one line across it, E-3..E+3, before: 000000 000000 000000 3ca5b4 000000 000000 000000
+      e1.g  one line across it, E-3..E+3, after : 000000 000000 4b7b80 96f5ff 4b7b80 000000 000000
+PASS  e1.g.1  hovered guide (horizontal): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1400x872)
+FAIL  e1.g.2  hovered guide (horizontal): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.g.3  hovered guide (horizontal): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.g.4  hovered guide (horizontal): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+PASS  e1.f.0  PREMISE: the hover on the frame's right edge hovers no guide (so only the frame changed)
+        aim (604,218); frame rect {"x":0,"y":0,"w":320,"h":224}; guides hoverIndex null; shots plantR1-scale1-frame-{off,on}.png
+      e1.f.right  active frame, right edge (vertical), per device column E-3..E+3 over 60 sampled rows: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 60, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.f.right  one line across it, E-3..E+3, before: 000000 000000 000000 d99133 000000 000000 000000
+      e1.f.right  one line across it, E-3..E+3, after : 000000 000000 7f693c ffd278 80693c 000000 000000
+PASS  e1.f.right.1  active frame, right edge (vertical): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1400x872)
+FAIL  e1.f.right.2  active frame, right edge (vertical): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.f.right.3  active frame, right edge (vertical): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.f.right.4  active frame, right edge (vertical): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+      e1.f.bottom  active frame, bottom edge (horizontal), per device row E-3..E+3 over 60 sampled columns: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 60, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.f.bottom  one line across it, E-3..E+3, before: 000000 000000 000000 d99133 000000 000000 000000
+      e1.f.bottom  one line across it, E-3..E+3, after : 000000 000000 7f693c ffd278 80693c 000000 000000
+PASS  e1.f.bottom.1  active frame, bottom edge (horizontal): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1400x872)
+FAIL  e1.f.bottom.2  active frame, bottom edge (horizontal): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.f.bottom.3  active frame, bottom edge (horizontal): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.f.bottom.4  active frame, bottom edge (horizontal): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+PASS  e1.r.0a  PREMISE: the one-region document is in the app, the view is zoom 1 at an integer camera, the canvas on whole device px
+        setRegions {"ok":true,"count":1}; view {"x":472,"y":472,"zoom":1}; geometry {"dpr":1,"left":284,"top":74,"width":836,"height":774,"innerWidth":1400,"innerHeight":872}
+PASS  e1.r.0  PREMISE: a real click on the panel row selected forest, and the overlay drew it selected
+        click {"x":1261,"y":122,"hitOk":true}; selectedRegionId forest; report {"mode":"full","regions":[{"id":"forest","visible":true,"bounds":{"x":512,"y":512,"w":1024,"h":1024},"rects":1,"hue":"#E69F00","selected":true}]}; shots plantR1-scale1-region-{off,on}.png
+      e1.r.left  selected region outline, left edge (vertical), per device column E-3..E+3 over 60 sampled rows: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 0, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.r.left  one line across it, E-3..E+3, before: b66d24 b66d24 7f582b e69f00 724000 492424 240000
+      e1.r.left  one line across it, E-3..E+3, after : b66d24 b66d24 b27c15 e69f00 ac7000 492424 240000
+PASS  e1.r.left.1  selected region outline, left edge (vertical): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1400x872)
+FAIL  e1.r.left.2  selected region outline, left edge (vertical): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.r.left.3  selected region outline, left edge (vertical): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.r.left.4  selected region outline, left edge (vertical): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+      e1.r.top  selected region outline, top edge (horizontal), per device row E-3..E+3 over 60 sampled columns: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 0, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.r.top  one line across it, E-3..E+3, before: 501e1e a23d3d 00190c e69f00 312200 372600 000000
+      e1.r.top  one line across it, E-3..E+3, after : 501e1e a23d3d 735c06 e69f00 8b6100 372600 000000
+PASS  e1.r.top.1  selected region outline, top edge (horizontal): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1400x872)
+FAIL  e1.r.top.2  selected region outline, top edge (horizontal): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.r.top.3  selected region outline, top edge (horizontal): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.r.top.4  selected region outline, top edge (horizontal): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+PASS  e1.d.0  PREMISE: the 'g' key armed the region tool, the tint is hidden, a real press inside forest and a real move of 64 px drew the gesture (one dragged outline), and releasing at the press point left the document as seeded
+        tool region; press (524,314) move +64; report {"mode":"gesture","drew":{"hatches":0,"unassignedHoles":0,"labels":0,"gestureOutlines":1,"trimmedOutlines":0}}; document unchanged true; shots plantR1-scale1-drag-{off,on}.png
+      e1.d.left  dragged region rect, left edge (vertical), per device column E-3..E+3 over 60 sampled rows: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 60, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.d.left  one line across it, E-3..E+3, before: b66d24 b66d24 924924 924924 b66d24 924924 b66d24
+      e1.d.left  one line across it, E-3..E+3, after : b66d24 b66d24 bc7412 e69f00 ce8612 924924 b66d24
+PASS  e1.d.left.1  dragged region rect, left edge (vertical): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1400x872)
+FAIL  e1.d.left.2  dragged region rect, left edge (vertical): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.d.left.3  dragged region rect, left edge (vertical): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.d.left.4  dragged region rect, left edge (vertical): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+      e1.d.top  dragged region rect, top edge (horizontal), per device row E-3..E+3 over 60 sampled columns: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 60, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.d.top  one line across it, E-3..E+3, before: b66d24 db9249 b66d24 924924 b66d24 492424 b6ff6d
+      e1.d.top  one line across it, E-3..E+3, after : b66d24 db9249 ce8612 e69f00 ce8612 492424 b6ff6d
+PASS  e1.d.top.1  dragged region rect, top edge (horizontal): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1400x872)
+FAIL  e1.d.top.2  dragged region rect, top edge (horizontal): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.d.top.3  dragged region rect, top edge (horizontal): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.d.top.4  dragged region rect, top edge (horizontal): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+   flush check armed: profile /home/volence/.cache/aurora-tmp-239/aurora-harness-profiles/even-chrome-239-harness-1282716-ee892786/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session ABSENT under this project key (session A opens the project mid-body), unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 99ms
+cleanup: tree under pid 1282739 (1 process(es)):
+           1282739 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (203B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (203B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+
+=== session: e1.5: even-width chrome at --force-device-scale-factor=1.5 (port 9364 verified free) ===
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+      provenance  app entry /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a/dist/main/index.mjs; aeon COPY /home/volence/.cache/aeon-copy-239-p1
+      e1.5  aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  e1.5.0  PREMISE: dpr 1.5 took, the map canvas sits on whole device px, the probe's two guides and the frame are drawn, a 2 CSS px line is 2 device px
+        geometry {"dpr":1.5,"left":284,"top":106,"width":536,"height":542,"innerWidth":1120,"innerHeight":672}; guides {"active":true,"sceneId":"even_chrome_probe","rows":[60,200]}; frame {"active":true,"rect":{"x":0,"y":0,"w":320,"h":224}}
+PASS  e1.5.g.0  PREMISE: a real mouse move onto layer 1's row hovers layer 1
+        aim (724,306); guides hoverIndex 1 dragIndex null; shots plantR1-scale1.5-guide-{off,on}.png
+      e1.5.g  hovered guide (horizontal), per device row E-3..E+3 over 60 sampled columns: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 60, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.5.g  one line across it, E-3..E+3, before: 000000 000000 000000 3ca5b4 000000 000000 000000
+      e1.5.g  one line across it, E-3..E+3, after : 000000 000000 4b7b80 96f5ff 4b7b80 000000 000000
+PASS  e1.5.g.1  hovered guide (horizontal): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1680x1008)
+FAIL  e1.5.g.2  hovered guide (horizontal): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.5.g.3  hovered guide (horizontal): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.5.g.4  hovered guide (horizontal): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+PASS  e1.5.f.0  PREMISE: the hover on the frame's right edge hovers no guide (so only the frame changed)
+        aim (604,218); frame rect {"x":0,"y":0,"w":320,"h":224}; guides hoverIndex null; shots plantR1-scale1.5-frame-{off,on}.png
+      e1.5.f.right  active frame, right edge (vertical), per device column E-3..E+3 over 60 sampled rows: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 60, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.5.f.right  one line across it, E-3..E+3, before: 000000 000000 000000 d99133 000000 000000 000000
+      e1.5.f.right  one line across it, E-3..E+3, after : 000000 000000 7f693c ffd278 80693c 000000 000000
+PASS  e1.5.f.right.1  active frame, right edge (vertical): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1680x1008)
+FAIL  e1.5.f.right.2  active frame, right edge (vertical): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.5.f.right.3  active frame, right edge (vertical): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.5.f.right.4  active frame, right edge (vertical): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+      e1.5.f.bottom  active frame, bottom edge (horizontal), per device row E-3..E+3 over 60 sampled columns: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 60, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.5.f.bottom  one line across it, E-3..E+3, before: 000000 000000 000000 d99133 000000 000000 000000
+      e1.5.f.bottom  one line across it, E-3..E+3, after : 000000 000000 7f693c ffd278 80693c 000000 000000
+PASS  e1.5.f.bottom.1  active frame, bottom edge (horizontal): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1680x1008)
+FAIL  e1.5.f.bottom.2  active frame, bottom edge (horizontal): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.5.f.bottom.3  active frame, bottom edge (horizontal): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.5.f.bottom.4  active frame, bottom edge (horizontal): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+PASS  e1.5.r.0a  PREMISE: the one-region document is in the app, the view is zoom 1 at an integer camera, the canvas on whole device px
+        setRegions {"ok":true,"count":1}; view {"x":472,"y":472,"zoom":1}; geometry {"dpr":1.5,"left":284,"top":74,"width":556,"height":574,"innerWidth":1120,"innerHeight":672}
+PASS  e1.5.r.0  PREMISE: a real click on the panel row selected forest, and the overlay drew it selected
+        click {"x":980,"y":121,"hitOk":true}; selectedRegionId forest; report {"mode":"full","regions":[{"id":"forest","visible":true,"bounds":{"x":512,"y":512,"w":1024,"h":1024},"rects":1,"hue":"#E69F00","selected":true}]}; shots plantR1-scale1.5-region-{off,on}.png
+      e1.5.r.left  selected region outline, left edge (vertical), per device column E-3..E+3 over 60 sampled rows: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 0, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.5.r.left  one line across it, E-3..E+3, before: b66d24 b66d24 76602f e69f00 924924 924924 924924
+      e1.5.r.left  one line across it, E-3..E+3, after : b66d24 b66d24 ae7f17 e69f00 bc7412 924924 924924
+PASS  e1.5.r.left.1  selected region outline, left edge (vertical): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1680x1008)
+FAIL  e1.5.r.left.2  selected region outline, left edge (vertical): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.5.r.left.3  selected region outline, left edge (vertical): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.5.r.left.4  selected region outline, left edge (vertical): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+      e1.5.r.top  selected region outline, top edge (horizontal), per device row E-3..E+3 over 60 sampled columns: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 0, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.5.r.top  one line across it, E-3..E+3, before: 000000 7d2f2f 754035 e69f00 000000 000000 000000
+      e1.5.r.top  one line across it, E-3..E+3, after : 000000 7d2f2f ad701a e69f00 735000 000000 000000
+PASS  e1.5.r.top.1  selected region outline, top edge (horizontal): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1680x1008)
+FAIL  e1.5.r.top.2  selected region outline, top edge (horizontal): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.5.r.top.3  selected region outline, top edge (horizontal): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.5.r.top.4  selected region outline, top edge (horizontal): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+PASS  e1.5.d.0  PREMISE: the 'g' key armed the region tool, the tint is hidden, a real press inside forest and a real move of 64 px drew the gesture (one dragged outline), and releasing at the press point left the document as seeded
+        tool region; press (524,314) move +64; report {"mode":"gesture","drew":{"hatches":0,"unassignedHoles":0,"labels":0,"gestureOutlines":1,"trimmedOutlines":0}}; document unchanged true; shots plantR1-scale1.5-drag-{off,on}.png
+      e1.5.d.left  dragged region rect, left edge (vertical), per device column E-3..E+3 over 60 sampled rows: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 60, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.5.d.left  one line across it, E-3..E+3, before: b66d24 b66d24 924924 b66d24 b66d24 924924 924924
+      e1.5.d.left  one line across it, E-3..E+3, after : b66d24 b66d24 bc7412 e69f00 ce8612 924924 924924
+PASS  e1.5.d.left.1  dragged region rect, left edge (vertical): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1680x1008)
+FAIL  e1.5.d.left.2  dragged region rect, left edge (vertical): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.5.d.left.3  dragged region rect, left edge (vertical): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.5.d.left.4  dragged region rect, left edge (vertical): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+      e1.5.d.top  dragged region rect, top edge (horizontal), per device row E-3..E+3 over 60 sampled columns: E-3: changed 0, full 0; E-2: changed 0, full 0; E-1: changed 60, full 0; E+0: changed 60, full 60; E+1: changed 60, full 0; E+2: changed 0, full 0; E+3: changed 0, full 0
+      e1.5.d.top  one line across it, E-3..E+3, before: 924924 924924 924924 b66d24 b66d24 924924 924924
+      e1.5.d.top  one line across it, E-3..E+3, after : 924924 924924 bc7412 e69f00 ce8612 924924 924924
+PASS  e1.5.d.top.1  dragged region rect, top edge (horizontal): E-2 is unchanged on every sampled line (nothing past the outer boundary)
+        E-2 changed 0/60; screenshot in device px: true (1680x1008)
+FAIL  e1.5.d.top.2  dragged region rect, top edge (horizontal): E-1 is the opaque stroke colour on every sampled line (BOTH edges on whole device px)
+        E-1 full 0/60
+PASS  e1.5.d.top.3  dragged region rect, top edge (horizontal): E is the opaque stroke colour on every sampled line
+        E full 60/60
+FAIL  e1.5.d.top.4  dragged region rect, top edge (horizontal): E+1 is unchanged on every sampled line (nothing crosses the inner boundary)
+        E+1 changed 60/60
+   flush check armed: profile /home/volence/.cache/aurora-tmp-239/aurora-harness-profiles/even-chrome-239-harness-1282716-ee892786/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session ABSENT under this project key (session A opens the project mid-body), unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 100ms
+cleanup: tree under pid 1286659 (1 process(es)):
+           1286659 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (203B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (203B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+
+40/68 checks passed
+FAILED: e1.g.2, e1.g.4, e1.f.right.2, e1.f.right.4, e1.f.bottom.2, e1.f.bottom.4, e1.r.left.2, e1.r.left.4, e1.r.top.2, e1.r.top.4, e1.d.left.2, e1.d.left.4, e1.d.top.2, e1.d.top.4, e1.5.g.2, e1.5.g.4, e1.5.f.right.2, e1.5.f.right.4, e1.5.f.bottom.2, e1.5.f.bottom.4, e1.5.r.left.2, e1.5.r.left.4, e1.5.r.top.2, e1.5.r.top.4, e1.5.d.left.2, e1.5.d.left.4, e1.5.d.top.2, e1.5.d.top.4
