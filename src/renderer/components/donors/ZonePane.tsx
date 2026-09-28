@@ -20,6 +20,7 @@ import {
 } from '../../canvas/canvas-colors';
 import { fitView, MAX_SCALE, MIN_SCALE, type PaneView } from './pane-view';
 import { layoutLabels, type LabelBox, type LabelItem } from './pane-labels';
+import { outlineNamesAt } from './pane-hover';
 
 export type { PaneView } from './pane-view';
 
@@ -36,6 +37,12 @@ export interface PaneOutline {
   tone?: 'accent' | 'warning' | 'faint';
   dashed?: boolean;
   tag?: string;
+  /**
+   * What the pane's hover names this outline by, when it is not `label`: a
+   * refused-subject outline's "<rule tag>: <subject label>" (row 236 (a)).
+   * Never drawn on the canvas; the on-canvas words are `label` and `tag`.
+   */
+  hover?: string;
 }
 
 /** The dash of a refused-subject outline, in screen pixels. */
@@ -245,12 +252,9 @@ export default function ZonePane(props: ZonePaneProps): React.ReactElement {
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
     if (!d && viewRef.current && canvasRef.current) {
-      // Every id under the pointer, so a label the layout had to hide is still
-      // one hover away (row 235 (b)).
-      const p = toWorld(e.clientX, e.clientY);
-      const names = [...new Set((outlines ?? []).filter((o) => o.label && p.x >= o.rect.x && p.x < o.rect.x + o.rect.w
-        && p.y >= o.rect.y && p.y < o.rect.y + o.rect.h).map((o) => o.label as string))];
-      const title = names.join('\n');
+      // Every name under the pointer (pane-hover.ts), so a label the layout had
+      // to hide is still one hover away (row 235 (b)).
+      const title = outlineNamesAt(outlines ?? [], toWorld(e.clientX, e.clientY)).join('\n');
       if (canvasRef.current.title !== title) canvasRef.current.title = title;
     }
     if (!d || !viewRef.current) return;

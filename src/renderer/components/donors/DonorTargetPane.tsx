@@ -126,7 +126,7 @@ export default function DonorTargetPane(): React.ReactElement {
       </div>
     );
   }
-  // The same world a refused shaft must overlap to be outlined (refused-subjects.ts).
+  // The same world a refused subject must overlap to be outlined (refused-subjects.ts).
   const { w: W, h: H } = actWorldRect(target.doc);
   const note = drawError ? `Aurora could not draw the composed act: ${drawError}`
     : bakeNote ?? (target.doc.clips.length === 0 ? `${target.actId} has no clips yet.` : null);

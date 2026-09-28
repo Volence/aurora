@@ -25,7 +25,8 @@ import { resolve } from 'node:path';
 import { usePasteStore, type PastePorts } from '../donor-paste';
 import type { ClipToolResult, GuardedWriteFile } from '../../../shared/ipc-types';
 import type { NewClip } from '../../../core/formats/donors/clip-manifest-doc';
-import { refusedOutlines } from '../../components/donors/target-outlines';
+import { refusedOutlines, targetPaneOutlines } from '../../components/donors/target-outlines';
+import { outlineNamesAt } from '../../components/donors/pane-hover';
 import { subjectsLabelOnPane } from '../../../core/formats/donors/refused-subjects';
 import { useDonorDraft } from '../donor-draft';
 import { useDonorStore } from '../donorStore';
@@ -415,11 +416,12 @@ async function refusedR3Paste() {
 describe('the target pane outlines what a refusal names (row 213 (b))', () => {
   beforeEach(() => { useDonorDraft.getState().reset(); useDonorStore.setState({ marquee: null }); });
 
-  it('a paste refusal naming the pasted clip: one dashed warning outline, tagged with the rule, at that clip in the manifest aeon judged', async () => {
+  it('a paste refusal naming the pasted clip: one dashed warning outline, tagged with the rule, at that clip in the manifest aeon judged, named on hover "<rule>: clip <index> <id>" (row 236 (a))', async () => {
     const { o } = await refusedR3Paste();
-    const r = JSON.parse(R3.stdout).refusals[0] as { rule: string; subjects: Array<{ index: number }> };
+    const r = JSON.parse(R3.stdout).refusals[0] as { rule: string; subjects: Array<{ index: number; id: string }> };
+    const [s] = r.subjects;
     expect(o.kind).toBe('refused');
-    expect(outlinesNow()).toEqual([{ rect: R3.manifest.clips[r.subjects[0].index].dst_rect, tone: 'warning', dashed: true, tag: r.rule }]);
+    expect(outlinesNow()).toEqual([{ rect: R3.manifest.clips[s.index].dst_rect, tone: 'warning', dashed: true, tag: r.rule, hover: `${r.rule}: clip ${s.index} ${s.id}` }]);
   });
 
   it('a pair rule (R10) outlines BOTH clips it names', async () => {
@@ -467,13 +469,23 @@ describe('the target pane outlines what a refusal names (row 213 (b))', () => {
     expect([clip.kind, shaft.kind]).toEqual(['clip', 'shaft']);
     expect(o.kind === 'crashed' ? o.text : o.kind).toBe('refused');
     expect(outlinesNow()).toEqual([
-      { rect: act.clips[clip.index].dst_rect, tone: 'warning', dashed: true, tag: r.rule },
-      { rect: act.shafts[shaft.index].dst_rect, tone: 'warning', dashed: true, tag: r.rule },
+      { rect: act.clips[clip.index].dst_rect, tone: 'warning', dashed: true, tag: r.rule, hover: `${r.rule}: clip ${clip.index} ${clip.id}` },
+      { rect: act.shafts[shaft.index].dst_rect, tone: 'warning', dashed: true, tag: r.rule, hover: `${r.rule}: shaft ${shaft.index} ${shaft.id}` },
     ]);
     // The words DonorPasteSection shows beside the refusal (its data-donors-note-subjects span).
     expect(o.kind === 'refused' && subjectsLabelOnPane(o.refusals[0].subjects, o.judged))
       .toBe(`clip ${clip.index} ${clip.id} and shaft ${shaft.index} ${shaft.id}`);
     expect(p.writes).toEqual([]);
+  });
+
+  it('row 236 (a): on the pane after aeon\'s real K9 pair, hovering the refused SHAFT names it "K9: shaft <index> <id>" (it has no id outline beneath it), and the refused clip is named the same way beside its id', async () => {
+    const { act, r } = await wovenRefusal('refuse_k9_shaft_dup_clip_id');
+    const [clip, shaft] = r.subjects;
+    const st = usePasteStore.getState();
+    const all = targetPaneOutlines({ doc: st.target?.doc ?? null, marquee: null, draft: { dst: null, clipId: '' }, outcome: st.outcome, bakeRefused: st.bakeRefused });
+    const mid = (d: unknown) => { const q = d as { x: number; y: number; w: number; h: number }; return { x: q.x + q.w / 2, y: q.y + q.h / 2 }; };
+    expect(outlineNamesAt(all, mid(act.shafts[shaft.index].dst_rect))).toEqual([`${r.rule}: shaft ${shaft.index} ${shaft.id}`]);
+    expect(outlineNamesAt(all, mid(act.clips[clip.index].dst_rect))).toEqual([act.clips[clip.index].id, `${r.rule}: clip ${clip.index} ${clip.id}`]);
   });
 
   it('row 233 (a): aeon\'s real K9 on a shaft wholly past the act draws NO outline and names the shaft "(not on this pane)"', async () => {

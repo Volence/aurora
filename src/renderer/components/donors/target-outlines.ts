@@ -10,8 +10,12 @@
 //     gives two outlines. A refused SHAFT is outlined at its dst_rect the same
 //     way (row 233 (a), ruled); the pane draws no standing shaft, so it shows
 //     one only while a refusal names it. A subject not on the pane (the fill, a
-//     shaft past the act) draws nothing here and is named "not on this pane"
-//     in the refusal text (refused-subjects.ts).
+//     clip, corridor or shaft wholly past the act) draws nothing here and is
+//     named "not on this pane" in the refusal text (refused-subjects.ts).
+//     ROW 236 (a), ruled: each
+//     refused outline names itself on the pane's hover as its rule tag and
+//     subject label ("K9: shaft 0 wfz_to_ehz", `refusalHoverName`), so one whose
+//     tag the layout hid (whole-act scale) is still named on the pane.
 //
 // Cleared with the refusal: a paste refusal by the next paste, an edit of the
 // draft or marquee, or leaving the page (donor-paste.ts `clearRefusal`); a
@@ -19,7 +23,7 @@
 
 import type { ClipManifestDoc } from '../../../core/formats/donors/clip-manifest-doc';
 import type { ClipNote } from '../../../core/formats/donors/clip-validate-json';
-import { resolveRefusedSubjects } from '../../../core/formats/donors/refused-subjects';
+import { refusalHoverName, resolveRefusedSubjects } from '../../../core/formats/donors/refused-subjects';
 import type { PasteOutcome } from '../../state/donor-paste';
 import type { PaneOutline } from './ZonePane';
 
@@ -32,7 +36,8 @@ export interface TargetOutlineInput {
 }
 
 /**
- * The refused-subject outlines alone: dashed, warning, tagged with the rule. One
+ * The refused-subject outlines alone: dashed, warning, tagged with the rule,
+ * named on hover as "<rule tag>: <subject label>". One
  * per (rule, subject): a pair rule whose two subjects sit on the SAME rectangle
  * (a paste placed exactly over a clip, aeon's R10) still gives two, so the
  * count says both were named. The same subject named by the same rule twice
@@ -46,7 +51,7 @@ export function refusedOutlines(input: Pick<TargetOutlineInput, 'outcome' | 'bak
       const key = `${p.rule}|${p.subject.kind}|${p.subject.index}|${p.rect.x},${p.rect.y},${p.rect.w},${p.rect.h}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ rect: p.rect, tone: 'warning', dashed: true, tag: p.rule });
+      out.push({ rect: p.rect, tone: 'warning', dashed: true, tag: p.rule, hover: refusalHoverName(p.rule, p.subject) });
     }
   };
   const o = input.outcome;

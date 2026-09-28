@@ -172,6 +172,45 @@ describe('a refusal\'s subjects, placed on the pane\'s manifest', () => {
     expect(subjectsLabelOnPane(r[0].subjects, doc)).toBe(`shaft ${shaft.index} ${shaft.id} (not on this pane)`);
   });
 
+  // ROW 236 (b): every placed kind takes the shaft's overlap test. No vendored aeon case puts
+  // a CLIP or CORRIDOR past the act (aeon's R8 / K2 "runs past the declared ... act"), so
+  // these are PLANTS on the woven manifest aeon judged: one rectangle moved to x = grid_w x
+  // SECTION_PIXEL_SIZE (the same move gen_validate_json.py's mut_k9_shaft_past_act makes for
+  // shafts[2]), and the subject is the one aeon's `_subject_of` would name, read from that
+  // manifest. Neither is claimed to be aeon output.
+  type Placeable = { id: string; dst_rect: RawRect };
+  function pastTheAct(kind: 'clips' | 'corridors', index: number, x: (paneW: number, r: RawRect) => number) {
+    const raw = structuredClone(rawJudged('refuse_k9_shaft_past_act')) as WovenRaw & { corridors: Placeable[] };
+    const entry = (raw[kind] as Placeable[])[index];
+    const paneW = raw.act.grid_w * SECTION_PIXEL_SIZE;
+    entry.dst_rect = { ...entry.dst_rect, x: x(paneW, entry.dst_rect) };
+    const subject = { kind: kind === 'clips' ? 'clip' as const : 'corridor' as const, index, id: entry.id };
+    return { doc: parseClipManifest(JSON.stringify(raw)), subject, dst: entry.dst_rect, paneW };
+  }
+  const refusalNaming = (subject: ClipNote['subjects'][number]): ClipNote[] =>
+    [{ rule: subject.kind === 'clip' ? 'R8' : 'K2', subjects: [subject], message: '' } as ClipNote];
+
+  for (const [kind, index] of [['clips', 3], ['corridors', 1]] as const) {
+    it(`row 236 (b): a ${kind.slice(0, -1)} wholly past the act (a plant) is NOT outlined, named "(not on this pane)"`, () => {
+      const { doc, subject, dst, paneW } = pastTheAct(kind, index, (w) => w);
+      // Anti-vacuous: the manifest still opens, the rectangle is there at that index with
+      // that id (so the lookup finds it), and it lies wholly outside the pane's world.
+      expect((kind === 'clips' ? doc.clips : doc.corridors)[index]).toMatchObject({ id: subject.id, dst });
+      expect(dst.x >= paneW).toBe(true);
+      const r = refusalNaming(subject);
+      expect(resolveRefusedSubjects(r, doc)).toEqual({ placed: [], offPane: [{ rule: r[0].rule, subject }] });
+      expect(subjectsLabelOnPane([subject], doc)).toBe(`${subject.kind} ${index} ${subject.id} (not on this pane)`);
+    });
+
+    it(`row 236 (b): a ${kind.slice(0, -1)} only PARTLY past the act (a plant) is still outlined, where it is`, () => {
+      // The test is overlap, not containment: the part on the pane is visible, so it is drawn.
+      const { doc, subject, dst, paneW } = pastTheAct(kind, index, (w, r) => w - Math.min(r.w, SECTION_PIXEL_SIZE) / 2);
+      expect(dst.x < paneW && dst.x + dst.w > paneW).toBe(true);
+      const r = refusalNaming(subject);
+      expect(resolveRefusedSubjects(r, doc)).toEqual({ placed: [{ rule: r[0].rule, subject, rect: dst }], offPane: [] });
+    });
+  }
+
   it('a real K8 (the fill) is still never outlined: named off the pane, not dropped', () => {
     const k = 'refuse_k8_fill_no_why';
     const r = refusalsOf('validate', VALIDATE[k]);
