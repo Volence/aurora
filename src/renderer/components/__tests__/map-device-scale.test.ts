@@ -50,6 +50,7 @@ import { useAetherStore } from '../../state/aetherStore';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { documentHistoryHub } from '../../state/history-hub';
 import type { ObjectPlacement, Section } from '../../../core/model/s4-types';
+import { fakeScaleDisplay, type FakeScaleDisplay } from '../../../test/fake-scale-display';
 
 // ── the fixture ────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,10 @@ let mounted: Hooked<object> | null = null;
 interface Surface {
   /** The map canvas's host stub: the first canvas the component renders. */
   canvas(): HostStub;
+  /** Every canvas the component rendered with a ref (the map, then the ghost layer). */
+  canvases(): HostStub[];
+  /** The movable display, when the row asked for one (row 237). */
+  display: FakeScaleDisplay | null;
   /** The container div's React props, where the pointer handlers live. */
   on(): Record<string, (e: unknown) => void>;
   /** Make the component repaint, and prove that it did. */
@@ -125,9 +130,17 @@ interface Surface {
  */
 let zoomTick = 1;
 
-async function mountMap(dpr: unknown): Promise<Surface> {
+async function mountMap(dpr: unknown, withDisplay = false): Promise<Surface> {
   win = installWindowStub();
   win.setDevicePixelRatio(dpr);
+  // OPT-IN, so every older row keeps the environment it was written against: a
+  // `matchMedia` that answers the resolution query the way a browser does (row 237).
+  let display: FakeScaleDisplay | null = null;
+  if (withDisplay) {
+    const w = (globalThis as unknown as { window: Record<string, unknown> }).window;
+    display = fakeScaleDisplay({ get: () => w.devicePixelRatio as number, set: (v) => win!.setDevicePixelRatio(v) });
+    w.matchMedia = display.matchMedia;
+  }
   const mod = await import('../MapViewport');
   const h = renderHooked(mod.default as unknown as (p: object) => React.ReactElement, {});
   mounted = h;
@@ -159,6 +172,8 @@ async function mountMap(dpr: unknown): Promise<Surface> {
   repaint();
   return {
     canvas: () => canvas,
+    canvases: () => canvases,
+    display,
     on: () => (h.el() as unknown as { props: Record<string, (e: unknown) => void> }).props,
     repaint,
   };
@@ -254,6 +269,36 @@ describe('VIEWPORT-NO-DPR: the map backing store is sized in device pixels', () 
       width: Math.round(VIEWPORT.width * 2),
       height: Math.round(VIEWPORT.height * 2),
     });
+  });
+
+  /**
+   * ROW 237 (a): THE SAME MOVE WITH NOTHING ELSE HAPPENING. The row above provokes a
+   * repaint by hand; on a real monitor move nothing provokes one (the CSS box is
+   * unchanged, so no ResizeObserver fires, and the author has not touched anything).
+   * The scale listener (canvas/device-grid.ts `onDeviceScaleChange`) is what repaints.
+   * Both dpr-sized canvases are held: the map and the ghost layer over it.
+   */
+  it('a scale change with NO resize and NO repaint re-sizes both canvases (row 237)', async () => {
+    const s = await mountMap(1, true);
+    const [map, ghost] = s.canvases();
+    expect(ghost, 'the ghost-layer canvas is gone: the tree moved').toBeDefined();
+    const size = (c: HostStub) => ({ width: Number((c.el as Record<string, unknown>).width), height: Number((c.el as Record<string, unknown>).height) });
+    const resizes = win!.observers().length;
+    for (const d of [1.5, 2, 1.25]) {
+      expect(s.display!.setScale(d), `the move to ${d} reached no listener`).toBeGreaterThan(0);
+      const want = { width: Math.round(VIEWPORT.width * d), height: Math.round(VIEWPORT.height * d) };
+      expect(size(map), `map canvas after the move to ${d}`).toEqual(want);
+      expect(size(ghost), `ghost canvas after the move to ${d}`).toEqual(want);
+    }
+    expect(win!.observers().length, 'a ResizeObserver was constructed during the moves').toBe(resizes);
+  });
+
+  it('unmounting the map removes its scale listener (row 237)', async () => {
+    const s = await mountMap(1, true);
+    expect(s.display!.totalListeners(), 'the map never armed a scale listener').toBe(1);
+    mounted!.unmount();
+    mounted = null;
+    expect(s.display!.totalListeners()).toBe(0);
   });
 
   /**

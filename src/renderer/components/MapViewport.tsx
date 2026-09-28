@@ -37,7 +37,7 @@ import type { MapClipboard } from '../../core/editing/map-clipboard';
 import { regionPreviewCanvas, publishPasteGhostReport } from '../canvas/region-preview';
 import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
-import { deviceScale } from '../canvas/device-grid';
+import { deviceScale, onDeviceScaleChange } from '../canvas/device-grid';
 import {
   bandPreview, refreshBandPreview, resolveDisplayedBg, resolveBandLens, bandLensCaptionLines,
 } from '../providers/bganim-preview-aeon';
@@ -1805,6 +1805,17 @@ export default function MapViewport() {
     observer.observe(container);
     return () => observer.disconnect();
   }, [redraw]);
+
+  // A DISPLAY-SCALE CHANGE WITH NO RESIZE (ROADMAP row 237): the window dragged to a
+  // monitor with another scale factor keeps its CSS box, so the observer above never
+  // fires, and both dpr-sized stores (this map and the ghost layer over it) kept the
+  // old factor until something else repainted: in place, but soft. The shared
+  // listener (canvas/device-grid.ts) calls the SAME `redraw` the observer does: it
+  // re-reads `deviceScale()` and re-sizes the map store first thing, and ends in
+  // `drawCollisionPreview`, which does the same for the ghost layer. (A second,
+  // explicit `drawCollisionPreview()` here was planted out and nothing reddened:
+  // docs/reviews/2026-09-28-canvas-dpr-237.md, Ma3.)
+  useEffect(() => onDeviceScaleChange(() => redraw()), [redraw]);
 
   // ---- THE MARQUEE SNAP MODIFIER (owner: "if you hold control it behaves like
   //      it did where it forces to draw collision size") ---------------------

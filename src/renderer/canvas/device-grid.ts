@@ -104,6 +104,80 @@ export function snapLength(cssLength: number, dpr: number): number {
  * renderer.
  */
 export function deviceScale(): number {
-  const dpr = typeof window === 'undefined' ? undefined : window.devicePixelRatio;
+  return usableScale(typeof window === 'undefined' ? undefined : window.devicePixelRatio);
+}
+
+/** `deviceScale`'s rule for one raw reading: every unusable value is 1. */
+function usableScale(dpr: unknown): number {
   return typeof dpr === 'number' && Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+}
+
+/** The part of `window` the scale listener uses: a reading and `matchMedia`. */
+export interface ScaleHost {
+  readonly devicePixelRatio?: unknown;
+  matchMedia?: (query: string) => {
+    addEventListener(type: 'change', fn: () => void): void;
+    removeEventListener(type: 'change', fn: () => void): void;
+  };
+}
+
+/**
+ * Call `listener` with the new device scale each time the display scale changes,
+ * WITH OR WITHOUT a resize, until the returned function is called.
+ *
+ * ═══ WHY BOTH MAP SURFACES NEED IT (ROADMAP row 237) ═══
+ *
+ * Dragging a window to a monitor with another scale factor changes
+ * `devicePixelRatio` and leaves the CSS box alone, so no ResizeObserver fires. Both
+ * map canvases (`MapViewport`, `ClassicLevelViewport`) re-sized their device-pixel
+ * backing store only on a resize or a repaint, so after such a move each kept its
+ * old store: the picture in the right place, soft, until something else redrew it
+ * (docs/reviews/2026-09-28-classic-canvas-dpr-194.md, Open). Browser zoom was never
+ * affected, because it changes the CSS box.
+ *
+ * ═══ WHY IT RE-ARMS ═══
+ *
+ * There is no "the scale changed" event. The standard mechanism is a media query
+ * for TODAY's scale, `(resolution: <dpr>dppx)`, whose list fires `change` when its
+ * answer flips: once, when the display leaves that scale. A listener left on it is
+ * deaf to every move after the first (it would fire again only on coming BACK to
+ * that exact scale). So each change drops the old list's listener and arms a new
+ * one on the query for the scale the display has now. At most one listener is
+ * live per subscription, and the unsubscribe removes whichever one that is.
+ *
+ * The reading goes through `deviceScale`'s rule, so an unusable value arms on
+ * `1dppx`, and the listener hears the same number the surfaces then size with.
+ *
+ * NO DISPLAY IS A NO-OP: no window (the node suite), or a host without
+ * `matchMedia`, arms nothing and returns an unsubscribe that does nothing. `host`
+ * is a parameter only so the listener can be tested against a fake display
+ * (canvas/__tests__/device-scale-change.test.ts); callers pass nothing.
+ */
+export function onDeviceScaleChange(
+  listener: (dpr: number) => void,
+  host: ScaleHost | null = typeof window === 'undefined' ? null : (window as unknown as ScaleHost),
+): () => void {
+  if (!host || typeof host.matchMedia !== 'function') return () => undefined;
+  const matchMedia = host.matchMedia.bind(host);
+  let list: ReturnType<typeof matchMedia> | null = null;
+  let stopped = false;
+  const arm = (): void => {
+    list = matchMedia(`(resolution: ${usableScale(host.devicePixelRatio)}dppx)`);
+    list.addEventListener('change', onChange);
+  };
+  const disarm = (): void => {
+    list?.removeEventListener('change', onChange);
+    list = null;
+  };
+  function onChange(): void {
+    disarm();
+    if (stopped) return;
+    arm();
+    listener(usableScale(host!.devicePixelRatio));
+  }
+  arm();
+  return () => {
+    stopped = true;
+    disarm();
+  };
 }

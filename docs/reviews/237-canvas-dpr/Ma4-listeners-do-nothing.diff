@@ -1,0 +1,26 @@
+diff --git a/src/renderer/components/MapViewport.tsx b/src/renderer/components/MapViewport.tsx
+index 33a0fc8b..357ea8bf 100644
+--- a/src/renderer/components/MapViewport.tsx
++++ b/src/renderer/components/MapViewport.tsx
+@@ -1815,7 +1815,7 @@ export default function MapViewport() {
+   // `drawCollisionPreview`, which does the same for the ghost layer. (A second,
+   // explicit `drawCollisionPreview()` here was planted out and nothing reddened:
+   // docs/reviews/2026-09-28-canvas-dpr-237.md, Ma3.)
+-  useEffect(() => onDeviceScaleChange(() => redraw()), [redraw]);
++  useEffect(() => onDeviceScaleChange(() => undefined), [redraw]);
+ 
+   // ---- THE MARQUEE SNAP MODIFIER (owner: "if you hold control it behaves like
+   //      it did where it forces to draw collision size") ---------------------
+diff --git a/src/renderer/components/classic/ClassicLevelViewport.tsx b/src/renderer/components/classic/ClassicLevelViewport.tsx
+index cda130a4..dd662193 100644
+--- a/src/renderer/components/classic/ClassicLevelViewport.tsx
++++ b/src/renderer/components/classic/ClassicLevelViewport.tsx
+@@ -1085,7 +1085,7 @@ export default function ClassicLevelViewport() {
+     if (!container) return;
+     const ro = new ResizeObserver(measure);
+     ro.observe(container);
+-    const offScale = onDeviceScaleChange(measure);
++    const offScale = onDeviceScaleChange(() => undefined);
+     return () => {
+       ro.disconnect();
+       offScale();

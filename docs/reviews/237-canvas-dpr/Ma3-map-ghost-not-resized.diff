@@ -1,0 +1,12 @@
+diff --git a/src/renderer/components/MapViewport.tsx b/src/renderer/components/MapViewport.tsx
+index 3e05b8e2..fdc08966 100644
+--- a/src/renderer/components/MapViewport.tsx
++++ b/src/renderer/components/MapViewport.tsx
+@@ -1814,7 +1814,6 @@ export default function MapViewport() {
+   // draws re-reads `deviceScale()` and re-sizes its own store first thing.
+   useEffect(() => onDeviceScaleChange(() => {
+     redraw();
+-    drawCollisionPreview();
+   }), [redraw, drawCollisionPreview]);
+ 
+   // ---- THE MARQUEE SNAP MODIFIER (owner: "if you hold control it behaves like

@@ -1,0 +1,17 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b
+
+ ✓ src/renderer/components/classic/__tests__/classic-overlays.test.ts (17 tests) 10ms
+ ✓ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts (124 tests) 45ms
+
+ Test Files  2 passed (2)
+      Tests  141 passed (141)
+   Start at  04:34:59
+   Duration  668ms (transform 812ms, setup 962ms, import 131ms, tests 55ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (2 module(s) reported).
+
+failure-class: no failures in this run (2 module(s) reported).
+
+run-completeness: COMPLETE, 2 of 2 module(s) this run selected finished.

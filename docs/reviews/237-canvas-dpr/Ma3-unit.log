@@ -1,0 +1,19 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b
+
+ ✓ src/renderer/canvas/__tests__/device-scale-change.test.ts (15 tests) 6ms
+ ✓ src/renderer/components/classic/__tests__/classic-device-scale.test.ts (21 tests) 327ms
+ ✓ src/renderer/components/__tests__/map-device-scale.test.ts (19 tests) 456ms
+     ✓ at a scale factor of 1 the store is the CSS box times the factor  436ms
+
+ Test Files  3 passed (3)
+      Tests  55 passed (55)
+   Start at  04:27:52
+   Duration  1.11s (transform 1.80s, setup 1.53s, import 111ms, tests 789ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (3 module(s) reported).
+
+failure-class: no failures in this run (3 module(s) reported).
+
+run-completeness: COMPLETE, 3 of 3 module(s) this run selected finished.

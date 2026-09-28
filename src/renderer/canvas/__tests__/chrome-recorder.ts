@@ -132,6 +132,10 @@ export function recordingContext(): Recording {
       m = [a, b, c, d, e, f];
     },
     resetTransform() { log('resetTransform', []); m = [...IDENTITY]; },
+    // NOT LOGGED, so no golden recorded before it existed can change: a read has no
+    // effect on the canvas. Added for the Sonic 1 overlay (row 237), which maps its
+    // world coordinates to CSS through the matrix in force.
+    getTransform() { const [a, b, c, d, e, f] = m; return { a, b, c, d, e, f }; },
     scale(x: number, y: number) { log('scale', [x, y]); m = mul(m, [x, 0, 0, y, 0, 0]); },
     translate(x: number, y: number) { log('translate', [x, y]); m = mul(m, [1, 0, 0, 1, x, y]); },
     beginPath() { log('beginPath', []); path = []; },

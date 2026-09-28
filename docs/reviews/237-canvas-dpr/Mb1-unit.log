@@ -1,0 +1,1079 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b
+
+ ✓ src/renderer/components/classic/__tests__/classic-overlays.test.ts (17 tests) 8ms
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts (124 tests | 91 failed) 64ms
+     × 1 CSS px at dpr 1, zoom 1, camera 0,0 5ms
+     × 1 CSS px at dpr 1, zoom 2, camera 3032,472 1ms
+     × 1 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     × 1 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     × 1 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     × 1 CSS px at dpr 1.25, zoom 1, camera 0,0 1ms
+     × 1 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     × 1 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     × 1 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     × 1 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     × 1 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     × 1 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     × 1 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     × 1 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     × 1 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     × 1 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     × 1 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     × 1 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     × 1 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     × 1 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     × 1 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     × 1 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     × 1 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     × 1 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     × 1 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     × 1 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     × 1 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     × 1 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     × 1 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     × 1 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     × 2 CSS px at dpr 1, zoom 1, camera 0,0 0ms
+     × 2 CSS px at dpr 1, zoom 2, camera 3032,472 0ms
+     × 2 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     × 2 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     × 2 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     × 2 CSS px at dpr 1.25, zoom 1, camera 0,0 0ms
+     × 2 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     × 2 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     × 2 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     × 2 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 3ms
+     × 2 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     × 2 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     × 2 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     × 2 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     × 2 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     × 2 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     × 2 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     × 2 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     × 2 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     × 2 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     × 2 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     × 2 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     × 2 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     × 2 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     × 2 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     × 2 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     × 2 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     × 2 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     × 2 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     × 2 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     × 1.5 CSS px at dpr 1, zoom 1, camera 0,0 0ms
+     × 1.5 CSS px at dpr 1, zoom 2, camera 3032,472 0ms
+     × 1.5 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     × 1.5 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     × 1.5 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     × 1.5 CSS px at dpr 1.25, zoom 1, camera 0,0 0ms
+     × 1.5 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     × 1.5 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     × 1.5 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     × 1.5 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     × 1.5 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     × 1.5 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     × 1.5 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     × 1.5 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     × 1.5 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     × 1.5 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     × 1.5 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     × 1.5 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     × 1.5 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     × 1.5 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     × 1.5 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     × 1.5 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     × 1.5 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     × 1.5 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     × 1.5 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     × 1.5 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     × 1.5 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     × 1.5 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     × 1.5 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     × 1.5 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     × a 1 CSS px outline covers exactly one whole device column at its edge, at every scale 0ms
+     ✓ dpr 1, zoom 1, camera 0,0 2ms
+     ✓ dpr 1, zoom 2, camera 3032,472 1ms
+     ✓ dpr 1, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 1, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 1, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 1.25, zoom 1, camera 0,0 1ms
+     ✓ dpr 1.25, zoom 2, camera 3032,472 1ms
+     ✓ dpr 1.25, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 1.25, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 1.25, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 1.35, zoom 1, camera 0,0 2ms
+     ✓ dpr 1.35, zoom 2, camera 3032,472 1ms
+     ✓ dpr 1.35, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 1.35, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 1.35, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 1.5, zoom 1, camera 0,0 1ms
+     ✓ dpr 1.5, zoom 2, camera 3032,472 1ms
+     ✓ dpr 1.5, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 1.5, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 1.5, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 2, zoom 1, camera 0,0 1ms
+     ✓ dpr 2, zoom 2, camera 3032,472 1ms
+     ✓ dpr 2, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 2, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 2, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 3, zoom 1, camera 0,0 1ms
+     ✓ dpr 3, zoom 2, camera 3032,472 1ms
+     ✓ dpr 3, zoom 0.5, camera 13,7 2ms
+     ✓ dpr 3, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 3, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ the census read the component (anti-vacuous) 0ms
+     ✓ no raw strokeRect is left in the component 0ms
+     ✓ the ghost outline, the stamp-drag preview and the collision marquee go through strokeRectOnDeviceGrid 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 91 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 1, camera 0,0
+AssertionError: corner x 3072: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 2, camera 3032,472
+AssertionError: corner x 80: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 0.5, camera 13,7
+AssertionError: corner x 1530: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 4593: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x 9311: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 1, camera 0,0
+AssertionError: corner x 3840: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 2, camera 3032,472
+AssertionError: corner x 100: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 0.5, camera 13,7
+AssertionError: corner x 1912: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 5741: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x 11639: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 1, camera 0,0
+AssertionError: corner x 4147: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 2, camera 3032,472
+AssertionError: corner x 108: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 0.5, camera 13,7
+AssertionError: corner x 2065: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 6200: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x 12570.000000000002: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 1, camera 0,0
+AssertionError: corner x 4608: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 2, camera 3032,472
+AssertionError: corner x 120: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 0.5, camera 13,7
+AssertionError: corner x 2294: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 6889: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x 13967: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 1, camera 0,0
+AssertionError: corner x 6144: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 2, camera 3032,472
+AssertionError: corner x 160: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 0.5, camera 13,7
+AssertionError: corner x 3059: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 9185: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x 18623: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 1, camera 0,0
+AssertionError: corner x 9216: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 2, camera 3032,472
+AssertionError: corner x 240: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 0.5, camera 13,7
+AssertionError: corner x 4589: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 13778: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x 27934: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:73:76
+     71|           expect(s.kind).toBe('rect');
+     72|           expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr)…
+     73|           for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${…
+       |                                                                            ^
+     74|           // Where: snapStroke's rule on the unsnapped edge's device c…
+     75|           const devL = (wx - v.x) * v.zoom * dpr, devT = (wy - v.y) * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/91]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > a 1 CSS px outline covers exactly one whole device column at its edge, at every scale
+AssertionError: dpr 1: the left edge starts mid-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:92:89
+     90|       const s = r.strokes[0];
+     91|       const left = Math.min(...s.pts.map((p) => p[0]));
+     92|       expect(isWhole(left - s.width / 2), `dpr ${dpr}: the left edge s…
+       |                                                                                         ^
+     93|       expect(isWhole(left + s.width / 2), `dpr ${dpr}: the left edge e…
+     94|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/91]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  91 failed | 50 passed (141)
+   Start at  04:33:31
+   Duration  763ms (transform 805ms, setup 954ms, import 132ms, tests 72ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (2 module(s) reported).
+
+failure-class: 91 failure record(s) in 1 file(s) (91 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION       91   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 1, camera 0,0
+        AssertionError: corner x 3072: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 2, camera 3032,472
+        AssertionError: corner x 80: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 0.5, camera 13,7
+        AssertionError: corner x 1530: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 4593: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 9311: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 1, camera 0,0
+        AssertionError: corner x 3840: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 2, camera 3032,472
+        AssertionError: corner x 100: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 0.5, camera 13,7
+        AssertionError: corner x 1912: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 5741: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 11639: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 1, camera 0,0
+        AssertionError: corner x 4147: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 2, camera 3032,472
+        AssertionError: corner x 108: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 0.5, camera 13,7
+        AssertionError: corner x 2065: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 6200: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 12570.000000000002: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 1, camera 0,0
+        AssertionError: corner x 4608: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 2, camera 3032,472
+        AssertionError: corner x 120: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 0.5, camera 13,7
+        AssertionError: corner x 2294: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 6889: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 13967: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 1, camera 0,0
+        AssertionError: corner x 6144: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 2, camera 3032,472
+        AssertionError: corner x 160: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 0.5, camera 13,7
+        AssertionError: corner x 3059: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 9185: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 18623: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 1, camera 0,0
+        AssertionError: corner x 9216: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 2, camera 3032,472
+        AssertionError: corner x 240: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 0.5, camera 13,7
+        AssertionError: corner x 4589: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 13778: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 27934: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 1, camera 0,0
+        AssertionError: corner x 3072: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 2, camera 3032,472
+        AssertionError: corner x 80: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 0.5, camera 13,7
+        AssertionError: corner x 1530: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 4593: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 9311: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 1, camera 0,0
+        AssertionError: corner x 3840: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 2, camera 3032,472
+        AssertionError: corner x 100: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 0.5, camera 13,7
+        AssertionError: corner x 1912: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 5741: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 11639: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 1, camera 0,0
+        AssertionError: corner x 4147: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 2, camera 3032,472
+        AssertionError: corner x 108: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 0.5, camera 13,7
+        AssertionError: corner x 2065: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 6200: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 12570.000000000002: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 1, camera 0,0
+        AssertionError: corner x 4608: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 2, camera 3032,472
+        AssertionError: corner x 120: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 0.5, camera 13,7
+        AssertionError: corner x 2294: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 6889: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 13967: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 1, camera 0,0
+        AssertionError: corner x 6144: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 2, camera 3032,472
+        AssertionError: corner x 160: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 0.5, camera 13,7
+        AssertionError: corner x 3059: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 9185: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 18623: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 1, camera 0,0
+        AssertionError: corner x 9216: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 2, camera 3032,472
+        AssertionError: corner x 240: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 0.5, camera 13,7
+        AssertionError: corner x 4589: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 13778: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 27934: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 1, camera 0,0
+        AssertionError: corner x 3072: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 2, camera 3032,472
+        AssertionError: corner x 80: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 0.5, camera 13,7
+        AssertionError: corner x 1530: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 4593: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 9311: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 1, camera 0,0
+        AssertionError: corner x 3840: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 2, camera 3032,472
+        AssertionError: corner x 100: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 0.5, camera 13,7
+        AssertionError: corner x 1912: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 5741: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 11639: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 1, camera 0,0
+        AssertionError: corner x 4147: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 2, camera 3032,472
+        AssertionError: corner x 108: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 0.5, camera 13,7
+        AssertionError: corner x 2065: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 6200: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 12570.000000000002: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 1, camera 0,0
+        AssertionError: corner x 4608: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 2, camera 3032,472
+        AssertionError: corner x 120: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 0.5, camera 13,7
+        AssertionError: corner x 2294: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 6889: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 13967: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 1, camera 0,0
+        AssertionError: corner x 6144: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 2, camera 3032,472
+        AssertionError: corner x 160: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 0.5, camera 13,7
+        AssertionError: corner x 3059: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 9185: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 18623: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 1, camera 0,0
+        AssertionError: corner x 9216: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 2, camera 3032,472
+        AssertionError: corner x 240: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 0.5, camera 13,7
+        AssertionError: corner x 4589: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 13778: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x 27934: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > a 1 CSS px outline covers exactly one whole device column at its edge, at every scale
+        AssertionError: dpr 1: the left edge starts mid-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 91 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 2 of 2 module(s) this run selected finished.

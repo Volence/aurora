@@ -1,0 +1,12 @@
+diff --git a/src/renderer/canvas/device-grid.ts b/src/renderer/canvas/device-grid.ts
+index c2254f88..08cb73d0 100644
+--- a/src/renderer/canvas/device-grid.ts
++++ b/src/renderer/canvas/device-grid.ts
+@@ -172,7 +172,6 @@ export function onDeviceScaleChange(
+   function onChange(): void {
+     disarm();
+     if (stopped) return;
+-    arm();
+     listener(usableScale(host!.devicePixelRatio));
+   }
+   arm();

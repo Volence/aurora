@@ -42,6 +42,7 @@ import { useClassicLevelStore } from '../../../state/classicLevelStore';
 import { useViewStore } from '../../../state/viewStore';
 import type { LevelDoc } from '../../../../core/level-classic/model';
 import type { ZoneActRef } from '../../../../core/project/adapter';
+import { fakeScaleDisplay, type FakeScaleDisplay } from '../../../../test/fake-scale-display';
 
 /**
  * ⚠ A FRACTIONAL RECT, DELIBERATELY: a browser reports one for a flex-sized box all
@@ -124,11 +125,21 @@ interface Surface {
   calls: Call[];
   /** Run the queued frame (the rAF-coalesced redraw) and flush its render. */
   paint(): void;
+  /** The movable display, when the row asked for one (row 237). */
+  display: FakeScaleDisplay | null;
 }
 
-async function mountClassic(dpr: unknown): Promise<Surface> {
+async function mountClassic(dpr: unknown, withDisplay = false): Promise<Surface> {
   win = installWindowStub();
   win.setDevicePixelRatio(dpr);
+  // OPT-IN, so every older row keeps the environment it was written against: a
+  // `matchMedia` that answers the resolution query the way a browser does (row 237).
+  let display: FakeScaleDisplay | null = null;
+  if (withDisplay) {
+    const w = (globalThis as unknown as { window: Record<string, unknown> }).window;
+    display = fakeScaleDisplay({ get: () => w.devicePixelRatio as number, set: (v) => win!.setDevicePixelRatio(v) });
+    w.matchMedia = display.matchMedia;
+  }
   restoreDocument = installDocumentStub();
   const mod = await import('../ClassicLevelViewport');
   const h = renderHooked(mod.default as unknown as (p: object) => React.ReactElement, {});
@@ -156,7 +167,7 @@ async function mountClassic(dpr: unknown): Promise<Surface> {
   };
   paint();
   expect((canvas.el as Record<string, unknown>).width, 'measure() never wrote the backing store').not.toBe(-1);
-  return { h, canvas, calls: rec.calls, paint };
+  return { h, canvas, calls: rec.calls, paint, display };
 }
 
 const el = (s: Surface) => s.canvas.el as Record<string, unknown> & { style: Record<string, unknown> };
@@ -211,6 +222,41 @@ describe('CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale',
       for (const b of blits) expect(b.smoothing, 'a chunk was blitted with image smoothing ON').toBe(false);
     });
   }
+});
+
+describe('row 237 (a): a scale change with no resize re-sizes the store', () => {
+  /**
+   * A window dragged to a monitor with another scale keeps its CSS box, so no
+   * ResizeObserver fires: row 194 left the store at the old factor until the next
+   * resize. The scale listener (canvas/device-grid.ts `onDeviceScaleChange`) re-runs
+   * measure(). Nothing else is done between the move and the read but draining the
+   * frame the redraw queued.
+   */
+  it('each move re-sizes the store to floor(CSS box x the new scale) and redraws at that scale', async () => {
+    const s = await mountClassic(1, true);
+    const resizes = win!.observers().length;
+    for (const d of [1.5, 2, 1.25]) {
+      s.calls.length = 0;
+      expect(s.display!.setScale(d), `the move to ${d} reached no listener`).toBeGreaterThan(0);
+      s.paint();
+      const w = Math.floor(VIEWPORT.width * d);
+      const h = Math.floor(VIEWPORT.height * d);
+      expect({ width: el(s).width, height: el(s).height }, `store after the move to ${d}`).toEqual({ width: w, height: h });
+      expect({ width: el(s).style.width, height: el(s).style.height }).toEqual({ width: `${w / d}px`, height: `${h / d}px` });
+      const transforms = s.calls.filter((c) => c.op === 'setTransform');
+      expect(transforms.length, `no redraw after the move to ${d}`).toBeGreaterThan(0);
+      for (const t of transforms) expect(t.args).toEqual([d, 0, 0, d, 0, 0]);
+    }
+    expect(win!.observers().length, 'a ResizeObserver was constructed during the moves').toBe(resizes);
+  });
+
+  it('holds one listener while mounted and none after unmount', async () => {
+    const s = await mountClassic(1, true);
+    expect(s.display!.totalListeners(), 'the canvas never armed a scale listener').toBe(1);
+    mounted!.unmount();
+    mounted = null;
+    expect(s.display!.totalListeners()).toBe(0);
+  });
 });
 
 describe('CLASSIC-CANVAS-BLUR-DPR: the pointer still maps in CSS pixels', () => {

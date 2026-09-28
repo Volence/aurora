@@ -1,0 +1,25 @@
+diff --git a/src/renderer/canvas/device-grid.ts b/src/renderer/canvas/device-grid.ts
+index c2254f88..5c6b2ac1 100644
+--- a/src/renderer/canvas/device-grid.ts
++++ b/src/renderer/canvas/device-grid.ts
+@@ -160,9 +160,11 @@ export function onDeviceScaleChange(
+   if (!host || typeof host.matchMedia !== 'function') return () => undefined;
+   const matchMedia = host.matchMedia.bind(host);
+   let list: ReturnType<typeof matchMedia> | null = null;
++  let first: ReturnType<typeof matchMedia> | null = null;
+   let stopped = false;
+   const arm = (): void => {
+     list = matchMedia(`(resolution: ${usableScale(host.devicePixelRatio)}dppx)`);
++    first ??= list;
+     list.addEventListener('change', onChange);
+   };
+   const disarm = (): void => {
+@@ -177,7 +179,6 @@ export function onDeviceScaleChange(
+   }
+   arm();
+   return () => {
+-    stopped = true;
+-    disarm();
++    first?.removeEventListener('change', onChange);
+   };
+ }

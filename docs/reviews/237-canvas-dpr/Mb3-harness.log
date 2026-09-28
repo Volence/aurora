@@ -1,0 +1,108 @@
+
+> aurora@0.1.0 harness:canvas-dpr-237
+> node scratchpad/canvas-dpr-237-harness.mjs
+
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b
+
+=== session: b.s1: classic stamp-ghost outline at --force-device-scale-factor=1 (port 9364 verified free) ===
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /home/volence/.cache/aurora-tmp-237/aurora-harness-profiles/canvas-dpr-237-harness-3123003-39390cc7 — see HAZARD 6
+      provenance  app entry /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b/dist/main/index.mjs (the root:/pinned: lines above name the tree)
+PASS  b.s1.0  PREMISE: dpr 1 took, chunk B armed by a real eyedrop, stamp tool armed by real clicks, camera set, the canvas sits on whole device px, cell A's edges are whole device px
+        dpr 1; boundary {"col":13,"row":2,"A":45,"B":49}; armed 49; tool stamp-chunk; camera {"x":3032,"y":472,"zoom":2}; canvas device origin 284,106; cell A edge device X 364 Y 186
+      b.s1  hover: (564,386) -> world {"x":3172,"y":612} cell {"col":12,"row":2} (cell A is 12,2); shots Mb3-scale1-hover-{off,on}.png
+      b.s1  left edge, per device column (X = cell A's first column): X-3: changed 0/200, full-strength 0/200; X-2: changed 0/200, full-strength 0/200; X-1: changed 200/200, full-strength 0/200; X+0: changed 200/200, full-strength 0/200; X+1: changed 0/200, full-strength 0/200; X+2: changed 0/200, full-strength 0/200; X+3: changed 0/200, full-strength 0/200
+      b.s1  top edge, per device row (Y = cell A's first row): Y-3: changed 0/200, full-strength 0/200; Y-2: changed 0/200, full-strength 0/200; Y-1: changed 200/200, full-strength 0/200; Y+0: changed 200/200, full-strength 0/200; Y+1: changed 0/200, full-strength 0/200; Y+2: changed 0/200, full-strength 0/200; Y+3: changed 0/200, full-strength 0/200
+      b.s1  one device row across the left edge, X-3..X+3, hover off: 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12
+      b.s1  one device row across the left edge, X-3..X+3, hover on : 0a0c12 0a0c12 4c6582 4c6582 0a0c12 0a0c12 0a0c12
+      b.s1  full-strength band per channel: [142.5, 155.3] [190.0, 202.8] [242.3, 255.0]
+FAIL  b.s1.1  left edge: the device column OUTSIDE cell A (X-1) is untouched by the hover on every sampled row (no half-covered column outward)
+        X-1 changed on 200/200 rows; anti-vacuous: the hover drew at this edge (X-1 + X changed on >= 200 rows): true; screenshot in device px: true (1400x872)
+FAIL  b.s1.2  left edge: device column X is the stroke at full strength on every sampled row
+        X full-strength on 0/200 rows
+FAIL  b.s1.3  top edge: the device row OUTSIDE cell A (Y-1) is untouched by the hover on every sampled column
+        Y-1 changed on 200/200 columns; anti-vacuous: the hover drew at this edge: true
+FAIL  b.s1.4  top edge: device row Y is the stroke at full strength on every sampled column
+        Y full-strength on 0/200 columns
+   flush check armed: profile /home/volence/.cache/aurora-tmp-237/aurora-harness-profiles/canvas-dpr-237-harness-3123003-39390cc7/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session 193B, unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 100ms
+cleanup: tree under pid 3123012 (1 process(es)):
+           3123012 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (203B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (203B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+
+=== session: b.s1.5: classic stamp-ghost outline at --force-device-scale-factor=1.5 (port 9364 verified free) ===
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+      provenance  app entry /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b/dist/main/index.mjs (the root:/pinned: lines above name the tree)
+PASS  b.s1.5.0  PREMISE: dpr 1.5 took, chunk B armed by a real eyedrop, stamp tool armed by real clicks, camera set, the canvas sits on whole device px, cell A's edges are whole device px
+        dpr 1.5; boundary {"col":13,"row":2,"A":45,"B":49}; armed 49; tool stamp-chunk; camera {"x":3032,"y":472,"zoom":2}; canvas device origin 426,159; cell A edge device X 546 Y 279
+      b.s1.5  hover: (564,386) -> world {"x":3172,"y":612} cell {"col":12,"row":2} (cell A is 12,2); shots Mb3-scale1.5-hover-{off,on}.png
+      b.s1.5  left edge, per device column (X = cell A's first column): X-3: changed 0/200, full-strength 0/200; X-2: changed 0/200, full-strength 0/200; X-1: changed 200/200, full-strength 0/200; X+0: changed 200/200, full-strength 0/200; X+1: changed 0/200, full-strength 0/200; X+2: changed 0/200, full-strength 0/200; X+3: changed 0/200, full-strength 0/200
+      b.s1.5  top edge, per device row (Y = cell A's first row): Y-3: changed 0/200, full-strength 0/200; Y-2: changed 0/200, full-strength 0/200; Y-1: changed 200/200, full-strength 0/200; Y+0: changed 200/200, full-strength 0/200; Y+1: changed 0/200, full-strength 0/200; Y+2: changed 0/200, full-strength 0/200; Y+3: changed 0/200, full-strength 0/200
+      b.s1.5  one device row across the left edge, X-3..X+3, hover off: 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12
+      b.s1.5  one device row across the left edge, X-3..X+3, hover on : 0a0c12 0a0c12 6d92bb 6d92bb 0a0c12 0a0c12 0a0c12
+      b.s1.5  full-strength band per channel: [142.5, 155.3] [190.0, 202.8] [242.3, 255.0]
+FAIL  b.s1.5.1  left edge: the device column OUTSIDE cell A (X-1) is untouched by the hover on every sampled row (no half-covered column outward)
+        X-1 changed on 200/200 rows; anti-vacuous: the hover drew at this edge (X-1 + X changed on >= 200 rows): true; screenshot in device px: true (1680x1008)
+FAIL  b.s1.5.2  left edge: device column X is the stroke at full strength on every sampled row
+        X full-strength on 0/200 rows
+FAIL  b.s1.5.3  top edge: the device row OUTSIDE cell A (Y-1) is untouched by the hover on every sampled column
+        Y-1 changed on 200/200 columns; anti-vacuous: the hover drew at this edge: true
+FAIL  b.s1.5.4  top edge: device row Y is the stroke at full strength on every sampled column
+        Y full-strength on 0/200 columns
+   flush check armed: profile /home/volence/.cache/aurora-tmp-237/aurora-harness-profiles/canvas-dpr-237-harness-3123003-39390cc7/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session 193B, unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 100ms
+cleanup: tree under pid 3146726 (1 process(es)):
+           3146726 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (203B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (203B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+
+2/10 checks passed
+FAILED: b.s1.1, b.s1.2, b.s1.3, b.s1.4, b.s1.5.1, b.s1.5.2, b.s1.5.3, b.s1.5.4

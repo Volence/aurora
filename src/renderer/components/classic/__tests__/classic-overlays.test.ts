@@ -117,7 +117,11 @@ function needleCtx(scale = 1) {
     fillRect() {}, strokeRect() {},
     moveTo(x: number, y: number) { pts.push({ x, y, style: ctx.strokeStyle }); },
     lineTo(x: number, y: number) { pts.push({ x, y, style: ctx.strokeStyle }); },
-    getTransform() { return { a: scale }; },
+    // The whole matrix, and a setTransform: since row 237 (b) the surface-line pass
+    // maps world to CSS through e/f/d and draws under the canvas's CSS transform.
+    // This recorder keeps the points in whatever frame they are issued in.
+    getTransform() { return { a: scale, b: 0, c: 0, d: scale, e: 0, f: 0 }; },
+    setTransform() {},
   };
   return { ctx: ctx as unknown as CanvasRenderingContext2D, pts };
 }

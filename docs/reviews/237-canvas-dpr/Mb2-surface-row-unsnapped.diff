@@ -1,0 +1,13 @@
+diff --git a/src/renderer/components/classic/classic-overlays.ts b/src/renderer/components/classic/classic-overlays.ts
+index e1d471a8..f279d833 100644
+--- a/src/renderer/components/classic/classic-overlays.ts
++++ b/src/renderer/components/classic/classic-overlays.ts
+@@ -226,7 +226,7 @@ export function drawCollision(
+       if (!run) continue;
+       let surfaceY = h >= 0 ? run.y : run.y + run.h;
+       if (cell.yf) surfaceY = 16 - surfaceY;
+-      const lineY = snapStroke(cssY(cy + surfaceY), 1, dpr).at;
++      const lineY = cssY(cy + surfaceY);
+       ctx.beginPath();
+       ctx.moveTo(snapLength(cssX(cx + c), dpr), lineY);
+       ctx.lineTo(snapLength(cssX(cx + c + 1), dpr), lineY);

@@ -1,0 +1,13 @@
+diff --git a/src/renderer/components/classic/classic-overlays.ts b/src/renderer/components/classic/classic-overlays.ts
+index e1d471a8..49adecd3 100644
+--- a/src/renderer/components/classic/classic-overlays.ts
++++ b/src/renderer/components/classic/classic-overlays.ts
+@@ -88,7 +88,7 @@ export function strokeRectOnDeviceGrid(
+   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+   ctx.lineWidth = snapStroke(0, cssWidth, dpr).width;
+   ctx.strokeRect(
+-    snapStroke(cssX, cssWidth, dpr).at, snapStroke(cssY, cssWidth, dpr).at,
++    snapLength(cssX, dpr), snapLength(cssY, dpr),
+     snapLength(cssW, dpr), snapLength(cssH, dpr),
+   );
+   ctx.restore();

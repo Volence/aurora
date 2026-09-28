@@ -1,0 +1,94 @@
+
+> aurora@0.1.0 harness:canvas-dpr-237
+> node scratchpad/canvas-dpr-237-harness.mjs
+
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b
+
+=== session: a.c: Sonic 1 canvas, launched at 1, scale changed mid-run (port 9364 verified free) ===
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /home/volence/.cache/aurora-tmp-237/aurora-harness-profiles/canvas-dpr-237-harness-1358983-baa0aefd — see HAZARD 6
+      provenance  app entry /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b/dist/main/index.mjs (the root:/pinned: lines above name the tree)
+      a.c  level: {"status":"ready","zone":"ghz","act":1}
+PASS  a.c.0  PREMISE: the launch is at dpr 1 and every canvas's store is its own rule at 1
+        classic {"dpr":1,"left":284,"top":106,"width":856,"height":742,"bw":856,"bh":742,"innerWidth":1400,"innerHeight":872}
+PASS  a.c.1  emulated 1.5: with NO resize, every store re-sized to its rule at the new scale
+        classic: dpr 1.5, CSS 856x742 (unchanged: true), store 1284x1113 want 1284x1113
+PASS  a.c.2  emulated 2, a SECOND change (the listener must have re-armed for 1.5): with NO resize, every store re-sized to its rule at the new scale
+        classic: dpr 2, CSS 856x742 (unchanged: true), store 1712x1484 want 1712x1484
+PASS  a.c.3  emulation cleared, back to the launch scale 1: with NO resize, every store re-sized to its rule at the new scale
+        classic: dpr 1, CSS 856x742 (unchanged: true), store 856x742 want 856x742
+   flush check armed: profile /home/volence/.cache/aurora-tmp-237/aurora-harness-profiles/canvas-dpr-237-harness-1358983-baa0aefd/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session 146B, unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 101ms
+cleanup: tree under pid 1359471 (1 process(es)):
+           1359471 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (203B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (203B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+
+=== session: a.m: aeon MapViewport, launched at 1, scale changed mid-run (port 9364 verified free) ===
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+      provenance  app entry /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b/dist/main/index.mjs; aeon COPY /home/volence/.cache/aurora-tmp-237/aeon-copy-a
+      a.m  aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+      a.m  aeon state: {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  a.m.0  PREMISE: the launch is at dpr 1 and every canvas's store is its own rule at 1
+        map-canvas {"dpr":1,"left":284,"top":74,"width":876,"height":721,"bw":876,"bh":721,"innerWidth":1400,"innerHeight":872}; map-preview-canvas {"dpr":1,"left":284,"top":74,"width":876,"height":721,"bw":876,"bh":721,"innerWidth":1400,"innerHeight":872}
+PASS  a.m.1  emulated 1.5: with NO resize, every store re-sized to its rule at the new scale
+        map-canvas: dpr 1.5, CSS 876x721 (unchanged: true), store 1314x1082 want 1314x1082; map-preview-canvas: dpr 1.5, CSS 876x721 (unchanged: true), store 1314x1082 want 1314x1082
+PASS  a.m.2  emulated 2, a SECOND change (the listener must have re-armed for 1.5): with NO resize, every store re-sized to its rule at the new scale
+        map-canvas: dpr 2, CSS 876x721 (unchanged: true), store 1752x1442 want 1752x1442; map-preview-canvas: dpr 2, CSS 876x721 (unchanged: true), store 1752x1442 want 1752x1442
+PASS  a.m.3  emulation cleared, back to the launch scale 1: with NO resize, every store re-sized to its rule at the new scale
+        map-canvas: dpr 1, CSS 876x721 (unchanged: true), store 876x721 want 876x721; map-preview-canvas: dpr 1, CSS 876x721 (unchanged: true), store 876x721 want 876x721
+   flush check armed: profile /home/volence/.cache/aurora-tmp-237/aurora-harness-profiles/canvas-dpr-237-harness-1358983-baa0aefd/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session ABSENT under this project key (session A opens the project mid-body), unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 100ms
+cleanup: tree under pid 1497642 (1 process(es)):
+           1497642 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (203B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (203B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+
+8/8 checks passed
