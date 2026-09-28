@@ -190,10 +190,43 @@ export interface NewClip {
  * Aurora can vouch for).
  */
 export function zoneMusic(doc: ClipManifestDoc, donor: string, zone: string): string | null {
-  const songs = new Set(doc.clips.filter((c) => c.donor === donor && c.zone === zone).map((c) => c.music));
-  if (songs.size !== 1) return null;
-  const [only] = songs;
-  return only;
+  const s = zoneSong(doc, donor, zone);
+  return s.kind === 'inherited' ? s.song : null;
+}
+
+/**
+ * What a paste of (donor, zone) inherits as its song, and when nothing, why
+ * (ROADMAP row 222's open half). `zoneMusic` is this with the reason dropped,
+ * so the line the page shows and the value `withClip` writes cannot disagree.
+ *   'new-zone'   the act has no clip of the pair yet;
+ *   'none-named' its clips of the pair name no song;
+ *   'disagree'   they name different songs (absent counts as a value, as in
+ *                aeon's R3), so none is one Aurora can vouch for.
+ */
+export type ZoneSong =
+  | { kind: 'inherited'; song: string; donor: string; zone: string }
+  | { kind: 'none'; why: 'new-zone' | 'none-named' | 'disagree'; donor: string; zone: string; songs: Array<string | null> };
+
+export function zoneSong(doc: ClipManifestDoc, donor: string, zone: string): ZoneSong {
+  const songs = [...new Set(doc.clips.filter((c) => c.donor === donor && c.zone === zone).map((c) => c.music))];
+  if (songs.length === 1 && songs[0] !== null) return { kind: 'inherited', song: songs[0], donor, zone };
+  const why = songs.length === 0 ? 'new-zone' : songs.length === 1 ? 'none-named' : 'disagree';
+  return { kind: 'none', why, donor, zone, songs };
+}
+
+/**
+ * The one sentence the paste form shows before a paste and its success summary
+ * repeats (the overseer's look call, 2026-09-28): `Song: <name> (from <donor>
+ * <zone>)` when every clip of that pair names the same song, otherwise
+ * `Song: none inherited (<why>)`. No picker: the page never chooses a song.
+ */
+export function zoneSongLine(s: ZoneSong): string {
+  if (s.kind === 'inherited') return `Song: ${s.song} (from ${s.donor} ${s.zone})`;
+  const pair = `${s.donor} ${s.zone}`;
+  if (s.why === 'new-zone') return `Song: none inherited (this act has no ${pair} clip yet)`;
+  if (s.why === 'none-named') return `Song: none inherited (the act's ${pair} clips name no song)`;
+  const named = s.songs.map((m) => m ?? 'no song').join(', ');
+  return `Song: none inherited (the act's ${pair} clips disagree: ${named})`;
 }
 
 /**

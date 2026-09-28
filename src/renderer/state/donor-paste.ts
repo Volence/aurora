@@ -46,7 +46,7 @@ import type {
 import type { UndoStack } from '../../core/editing/undo-stack';
 import {
   clipsManifestPath, CLIPS_ROOT_REL, newClipManifest, parseClipManifest, serializeClipManifest, withClip,
-  type ClipManifestDoc, type NewClip,
+  zoneSong, zoneSongLine, type ClipManifestDoc, type NewClip,
 } from '../../core/formats/donors/clip-manifest-doc';
 import { saveConflictCauses } from '../../core/project/conflict-message';
 import {
@@ -106,7 +106,12 @@ export interface BakedAct {
 }
 
 export type PasteOutcome =
-  | { kind: 'pasted'; clipId: string; path: string; created: boolean; warnings: ClipNote[] }
+  /**
+   * `song` is the sentence the form showed before the paste (row 222), taken
+   * from the act as it stood before this clip was added: the same
+   * `zoneSong` that decided whether `withClip` wrote a `music`.
+   */
+  | { kind: 'pasted'; clipId: string; path: string; created: boolean; warnings: ClipNote[]; song: string }
   /** aeon's loader (or bake) refused: `refusals` as its --json names them; `text` is their messages. */
   | { kind: 'refused'; stage: 'validate' | 'bake'; refusals: ClipNote[]; warnings: ClipNote[]; text: string; command: string }
   /** aeon's loader (or bake) ran and CRASHED (or answered outside its contract): not judged, not a refusal. */
@@ -274,6 +279,7 @@ export const usePasteStore = create<PasteState>((set, get) => {
       set({ busy: true, outcome: null });
       try {
         const next = withClip(target.doc, clip);
+        const song = zoneSongLine(zoneSong(target.doc, clip.donor, clip.zone));
         const text = serializeClipManifest(next);
         const v = await ports.clipTool(root, 'validate', text);
         if (v.couldNotRun) {
@@ -325,7 +331,7 @@ export const usePasteStore = create<PasteState>((set, get) => {
         };
         const o: PasteOutcome = {
           kind: 'pasted', clipId: clip.id, path: target.path, created: target.onDisk === null,
-          warnings: verdict.warnings,
+          warnings: verdict.warnings, song,
         };
         const acts = get().acts ?? [];
         set({

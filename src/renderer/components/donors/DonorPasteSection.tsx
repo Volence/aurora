@@ -45,7 +45,8 @@ import { subjectsLabel, type ClipNote } from '../../../core/formats/donors/clip-
 import { readPoolRows, type PoolRow, type PoolRowField } from '../../../core/formats/donors/clipact-pool';
 import { useDonorDraft } from '../../state/donor-draft';
 import {
-  clipIdProblem, gridToHold, REGION_ID_RE, suggestClipId, suggestDestination,
+  clipIdProblem, gridToHold, REGION_ID_RE, suggestClipId, suggestDestination, zoneSong, zoneSongLine,
+  type ClipManifestDoc,
 } from '../../../core/formats/donors/clip-manifest-doc';
 import { COLLISION_QUANTUM_PX } from '../../../core/formats/donors/donor-marquee';
 import { SECTION_PIXEL_SIZE } from '../../../core/model/s4-types';
@@ -169,12 +170,22 @@ function WarningList({ warnings }: { warnings: ClipNote[] }): React.ReactElement
 
 const STAGE_NAME = { validate: 'manifest loader', bake: 'bake' } as const;
 
-function outcomeView(o: PasteOutcome): React.ReactElement {
+/**
+ * The song a paste of (donor, zone) inherits, as one line, BEFORE the paste
+ * (row 222; the look call is in `zoneSongLine`). The success summary repeats
+ * the same sentence (the outcome's `song`). No picker: the page never chooses.
+ */
+export function SongLine({ doc, donor, zone }: { doc: ClipManifestDoc; donor: string; zone: string }): React.ReactElement {
+  return <div data-donors-song style={NOTE}>{zoneSongLine(zoneSong(doc, donor, zone))}</div>;
+}
+
+export function outcomeView(o: PasteOutcome): React.ReactElement {
   switch (o.kind) {
     case 'pasted':
       return (
         <div data-donors-outcome="pasted" style={NOTE}>
           Pasted {o.clipId}: {o.created ? 'created' : 'rewrote'} {o.path}. aeon validated it and baked it.
+          {' '}<span data-donors-outcome-song>{o.song}</span>
           <WarningList warnings={o.warnings} />
         </div>
       );
@@ -308,6 +319,7 @@ function PasteForm(): React.ReactElement {
                  placeholder="the argument for leaving the section grid" style={INPUT} />
         </Field>
       )}
+      {zone && target && <SongLine doc={target.doc} donor={zone.manifest.donor} zone={zone.manifest.zone} />}
       <div style={NOTE} data-donors-copies>
         A paste writes one clip into {target ? target.path : 'the clip act’s clips.json'} and nothing else. aeon&apos;s bake
         takes the art (every nametable word) and BOTH collision planes from this rectangle; objects and rings are not

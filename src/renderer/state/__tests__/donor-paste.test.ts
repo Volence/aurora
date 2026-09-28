@@ -214,6 +214,48 @@ describe('a paste writes only what aeon accepted', () => {
   });
 });
 
+/** Row 222's open half: aeon's judged paste manifests (paste-music.cases.json) over the vendored s2_ehz_cpz. */
+const EHZ_CPZ = readFileSync(resolve(__dirname, '../../../../test/fixtures/clips/s2_ehz_cpz.clips.json'), 'utf8');
+const EHZ_CPZ_PATH = 'games/sonic4/data/clips/s2_ehz_cpz/clips.json';
+type MusicClip = { id: string; donor: string; zone: string; src_rect: NewClip['src']; dst_rect: NewClip['dst']; music?: string };
+const MUSIC = JSON.parse(readFileSync(resolve(__dirname, '../../../../test/fixtures/clips/aeon-outputs/paste-music.cases.json'), 'utf8')) as
+  Record<string, { exit: number; stdout: string; stderr: string; manifest: { clips: MusicClip[] } }>;
+function musicPaste(name: string): NewClip {
+  const e = MUSIC[name].manifest.clips.at(-1)!;
+  return { id: e.id, donor: e.donor, zone: e.zone, src: e.src_rect, dst: e.dst_rect };
+}
+
+describe('a paste that inherits its zone\'s song says so (row 222)', () => {
+  it('the success summary names the song aeon accepted on the pasted clip, and where it came from', async () => {
+    const disk: Disk = { files: new Map([[EHZ_CPZ_PATH, { text: EHZ_CPZ, mtimeMs: 7 }]]), clock: 100 };
+    const c = MUSIC.accept_paste_inherits_music;
+    const p = ports(disk, { validate: (t) => (t.includes('"ehz_1"') ? { ok: true, exitCode: c.exit, stdout: c.stdout, stderr: c.stderr } : {}) });
+    await usePasteStore.getState().selectAct('s2_ehz_cpz', p);
+    const o = await usePasteStore.getState().paste(musicPaste('accept_paste_inherits_music'), p);
+    const judged = c.manifest.clips.at(-1)!;
+    expect(o.kind === 'pasted' && o.song).toBe(`Song: ${judged.music} (from ${judged.donor} ${judged.zone})`);
+  });
+
+  it('the song the summary names is the one the paste WROTE onto the clip', async () => {
+    const disk: Disk = { files: new Map([[EHZ_CPZ_PATH, { text: EHZ_CPZ, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk);
+    await usePasteStore.getState().selectAct('s2_ehz_cpz', p);
+    const o = await usePasteStore.getState().paste(musicPaste('accept_paste_inherits_music'), p);
+    const wrote = JSON.parse(new TextDecoder().decode(p.writes[0].bytes)).clips.at(-1) as { music?: string };
+    expect(typeof wrote.music).toBe('string');
+    expect(o.kind === 'pasted' && o.song.startsWith(`Song: ${wrote.music} (`)).toBe(true);
+  });
+
+  it('a zone new to the act: the summary says none was inherited, and why', async () => {
+    const disk: Disk = { files: new Map([[EHZ_CPZ_PATH, { text: EHZ_CPZ, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk);
+    await usePasteStore.getState().selectAct('s2_ehz_cpz', p);
+    const clip = musicPaste('accept_paste_new_zone_no_music');
+    const o = await usePasteStore.getState().paste(clip, p);
+    expect(o.kind === 'pasted' && o.song).toBe(`Song: none inherited (this act has no ${clip.donor} ${clip.zone} clip yet)`);
+  });
+});
+
 describe('the target act\'s re-bake note tells a bake refusal from a bake crash', () => {
   it('a refusal on disk is a REFUSED note naming aeon\'s rule, subjects and sentence; nothing is drawn', async () => {
     const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
