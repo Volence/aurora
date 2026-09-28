@@ -25,6 +25,9 @@ import { resolve } from 'node:path';
 import { usePasteStore, type PastePorts } from '../donor-paste';
 import type { ClipToolResult, GuardedWriteFile } from '../../../shared/ipc-types';
 import type { NewClip } from '../../../core/formats/donors/clip-manifest-doc';
+import { refusedOutlines } from '../../components/donors/target-outlines';
+import { useDonorDraft } from '../donor-draft';
+import { useDonorStore } from '../donorStore';
 
 const PINS = readFileSync(resolve(__dirname, '../../../../test/fixtures/clips/s2_two_clip_pins.clips.json'), 'utf8');
 const PINS_PATH = 'games/sonic4/data/clips/s2_two_clip_pins/clips.json';
@@ -214,6 +217,48 @@ describe('a paste writes only what aeon accepted', () => {
   });
 });
 
+/** Row 222's open half: aeon's judged paste manifests (paste-music.cases.json) over the vendored s2_ehz_cpz. */
+const EHZ_CPZ = readFileSync(resolve(__dirname, '../../../../test/fixtures/clips/s2_ehz_cpz.clips.json'), 'utf8');
+const EHZ_CPZ_PATH = 'games/sonic4/data/clips/s2_ehz_cpz/clips.json';
+type MusicClip = { id: string; donor: string; zone: string; src_rect: NewClip['src']; dst_rect: NewClip['dst']; music?: string };
+const MUSIC = JSON.parse(readFileSync(resolve(__dirname, '../../../../test/fixtures/clips/aeon-outputs/paste-music.cases.json'), 'utf8')) as
+  Record<string, { exit: number; stdout: string; stderr: string; manifest: { clips: MusicClip[] } }>;
+function musicPaste(name: string): NewClip {
+  const e = MUSIC[name].manifest.clips.at(-1)!;
+  return { id: e.id, donor: e.donor, zone: e.zone, src: e.src_rect, dst: e.dst_rect };
+}
+
+describe('a paste that inherits its zone\'s song says so (row 222)', () => {
+  it('the success summary names the song aeon accepted on the pasted clip, and where it came from', async () => {
+    const disk: Disk = { files: new Map([[EHZ_CPZ_PATH, { text: EHZ_CPZ, mtimeMs: 7 }]]), clock: 100 };
+    const c = MUSIC.accept_paste_inherits_music;
+    const p = ports(disk, { validate: (t) => (t.includes('"ehz_1"') ? { ok: true, exitCode: c.exit, stdout: c.stdout, stderr: c.stderr } : {}) });
+    await usePasteStore.getState().selectAct('s2_ehz_cpz', p);
+    const o = await usePasteStore.getState().paste(musicPaste('accept_paste_inherits_music'), p);
+    const judged = c.manifest.clips.at(-1)!;
+    expect(o.kind === 'pasted' && o.song).toBe(`Song: ${judged.music} (from ${judged.donor} ${judged.zone})`);
+  });
+
+  it('the song the summary names is the one the paste WROTE onto the clip', async () => {
+    const disk: Disk = { files: new Map([[EHZ_CPZ_PATH, { text: EHZ_CPZ, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk);
+    await usePasteStore.getState().selectAct('s2_ehz_cpz', p);
+    const o = await usePasteStore.getState().paste(musicPaste('accept_paste_inherits_music'), p);
+    const wrote = JSON.parse(new TextDecoder().decode(p.writes[0].bytes)).clips.at(-1) as { music?: string };
+    expect(typeof wrote.music).toBe('string');
+    expect(o.kind === 'pasted' && o.song.startsWith(`Song: ${wrote.music} (`)).toBe(true);
+  });
+
+  it('a zone new to the act: the summary says none was inherited, and why', async () => {
+    const disk: Disk = { files: new Map([[EHZ_CPZ_PATH, { text: EHZ_CPZ, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk);
+    await usePasteStore.getState().selectAct('s2_ehz_cpz', p);
+    const clip = musicPaste('accept_paste_new_zone_no_music');
+    const o = await usePasteStore.getState().paste(clip, p);
+    expect(o.kind === 'pasted' && o.song).toBe(`Song: none inherited (this act has no ${clip.donor} ${clip.zone} clip yet)`);
+  });
+});
+
 describe('the target act\'s re-bake note tells a bake refusal from a bake crash', () => {
   it('a refusal on disk is a REFUSED note naming aeon\'s rule, subjects and sentence; nothing is drawn', async () => {
     const disk: Disk = { files: new Map([[PINS_PATH, { text: PINS, mtimeMs: 7 }]]), clock: 100 };
@@ -223,7 +268,9 @@ describe('the target act\'s re-bake note tells a bake refusal from a bake crash'
     const r = JSON.parse(BAKE_CASES.refuse_c4_bake_own.stdout).refusals[0] as { rule: string; subjects: { index: number; id: string }[]; message: string };
     expect(s.baked).toBeNull();
     expect(s.bakeNoteKind).toBe('refused');
-    expect(s.bakeNote).toContain(`${r.rule} (clip ${r.subjects[0].index} ${r.subjects[0].id}): ${r.message}`);
+    // aeon's C4 names clip 0 `ehz_cut`, and this act's clip 0 is another clip, so row 213 (b)
+    // names the subject as not on this pane rather than outlining the wrong rectangle.
+    expect(s.bakeNote).toContain(`${r.rule} (clip ${r.subjects[0].index} ${r.subjects[0].id} (not on this pane)): ${r.message}`);
   });
 
   it('a crash on disk is a CRASHED note carrying stderr that says it is not a refusal, never "refuses"', async () => {
@@ -340,5 +387,122 @@ describe('Ctrl+Z on the Donors facet reaches the paste, not the act', () => {
     expect(h.canUndo).toBe(false);
     await usePasteStore.getState().paste(CLIP, p);
     expect(h.canUndo).toBe(true);
+  });
+});
+
+/**
+ * ROW 213 (b): a refusal's subjects are outlined on the target pane (dashed,
+ * warning, tagged with the rule) while the refusal stands, and cleared with it.
+ * The refusals are aeon's real answers; every expected rectangle is read from
+ * the manifest aeon judged or the vendored act, never typed here.
+ */
+const TWO = readFileSync(resolve(__dirname, '../../../../test/fixtures/clips/s2_two_clip.clips.json'), 'utf8');
+const TWO_PATH = 'games/sonic4/data/clips/s2_two_clip/clips.json';
+const outlinesNow = () => refusedOutlines(usePasteStore.getState());
+const R3 = MUSIC.refuse_r3_paste_pre222;
+
+/** A paste of R3's clip into s2_ehz_cpz that aeon's loader refuses with its real R3 answer. */
+async function refusedR3Paste() {
+  const disk: Disk = { files: new Map([[EHZ_CPZ_PATH, { text: EHZ_CPZ, mtimeMs: 7 }]]), clock: 100 };
+  const p = ports(disk, { validate: (t) => (t.includes('"ehz_1"') ? { ok: false, exitCode: R3.exit, stdout: R3.stdout, stderr: R3.stderr } : {}) });
+  await usePasteStore.getState().selectAct('s2_ehz_cpz', p);
+  useDonorDraft.getState().reset();
+  const o = await usePasteStore.getState().paste(musicPaste('refuse_r3_paste_pre222'), p);
+  return { o, p };
+}
+
+describe('the target pane outlines what a refusal names (row 213 (b))', () => {
+  beforeEach(() => { useDonorDraft.getState().reset(); useDonorStore.setState({ marquee: null }); });
+
+  it('a paste refusal naming the pasted clip: one dashed warning outline, tagged with the rule, at that clip in the manifest aeon judged', async () => {
+    const { o } = await refusedR3Paste();
+    const r = JSON.parse(R3.stdout).refusals[0] as { rule: string; subjects: Array<{ index: number }> };
+    expect(o.kind).toBe('refused');
+    expect(outlinesNow()).toEqual([{ rect: R3.manifest.clips[r.subjects[0].index].dst_rect, tone: 'warning', dashed: true, tag: r.rule }]);
+  });
+
+  it('a pair rule (R10) outlines BOTH clips it names', async () => {
+    const disk: Disk = { files: new Map([[TWO_PATH, { text: TWO, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk, { validate: (t) => (t.includes('ehz_x') ? aeonSaid('refuse_r10_pair') : {}) });
+    await usePasteStore.getState().selectAct('s2_two_clip', p);
+    await usePasteStore.getState().paste(CLIP, p);
+    const subjects = JSON.parse(CASES.refuse_r10_pair.stdout).refusals[0].subjects as Array<{ index: number }>;
+    const clips = JSON.parse(TWO).clips as Array<{ dst_rect: unknown }>;
+    expect(outlinesNow().map((x) => [x.rect, x.tag])).toEqual(subjects.map((s) => [clips[s.index].dst_rect, 'R10']));
+  });
+
+  it('a pair whose two clips sit on ONE rectangle (a paste placed exactly over a clip) still gives two outlines', async () => {
+    // aeon's real R10 pair answer, over s2_two_clip with clip 1 moved onto clip 0's rectangle: the
+    // overlap R10 names, in its most extreme form (the harness's DP.7 places its paste exactly so).
+    const raw = JSON.parse(TWO) as { clips: Array<{ dst_rect: unknown }> };
+    raw.clips[1].dst_rect = raw.clips[0].dst_rect;
+    const { parseClipManifest } = await import('../../../core/formats/donors/clip-manifest-doc');
+    const refusals = JSON.parse(CASES.refuse_r10_pair.stdout).refusals;
+    const got = refusedOutlines({
+      outcome: { kind: 'refused', stage: 'validate', refusals, warnings: [], text: '', command: '', judged: parseClipManifest(JSON.stringify(raw)) },
+      bakeRefused: null,
+    });
+    expect(got.map((x) => [x.rect, x.tag])).toEqual([[raw.clips[0].dst_rect, 'R10'], [raw.clips[0].dst_rect, 'R10']]);
+  });
+
+  it('an EDIT of the drafted clip clears the refusal and its outlines', async () => {
+    await refusedR3Paste();
+    expect(outlinesNow().length).toBe(1);
+    useDonorDraft.getState().setClipId('ehz_2');
+    expect({ outcome: usePasteStore.getState().outcome, outlines: outlinesNow() }).toEqual({ outcome: null, outlines: [] });
+  });
+
+  it('a new MARQUEE clears the refusal and its outlines', async () => {
+    await refusedR3Paste();
+    expect(outlinesNow().length).toBe(1);
+    useDonorStore.getState().setMarquee({ x: 0, y: 0, w: 1024, h: 1024 });
+    expect(outlinesNow()).toEqual([]);
+  });
+
+  it('a new validate run clears them: the next paste, accepted, leaves no refused outline', async () => {
+    const { p } = await refusedR3Paste();
+    expect(outlinesNow().length).toBe(1);
+    // The same draft pasted again: this time the port answers with aeon's acceptance.
+    const again = await usePasteStore.getState().paste(musicPaste('accept_paste_inherits_music'), ports({ files: new Map([[EHZ_CPZ_PATH, { text: EHZ_CPZ, mtimeMs: 7 }]]), clock: 100 }));
+    expect({ kind: again.kind, outlines: outlinesNow() }).toEqual({ kind: 'pasted', outlines: [] });
+    expect(p.writes).toEqual([]);
+  });
+
+  it('clearing a refusal (leaving the page) keeps any other outcome: a pasted summary survives it', async () => {
+    const disk: Disk = { files: new Map([[EHZ_CPZ_PATH, { text: EHZ_CPZ, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk);
+    await usePasteStore.getState().selectAct('s2_ehz_cpz', p);
+    await usePasteStore.getState().paste(musicPaste('accept_paste_inherits_music'), p);
+    usePasteStore.getState().clearRefusal();
+    expect(usePasteStore.getState().outcome?.kind).toBe('pasted');
+  });
+
+  it('a re-bake refusal of the act on disk outlines the clip it names (R12 on s2_two_clip\'s clip 1)', async () => {
+    const disk: Disk = { files: new Map([[TWO_PATH, { text: TWO, mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk, { bake: () => aeonBaked('refuse_r12_after_w2') });
+    await usePasteStore.getState().selectAct('s2_two_clip', p);
+    const r = JSON.parse(BAKE_CASES.refuse_r12_after_w2.stdout).refusals[0] as { rule: string; subjects: Array<{ index: number }> };
+    expect(outlinesNow().map((x) => [x.rect, x.tag])).toEqual([[JSON.parse(TWO).clips[r.subjects[0].index].dst_rect, r.rule]]);
+  });
+
+  it('an edit of the draft does NOT clear a re-bake refusal: that one is about the act on disk', async () => {
+    const disk: Disk = { files: new Map([[TWO_PATH, { text: TWO, mtimeMs: 7 }]]), clock: 100 };
+    await usePasteStore.getState().selectAct('s2_two_clip', ports(disk, { bake: () => aeonBaked('refuse_r12_after_w2') }));
+    useDonorDraft.getState().setClipId('anything');
+    expect(outlinesNow().length).toBe(1);
+  });
+
+  it('the next bake run clears a re-bake refusal\'s outline when aeon now accepts the act', async () => {
+    const disk: Disk = { files: new Map([[TWO_PATH, { text: TWO, mtimeMs: 7 }]]), clock: 100 };
+    await usePasteStore.getState().selectAct('s2_two_clip', ports(disk, { bake: () => aeonBaked('refuse_r12_after_w2') }));
+    expect(outlinesNow().length).toBe(1);
+    await usePasteStore.getState().selectAct('s2_two_clip', ports(disk, { bake: () => aeonBaked('accept_w2') }));
+    expect({ refused: usePasteStore.getState().bakeRefused, outlines: outlinesNow() }).toEqual({ refused: null, outlines: [] });
+  });
+
+  it('an act-level re-bake refusal (C3, no subjects) outlines nothing', async () => {
+    const disk: Disk = { files: new Map([[TWO_PATH, { text: TWO, mtimeMs: 7 }]]), clock: 100 };
+    await usePasteStore.getState().selectAct('s2_two_clip', ports(disk, { bake: () => aeonBaked('refuse_c3_act_level') }));
+    expect({ kind: usePasteStore.getState().bakeNoteKind, outlines: outlinesNow() }).toEqual({ kind: 'refused', outlines: [] });
   });
 });

@@ -46,12 +46,15 @@ import type {
 import type { UndoStack } from '../../core/editing/undo-stack';
 import {
   clipsManifestPath, CLIPS_ROOT_REL, newClipManifest, parseClipManifest, serializeClipManifest, withClip,
-  type ClipManifestDoc, type NewClip,
+  zoneSong, zoneSongLine, type ClipManifestDoc, type NewClip,
 } from '../../core/formats/donors/clip-manifest-doc';
 import { saveConflictCauses } from '../../core/project/conflict-message';
 import {
-  readBakeJson, readValidateJson, subjectsLabel, type ClipJsonVerdict, type ClipNote,
+  readBakeJson, readValidateJson, type ClipJsonVerdict, type ClipNote,
 } from '../../core/formats/donors/clip-validate-json';
+import { ruleTag, subjectsLabelOnPane } from '../../core/formats/donors/refused-subjects';
+import { useDonorDraft, type DonorDraft } from './donor-draft';
+import { useDonorStore } from './donorStore';
 
 /** The undo document the Donors facet owns (editorStore.focusedDocId). */
 export const DONOR_PASTE_DOC_ID = 'doc:donor-paste';
@@ -106,9 +109,18 @@ export interface BakedAct {
 }
 
 export type PasteOutcome =
-  | { kind: 'pasted'; clipId: string; path: string; created: boolean; warnings: ClipNote[] }
-  /** aeon's loader (or bake) refused: `refusals` as its --json names them; `text` is their messages. */
-  | { kind: 'refused'; stage: 'validate' | 'bake'; refusals: ClipNote[]; warnings: ClipNote[]; text: string; command: string }
+  /**
+   * `song` is the sentence the form showed before the paste (row 222), taken
+   * from the act as it stood before this clip was added: the same
+   * `zoneSong` that decided whether `withClip` wrote a `music`.
+   */
+  | { kind: 'pasted'; clipId: string; path: string; created: boolean; warnings: ClipNote[]; song: string }
+  /**
+   * aeon's loader (or bake) refused: `refusals` as its --json names them; `text` is their messages.
+   * `judged` is the manifest aeon judged (the act with the pasted clip appended): the target pane
+   * places each refusal's subjects on it (row 213 (b), refused-subjects.ts).
+   */
+  | { kind: 'refused'; stage: 'validate' | 'bake'; refusals: ClipNote[]; warnings: ClipNote[]; text: string; command: string; judged: ClipManifestDoc }
   /** aeon's loader (or bake) ran and CRASHED (or answered outside its contract): not judged, not a refusal. */
   | { kind: 'crashed'; stage: 'validate' | 'bake'; why: string; exitCode: number | null; stdout: string; stderr: string; text: string; command: string }
   | { kind: 'could-not-run'; stage: 'validate' | 'bake'; text: string; command: string }
@@ -137,6 +149,12 @@ export interface PasteState {
   bakeNote: string | null;
   /** What `bakeNote` is: a refusal, a CRASH (never a refusal), or a bake that could not run. Null with no note. */
   bakeNoteKind: 'refused' | 'crashed' | 'could-not-run' | null;
+  /**
+   * The re-bake's refusals and the manifest they were judged on (the act on disk), kept
+   * structured so the target pane can outline their subjects (row 213 (b)). Set and
+   * cleared with `bakeNote`: null whenever the note is not a refusal.
+   */
+  bakeRefused: { refusals: ClipNote[]; doc: ClipManifestDoc } | null;
   busy: boolean;
   outcome: PasteOutcome | null;
   undoStack: HistoryEntry[];
@@ -148,12 +166,17 @@ export interface PasteState {
   paste(clip: NewClip, ports?: PastePorts): Promise<PasteOutcome>;
   undo(ports?: PastePorts): Promise<PasteOutcome | null>;
   redo(ports?: PastePorts): Promise<PasteOutcome | null>;
+  /**
+   * Clear a paste REFUSAL (and so its outlines on the target pane): the author
+   * edited the paste, or left the page. Any other outcome is kept.
+   */
+  clearRefusal(): void;
   reset(): void;
 }
 
 const INITIAL = {
   root: null, acts: null, actsError: null, target: null, targetError: null, baked: null, bakeNote: null,
-  bakeNoteKind: null as PasteState['bakeNoteKind'], busy: false, outcome: null, undoStack: [] as HistoryEntry[], redoStack: [] as HistoryEntry[],
+  bakeNoteKind: null as PasteState['bakeNoteKind'], bakeRefused: null as PasteState['bakeRefused'], busy: false, outcome: null, undoStack: [] as HistoryEntry[], redoStack: [] as HistoryEntry[],
 };
 
 function toolText(r: ClipToolResult): string {
@@ -167,15 +190,22 @@ function bakedFrom(b: ClipToolBaked, forText: string): BakedAct {
   return { clipact, files: b.files, forText };
 }
 
-/** One refusal or warning as a line: rule tag, who it is about, aeon's sentence. */
-function noteLine(n: ClipNote): string {
-  return `${n.rule ?? 'untagged'} (${subjectsLabel(n.subjects)}): ${n.message}`;
+/**
+ * One refusal or warning as a line: rule tag, who it is about, aeon's sentence.
+ * A subject that is not on the pane (`doc`) is named as such, never dropped.
+ */
+function noteLine(n: ClipNote, doc: ClipManifestDoc | null): string {
+  return `${ruleTag(n.rule)} (${subjectsLabelOnPane(n.subjects, doc)}): ${n.message}`;
 }
 
-/** The target pane's note for a re-bake that did not accept: a refusal in aeon's words, or a crash that says it is not one. */
-export function bakeNoteText(v: Exclude<ClipJsonVerdict, { kind: 'accepted' }>): string {
+/**
+ * The target pane's note for a re-bake that did not accept: a refusal in aeon's
+ * words, or a crash that says it is not one. `doc` is the act the bake judged,
+ * the one the pane shows.
+ */
+export function bakeNoteText(v: Exclude<ClipJsonVerdict, { kind: 'accepted' }>, doc: ClipManifestDoc | null = null): string {
   if (v.kind === 'refused') {
-    return `aeon's bake refuses this act as it stands on disk:\n${v.refusals.map(noteLine).join('\n')}`;
+    return `aeon's bake refuses this act as it stands on disk:\n${v.refusals.map((n) => noteLine(n, doc)).join('\n')}`;
   }
   return `aeon's bake CRASHED (${v.exitCode === null ? 'no exit code' : `exit ${v.exitCode}`}) on this act as it stands on disk, `
     + `so the act was not judged and is not drawn. This is not a refusal: ${v.why}.\n${v.stderr.trim() || '(nothing on stderr)'}`;
@@ -183,7 +213,7 @@ export function bakeNoteText(v: Exclude<ClipJsonVerdict, { kind: 'accepted' }>):
 
 /** A stage's refusal or crash as the paste's outcome: the same fields for the loader and the bake. */
 function judgedOutcome(
-  stage: 'validate' | 'bake', r: ClipToolResult, v: Exclude<ClipJsonVerdict, { kind: 'accepted' }>,
+  stage: 'validate' | 'bake', r: ClipToolResult, v: Exclude<ClipJsonVerdict, { kind: 'accepted' }>, judged: ClipManifestDoc,
 ): PasteOutcome {
   if (v.kind === 'crashed') {
     return {
@@ -193,7 +223,7 @@ function judgedOutcome(
   }
   return {
     kind: 'refused', stage, refusals: v.refusals, warnings: v.warnings,
-    text: v.refusals.map((n) => n.message).join('\n'), command: r.command,
+    text: v.refusals.map((n) => n.message).join('\n'), command: r.command, judged,
   };
 }
 
@@ -203,18 +233,23 @@ export const usePasteStore = create<PasteState>((set, get) => {
   /** Re-bake the manifest on disk for display; never blocks and never writes. */
   async function refreshBake(ports: PastePorts): Promise<void> {
     const { root, target } = get();
-    if (!root || !target || target.doc.clips.length === 0) { set({ baked: null, bakeNote: null, bakeNoteKind: null }); return; }
+    if (!root || !target || target.doc.clips.length === 0) { set({ baked: null, bakeNote: null, bakeNoteKind: null, bakeRefused: null }); return; }
     const text = target.onDisk?.text ?? serializeClipManifest(target.doc);
     const r = await ports.clipTool(root, 'bake', text);
     if (r.couldNotRun) {
-      set({ baked: null, bakeNote: `Aurora could not run aeon's bake, so the act is not drawn: ${toolText(r)}`, bakeNoteKind: 'could-not-run' });
+      set({ baked: null, bakeNote: `Aurora could not run aeon's bake, so the act is not drawn: ${toolText(r)}`, bakeNoteKind: 'could-not-run', bakeRefused: null });
       return;
     }
     const v = readBakeJson(r.exitCode, r.stdout, r.stderr);
-    if (v.kind === 'accepted' && r.baked) set({ baked: bakedFrom(r.baked, text), bakeNote: null, bakeNoteKind: null });
+    if (v.kind === 'accepted' && r.baked) set({ baked: bakedFrom(r.baked, text), bakeNote: null, bakeNoteKind: null, bakeRefused: null });
     else if (v.kind === 'accepted') {
-      set({ baked: null, bakeNote: 'aeon\'s bake accepted this act but Aurora got no composed act back, so it is not drawn.', bakeNoteKind: 'could-not-run' });
-    } else set({ baked: null, bakeNote: bakeNoteText(v), bakeNoteKind: v.kind });
+      set({ baked: null, bakeNote: 'aeon\'s bake accepted this act but Aurora got no composed act back, so it is not drawn.', bakeNoteKind: 'could-not-run', bakeRefused: null });
+    } else {
+      set({
+        baked: null, bakeNote: bakeNoteText(v, target.doc), bakeNoteKind: v.kind,
+        bakeRefused: v.kind === 'refused' ? { refusals: v.refusals, doc: target.doc } : null,
+      });
+    }
   }
 
   async function reloadTarget(ports: PastePorts, actId: string): Promise<void> {
@@ -246,7 +281,7 @@ export const usePasteStore = create<PasteState>((set, get) => {
     },
 
     async selectAct(actId, ports = ipcPastePorts) {
-      set({ busy: true, outcome: null, baked: null, bakeNote: null, bakeNoteKind: null });
+      set({ busy: true, outcome: null, baked: null, bakeNote: null, bakeNoteKind: null, bakeRefused: null });
       try {
         await reloadTarget(ports, actId);
         await refreshBake(ports);
@@ -260,7 +295,7 @@ export const usePasteStore = create<PasteState>((set, get) => {
     newAct(actId, gridW, gridH) {
       set({
         target: { actId, path: clipsManifestPath(actId), doc: newClipManifest(actId, gridW, gridH), onDisk: null },
-        targetError: null, baked: null, bakeNote: null, bakeNoteKind: null, outcome: null,
+        targetError: null, baked: null, bakeNote: null, bakeNoteKind: null, bakeRefused: null, outcome: null,
       });
     },
 
@@ -274,6 +309,7 @@ export const usePasteStore = create<PasteState>((set, get) => {
       set({ busy: true, outcome: null });
       try {
         const next = withClip(target.doc, clip);
+        const song = zoneSongLine(zoneSong(target.doc, clip.donor, clip.zone));
         const text = serializeClipManifest(next);
         const v = await ports.clipTool(root, 'validate', text);
         if (v.couldNotRun) {
@@ -283,7 +319,7 @@ export const usePasteStore = create<PasteState>((set, get) => {
         }
         const verdict = readValidateJson(v.exitCode, v.stdout, v.stderr);
         if (verdict.kind !== 'accepted') {
-          const o = judgedOutcome('validate', v, verdict);
+          const o = judgedOutcome('validate', v, verdict, next);
           set({ outcome: o });
           return o;
         }
@@ -296,7 +332,7 @@ export const usePasteStore = create<PasteState>((set, get) => {
         // The bake's answer, read like the loader's: only an accepted bake's tree is used.
         const bv = readBakeJson(b.exitCode, b.stdout, b.stderr);
         if (bv.kind !== 'accepted') {
-          const o = judgedOutcome('bake', b, bv);
+          const o = judgedOutcome('bake', b, bv, next);
           set({ outcome: o });
           return o;
         }
@@ -325,12 +361,12 @@ export const usePasteStore = create<PasteState>((set, get) => {
         };
         const o: PasteOutcome = {
           kind: 'pasted', clipId: clip.id, path: target.path, created: target.onDisk === null,
-          warnings: verdict.warnings,
+          warnings: verdict.warnings, song,
         };
         const acts = get().acts ?? [];
         set({
           target: { ...target, doc: next, onDisk: { text, mtimeMs: mtime } },
-          baked: bakedFrom(b.baked, text), bakeNote: null, bakeNoteKind: null, outcome: o,
+          baked: bakedFrom(b.baked, text), bakeNote: null, bakeNoteKind: null, bakeRefused: null, outcome: o,
           undoStack: [...get().undoStack, entry], redoStack: [],
           acts: acts.includes(target.actId) ? acts : [...acts, target.actId].sort(),
         });
@@ -442,8 +478,32 @@ export const usePasteStore = create<PasteState>((set, get) => {
       }
     },
 
+    clearRefusal() {
+      if (get().outcome?.kind === 'refused') set({ outcome: null });
+    },
+
     reset() { set({ ...INITIAL }); },
   };
+});
+
+// ═══ AN EDIT CLEARS A PASTE REFUSAL (row 213 (b)) ═══════════════════════
+//
+// A refusal is aeon's verdict on ONE candidate manifest: the act plus the clip
+// as it was drafted when Paste was pressed. The moment the author changes that
+// clip (its id, where it goes, the snap, the reason, the marquee, the donor
+// zone), the verdict is about a paste that no longer exists, so it and its
+// outlines on the target pane are cleared. The re-bake note is NOT cleared by
+// an edit: it is about the act on disk, which an edit of the draft does not
+// touch; the next bake run replaces it.
+
+function draftKey(d: DonorDraft): string {
+  return JSON.stringify([d.clipId, d.dst, d.mode, d.reason]);
+}
+useDonorDraft.subscribe((s, p) => {
+  if (draftKey(s) !== draftKey(p)) usePasteStore.getState().clearRefusal();
+});
+useDonorStore.subscribe((s, p) => {
+  if (s.marquee !== p.marquee || s.zone !== p.zone) usePasteStore.getState().clearRefusal();
 });
 
 /**

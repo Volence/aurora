@@ -42,10 +42,12 @@ import { useProjectStore } from '../../state/projectStore';
 import { useDonorStore } from '../../state/donorStore';
 import { usePasteStore, type PasteOutcome } from '../../state/donor-paste';
 import { subjectsLabel, type ClipNote } from '../../../core/formats/donors/clip-validate-json';
+import { subjectsLabelOnPane } from '../../../core/formats/donors/refused-subjects';
 import { readPoolRows, type PoolRow, type PoolRowField } from '../../../core/formats/donors/clipact-pool';
 import { useDonorDraft } from '../../state/donor-draft';
 import {
-  clipIdProblem, gridToHold, REGION_ID_RE, suggestClipId, suggestDestination,
+  clipIdProblem, gridToHold, REGION_ID_RE, suggestClipId, suggestDestination, zoneSong, zoneSongLine,
+  type ClipManifestDoc,
 } from '../../../core/formats/donors/clip-manifest-doc';
 import { COLLISION_QUANTUM_PX } from '../../../core/formats/donors/donor-marquee';
 import { SECTION_PIXEL_SIZE } from '../../../core/model/s4-types';
@@ -141,14 +143,18 @@ const TAG: React.CSSProperties = {
   padding: `0 ${T.s1}`, marginRight: T.s1, color: T.textHi,
 };
 
-/** One refusal or warning as aeon's --json names it: the rule, who it is about, aeon's sentence. */
-function NoteHead({ note, kind }: { note: ClipNote; kind: 'refusal' | 'warning' }): React.ReactElement {
+/**
+ * One refusal or warning as aeon's --json names it: the rule, who it is about, aeon's sentence.
+ * For a refusal, `judged` is the manifest aeon judged: a subject the target pane cannot place
+ * on it is named "not on this pane" (row 213 (b)), never dropped.
+ */
+function NoteHead({ note, kind, judged }: { note: ClipNote; kind: 'refusal' | 'warning'; judged?: ClipManifestDoc }): React.ReactElement {
   return (
     <div style={{ ...(kind === 'refusal' ? WARN : NOTE), marginBottom: T.s1 }}>
       <span data-donors-note-rule style={{ ...TAG, borderColor: kind === 'refusal' ? T.warning : T.border }}>
         {note.rule ?? 'untagged'}
       </span>
-      <span data-donors-note-subjects>{subjectsLabel(note.subjects)}</span>
+      <span data-donors-note-subjects>{judged ? subjectsLabelOnPane(note.subjects, judged) : subjectsLabel(note.subjects)}</span>
     </div>
   );
 }
@@ -169,12 +175,22 @@ function WarningList({ warnings }: { warnings: ClipNote[] }): React.ReactElement
 
 const STAGE_NAME = { validate: 'manifest loader', bake: 'bake' } as const;
 
-function outcomeView(o: PasteOutcome): React.ReactElement {
+/**
+ * The song a paste of (donor, zone) inherits, as one line, BEFORE the paste
+ * (row 222; the look call is in `zoneSongLine`). The success summary repeats
+ * the same sentence (the outcome's `song`). No picker: the page never chooses.
+ */
+export function SongLine({ doc, donor, zone }: { doc: ClipManifestDoc; donor: string; zone: string }): React.ReactElement {
+  return <div data-donors-song style={NOTE}>{zoneSongLine(zoneSong(doc, donor, zone))}</div>;
+}
+
+export function outcomeView(o: PasteOutcome): React.ReactElement {
   switch (o.kind) {
     case 'pasted':
       return (
         <div data-donors-outcome="pasted" style={NOTE}>
           Pasted {o.clipId}: {o.created ? 'created' : 'rewrote'} {o.path}. aeon validated it and baked it.
+          {' '}<span data-donors-outcome-song>{o.song}</span>
           <WarningList warnings={o.warnings} />
         </div>
       );
@@ -188,7 +204,7 @@ function outcomeView(o: PasteOutcome): React.ReactElement {
           </div>
           {o.refusals.map((r, i) => (
             <div key={i} data-donors-refusal-note={r.rule ?? ''}>
-              <NoteHead note={r} kind="refusal" />
+              <NoteHead note={r} kind="refusal" judged={o.judged} />
               <pre data-donors-refusal style={PRE}>{r.message}</pre>
             </div>
           ))}
@@ -308,6 +324,7 @@ function PasteForm(): React.ReactElement {
                  placeholder="the argument for leaving the section grid" style={INPUT} />
         </Field>
       )}
+      {zone && target && <SongLine doc={target.doc} donor={zone.manifest.donor} zone={zone.manifest.zone} />}
       <div style={NOTE} data-donors-copies>
         A paste writes one clip into {target ? target.path : 'the clip act’s clips.json'} and nothing else. aeon&apos;s bake
         takes the art (every nametable word) and BOTH collision planes from this rectangle; objects and rings are not

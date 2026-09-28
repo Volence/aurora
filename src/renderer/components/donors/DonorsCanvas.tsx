@@ -11,6 +11,7 @@ import { T } from '../ui/theme';
 import ZonePane, { type PaneBitmap } from './ZonePane';
 import { useDonorStore } from '../../state/donorStore';
 import { useProjectStore } from '../../state/projectStore';
+import { usePasteStore } from '../../state/donor-paste';
 import { composeWindow, drawnPixels, rgbaLines, tileRgbaLookup } from '../../canvas/donor-compose';
 import type { DonorZone } from '../../../core/formats/donors/donor-tree';
 import { marqueeRect } from '../../../core/formats/donors/donor-marquee';
@@ -52,6 +53,11 @@ export default function DonorsCanvas(): React.ReactElement {
   React.useEffect(() => {
     if (root) void useDonorStore.getState().refresh(root);
   }, [root]);
+
+  // Leaving the page clears a paste REFUSAL and with it the target pane's
+  // outlines of its subjects (row 213 (b)): the verdict was on a draft the
+  // author has walked away from. A re-bake note about the act on disk stays.
+  React.useEffect(() => () => usePasteStore.getState().clearRefusal(), []);
 
   React.useEffect(() => {
     let live = true;
