@@ -1,0 +1,33 @@
+{
+  "$what": "Provenance of s2_woven.clipact.json: an OUTPUT of aeon's own tools/clip_act_bake.py, captured from a real run, vendored for the donor page's pool readout on a woven act (ROADMAP row 229, docs/reviews/2026-09-28-pool-shafts-fill-229.md; the defect was found at row 228, docs/reviews/2026-09-28-revendor-228.md section 5(b)). Not a committed aeon file, so it is pinned by the revision and the command that produced it.",
+  "$why": "the only vendored clipact.json that carries pool.per_shaft and pool.per_fill (7 shafts, 1 fill), so it is the red-first row for reading them and for checking aeon's tile invariant over all four lists. Every expected number in the unit rows is READ from this file, never typed.",
+  "aeon": {
+    "repo": "git@github.com:Volence/aeon.git",
+    "branch_that_answers_currency": "origin/master",
+    "revision": "cffdf7168fca5030c45b22b27c5e8c2916e1112c",
+    "revision_is": "aeon origin/master as read 2026-09-28T03:44Z (no fetch by this parcel): the same revision as row 228's pin, which the sibling markers name. tools/clip_act_bake.py last changed at d796ad94 (git log -1 --format=%h origin/master -- tools/clip_act_bake.py), the commit that added pool.per_shaft (pool.per_fill came one commit earlier, at 8afa8015) and reworded per_clip_fields.tiles_added to state the sum over per_clip, per_corridor, per_shaft and per_fill. games/sonic4/data/clips/s2_woven/clips.json last changed at afe9aaef; tools/clip_manifest.py at 6ba38be0.",
+    "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, or any inputs[].path's blob differs from its inputs[].blob, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob, inputs[].blob and revision here (and in the sibling markers of test/fixtures/clips/aeon-outputs/)",
+    "materialised_by": "git -C <aeon> archive cffdf7168fca5030c45b22b27c5e8c2916e1112c | tar -x into $HOME/.cache/aurora-229-aeon/tree (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
+    "tool_path": "tools/clip_act_bake.py",
+    "tool_blob": "958958b55f90ea710e8dd61c3d967e3c8ca0a276",
+    "tool_last_changed_at": "d796ad94",
+    "inputs_are": "the documents fixture.command names (the clips.json it bakes; the currency row requires every one of them here) and tools/clip_manifest.py, which clip_act_bake.py imports and which reads the manifest's `shafts` and `fill`. NOT pinned: the bake's other imports (collision_pipeline, fg_page_order, ojz_strip_gen, tile_dedupe and theirs) and the donor conversion; a change there moves the output with this row green.",
+    "inputs": [
+      {
+        "path": "games/sonic4/data/clips/s2_woven/clips.json",
+        "blob": "3220c11f1d35b33ea1efe0c3e4aa66ee833a0df5"
+      },
+      {
+        "path": "tools/clip_manifest.py",
+        "blob": "080d83131d49996463a3cb9b9cf24856939f0ff9"
+      }
+    ],
+    "what_this_capture_measured": "pool.tiles 2894, pool.pages 49. tiles_added sums to 2858 over 8 per_clip rows, 26 over 4 per_corridor rows, 9 over 7 per_shaft rows and 0 over 1 per_fill row (id \"fill\", index 0); 2858 + 26 + 9 + 0 + 1 (the blank) = 2894, so aeon's four-list invariant holds. Aurora before row 229 summed only per_clip and per_corridor and reported 2885 against 2894. Wall-clock `placement.seconds` and its refine_rounds seconds vary run to run and are the only fields a re-run is expected to move."
+  },
+  "fixture": {
+    "path": "test/fixtures/clips/aeon-outputs/s2_woven.clipact.json",
+    "command": "python3 tools/clip_act_bake.py bake games/sonic4/data/clips/s2_woven/clips.json --out <scratch>/bake_s2_woven --json (exit 0, stdout {ok: true, refusals: [], schema: 1, warnings: [W3 ...]}); the clipact.json it wrote, verbatim",
+    "why_this_one": "the woven act (one of the two clip manifests at the pin with shafts and a fill, beside s2_woven_2d; measured by grepping every games/sonic4/data/clips/*/clips.json in the copy): 7 shafts and 1 neutral fill, and 9 of the act's tiles are added by shafts, so a reader that sums two lists disagrees with pool.tiles by exactly those 9.",
+    "sha256": "192cde06396efe826dee73a5ebfe9fe9974a164c07ae6593ea0e7b538e7b2c3b"
+  }
+}
