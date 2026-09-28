@@ -47,10 +47,17 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
   const current = `${currentZoneId}/${currentActId}`;
   if (!targets.includes(current)) targets.push(current);
 
+  // Acts fully written so far, the act in progress, and how many of ITS files
+  // reached disk. Held outside the try so a throw can report them: the loop
+  // saves acts in order and never rolls back (ROADMAP row 225(d)), so a refusal
+  // of act 2 leaves act 1 on disk, and the error must not read as "nothing".
+  const written: string[] = [];
+  let inProgress: string | null = null;
+  let inProgressFiles = 0;
+
   try {
     s.setLoading(true);
     const fa = createIpcFileAccess(config.basePath);
-    const written: string[] = [];
     // Writes to a file EVERY zone reads (the player palette, CRAM line 0), by
     // path, holding the sentence the report names each by. Filled only when the
     // bytes actually went to disk: a planned write the skip below found already
@@ -69,6 +76,8 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
     for (const key of targets) {
       const ref = splitActKey(key);
       if (!ref) continue;
+      inProgress = key;
+      inProgressFiles = 0;
       const plan = await buildAeonSavePlan(fa, config, project, ref.zoneId, ref.actId,
         { legacyAtlasMerged: s.legacyAtlasMerged });
       // WRITE ONLY WHAT CHANGED.
@@ -106,6 +115,7 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
         if (!planFileNeedsWrite(f.compare, old, f.bytes)) continue;
         await window.api.writeBinaryFile(config.basePath, f.path,
           f.bytes.buffer.slice(f.bytes.byteOffset, f.bytes.byteOffset + f.bytes.byteLength) as ArrayBuffer);
+        inProgressFiles++;
         const shared = plan.shared.find((s) => s.path === f.path);
         if (shared) sharedWritten.set(shared.path, shared.what);
       }
@@ -113,6 +123,7 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
       for (const r of plan.removals) pendingRemovals.set(r.path, r);
       ledgers = plan.ledgers;
       written.push(key);
+      inProgress = null;
     }
 
     // ═══ THE REMOVAL STEP ═════════════════════════════════════════════════
@@ -227,9 +238,44 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
     }
     return { kind: 'saved' };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const thrown = err instanceof Error ? err.message : String(err);
+    const partial = partialSaveReport(written, inProgress, inProgressFiles, targets);
+    const message = partial ? `${thrown}\n\n${partial.detail}` : thrown;
     useProjectStore.getState().setError(message);
-    useToastStore.getState().addToast('Save failed', 'error');
+    useToastStore.getState().addToast(partial ? partial.toast : 'Save failed', 'error');
     return { kind: 'error', message };
   }
+}
+
+/**
+ * What a save that threw partway had ALREADY written, or null when it wrote
+ * nothing. ROADMAP row 225(d): the loop saves acts in order and does not roll
+ * back, so a refusal of a later act (the reserved-bits refusal, a refused
+ * write) leaves earlier acts on disk, while the thrown message is about the
+ * failing act alone and can end "Nothing was written." Said beside it, so the
+ * page cannot read as "nothing was saved" when something was. The written acts
+ * are NOT marked clean (their removals and ledgers never ran), so they keep
+ * their unsaved dot and the next save finishes them.
+ */
+function partialSaveReport(
+  written: readonly string[],
+  failing: string | null,
+  failingFiles: number,
+  targets: readonly string[],
+): { detail: string; toast: string } | null {
+  if (written.length === 0 && failingFiles === 0) return null;
+  const at = failing ? targets.indexOf(failing) : -1;
+  const notAttempted = at >= 0 ? targets.slice(at + 1) : [];
+  const failingPart = failing && failingFiles > 0
+    ? `${written.length ? '; and ' : ''}${failingFiles} file${failingFiles === 1 ? '' : 's'} of ${failing}` : '';
+  const detail = 'This save stopped partway and was not rolled back. Already written to disk: '
+    + `${written.join(', ')}${failingPart}. `
+    + (failing ? `Not saved: ${failing}` : 'Not saved: the rest')
+    + (notAttempted.length ? `, and not attempted: ${notAttempted.join(', ')}` : '')
+    + (failing ? ` ("Nothing was written" above, where it appears, is about ${failing} only)` : '')
+    + `. ${written.length ? `${written.join(', ')} still ${written.length === 1 ? 'shows' : 'show'} as unsaved; ` : ''}`
+    + 'save again once the refusal is fixed.';
+  const toast = `Save failed partway: ${written.length ? `${written.join(', ')} written` : `${failingFiles} file(s) written`}`
+    + (failing ? `, ${failing} not` : '');
+  return { detail, toast };
 }

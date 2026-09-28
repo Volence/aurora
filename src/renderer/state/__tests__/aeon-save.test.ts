@@ -14,6 +14,7 @@ import { serializeNametable } from '../../../core/formats/s4-nametable';
 import { serializeTiles } from '../../../core/export/tile-dedup';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../core/model/s4-types';
 import type { Tile } from '../../../core/model/s4-types';
+import { ensureCollisionPlanes } from '../../../core/collision/collision-cell-resolve';
 
 // --- a two-act project, in memory ------------------------------------------
 
@@ -331,6 +332,62 @@ describe('saveAeonProject', () => {
   // half that broke the pairing would show up as a red row rather than as a
   // green mock agreeing with itself.
   // ═════════════════════════════════════════════════════════════════════════
+  /**
+   * ROADMAP row 225(d): A REFUSED ACT IN A MULTI-ACT SAVE LEAVES EARLIER ACTS
+   * WRITTEN. The loop saves dirty acts in order and does not roll back, so when
+   * act 2's plan throws (here: the reserved-bits refusal), act 1's bytes are
+   * already on disk. Before the row, the author saw "Save failed" and act 2's
+   * own refusal ending "Nothing was written.", which reads as the whole save.
+   * The act names are read from the fixture, and act 1's file is judged written
+   * by its bytes on disk, not by the message.
+   */
+  it('a refusal partway through a multi-act save names what WAS written before it', async () => {
+    const [first, second] = PROJECT_JSON.zones[0].acts.map((a) => `ojz/${a.id}`);
+    dirtyAct('ojz', 'act1');
+    dirtyAct('ojz', 'act2');
+    const proj = useProjectStore.getState().project!;
+    const acts = proj.zones.find((z) => z.id === 'ojz')!.acts;
+    // An edit act 1 must write, so its bytes on disk are a measurement.
+    const nt1 = acts.find((a) => a.id === 'act1')!.sections[0]!.tileGrid.nametable;
+    nt1[5] = (2 << 13) | 1;
+    const ntPath = 'data/ojz/act1/section_0.tiles.bin';
+    const before = files.get(ntPath)!;
+    // Act 2 carries a retired mark (bits 15:14), which its plan refuses.
+    const sec2 = acts.find((a) => a.id === 'act2')!.sections[0]!;
+    ensureCollisionPlanes(sec2);   // the fixture has no collision files
+    sec2.collisionEdit![0] = (sec2.collisionEdit![0]! | (1 << 14)) & 0xFFFF;
+
+    const result = await saveAeonProject();
+
+    expect(result.kind).toBe('error');
+    // Act 1 really was written: its nametable on disk moved.
+    expect(files.get(ntPath)).not.toEqual(before);
+    const shown = useProjectStore.getState().error ?? '';
+    expect(shown).toMatch(new RegExp(`refusing to save ${second}`));
+    // What the author sees names act 1 as written and act 2 as not.
+    expect(shown).toMatch(new RegExp(`already written.*${first}`, 'i'));
+    const toast = useToastStore.getState().toasts.at(-1)!;
+    expect(toast.type).toBe('error');
+    expect(toast.message).toContain(first);
+    expect(toast.message).toContain(second);
+    // Act 1 is NOT marked clean (its removals and ledgers never ran), which is
+    // what the message tells the author; measured, not assumed.
+    expect(Object.keys(useEditorStore.getState().dirtyActs)).toContain(first);
+  });
+
+  it('CONTROL: a refusal of the FIRST act (nothing written) does not claim an earlier write', async () => {
+    dirtyAct('ojz', 'act1');
+    const proj = useProjectStore.getState().project!;
+    const sec1 = proj.zones.find((z) => z.id === 'ojz')!.acts.find((a) => a.id === 'act1')!.sections[0]!;
+    ensureCollisionPlanes(sec1);
+    sec1.collisionEdit![0] = (sec1.collisionEdit![0]! | (1 << 14)) & 0xFFFF;
+    const result = await saveAeonProject();
+    expect(result.kind).toBe('error');
+    expect(written).toEqual([]);
+    expect(useProjectStore.getState().error ?? '').not.toMatch(/already written/i);
+    expect(useToastStore.getState().toasts.at(-1)!.message).toBe('Save failed');
+  });
+
   describe('a write the main process refuses', () => {
     let tmp: string;
     let outside: string;

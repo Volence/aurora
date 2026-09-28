@@ -11,7 +11,7 @@ import {
 } from './discovery-file';
 import { requestAgent } from './agent-bridge';
 import type { AgentRequest } from '../shared/agent-protocol';
-import { EDITOR_METHODS } from './editor-methods';
+import { EDITOR_METHODS, mcpInputSchema } from './editor-methods';
 import { handleRequest, addSubscriber, removeSubscriber } from './aether/adapter';
 import { loopbackOnly } from './loopback-guard';
 
@@ -65,7 +65,9 @@ function buildServer(getWindow: () => BrowserWindow | null): McpServer {
     // which is what an empty shape compiles to. `agent-road-schema-gate.test.ts`
     // asserts both halves, and asserts them over EDITOR_METHODS rather than over
     // a list of tool names, so a method added later is covered by construction.
-    const config = { description: m.description, inputSchema: m.params };
+    // A `strict` method registers a strict ZodObject (unknown keys REFUSED,
+    // ROADMAP row 225(a)); every other method registers its raw shape as before.
+    const config = { description: m.description, inputSchema: mcpInputSchema(m) };
     server.registerTool(m.name, config, async (args: Record<string, unknown> = {}) => {
       const result = await forward({ kind: m.kind, ...args } as AgentRequest);
       if (m.result === 'image') {

@@ -104,6 +104,15 @@ export interface PaintCollisionRectOptions {
   cellsH: number;
 }
 
+/**
+ * paint_collision's RETIRED parameters (ROADMAP rows 223+224: they painted the
+ * loop crossover mark, bits 15:14, which aeon now refuses). The agent handler
+ * refuses them by name, and the MCP/Aether roads refuse them as unknown keys
+ * because paint_collision's schema is strict (row 225(a)). One list, read by the
+ * handler and by the road tests, so neither can name a key the other forgot.
+ */
+export const RETIRED_PAINT_COLLISION_KEYS = ['crossover', 'crossoverSpan'] as const;
+
 /** Validate a paint_collision rectangle. Coordinates are 16px CELL units
  *  (half a section's tile dimensions), not tile units — mirrors
  *  validatePaintRegion's shape/return convention but against cellsW/cellsH. */
