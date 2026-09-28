@@ -19,7 +19,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { recordingContext } from './chrome-recorder';
-import { deviceStrokeWidth, segmentsOnDeviceGrid, cameraDeviceMapping } from '../device-grid';
+import {
+  deviceStrokeWidth, segmentsOnDeviceGrid, cameraDeviceMapping, snapStroke, snapStrokeEdges, snapLength,
+} from '../device-grid';
 import { ARROW_WIDTH_SCALE } from '../../../core/collision/collision-angle-mark';
 
 /** A rational n / d, d > 0, both integers. */
@@ -156,3 +158,127 @@ for (const [name, path] of [['aeon (cameraDeviceMapping)', aeonPathWidth], ['cla
     }
   });
 }
+
+// ═══ A STROKE POSITION AT A TIE IS DECIDED BY A RULE TOO (ROADMAP row 242) ═══
+//
+// Where a stroke goes is one more rounding: `round(cssAt * dpr)` picks the device pixel
+// its centre goes on (or next to, for an odd width), and `snapLength` rounds an end or a
+// size the same way. A device coordinate of exactly k + 0.5 is a tie, and the float
+// paths the renderers use arrive on either side of it: aeon's `cameraDeviceMapping` puts
+// world 48 at zoom 3.3, camera 13, dpr 1 on 115.49999999999997, where the exact value is
+// (48 - 13) * 33 / 10 = 115.5. Rule: a position tie goes UP (toward +infinity), which is
+// `Math.round`'s own half-up, the answer every EXACT tie already got. Expectations come
+// from the exact rational oracle below, never from the current output.
+
+/** The device pixel the rule rounds an exact rational device coordinate to: half-up. */
+const devicePixel = (n: number, d: number): number => Math.floor((2 * n + d) / (2 * d));
+/** Whether the exact rational device coordinate n / d is a position tie (k + 0.5). */
+const isPositionTie = (n: number, d: number): boolean =>
+  (2 * n) % d === 0 && Math.abs((2 * n) / d) % 2 === 1;
+
+/** The CSS x `segmentsOnDeviceGrid` computes for world x `wx` under aeon's camera mapping. */
+function aeonCssX(wx: number, camX: number, zoom: number, dpr: number): number {
+  const m = cameraDeviceMapping(camX, 0, zoom, dpr);
+  return (wx * m.a + m.e) / dpr;
+}
+
+describe('the premise: a position tie reaches the snap below its exact value', () => {
+  it('zoom 3.3, camera 13, world 48, dpr 1 is the exact tie 115.5 and arrives as 115.49999999999997', () => {
+    // exact: (48 - 13) * (33 / 10) * 1 = 1155 / 10.
+    expect(isPositionTie(1155, 10)).toBe(true);
+    expect(devicePixel(1155, 10)).toBe(116);
+    const css = aeonCssX(48, 13, 3.3, 1);
+    expect(css * 1).toBe(115.49999999999997);
+    expect(css * 1).toBeLessThan(115.5);
+  });
+});
+
+describe('a position tie through segmentsOnDeviceGrid goes up, and the width does not change', () => {
+  // Vertical segment at world x 48, zoom 3.3, camera 13, dpr 1: exact device x 115.5, a
+  // tie, so the rule's pixel is 116. A 1 px stroke (odd, 1 device px) centres on 116.5,
+  // edges 116 and 117; a 2 px stroke (even, 2 device px) centres on 116, edges 115 and
+  // 117. A horizontal segment from world x 48 to 60 has its ends at exact 115.5 (a tie,
+  // 116) and (60 - 13) * 3.3 = 155.1 (not a tie, 155).
+  const zoom = 3.3, camX = 13, dpr = 1;
+  const draw = (lineCss: number, vertical: boolean) => {
+    const r = recordingContext();
+    r.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const p = segmentsOnDeviceGrid(r.ctx, dpr, cameraDeviceMapping(camX, 0, zoom, dpr));
+    p.lineWidth = lineCss / zoom;
+    p.beginPath();
+    if (vertical) { p.moveTo(48, 0); p.lineTo(48, 10); } else { p.moveTo(48, 5); p.lineTo(60, 5); }
+    p.stroke();
+    return r.strokes[0];
+  };
+
+  it('a 1 px vertical line centres on 116.5 (edges 116 and 117), width 1', () => {
+    const s = draw(1, true);
+    expect(s.pts.map((pt) => pt[0])).toEqual([116.5, 116.5]);
+    expect(s.width).toBe(1);
+  });
+
+  it('a 2 px vertical line centres on 116 (edges 115 and 117), width 2', () => {
+    const s = draw(2, true);
+    expect(s.pts.map((pt) => pt[0])).toEqual([116, 116]);
+    expect(s.width).toBe(2);
+  });
+
+  it('a horizontal line\'s tied end goes to 116 and its untied end stays on 155', () => {
+    const s = draw(1, false);
+    expect(s.pts.map((pt) => pt[0])).toEqual([116, 155]);
+  });
+});
+
+describe('every position, tie or not, on a sweep of the camera path follows the rule', () => {
+  // Zooms n / 20 for n = 3..160 (0.15 to 8), row 240's dprs, cameras 0..12, worlds 0..40:
+  // the exact device x is (world - cam) * zn * dn / (20 * dd).
+  const dprs: Q[] = DPRS;
+  it('snapStrokeEdges (1 px and 2 px), snapStroke (1 px) and snapLength land on the rule\'s pixel', () => {
+    let ties = 0;
+    let noisyTies = 0;
+    const bad: string[] = [];
+    for (let zn = 3; zn <= 160; zn++) {
+      for (const [dn, dd] of dprs) {
+        const zoom = zn / 20, dpr = dn / dd;
+        for (let cam = 0; cam <= 12; cam++) {
+          for (let wx = 0; wx <= 40; wx++) {
+            const n = (wx - cam) * zn * dn, d = 20 * dd;
+            const want = devicePixel(n, d);
+            if (isPositionTie(n, d)) {
+              ties++;
+              if (Math.round(aeonCssX(wx, cam, zoom, dpr) * dpr) !== want) noisyTies++;
+            }
+            const css = aeonCssX(wx, cam, zoom, dpr);
+            const odd = snapStrokeEdges(css, 1, dpr);
+            const even = snapStrokeEdges(css, 2, dpr);
+            const half = snapStroke(css, 1, dpr);
+            const len = snapLength(css, dpr);
+            const off = (got: number, exp: number) => Math.abs(got - exp) > 1e-9;
+            if (off(odd.at * dpr, want + 0.5) || off(even.at * dpr, want) || off(half.at * dpr, want + 0.5)
+              || off(len * dpr, want)) {
+              if (bad.length < 10) {
+                bad.push(`zoom ${zoom} dpr ${dpr} cam ${cam} world ${wx}: device ${css * dpr}, want pixel ${want}, `
+                  + `edges ${odd.at * dpr} / ${even.at * dpr}, snapStroke ${half.at * dpr}, length ${len * dpr}`);
+              }
+            }
+            if (off(odd.width * dpr, deviceStrokeWidth(1, dpr)) || off(even.width * dpr, deviceStrokeWidth(2, dpr))) {
+              if (bad.length < 10) bad.push(`zoom ${zoom} dpr ${dpr} cam ${cam} world ${wx}: width moved`);
+            }
+          }
+        }
+      }
+    }
+    // Anti-vacuous: the sweep holds ties, and the unfixed float path decides some wrongly.
+    expect(ties).toBeGreaterThan(1000);
+    expect(noisyTies).toBeGreaterThan(100);
+    expect(bad).toEqual([]);
+  });
+
+  it('a device coordinate just outside the tolerance of a tie is not a tie (nothing else changes)', () => {
+    // 115.5 - 1e-6 is nearer 115; 115.5 + 1e-6 is nearer 116; 112.2 is nowhere near a tie.
+    expect(snapStrokeEdges(115.5 - 1e-6, 2, 1).at).toBe(115);
+    expect(snapStrokeEdges(115.5 + 1e-6, 2, 1).at).toBe(116);
+    expect(snapLength(115.5 - 1e-6, 1)).toBe(115);
+    expect(snapStrokeEdges(aeonCssX(47, 13, 3.3, 1), 1, 1).at).toBe(112.5);
+  });
+});
