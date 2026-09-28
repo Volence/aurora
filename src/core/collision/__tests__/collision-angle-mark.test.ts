@@ -304,7 +304,10 @@ describe('drawAngleMark: casing under core, and the geometry that reaches canvas
     drawAngleMark(r.ctx, 0, 0, 16, angleMark(profile(RISING_FLOOR, 0x20))!, OPTS);
     const [barCasing, stemCasing, barCore, stemCore] = r.strokes;
     expect(stemCore.width).toBeCloseTo(OPTS.coreWidth * ARROW_WIDTH_SCALE, 10);
-    expect(stemCasing.width).toBeCloseTo(OPTS.casingWidth * ARROW_WIDTH_SCALE, 10);
+    // The stem's CASING is its core plus the bar's own casing margin on each side
+    // (ROADMAP row 240 (c)), so the stem's outline is exactly as heavy as the bar's.
+    expect(stemCasing.width).toBeCloseTo(OPTS.coreWidth * ARROW_WIDTH_SCALE + (OPTS.casingWidth - OPTS.coreWidth), 10);
+    expect(stemCasing.width - stemCore.width).toBeCloseTo(barCasing.width - barCore.width, 10);
     expect(stemCore.width).toBeGreaterThan(barCore.width);
     expect(stemCasing.width).toBeGreaterThan(barCasing.width);
     // Length: the stem reaches further from the shared anchor than either half
@@ -401,7 +404,7 @@ describe('drawAngleMark: casing under core, and the geometry that reaches canvas
     // the first cut: 7 angle-coloured pixels in a 38px canvas, against 15 for
     // the mark it replaced.
     expect(r.strokes).toEqual([
-      { style: '#000', width: 3 * ARROW_WIDTH_SCALE },
+      { style: '#000', width: 1 * ARROW_WIDTH_SCALE + (3 - 1) },
       { style: '#f00', width: 1 * ARROW_WIDTH_SCALE },
     ]);
     // ...and what it drew is the NORMAL, not the tangent. At $20 both are

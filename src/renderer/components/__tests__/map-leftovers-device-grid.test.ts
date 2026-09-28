@@ -192,13 +192,17 @@ describe('the collision-paint shape ghost strokes on the device grid (row 240 (a
         expect(cols[0]).toBeCloseTo(expectedCentre(dx(X), 3, dpr), 9);
         expect(cols[1]).toBeCloseTo(expectedCentre(dx(X + 16), 3, dpr), 9);
 
-        // The mark: every core and casing segment axis-aligned and whole. The stem is
-        // ARROW_WIDTH_SCALE times the bar's width; the last stroke of each colour is it.
+        // The mark: every core and casing segment axis-aligned and whole. The stem's core
+        // is ARROW_WIDTH_SCALE times the bar's, and its casing that core plus the bar's
+        // casing margin on each side (ROADMAP row 240 (c)), so the two share a centre;
+        // the last stroke of each colour is the stem.
         const core = m.rec.strokes.filter((s) => s.style === COLLISION_ANGLE_TICK);
         const casing = m.rec.strokes.filter((s) => s.style === COLLISION_ANGLE_CASING);
         expect(core.length, 'no mark: the row measures nothing').toBeGreaterThan(0);
-        axisSegments(core.slice(-1), 1.25 * ARROW_WIDTH_SCALE, dpr, 'stem core');
-        axisSegments(casing.slice(-1), 3 * ARROW_WIDTH_SCALE, dpr, 'stem casing');
+        const stemCore = axisSegments(core.slice(-1), 1.25 * ARROW_WIDTH_SCALE, dpr, 'stem core');
+        const stemCasing = axisSegments(casing.slice(-1), 1.25 * ARROW_WIDTH_SCALE + (3 - 1.25), dpr, 'stem casing');
+        expect(stemCasing[0][0], 'the stem is concentric in its casing').toBeCloseTo(stemCore[0][0], 6);
+        expect(stemCasing[0][1], 'the stem is concentric in its casing').toBeCloseTo(stemCore[0][1], 6);
         axisSegments(core.slice(0, -1), 1.25, dpr, 'bar core');
         axisSegments(casing.slice(0, -1), 3, dpr, 'bar casing');
       });
