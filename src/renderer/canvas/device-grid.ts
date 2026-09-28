@@ -183,6 +183,61 @@ export function strokeCssRectOnDeviceGrid(
   ctx.restore();
 }
 
+/**
+ * Outline the INSIDE of the CSS rect (cssX, cssY, cssW, cssH) with a stroke of `cssWidth`
+ * CSS px ON THE DEVICE GRID (ROADMAP row 239 (d)): the stroke's OUTER edge on each side is
+ * the rect's edge rounded to a whole device pixel, and its inner edge is
+ * `deviceStrokeWidth(cssWidth, dpr)` device px inside it. So both edges of every side are
+ * whole device pixels, and the stroke never leaves the rect.
+ *
+ * It exists for the strokes that were drawn INSET in world units, `strokeRect(x + w/2, y +
+ * w/2, W - w, H - w)` at `lineWidth w`: MapViewport's collision-paint block outlines. The
+ * centre of each side goes through `snapStrokeEdges`, asked at a device coordinate that is
+ * already whole (`floor(w/2)` in from the left or top edge, `ceil(w/2)` in from the right
+ * or bottom), so the helper's own parity rule puts it at `edge + w/2` or `edge - w/2`.
+ *
+ * At dpr 1 a 1 CSS px inset outline on an integer edge covers exactly the column and row
+ * the world-unit `1 / zoom` stroke inset by `0.5 / zoom` covered. `ctx`'s transform and
+ * state are left exactly as they were found.
+ */
+export function strokeCssRectInsetOnDeviceGrid(
+  ctx: CanvasRenderingContext2D,
+  cssX: number, cssY: number, cssW: number, cssH: number,
+  cssWidth: number,
+  dpr: number,
+): void {
+  const w = deviceStrokeWidth(cssWidth, dpr);
+  const lo = (edgeCss: number): number =>
+    snapStrokeEdges((Math.round(edgeCss * dpr) + Math.floor(w / 2)) / dpr, cssWidth, dpr).at;
+  const hi = (edgeCss: number): number =>
+    snapStrokeEdges((Math.round(edgeCss * dpr) - Math.ceil(w / 2)) / dpr, cssWidth, dpr).at;
+  const l = lo(cssX), t = lo(cssY), r = hi(cssX + cssW), b = hi(cssY + cssH);
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.lineWidth = w / dpr;
+  ctx.strokeRect(l, t, r - l, b - t);
+  ctx.restore();
+}
+
+/**
+ * An axis-aligned world-to-DEVICE mapping, `device = world * a + e` across and
+ * `world * d + f` down: the part of a `DOMMatrix` `segmentsOnDeviceGrid` reads.
+ */
+export interface DeviceMapping { a: number; d: number; e: number; f: number }
+
+/**
+ * The mapping MapViewport's map canvas draws its overlays under: its base
+ * `setTransform(dpr)`, then `OverlayRenderer.render`'s `scale(zoom)` and
+ * `translate(-vpX, -vpY)`. Stated from the camera the caller already holds, for the reason
+ * MapViewport's ghost maps its rects by hand (row 238 (a)): the node suite's shared
+ * stub context answers `getTransform()` with `undefined`, and map-device-scale.test.ts
+ * REQUIRES it to stay unanswered.
+ */
+export function cameraDeviceMapping(vpX: number, vpY: number, zoom: number, dpr: number): DeviceMapping {
+  const k = zoom * dpr;
+  return { a: k, d: k, e: -vpX * k, f: -vpY * k };
+}
+
 /** The path calls `segmentsOnDeviceGrid` answers: the shape of `MarkDrawCtx`. */
 export interface SegmentPathCtx {
   strokeStyle: string;
@@ -215,13 +270,16 @@ export interface SegmentPathCtx {
  *
  * `strokeStyle` and `lineWidth` are forwarded as state; `ctx`'s transform, dash and
  * everything else are left exactly as they were found. The world-to-CSS mapping is read
- * once, when this is called.
+ * once, when this is called: off `ctx.getTransform()`, or, when the caller already knows
+ * it, from `mapping` (aeon's overlays pass `cameraDeviceMapping`, ROADMAP row 239 (d)),
+ * which must then be the transform in force.
  */
 export function segmentsOnDeviceGrid(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   dpr: number,
+  mapping?: DeviceMapping,
 ): SegmentPathCtx {
-  const m = ctx.getTransform();
+  const m = mapping ?? ctx.getTransform();
   const cssX = (wx: number): number => (wx * m.a + m.e) / dpr;
   const cssY = (wy: number): number => (wy * m.d + m.f) / dpr;
   let segs: [number, number, number, number][] = [];

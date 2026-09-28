@@ -37,7 +37,7 @@ import type { MapClipboard } from '../../core/editing/map-clipboard';
 import { regionPreviewCanvas, publishPasteGhostReport } from '../canvas/region-preview';
 import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
-import { deviceScale, onDeviceScaleChange, strokeCssRectOnDeviceGrid } from '../canvas/device-grid';
+import { deviceScale, onDeviceScaleChange, strokeCssRectOnDeviceGrid, strokeCssRectInsetOnDeviceGrid } from '../canvas/device-grid';
 import {
   bandPreview, refreshBandPreview, resolveDisplayedBg, resolveBandLens, bandLensCaptionLines,
 } from '../providers/bganim-preview-aeon';
@@ -947,9 +947,12 @@ export default function MapViewport() {
         // Same colour language as the marquee: peach means this footprint
         // carries art and no collision.
         ctx.strokeStyle = clip.artOnly ? MAP_MARQUEE_ART_ONLY : SELECTION_MARQUEE;
-        ctx.lineWidth = 2 / pZoom;
-        ctx.setLineDash([4 / pZoom, 4 / pZoom]);
-        ctx.strokeRect(px, py, pw, ph);
+        // ON THE DEVICE GRID, as the marquee is (ROADMAP row 239 (d)): the rect mapped to
+        // CSS px from this block's own camera, both edges of every side on whole device
+        // pixels, and the dash stated in the CSS frame it is stroked in (4 CSS px, the
+        // `4 / pZoom` world units it always was).
+        ctx.setLineDash([4, 4]);
+        strokeCssRectOnDeviceGrid(ctx, (px - pvpX) * pZoom, (py - pvpY) * pZoom, pw * pZoom, ph * pZoom, 2, dpr);
         ctx.setLineDash([]);
         ctx.restore();
       }
@@ -989,21 +992,26 @@ export default function MapViewport() {
     ctx.translate(-vpX, -vpY);
 
     // Scope: outline every block the stroke would change (erase tints red).
-    const inset = 0.5 / zoom;
+    //
+    // BOTH OUTLINES ARE INSET STROKES ON THE DEVICE GRID (ROADMAP row 239 (d)). They were
+    // stroked in world units, `1 / zoom` inset by `0.5 / zoom` and `1.5 / zoom` inset by
+    // `0.75 / zoom`, so each sat just inside its 16px cell with whatever edge the camera
+    // gave it. `strokeCssRectInsetOnDeviceGrid` keeps them inside the cell, with the
+    // outer edge on the cell's edge rounded to a whole device pixel and the inner edge a
+    // whole number of device px in from it.
+    const cellCss = (wv: number, vv: number): number => (wv - vv) * zoom;
     for (const t of all) {
       const wx = offset.x + t.cellCol * 16, wy = offset.y + t.cellRow * 16;
       if (erasing) { ctx.fillStyle = COLLISION_PREVIEW_ERASE; ctx.fillRect(wx, wy, 16, 16); }
       ctx.strokeStyle = COLLISION_PREVIEW_SCOPE;
-      ctx.lineWidth = 1 / zoom;
-      ctx.strokeRect(wx + inset, wy + inset, 16 - 2 * inset, 16 - 2 * inset);
+      strokeCssRectInsetOnDeviceGrid(ctx, cellCss(wx, vpX), cellCss(wy, vpY), 16 * zoom, 16 * zoom, 1, dpr);
     }
 
     // The shape ghost at the cursor cell + a brighter outline.
     const wx = offset.x + primary.cellCol * 16, wy = offset.y + primary.cellRow * 16;
     if (profile) drawCollisionShape(ctx as unknown as ShapeDrawCtx, wx, wy, 16, profile, collisionPreviewOpts(zoom));
     ctx.strokeStyle = COLLISION_PREVIEW_PRIMARY;
-    ctx.lineWidth = 1.5 / zoom;
-    ctx.strokeRect(wx + 0.75 / zoom, wy + 0.75 / zoom, 16 - 1.5 / zoom, 16 - 1.5 / zoom);
+    strokeCssRectInsetOnDeviceGrid(ctx, cellCss(wx, vpX), cellCss(wy, vpY), 16 * zoom, 16 * zoom, 1.5, dpr);
 
     ctx.restore();
   }, []);
