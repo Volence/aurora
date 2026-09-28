@@ -43,7 +43,7 @@ interface Marker {
   generator?: { path: string };
 }
 const BAKE_CASES = JSON.parse(readFileSync(resolve(DIR, 'bake-json.cases.json'), 'utf8')) as Record<string, { exit: number; stdout: string; stderr: string; argv: string[] }>;
-const MARKERS = ['s2_ehz_cpz.clipact', 's2_two_clip.clipact', 'validate-json.cases', 'paste-music.cases', 'bake-json.cases'].map((stem) =>
+const MARKERS = ['s2_ehz_cpz.clipact', 's2_two_clip.clipact', 's2_woven.clipact', 'validate-json.cases', 'paste-music.cases', 'bake-json.cases'].map((stem) =>
   JSON.parse(readFileSync(resolve(DIR, `${stem}.provenance.json`), 'utf8')) as Marker);
 const REAL = ['s2_ehz_cpz', 's2_two_clip'];
 
@@ -88,6 +88,70 @@ describe('pool rows: read from a clipact.json aeon\'s bake wrote', () => {
     const got = readPoolRows(raw as unknown as Record<string, unknown>);
     expect(got.state).toBe('present');
     expect(got.state === 'present' && got.perCorridor).toEqual([]);
+  });
+});
+
+/**
+ * ROW 229. aeon's bake (tools/clip_act_bake.py since d796ad94) writes
+ * `pool.per_shaft` (index-aligned with the file's `shafts`) and `pool.per_fill`
+ * (one row for the file's `fill`) when the act has them, and states its tile
+ * invariant over per_clip, per_corridor, per_shaft AND per_fill. The woven act is
+ * aeon's real output with both; every expected number is read from it.
+ */
+describe('pool rows on a woven act: shafts and fill are read, and the tile sum counts every list shown', () => {
+  type Row = { id: string; index: number; tiles: number; tiles_added: number; pages_touched: number; pages_exclusive: number };
+  const woven = () => clipact('s2_woven') as unknown as {
+    pool: Record<string, unknown> & { per_clip: Row[]; per_corridor: Row[]; per_shaft: Row[]; per_fill: Row[]; tiles: number; pages: number };
+    clips: { id: string }[]; corridors: { id: string }[]; shafts: { id: string }[]; fill: Record<string, unknown>;
+  };
+  const LISTS = ['per_clip', 'per_corridor', 'per_shaft', 'per_fill'] as const;
+  const addedPlusBlank = (raw: ReturnType<typeof woven>) =>
+    LISTS.reduce((a, k) => a + raw.pool[k].reduce((b, r) => b + r.tiles_added, 0), 0) + 1;
+
+  it('the fixture is not vacuous: it carries shaft and fill rows, and the shafts add tiles the two-list sum would miss', () => {
+    const raw = woven();
+    expect(raw.pool.per_shaft.length).toBeGreaterThan(0);
+    expect(raw.pool.per_fill.length).toBe(1);
+    expect(raw.pool.per_shaft.reduce((a, r) => a + r.tiles_added, 0)).toBeGreaterThan(0);
+    expect(addedPlusBlank(raw)).toBe(raw.pool.tiles);
+  });
+
+  it('s2_woven: all four sections come back exactly as aeon wrote them', () => {
+    const raw = woven();
+    const got = readPoolRows(raw as unknown as Record<string, unknown>);
+    expect(got.state, got.state === 'unavailable' ? got.why : '').toBe('present');
+    if (got.state !== 'present') return;
+    expect({ perClip: got.perClip, perCorridor: got.perCorridor, perShaft: got.perShaft, perFill: got.perFill })
+      .toEqual({ perClip: raw.pool.per_clip, perCorridor: raw.pool.per_corridor, perShaft: raw.pool.per_shaft, perFill: raw.pool.per_fill });
+  });
+
+  it('s2_woven: the shaft rows line up with the file\'s own shafts, by id and index', () => {
+    const raw = woven();
+    const got = readPoolRows(raw as unknown as Record<string, unknown>);
+    expect(got.state === 'present' && got.perShaft.map((r) => [r.id, r.index])).toEqual(raw.shafts.map((s, i) => [s.id, i]));
+  });
+
+  it('s2_woven: aeon\'s tile sum over all four lists holds, and the reader says so and reports nothing broken', () => {
+    const raw = woven();
+    const got = readPoolRows(raw as unknown as Record<string, unknown>);
+    expect(got.state === 'present' && { tilesSum: got.tilesSum, broken: got.broken, unshown: got.unshown })
+      .toEqual({ tilesSum: { state: 'holds', total: raw.pool.tiles }, broken: [], unshown: [] });
+  });
+
+  it('a planted pool list the page does not read is NAMED, and the tile sum reads "cannot check", never a mismatch', () => {
+    const raw = woven();
+    raw.pool.per_zzz = [{ ...raw.pool.per_shaft[0], id: 'zzz', index: 0, tiles_added: 5 }];
+    const got = readPoolRows(raw as unknown as Record<string, unknown>);
+    expect(got.state === 'present' && { unshown: got.unshown, tilesSum: got.tilesSum.state, broken: got.broken })
+      .toEqual({ unshown: ['per_zzz'], tilesSum: 'cannot-check', broken: [] });
+  });
+
+  it('a planted change to a shaft row\'s tiles_added is a genuine mismatch, stated over all four lists', () => {
+    const raw = woven();
+    raw.pool.per_shaft[0].tiles_added += 1;
+    const got = readPoolRows(raw as unknown as Record<string, unknown>);
+    expect(got.state === 'present' && got.broken)
+      .toContain(`the rows' added tiles plus the blank make ${addedPlusBlank(raw)}, but pool.tiles is ${raw.pool.tiles}`);
   });
 });
 
