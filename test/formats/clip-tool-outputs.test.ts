@@ -41,6 +41,7 @@ interface Marker {
   aeon: {
     revision: string; tool_path: string; tool_blob: string; re_measure: string; materialised_by: string;
     inputs?: { path: string; blob: string }[]; closure_not_loaded?: string[];
+    data_not_opened?: string[]; inputs_excluded?: { path: string; why: string }[];
   };
   fixture: { path: string; sha256: string; command: string };
   generator?: { path: string };
@@ -545,7 +546,7 @@ describe('CURRENCY: the INPUTS those tools read, at aeon origin/master', () => {
     // materialised_by names; every module in it is pinned, or listed as measured
     // not-loaded. Each pinned blob is also held to the marker's OWN revision, so a
     // blob cannot have been typed or taken from some other tree.
-    it(`${m.fixture.path}: every aeon module the tool and the donor conversion import is pinned (or measured not loaded), each at the marker's revision`, (ctx) => {
+    it(`${m.fixture.path}: every aeon module and data file the tool and the donor conversion read is pinned, measured unread, or a declared exclusion, each at the marker's revision`, (ctx) => {
       const conv = /python3 (tools\/[a-z0-9_]+\.py) convert --all-six/.exec(m.aeon.materialised_by);
       expect(conv, `${m.fixture.path}: materialised_by names no donor conversion`).not.toBeNull();
       const aeon = peerRepo('aeon');
@@ -595,6 +596,38 @@ describe('CURRENCY: the INPUTS those tools read, at aeon origin/master', () => {
       const contradicted: string[] = [];
       for (const [p, top] of topLevel) if (pinned.has(p)) for (const q of top) if (notLoaded.includes(q)) contradicted.push(`${q} (imported at top level by ${p})`);
       expect(contradicted, `${m.fixture.path}: listed as not loaded, but a loaded module imports it unconditionally`).toEqual([]);
+
+      // DATA FILES. The loaded modules (tool_path and every pinned tools/*.py) name the
+      // committed files they read as os.path.join of string literals; derive those here,
+      // at the revision. Each must be pinned, measured not opened (data_not_opened), or
+      // a DECLARED exclusion (inputs_excluded: read, deliberately unpinned, with its why).
+      // An exclusion is its own category: dropping a pin without declaring it still reds.
+      const loaded = [...pinned].filter((p) => p.startsWith('tools/') && p.endsWith('.py'));
+      const named = new Set<string>();
+      for (const p of loaded) {
+        const at = readAtRev(aeon, rev, p);
+        if (!at.ok) continue;
+        for (const call of at.text.matchAll(/os\.path\.join\(([^()]*)\)/g)) {
+          const lits = [...call[1].matchAll(/["']([A-Za-z0-9_.-]+)["']/g)].map((x) => x[1]);
+          if (lits.length === 0 || !lits[lits.length - 1].includes('.')) continue;
+          for (let i = 0; i < lits.length; i++) {
+            const q = lits.slice(i).join('/');
+            if (!named.has(q) && readAtRev(aeon, rev, q).ok) named.add(q);
+          }
+        }
+      }
+      // Anti-vacuous: the clip tools read at least one committed data file this way.
+      expect(named.size, `${m.fixture.path}: derived no data file from the loaded modules`).toBeGreaterThan(0);
+      const notOpened = m.aeon.data_not_opened ?? [];
+      const excluded = m.aeon.inputs_excluded ?? [];
+      const excludedPaths = excluded.map((e) => e.path);
+      expect([...notOpened, ...excludedPaths].filter((p) => pinned.has(p)), `${m.fixture.path}: both pinned and not`).toEqual([]);
+      for (const e of excluded) {
+        expect(named.has(e.path), `${m.fixture.path}: excludes ${e.path}, which no loaded module names (an exclusion must be of something the tools read)`).toBe(true);
+        expect(e.why.length, `${m.fixture.path}: ${e.path} is excluded with no why`).toBeGreaterThan(0);
+      }
+      expect([...named].filter((p) => !pinned.has(p) && !notOpened.includes(p) && !excludedPaths.includes(p)).sort(),
+        `${m.fixture.path}: a data file a loaded module names at ${m.aeon.revision} is neither pinned, measured not opened, nor a declared exclusion`).toEqual([]);
       const wrong: string[] = [];
       for (const i of m.aeon.inputs ?? []) {
         const at = readAtRev(aeon, rev, i.path);

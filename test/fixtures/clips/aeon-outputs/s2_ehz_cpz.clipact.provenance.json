@@ -10,7 +10,7 @@
     "materialised_by": "git -C <aeon> archive -o <tar> b85e60d2352242161607ea2cd25c2d9e799e86a7, extracted into $HOME/.cache/aurora-revendor-aeon/tree (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
     "tool_path": "tools/clip_act_bake.py",
     "tool_blob": "958958b55f90ea710e8dd61c3d967e3c8ca0a276",
-    "inputs_are": "Every aeon-COMMITTED file the recorded run reads, pinned by blob at `revision` (ROADMAP row 219, measured, not typed): (1) the clip manifests the recorded run names (derived by the completeness row from fixture.command and the generator's `plan`); (2) every aeon module the run LOADED, i.e. the import closure of tool_path as executed; (3) the donor conversion (tools/s2_zone_convert.py, named in materialised_by) and every module it loaded, because the donor trees the tools read (games/sonic4/data/donors/, gitignored in aeon) are that conversion's output, not committed files; (4) the data files those modules opened (engine/system/constants.emp, project.json, and whichever of art/palettes/SonicAndTails.bin, games/sonic4/player/knuckles.emp and games/sonic4/data/collision/base_s2/*.bin this run opens). HOW MEASURED: the recorded command and the conversion were re-run in the materialised copy at e47493aa with a sys.addaudithook `open` hook in every Python process (sitecustomize on PYTHONPATH), and every opened path inside the copy was kept bar the donor trees and the scratch outputs; every file kept has the same blob at b85e60d2, e47493aa and origin/master 28880431. The completeness row re-derives the static import closure of tool_path and the conversion tool at `revision` (git objects) and requires every module in it to be pinned here or listed in closure_not_loaded. NOT PINNED, stated: (a) closure_not_loaded, modules the tools import only inside functions this run never called (measured by the same trace); (b) the donor SOURCES, outside aeon: the conversion reads the suite's s2disasm (art, collision, level, mappings, s2.asm, s2.constants.asm) and s2-simonwai-disasm (HPZ), and the bake reads s2disasm level/objects/*_1.bin and s2.asm directly; those are other repositories' working trees, read by path, which the currency row (aeon origin/master) cannot see; observed at capture clean at s2disasm HEAD e45ebf332f39987424ca3102e50c717628f71269 and s2-simonwai-disasm HEAD 0113ca4775115689edc87d4115ed9cb51f220e02; (c) anything opened below Python (a C extension's fopen), which the audit hook cannot see; the modules traced read their files through Python's open (checked: no np.fromfile/memmap in them).",
+    "inputs_are": "Every aeon-COMMITTED file the recorded run reads, pinned by blob at `revision` (ROADMAP row 219, measured, not typed): (1) the clip manifests the recorded run names (derived by the completeness row from fixture.command and the generator's `plan`); (2) every aeon module the run LOADED, i.e. the import closure of tool_path as executed; (3) the donor conversion (tools/s2_zone_convert.py, named in materialised_by) and every module it loaded, because the donor trees the tools read (games/sonic4/data/donors/, gitignored in aeon) are that conversion's output, not committed files; (4) the data files those modules opened (project.json, and whichever of art/palettes/SonicAndTails.bin, games/sonic4/player/knuckles.emp and games/sonic4/data/collision/base_s2/*.bin this run opens). HOW MEASURED: the recorded command and the conversion were re-run in the materialised copy at e47493aa with a sys.addaudithook `open` hook in every Python process (sitecustomize on PYTHONPATH), and every opened path inside the copy was kept bar the donor trees and the scratch outputs; every file kept has the same blob at b85e60d2, e47493aa and origin/master 28880431. The completeness row re-derives the static import closure of tool_path and the conversion tool at `revision` (git objects) and requires every module in it to be pinned here or listed in closure_not_loaded, and derives the committed data files those loaded modules name in an os.path.join of string literals, each of which must be pinned, listed in data_not_opened, or declared in inputs_excluded. NOT PINNED, stated: (0) engine/system/constants.emp, a DECLARED exclusion, see inputs_excluded (read by the tools, deliberately unpinned; finer pin tracked as ROADMAP row 234); (a) closure_not_loaded, modules the tools import only inside functions this run never called (measured by the same trace); (b) the donor SOURCES, outside aeon: the conversion reads the suite's s2disasm (art, collision, level, mappings, s2.asm, s2.constants.asm) and s2-simonwai-disasm (HPZ), and the bake reads s2disasm level/objects/*_1.bin and s2.asm directly; those are other repositories' working trees, read by path, which the currency row (aeon origin/master) cannot see; observed at capture clean at s2disasm HEAD e45ebf332f39987424ca3102e50c717628f71269 and s2-simonwai-disasm HEAD 0113ca4775115689edc87d4115ed9cb51f220e02; (c) anything opened below Python (a C extension's fopen), which the audit hook cannot see; the modules traced read their files through Python's open (checked: no np.fromfile/memmap in them).",
     "closure_not_loaded": [
       "tools/gen_collision_data.py",
       "tools/ojz_block_gen.py",
@@ -18,6 +18,21 @@
       "tools/s4lz.py"
     ],
     "closure_not_loaded_is": "modules in the static import closure of tool_path and the conversion tool at `revision` that the recorded run and the conversion never loaded (they are imported inside functions the run did not call: the audit trace above). Not pinned: a change there cannot move this output unless a pinned file starts calling it, and that change moves a pinned blob.",
+    "data_not_opened": [
+      "docs/generated/vram-map-sonic4.md",
+      "engine/level/camera.emp",
+      "games/sonic4/data/generated/ojz/act1/DONOR_PROVENANCE.json",
+      "games/sonic4/data/generated/ojz/act1/act_grid.emp",
+      "games/sonic4/data/levels/ojz/act1/act_descriptor.emp",
+      "games/sonic4/player/knuckles.emp"
+    ],
+    "data_not_opened_is": "committed files a loaded module names (an os.path.join of string literals) that the audit trace saw no process of the recorded run or the conversion open. Not pinned: the output cannot depend on a file nothing opened.",
+    "inputs_excluded": [
+      {
+        "path": "engine/system/constants.emp",
+        "why": "READ by the tools (engine/system/constants.emp: clip_manifest.py, fg_page_order.py, fg_working_set.py and layer_lines.py parse named constants out of it; the audit trace saw every recorded run open it) and DELIBERATELY NOT PINNED (overseer ruling at row 219's landing, 2026-09-28): it is the highest-churn input, 37 aeon commits in the 30 days to 2026-09-28, and pinning it whole took the days with a currency red over those 30 days from 9 (the pre-219 pins) to 19; without it, 16. A change to a constant the tools read can therefore move this output with the currency rows green. The finer pin (only the constants the clip tools read, by name and value at the pin) is tracked as ROADMAP row 234."
+      }
+    ],
     "inputs": [
       {
         "path": "games/sonic4/data/clips/s2_ehz_cpz/clips.json",
@@ -30,10 +45,6 @@
       {
         "path": "art/palettes/SonicAndTails.bin",
         "blob": "188e07ba51f628ab374fb615fbdc3bad4809cc6d"
-      },
-      {
-        "path": "engine/system/constants.emp",
-        "blob": "b86134bf03624f804991c73ba7488dd76cbff368"
       },
       {
         "path": "games/sonic4/data/collision/base_s2/angles.bin",
