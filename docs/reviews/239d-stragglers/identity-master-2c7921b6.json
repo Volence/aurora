@@ -1,0 +1,19 @@
+{
+ "tag": "dgo-master",
+ "head": "unknown",
+ "root": "/home/volence/.cache/aurora-master-239d",
+ "captures": {
+  "probe": {
+   "w": 816,
+   "h": 742,
+   "hash": "a55232571f3233f4",
+   "path": "/home/volence/.cache/aurora-master-239d/scratchpad/shots-dpr-guides-offset/state-probe-a-N-dgo-master.png"
+  },
+  "floor": {
+   "w": 816,
+   "h": 742,
+   "hash": "81860e4ef2e51081",
+   "path": "/home/volence/.cache/aurora-master-239d/scratchpad/shots-dpr-guides-offset/state-floor-a-N-dgo-master.png"
+  }
+ }
+}

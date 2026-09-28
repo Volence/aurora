@@ -39,7 +39,7 @@
 // stroke appears where the region simply continues off-screen. Classic passes
 // the whole chunk and is therefore bit-identical to the loop this replaced.
 
-import { segmentsOnDeviceGrid, type SegmentPathCtx } from './device-grid';
+import { segmentsOnDeviceGrid, type DeviceMapping, type SegmentPathCtx } from './device-grid';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -71,10 +71,17 @@ export interface TileLensSpec {
    * `segmentsOnDeviceGrid` (canvas/device-grid.ts), each stroke centred where
    * `snapStrokeEdges` puts it (both of its edges on whole device px) and its ends on
    * whole device px. Absent, the strokes are drawn in
-   * world units exactly as before; aeon's lenses pass nothing, so their picture is
-   * unchanged by row 238.
+   * world units exactly as before. Since ROADMAP row 239 (d) every caller passes one:
+   * classic's lens, aeon's priority and both-planes lenses, and the composer's (at the
+   * scale of ITS backing store, which is 1; see composer-priority-lens.ts).
    */
   dpr?: number;
+  /**
+   * The world-to-device mapping in force, when the caller knows it without asking the
+   * context (aeon's map lenses: `cameraDeviceMapping`). Absent, `segmentsOnDeviceGrid`
+   * reads `ctx.getTransform()`. Used only with `dpr`.
+   */
+  toDevice?: DeviceMapping;
 }
 
 /** What one call actually painted, so a caller can publish a real count. */
@@ -121,7 +128,7 @@ export function drawTileLens(ctx: Ctx, spec: TileLensSpec): TileLensDrawn {
   // Boundary strokes: each marked tile's sides whose neighbour is KNOWN-unmarked.
   const path: SegmentPathCtx = spec.dpr === undefined
     ? (ctx as unknown as SegmentPathCtx)
-    : segmentsOnDeviceGrid(ctx, spec.dpr);
+    : segmentsOnDeviceGrid(ctx, spec.dpr, spec.toDevice);
   path.strokeStyle = spec.edge;
   path.lineWidth = 1 * invZoom;
   path.beginPath();

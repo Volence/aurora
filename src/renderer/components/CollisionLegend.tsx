@@ -10,7 +10,7 @@ import {
   type MarkDrawCtx,
 } from '../../core/collision/collision-angle-mark';
 import type { CollisionProfile } from '../../core/collision/collision-model';
-import { deviceScale, onDeviceScaleChange } from '../canvas/device-grid';
+import { deviceScale, onDeviceScaleChange, segmentsOnDeviceGrid } from '../canvas/device-grid';
 
 type Row =
   | { kind: 'fill' | 'line' | 'outline'; color: string; label: string }
@@ -71,7 +71,14 @@ export function AngleSwatch({ cellScreenPx }: { cellScreenPx: number }) {
       ctx.clearRect(0, 0, SWATCH, SWATCH);
       const mark = angleMark(LEGEND_PROFILE);
       if (!mark) return;
-      drawAngleMark(ctx as unknown as MarkDrawCtx, 0, 0, SWATCH, mark, {
+      // THROUGH THE DEVICE-GRID ADAPTER (ROADMAP row 239 (d)), the one classic's overlay
+      // and aeon's hand the same `drawAngleMark`, so the key is stroked by the rule the
+      // map's marks are. An axis-aligned bar or stem would land with both edges on
+      // whole device pixels; this swatch's profile is a $20 slope, so both are
+      // DIAGONAL and the adapter draws them where they were, at their CSS width (the
+      // rule is about device rows and columns). The legend's pixels are therefore
+      // unchanged by the routing, and that is disclosed rather than claimed as a snap.
+      drawAngleMark(segmentsOnDeviceGrid(ctx, dpr) as unknown as MarkDrawCtx, 0, 0, SWATCH, mark, {
         color: COLLISION_ANGLE_TICK,
         casing: COLLISION_ANGLE_CASING,
         coreWidth: 1.25,

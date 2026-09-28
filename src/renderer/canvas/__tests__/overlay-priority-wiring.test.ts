@@ -29,7 +29,7 @@ function recCtx() {
   const ctx = {
     lineWidth: 0, font: '', textAlign: 'left' as CanvasTextAlign,
     fillStyle: '', strokeStyle: '', globalAlpha: 1, imageSmoothingEnabled: false,
-    save() {}, restore() {}, translate() {}, scale() {}, beginPath() {},
+    save() {}, restore() {}, translate() {}, scale() {}, beginPath() {}, setTransform() {},
     fill() {}, stroke() {}, setLineDash() {}, moveTo() {}, lineTo() {}, arc() {},
     drawImage() {}, strokeRect() {}, fillText() {},
     measureText: () => ({ width: 0 }),
@@ -75,7 +75,7 @@ describe('OverlayRenderer.render: the priority lens gate', () => {
     const { ctx, fills } = recCtx();
     const lens = new OverlayRenderer().render(
       ctx, [{ section: sectionWithHighTile(3, 2), offsetX: 0, offsetY: 0 }],
-      overlays(), viewport,
+      overlays(), viewport, 1,
     );
     expect(veils(fills)).toEqual([]);
     expect(lens.priority).toEqual({ veils: 0, segments: 0 });
@@ -85,7 +85,7 @@ describe('OverlayRenderer.render: the priority lens gate', () => {
     const { ctx, fills } = recCtx();
     const lens = new OverlayRenderer().render(
       ctx, [{ section: sectionWithHighTile(3, 2), offsetX: 0, offsetY: 0 }],
-      overlays({ showPriority: true }), viewport,
+      overlays({ showPriority: true }), viewport, 1,
     );
     expect(veils(fills)).toEqual([{ style: PRIORITY_FILL, x: 24, y: 16, w: 8, h: 8 }]);
     expect(lens.priority).toEqual({ veils: 1, segments: 4 });
@@ -103,7 +103,7 @@ describe('OverlayRenderer.render: the priority lens gate', () => {
       ],
       overlays({ showPriority: true }),
       // Wide enough to see both sections' tiles.
-      { x: 0, y: 0, width: SECTION_PIXEL_SIZE + 64, height: 600, zoom: 1 },
+      { x: 0, y: 0, width: SECTION_PIXEL_SIZE + 64, height: 600, zoom: 1 }, 1,
     );
     expect(veils(fills)).toEqual([
       { style: PRIORITY_FILL, x: 24, y: 16, w: 8, h: 8 },
@@ -120,7 +120,7 @@ describe('OverlayRenderer.render: the priority lens gate', () => {
     } as unknown as Section;
     const { ctx, fills } = recCtx();
     const lens = new OverlayRenderer().render(
-      ctx, [{ section, offsetX: 0, offsetY: 0 }], overlays({ showPriority: true }), viewport,
+      ctx, [{ section, offsetX: 0, offsetY: 0 }], overlays({ showPriority: true }), viewport, 1,
     );
     expect(veils(fills)).toEqual([]);
     expect(lens.priority).toEqual({ veils: 0, segments: 0 });

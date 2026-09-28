@@ -1,0 +1,13 @@
+diff --git a/src/renderer/canvas/OverlayRenderer.ts b/src/renderer/canvas/OverlayRenderer.ts
+index 5cf2ec1a..33952f49 100644
+--- a/src/renderer/canvas/OverlayRenderer.ts
++++ b/src/renderer/canvas/OverlayRenderer.ts
+@@ -378,7 +378,7 @@ export class OverlayRenderer {
+               if (mark) {
+                 // The TIER comes back from the draw, not from a second copy of
+                 // markTier here — the publish must report what was painted.
+-                const tier = drawAngleMark(markPath as unknown as MarkDrawCtx, cx, cy, 16, mark, {
++                const tier = drawAngleMark(ctx as unknown as MarkDrawCtx, cx, cy, 16, mark, {
+                   color: COLLISION_ANGLE_TICK,
+                   casing: COLLISION_ANGLE_CASING,
+                   coreWidth: 1.25 / zoom,

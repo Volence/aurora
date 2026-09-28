@@ -1,0 +1,513 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a89182949c0610033
+
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts (120 tests | 48 failed) 63ms
+     ✓ a flat floor's mark, dpr 1, zoom 3.6250, camera 3.3,1.7 3ms
+     ✓ a flat floor's mark, dpr 1, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ a flat floor's mark, dpr 1, zoom 2.0000, camera 0,0 1ms
+     ✓ a flat floor's mark, dpr 1, zoom 1.0000, camera 13,7 2ms
+     ✓ a flat floor's mark, dpr 1.25, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ a flat floor's mark, dpr 1.25, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ a flat floor's mark, dpr 1.25, zoom 2.0000, camera 0,0 0ms
+     ✓ a flat floor's mark, dpr 1.25, zoom 1.0000, camera 13,7 1ms
+     ✓ a flat floor's mark, dpr 1.35, zoom 3.6250, camera 3.3,1.7 2ms
+     ✓ a flat floor's mark, dpr 1.35, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ a flat floor's mark, dpr 1.35, zoom 2.0000, camera 0,0 0ms
+     ✓ a flat floor's mark, dpr 1.35, zoom 1.0000, camera 13,7 0ms
+     ✓ a flat floor's mark, dpr 1.5, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ a flat floor's mark, dpr 1.5, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ a flat floor's mark, dpr 1.5, zoom 2.0000, camera 0,0 0ms
+     ✓ a flat floor's mark, dpr 1.5, zoom 1.0000, camera 13,7 0ms
+     ✓ a flat floor's mark, dpr 2, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ a flat floor's mark, dpr 2, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ a flat floor's mark, dpr 2, zoom 2.0000, camera 0,0 0ms
+     ✓ a flat floor's mark, dpr 2, zoom 1.0000, camera 13,7 0ms
+     ✓ a flat floor's mark, dpr 3, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ a flat floor's mark, dpr 3, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ a flat floor's mark, dpr 3, zoom 2.0000, camera 0,0 0ms
+     ✓ a flat floor's mark, dpr 3, zoom 1.0000, camera 13,7 0ms
+     ✓ CONTROL: the slope ($20) mark is diagonal and drawn where it was, at its unsnapped CSS width 1ms
+     ✓ dpr 1, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ dpr 1, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1, zoom 0.5000, camera 1.3,0.7 0ms
+     ✓ dpr 1, zoom 0.2500, camera 0,0 0ms
+     ✓ dpr 1.25, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.25, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.25, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.25, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1.25, zoom 0.5000, camera 1.3,0.7 0ms
+     ✓ dpr 1.25, zoom 0.2500, camera 0,0 0ms
+     ✓ dpr 1.35, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.35, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.35, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.35, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1.35, zoom 0.5000, camera 1.3,0.7 0ms
+     ✓ dpr 1.35, zoom 0.2500, camera 0,0 0ms
+     ✓ dpr 1.5, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.5, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.5, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.5, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1.5, zoom 0.5000, camera 1.3,0.7 0ms
+     ✓ dpr 1.5, zoom 0.2500, camera 0,0 0ms
+     ✓ dpr 2, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 2, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 2, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 2, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 2, zoom 0.5000, camera 1.3,0.7 0ms
+     ✓ dpr 2, zoom 0.2500, camera 0,0 0ms
+     ✓ dpr 3, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 3, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 3, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 3, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 3, zoom 0.5000, camera 1.3,0.7 0ms
+     ✓ dpr 3, zoom 0.2500, camera 0,0 0ms
+     ✓ below zoom 0.5 the border is ONE device px at dpr 1, not the parity rule's even minimum of 2 0ms
+     × dpr 1, zoom 3.6250, camera 3.3,1.7 6ms
+     × dpr 1, zoom 1.5000, camera 10.25,3.5 1ms
+     × dpr 1, zoom 2.0000, camera 0,0 1ms
+     × dpr 1, zoom 1.0000, camera 13,7 1ms
+     × dpr 1.25, zoom 3.6250, camera 3.3,1.7 1ms
+     × dpr 1.25, zoom 1.5000, camera 10.25,3.5 0ms
+     × dpr 1.25, zoom 2.0000, camera 0,0 0ms
+     × dpr 1.25, zoom 1.0000, camera 13,7 1ms
+     × dpr 1.35, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 1.35, zoom 1.5000, camera 10.25,3.5 1ms
+     × dpr 1.35, zoom 2.0000, camera 0,0 0ms
+     × dpr 1.35, zoom 1.0000, camera 13,7 1ms
+     × dpr 1.5, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 1.5, zoom 1.5000, camera 10.25,3.5 0ms
+     × dpr 1.5, zoom 2.0000, camera 0,0 0ms
+     × dpr 1.5, zoom 1.0000, camera 13,7 1ms
+     × dpr 2, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 2, zoom 1.5000, camera 10.25,3.5 0ms
+     × dpr 2, zoom 2.0000, camera 0,0 1ms
+     × dpr 2, zoom 1.0000, camera 13,7 1ms
+     × dpr 3, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 3, zoom 1.5000, camera 10.25,3.5 1ms
+     × dpr 3, zoom 2.0000, camera 0,0 0ms
+     × dpr 3, zoom 1.0000, camera 13,7 0ms
+     × dpr 1, zoom 3.6250, camera 3.3,1.7 1ms
+     × dpr 1, zoom 1.5000, camera 10.25,3.5 1ms
+     × dpr 1, zoom 2.0000, camera 0,0 0ms
+     × dpr 1, zoom 1.0000, camera 13,7 0ms
+     × dpr 1.25, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 1.25, zoom 1.5000, camera 10.25,3.5 0ms
+     × dpr 1.25, zoom 2.0000, camera 0,0 0ms
+     × dpr 1.25, zoom 1.0000, camera 13,7 1ms
+     × dpr 1.35, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 1.35, zoom 1.5000, camera 10.25,3.5 0ms
+     × dpr 1.35, zoom 2.0000, camera 0,0 0ms
+     × dpr 1.35, zoom 1.0000, camera 13,7 1ms
+     × dpr 1.5, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 1.5, zoom 1.5000, camera 10.25,3.5 0ms
+     × dpr 1.5, zoom 2.0000, camera 0,0 0ms
+     × dpr 1.5, zoom 1.0000, camera 13,7 0ms
+     × dpr 2, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 2, zoom 1.5000, camera 10.25,3.5 0ms
+     × dpr 2, zoom 2.0000, camera 0,0 0ms
+     × dpr 2, zoom 1.0000, camera 13,7 0ms
+     × dpr 3, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 3, zoom 1.5000, camera 10.25,3.5 0ms
+     × dpr 3, zoom 2.0000, camera 0,0 0ms
+     × dpr 3, zoom 1.0000, camera 13,7 1ms
+     ✓ zoom 1, origin 0,0 1ms
+     ✓ zoom 1, origin 96,64 0ms
+     ✓ zoom 3, origin 0,0 0ms
+     ✓ zoom 3, origin 96,64 0ms
+     ✓ zoom 4, origin 0,0 0ms
+     ✓ zoom 4, origin 96,64 0ms
+     ✓ zoom 8, origin 0,0 0ms
+     ✓ zoom 8, origin 96,64 0ms
+     ✓ CENSUS: AngleSwatch hands drawAngleMark `segmentsOnDeviceGrid(ctx, dpr)`, never the raw context 0ms
+     ✓ the swatch's $20 mark is ALL diagonal, so the routing changes none of its pixels (disclosed, not a snap) 0ms
+ ✓ src/renderer/components/__tests__/legend-anchor-device-scale.test.ts (4 tests) 291ms
+ ✓ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts (49 tests) 539ms
+     ✓ dpr 1, zoom 1.5, camera 0,0  475ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 48 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 3.6250, camera 3.3,1.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 1.5000, camera 10.25,3.5
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 1.0000, camera 13,7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 3.6250, camera 3.3,1.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 1.5000, camera 10.25,3.5
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 1.0000, camera 13,7
+AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:157:104
+    155|     const horizontal = Math.abs(y1 - y0) < EPS, vertical = Math.abs(x1…
+    156|     expect(horizontal || vertical, `segment ${i / 2} is neither horizo…
+    157|     expect(edgesWhole(horizontal ? y0 : x0, s.width), `segment ${i / 2…
+       |                                                                                                        ^
+    158|     expect(isWhole(horizontal ? x0 : y0) && isWhole(horizontal ? x1 : …
+    159|   }
+ ❯ expectLoneSquare src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:252:3
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:271:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/48]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 3.6250, camera 3.3,1.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 1.5000, camera 10.25,3.5
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 1.0000, camera 13,7
+AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+ ❯ expectWidth src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:144:30
+    142|       `width ${s.width} at a tie (${x} device px) is neither neighbour…
+    143|   } else {
+    144|     expect(s.width, 'width').toBeCloseTo(want, 9);
+       |                              ^
+    145|   }
+    146| }
+ ❯ expectSegmentsOnGrid src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:151:3
+ ❯ expectLoneSquare src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:252:3
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:271:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/48]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 3.6250, camera 3.3,1.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 1.5000, camera 10.25,3.5
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 1.0000, camera 13,7
+AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+ ❯ expectWidth src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:144:30
+    142|       `width ${s.width} at a tie (${x} device px) is neither neighbour…
+    143|   } else {
+    144|     expect(s.width, 'width').toBeCloseTo(want, 9);
+       |                              ^
+    145|   }
+    146| }
+ ❯ expectSegmentsOnGrid src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:151:3
+ ❯ expectLoneSquare src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:252:3
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:271:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/48]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 3.6250, camera 3.3,1.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 1.5000, camera 10.25,3.5
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 1.0000, camera 13,7
+AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+ ❯ expectWidth src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:144:30
+    142|       `width ${s.width} at a tie (${x} device px) is neither neighbour…
+    143|   } else {
+    144|     expect(s.width, 'width').toBeCloseTo(want, 9);
+       |                              ^
+    145|   }
+    146| }
+ ❯ expectSegmentsOnGrid src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:151:3
+ ❯ expectLoneSquare src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:252:3
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:271:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/48]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 3.6250, camera 3.3,1.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 1.5000, camera 10.25,3.5
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 1.0000, camera 13,7
+AssertionError: width 2 at a tie (2 device px) is neither neighbour: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectWidth src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:142:74
+    140|   if (tie) {
+    141|     expect(isWhole(s.width) && Math.round(s.width) % 2 === want % 2 &&…
+    142|       `width ${s.width} at a tie (${x} device px) is neither neighbour…
+       |                                                                          ^
+    143|   } else {
+    144|     expect(s.width, 'width').toBeCloseTo(want, 9);
+ ❯ expectSegmentsOnGrid src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:151:3
+ ❯ expectLoneSquare src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:252:3
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:271:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/48]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 3.6250, camera 3.3,1.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 1.5000, camera 10.25,3.5
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 1.0000, camera 13,7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 3.6250, camera 3.3,1.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 1.5000, camera 10.25,3.5
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 1.0000, camera 13,7
+AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:157:104
+    155|     const horizontal = Math.abs(y1 - y0) < EPS, vertical = Math.abs(x1…
+    156|     expect(horizontal || vertical, `segment ${i / 2} is neither horizo…
+    157|     expect(edgesWhole(horizontal ? y0 : x0, s.width), `segment ${i / 2…
+       |                                                                                                        ^
+    158|     expect(isWhole(horizontal ? x0 : y0) && isWhole(horizontal ? x1 : …
+    159|   }
+ ❯ expectLoneSquare src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:252:3
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:285:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/48]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 3.6250, camera 3.3,1.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 1.5000, camera 10.25,3.5
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 1.0000, camera 13,7
+AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+ ❯ expectWidth src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:144:30
+    142|       `width ${s.width} at a tie (${x} device px) is neither neighbour…
+    143|   } else {
+    144|     expect(s.width, 'width').toBeCloseTo(want, 9);
+       |                              ^
+    145|   }
+    146| }
+ ❯ expectSegmentsOnGrid src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:151:3
+ ❯ expectLoneSquare src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:252:3
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:285:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/48]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 3.6250, camera 3.3,1.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 1.5000, camera 10.25,3.5
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 1.0000, camera 13,7
+AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+ ❯ expectWidth src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:144:30
+    142|       `width ${s.width} at a tie (${x} device px) is neither neighbour…
+    143|   } else {
+    144|     expect(s.width, 'width').toBeCloseTo(want, 9);
+       |                              ^
+    145|   }
+    146| }
+ ❯ expectSegmentsOnGrid src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:151:3
+ ❯ expectLoneSquare src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:252:3
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:285:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/48]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 3.6250, camera 3.3,1.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 1.5000, camera 10.25,3.5
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 1.0000, camera 13,7
+AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+ ❯ expectWidth src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:144:30
+    142|       `width ${s.width} at a tie (${x} device px) is neither neighbour…
+    143|   } else {
+    144|     expect(s.width, 'width').toBeCloseTo(want, 9);
+       |                              ^
+    145|   }
+    146| }
+ ❯ expectSegmentsOnGrid src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:151:3
+ ❯ expectLoneSquare src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:252:3
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:285:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/48]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 3.6250, camera 3.3,1.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 1.5000, camera 10.25,3.5
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 1.0000, camera 13,7
+AssertionError: width 2 at a tie (2 device px) is neither neighbour: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectWidth src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:142:74
+    140|   if (tie) {
+    141|     expect(isWhole(s.width) && Math.round(s.width) % 2 === want % 2 &&…
+    142|       `width ${s.width} at a tie (${x} device px) is neither neighbour…
+       |                                                                          ^
+    143|   } else {
+    144|     expect(s.width, 'width').toBeCloseTo(want, 9);
+ ❯ expectSegmentsOnGrid src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:151:3
+ ❯ expectLoneSquare src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:252:3
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:285:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/48]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  48 failed | 125 passed (173)
+   Start at  06:53:09
+   Duration  1.21s (transform 2.01s, setup 1.64s, import 330ms, tests 893ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (3 module(s) reported).
+
+failure-class: 48 failure record(s) in 1 file(s) (48 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION       48   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 3.6250, camera 3.3,1.7
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 1.5000, camera 10.25,3.5
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 2.0000, camera 0,0
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 1.0000, camera 13,7
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 2.0000, camera 0,0
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 1.0000, camera 13,7
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 2.0000, camera 0,0
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 1.0000, camera 13,7
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 2.0000, camera 0,0
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 1.0000, camera 13,7
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width 2 at a tie (2 device px) is neither neighbour: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width 2 at a tie (2 device px) is neither neighbour: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 2.0000, camera 0,0
+        AssertionError: width 2 at a tie (2 device px) is neither neighbour: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 1.0000, camera 13,7
+        AssertionError: width 2 at a tie (2 device px) is neither neighbour: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 3.6250, camera 3.3,1.7
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 1.5000, camera 10.25,3.5
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 2.0000, camera 0,0
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon priority lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 1.0000, camera 13,7
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 3.6250, camera 3.3,1.7
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 1.5000, camera 10.25,3.5
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 2.0000, camera 0,0
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1, zoom 1.0000, camera 13,7
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 2.0000, camera 0,0
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.25, zoom 1.0000, camera 13,7
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 2.0000, camera 0,0
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.35, zoom 1.0000, camera 13,7
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 2.0000, camera 0,0
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 1.5, zoom 1.0000, camera 13,7
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width 2 at a tie (2 device px) is neither neighbour: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width 2 at a tie (2 device px) is neither neighbour: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 2.0000, camera 0,0
+        AssertionError: width 2 at a tie (2 device px) is neither neighbour: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 2, zoom 1.0000, camera 13,7
+        AssertionError: width 2 at a tie (2 device px) is neither neighbour: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 3.6250, camera 3.3,1.7
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 1.5000, camera 10.25,3.5
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 2.0000, camera 0,0
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 4: aeon both-planes lens edges are on the device grid (row 239 (d)) > dpr 3, zoom 1.0000, camera 13,7
+        AssertionError: segment 0: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 48 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 3 of 3 module(s) this run selected finished.

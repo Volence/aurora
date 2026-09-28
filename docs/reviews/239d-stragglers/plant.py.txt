@@ -1,0 +1,35 @@
+import sys
+W = '/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a89182949c0610033/'
+PLANTS = {
+    'P1': [('src/renderer/components/MapViewport.tsx',
+            "        ctx.setLineDash([4, 4]);\n        strokeCssRectOnDeviceGrid(ctx, (px - pvpX) * pZoom, (py - pvpY) * pZoom, pw * pZoom, ph * pZoom, 2, dpr);",
+            "        ctx.lineWidth = 2 / pZoom;\n        ctx.setLineDash([4 / pZoom, 4 / pZoom]);\n        ctx.strokeRect(px, py, pw, ph);")],
+    'P2': [('src/renderer/components/MapViewport.tsx',
+            "      strokeCssRectInsetOnDeviceGrid(ctx, cellCss(wx, vpX), cellCss(wy, vpY), 16 * zoom, 16 * zoom, 1, dpr);",
+            "      ctx.lineWidth = 1 / zoom;\n      ctx.strokeRect(wx + 0.5 / zoom, wy + 0.5 / zoom, 16 - 1 / zoom, 16 - 1 / zoom);"),
+           ('src/renderer/components/MapViewport.tsx',
+            "    strokeCssRectInsetOnDeviceGrid(ctx, cellCss(wx, vpX), cellCss(wy, vpY), 16 * zoom, 16 * zoom, 1.5, dpr);",
+            "    ctx.lineWidth = 1.5 / zoom;\n    ctx.strokeRect(wx + 0.75 / zoom, wy + 0.75 / zoom, 16 - 1.5 / zoom, 16 - 1.5 / zoom);")],
+    'P3a': [('src/renderer/canvas/OverlayRenderer.ts',
+             "const tier = drawAngleMark(markPath as unknown as MarkDrawCtx, cx, cy, 16, mark, {",
+             "const tier = drawAngleMark(ctx as unknown as MarkDrawCtx, cx, cy, 16, mark, {")],
+    'P3b': [('src/renderer/canvas/OverlayRenderer.ts',
+             "      strokeCssRectOnDeviceGrid(ctx as CanvasRenderingContext2D,\n"
+             "        (wx - half - vpX) * zoom, (wy - half - vpY) * zoom, OBJECT_BOX_SIZE * zoom, OBJECT_BOX_SIZE * zoom,\n"
+             "        Math.max(OBJECT_BOX_STROKE_WIDTH * zoom, 0.5), dpr);",
+             "      ctx.lineWidth = OBJECT_BOX_STROKE_WIDTH;\n"
+             "      ctx.strokeRect(wx - half, wy - half, OBJECT_BOX_SIZE, OBJECT_BOX_SIZE);")],
+    'P4a': [(f, "    dpr,\n    toDevice: cameraDeviceMapping(vpX, vpY, zoom, dpr),\n", "")
+            for f in ('src/renderer/canvas/priority-lens.ts', 'src/renderer/canvas/both-planes-lens.ts')],
+    'P4b': [('src/renderer/canvas/composer-priority-lens.ts', "    dpr: 1,\n", "")],
+    'P5': [('src/renderer/components/CollisionLegend.tsx',
+            "drawAngleMark(segmentsOnDeviceGrid(ctx, dpr) as unknown as MarkDrawCtx,",
+            "drawAngleMark(ctx as unknown as MarkDrawCtx,")],
+}
+for key in sys.argv[1:]:
+    for f, a, b in PLANTS[key]:
+        s = open(W + f).read()
+        assert s.count(a) == 1, (f, a)
+        s = s.replace(a, b)
+        open(W + f, 'w').write(s)
+    print('planted', key)

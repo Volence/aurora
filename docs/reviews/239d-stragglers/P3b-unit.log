@@ -1,0 +1,642 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a89182949c0610033
+
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts (120 tests | 34 failed) 65ms
+     ✓ a flat floor's mark, dpr 1, zoom 3.6250, camera 3.3,1.7 4ms
+     ✓ a flat floor's mark, dpr 1, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ a flat floor's mark, dpr 1, zoom 2.0000, camera 0,0 1ms
+     ✓ a flat floor's mark, dpr 1, zoom 1.0000, camera 13,7 1ms
+     ✓ a flat floor's mark, dpr 1.25, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ a flat floor's mark, dpr 1.25, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ a flat floor's mark, dpr 1.25, zoom 2.0000, camera 0,0 1ms
+     ✓ a flat floor's mark, dpr 1.25, zoom 1.0000, camera 13,7 1ms
+     ✓ a flat floor's mark, dpr 1.35, zoom 3.6250, camera 3.3,1.7 2ms
+     ✓ a flat floor's mark, dpr 1.35, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ a flat floor's mark, dpr 1.35, zoom 2.0000, camera 0,0 0ms
+     ✓ a flat floor's mark, dpr 1.35, zoom 1.0000, camera 13,7 0ms
+     ✓ a flat floor's mark, dpr 1.5, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ a flat floor's mark, dpr 1.5, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ a flat floor's mark, dpr 1.5, zoom 2.0000, camera 0,0 1ms
+     ✓ a flat floor's mark, dpr 1.5, zoom 1.0000, camera 13,7 1ms
+     ✓ a flat floor's mark, dpr 2, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ a flat floor's mark, dpr 2, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ a flat floor's mark, dpr 2, zoom 2.0000, camera 0,0 0ms
+     ✓ a flat floor's mark, dpr 2, zoom 1.0000, camera 13,7 0ms
+     ✓ a flat floor's mark, dpr 3, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ a flat floor's mark, dpr 3, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ a flat floor's mark, dpr 3, zoom 2.0000, camera 0,0 0ms
+     ✓ a flat floor's mark, dpr 3, zoom 1.0000, camera 13,7 0ms
+     ✓ CONTROL: the slope ($20) mark is diagonal and drawn where it was, at its unsnapped CSS width 0ms
+     × dpr 1, zoom 3.6250, camera 3.3,1.7 4ms
+     × dpr 1, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ dpr 1, zoom 2.0000, camera 0,0 0ms
+     × dpr 1, zoom 1.0000, camera 13,7 2ms
+     × dpr 1, zoom 0.5000, camera 1.3,0.7 0ms
+     × dpr 1, zoom 0.2500, camera 0,0 0ms
+     × dpr 1.25, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 1.25, zoom 1.5000, camera 10.25,3.5 0ms
+     × dpr 1.25, zoom 2.0000, camera 0,0 0ms
+     × dpr 1.25, zoom 1.0000, camera 13,7 0ms
+     × dpr 1.25, zoom 0.5000, camera 1.3,0.7 0ms
+     × dpr 1.25, zoom 0.2500, camera 0,0 0ms
+     × dpr 1.35, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 1.35, zoom 1.5000, camera 10.25,3.5 0ms
+     × dpr 1.35, zoom 2.0000, camera 0,0 0ms
+     × dpr 1.35, zoom 1.0000, camera 13,7 0ms
+     × dpr 1.35, zoom 0.5000, camera 1.3,0.7 0ms
+     × dpr 1.35, zoom 0.2500, camera 0,0 0ms
+     × dpr 1.5, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 1.5, zoom 1.5000, camera 10.25,3.5 0ms
+     × dpr 1.5, zoom 2.0000, camera 0,0 0ms
+     × dpr 1.5, zoom 1.0000, camera 13,7 0ms
+     × dpr 1.5, zoom 0.5000, camera 1.3,0.7 0ms
+     × dpr 1.5, zoom 0.2500, camera 0,0 0ms
+     × dpr 2, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 2, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 2, zoom 2.0000, camera 0,0 0ms
+     × dpr 2, zoom 1.0000, camera 13,7 0ms
+     × dpr 2, zoom 0.5000, camera 1.3,0.7 0ms
+     × dpr 2, zoom 0.2500, camera 0,0 0ms
+     × dpr 3, zoom 3.6250, camera 3.3,1.7 0ms
+     × dpr 3, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 3, zoom 2.0000, camera 0,0 3ms
+     × dpr 3, zoom 1.0000, camera 13,7 0ms
+     × dpr 3, zoom 0.5000, camera 1.3,0.7 0ms
+     × dpr 3, zoom 0.2500, camera 0,0 0ms
+     × below zoom 0.5 the border is ONE device px at dpr 1, not the parity rule's even minimum of 2 0ms
+     ✓ dpr 1, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ dpr 1, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ dpr 1, zoom 2.0000, camera 0,0 1ms
+     ✓ dpr 1, zoom 1.0000, camera 13,7 1ms
+     ✓ dpr 1.25, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.25, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.25, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.25, zoom 1.0000, camera 13,7 1ms
+     ✓ dpr 1.35, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.35, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.35, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.35, zoom 1.0000, camera 13,7 1ms
+     ✓ dpr 1.5, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.5, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ dpr 1.5, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.5, zoom 1.0000, camera 13,7 2ms
+     ✓ dpr 2, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 2, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 2, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 2, zoom 1.0000, camera 13,7 1ms
+     ✓ dpr 3, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 3, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 3, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 3, zoom 1.0000, camera 13,7 1ms
+     ✓ dpr 1, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ dpr 1, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ dpr 1, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1.25, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.25, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.25, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.25, zoom 1.0000, camera 13,7 1ms
+     ✓ dpr 1.35, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.35, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.35, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.35, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1.5, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.5, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.5, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.5, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 2, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 2, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 2, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 2, zoom 1.0000, camera 13,7 1ms
+     ✓ dpr 3, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 3, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 3, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 3, zoom 1.0000, camera 13,7 0ms
+     ✓ zoom 1, origin 0,0 1ms
+     ✓ zoom 1, origin 96,64 0ms
+     ✓ zoom 3, origin 0,0 0ms
+     ✓ zoom 3, origin 96,64 0ms
+     ✓ zoom 4, origin 0,0 0ms
+     ✓ zoom 4, origin 96,64 0ms
+     ✓ zoom 8, origin 0,0 0ms
+     ✓ zoom 8, origin 96,64 0ms
+     ✓ CENSUS: AngleSwatch hands drawAngleMark `segmentsOnDeviceGrid(ctx, dpr)`, never the raw context 0ms
+     ✓ the swatch's $20 mark is ALL diagonal, so the routing changes none of its pixels (disclosed, not a snap) 0ms
+ ✓ src/renderer/components/__tests__/legend-anchor-device-scale.test.ts (4 tests) 271ms
+ ✓ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts (49 tests) 511ms
+     ✓ dpr 1, zoom 1.5, camera 0,0  450ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 34 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1, zoom 3.6250, camera 3.3,1.7
+AssertionError: width: expected 3.625 to be close to 4, received difference is 0.375, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1, zoom 1.5000, camera 10.25,3.5
+AssertionError: width: expected 1.5 to be close to 2, received difference is 0.5, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1, zoom 1.0000, camera 13,7
+AssertionError: side at x 19: an edge off the device grid: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:228:89
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+       |                                                                                         ^
+    229|           expect(edgesWhole(y, s.width), `side at y ${y}: an edge off …
+    230|         }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1, zoom 0.5000, camera 1.3,0.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 2, zoom 0.2500, camera 0,0
+AssertionError: width: expected 0.5 to be close to 1, received difference is 0.5, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1, zoom 0.2500, camera 0,0
+AssertionError: width: expected 0.25 to be close to 1, received difference is 0.75, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.25, zoom 3.6250, camera 3.3,1.7
+AssertionError: width: expected 4.53125 to be close to 4, received difference is 0.53125, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.25, zoom 1.5000, camera 10.25,3.5
+AssertionError: width: expected 1.875 to be close to 2, received difference is 0.125, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.25, zoom 2.0000, camera 0,0
+AssertionError: width: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.25, zoom 1.0000, camera 13,7
+AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.25, zoom 0.5000, camera 1.3,0.7
+AssertionError: width: expected 0.625 to be close to 1, received difference is 0.375, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.25, zoom 0.2500, camera 0,0
+AssertionError: width: expected 0.3125 to be close to 1, received difference is 0.6875, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.35, zoom 3.6250, camera 3.3,1.7
+AssertionError: width: expected 4.893750000000001 to be close to 4, received difference is 0.8937500000000007, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.35, zoom 1.5000, camera 10.25,3.5
+AssertionError: width: expected 2.0250000000000004 to be close to 2, received difference is 0.025000000000000355, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.35, zoom 2.0000, camera 0,0
+AssertionError: width: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.35, zoom 1.0000, camera 13,7
+AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.35, zoom 0.5000, camera 1.3,0.7
+AssertionError: width: expected 0.675 to be close to 1, received difference is 0.32499999999999996, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.35, zoom 0.2500, camera 0,0
+AssertionError: width: expected 0.3375 to be close to 1, received difference is 0.6625, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.5, zoom 3.6250, camera 3.3,1.7
+AssertionError: width: expected 5.4375 to be close to 6, received difference is 0.5625, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.5, zoom 1.5000, camera 10.25,3.5
+AssertionError: width: expected 2.25 to be close to 2, received difference is 0.25, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.5, zoom 2.0000, camera 0,0
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 2, zoom 1.5000, camera 10.25,3.5
+AssertionError: width: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.5, zoom 1.0000, camera 13,7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 3, zoom 0.5000, camera 1.3,0.7
+AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.5, zoom 0.5000, camera 1.3,0.7
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 3, zoom 0.2500, camera 0,0
+AssertionError: width: expected 0.75 to be close to 1, received difference is 0.25, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.5, zoom 0.2500, camera 0,0
+AssertionError: width: expected 0.375 to be close to 1, received difference is 0.625, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 2, zoom 3.6250, camera 3.3,1.7
+AssertionError: width: expected 7.25 to be close to 8, received difference is 0.75, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 2, zoom 1.0000, camera 13,7
+AssertionError: width: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 2, zoom 0.5000, camera 1.3,0.7
+AssertionError: side at x 30.7: an edge off the device grid: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:228:89
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+       |                                                                                         ^
+    229|           expect(edgesWhole(y, s.width), `side at y ${y}: an edge off …
+    230|         }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 3, zoom 3.6250, camera 3.3,1.7
+AssertionError: width: expected 10.875 to be close to 10, received difference is 0.875, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 3, zoom 1.5000, camera 10.25,3.5
+AssertionError: width: expected 4.5 to be close to 4, received difference is 0.5, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:226:34
+    224|         // The world width (1 world px, so `zoom` CSS px), never under…
+    225|         const cssWidth = Math.max(1 * v.zoom, 0.5);
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+       |                                  ^
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 3, zoom 1.0000, camera 13,7
+AssertionError: side at x 57: an edge off the device grid: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:228:89
+    226|         expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidt…
+    227|         for (const [x, y] of s.pts) {
+    228|           expect(edgesWhole(x, s.width), `side at x ${x}: an edge off …
+       |                                                                                         ^
+    229|           expect(edgesWhole(y, s.width), `side at y ${y}: an edge off …
+    230|         }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/34]⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > below zoom 0.5 the border is ONE device px at dpr 1, not the parity rule's even minimum of 2
+AssertionError: expected 0.25 to be close to 1, received difference is 0.75, but expected 5e-10
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:243:23
+    241|     const r = renderAt(1, { zoom: 0.25, x: 0, y: 0 }, { showObjects: t…
+    242|     const box = r.strokes.find((s) => s.style === OBJECT_BOX_STROKE)!;
+    243|     expect(box.width).toBeCloseTo(1, 9);
+       |                       ^
+    244|     // The rule the floor exists to avoid, stated: a quarter CSS px re…
+    245|     expect(deviceStrokeWidth(0.25, 1)).toBe(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/34]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  34 failed | 139 passed (173)
+   Start at  06:53:08
+   Duration  1.21s (transform 2.04s, setup 1.70s, import 337ms, tests 847ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (3 module(s) reported).
+
+failure-class: 34 failure record(s) in 1 file(s) (34 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION       34   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width: expected 3.625 to be close to 4, received difference is 0.375, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width: expected 1.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1, zoom 1.0000, camera 13,7
+        AssertionError: side at x 19: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1, zoom 0.5000, camera 1.3,0.7
+        AssertionError: width: expected 0.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1, zoom 0.2500, camera 0,0
+        AssertionError: width: expected 0.25 to be close to 1, received difference is 0.75, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.25, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width: expected 4.53125 to be close to 4, received difference is 0.53125, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.25, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width: expected 1.875 to be close to 2, received difference is 0.125, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.25, zoom 2.0000, camera 0,0
+        AssertionError: width: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.25, zoom 1.0000, camera 13,7
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.25, zoom 0.5000, camera 1.3,0.7
+        AssertionError: width: expected 0.625 to be close to 1, received difference is 0.375, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.25, zoom 0.2500, camera 0,0
+        AssertionError: width: expected 0.3125 to be close to 1, received difference is 0.6875, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.35, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width: expected 4.893750000000001 to be close to 4, received difference is 0.8937500000000007, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.35, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width: expected 2.0250000000000004 to be close to 2, received difference is 0.025000000000000355, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.35, zoom 2.0000, camera 0,0
+        AssertionError: width: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.35, zoom 1.0000, camera 13,7
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.35, zoom 0.5000, camera 1.3,0.7
+        AssertionError: width: expected 0.675 to be close to 1, received difference is 0.32499999999999996, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.35, zoom 0.2500, camera 0,0
+        AssertionError: width: expected 0.3375 to be close to 1, received difference is 0.6625, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.5, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width: expected 5.4375 to be close to 6, received difference is 0.5625, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.5, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width: expected 2.25 to be close to 2, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.5, zoom 2.0000, camera 0,0
+        AssertionError: width: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.5, zoom 1.0000, camera 13,7
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.5, zoom 0.5000, camera 1.3,0.7
+        AssertionError: width: expected 0.75 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 1.5, zoom 0.2500, camera 0,0
+        AssertionError: width: expected 0.375 to be close to 1, received difference is 0.625, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 2, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width: expected 7.25 to be close to 8, received difference is 0.75, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 2, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 2, zoom 1.0000, camera 13,7
+        AssertionError: width: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 2, zoom 0.5000, camera 1.3,0.7
+        AssertionError: side at x 30.7: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 2, zoom 0.2500, camera 0,0
+        AssertionError: width: expected 0.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 3, zoom 3.6250, camera 3.3,1.7
+        AssertionError: width: expected 10.875 to be close to 10, received difference is 0.875, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 3, zoom 1.5000, camera 10.25,3.5
+        AssertionError: width: expected 4.5 to be close to 4, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 3, zoom 1.0000, camera 13,7
+        AssertionError: side at x 57: an edge off the device grid: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 3, zoom 0.5000, camera 1.3,0.7
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > dpr 3, zoom 0.2500, camera 0,0
+        AssertionError: width: expected 0.75 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 3: aeon OverlayRenderer no-preview object box is on the device grid (row 239 (d)) > below zoom 0.5 the border is ONE device px at dpr 1, not the parity rule's even minimum of 2
+        AssertionError: expected 0.25 to be close to 1, received difference is 0.75, but expected 5e-10
+        why this bucket: name is AssertionError
+
+failure-class: 34 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 3 of 3 module(s) this run selected finished.

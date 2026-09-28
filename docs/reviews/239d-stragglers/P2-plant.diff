@@ -1,0 +1,23 @@
+diff --git a/src/renderer/components/MapViewport.tsx b/src/renderer/components/MapViewport.tsx
+index d06670ef..6d79569c 100644
+--- a/src/renderer/components/MapViewport.tsx
++++ b/src/renderer/components/MapViewport.tsx
+@@ -1004,14 +1004,16 @@ export default function MapViewport() {
+       const wx = offset.x + t.cellCol * 16, wy = offset.y + t.cellRow * 16;
+       if (erasing) { ctx.fillStyle = COLLISION_PREVIEW_ERASE; ctx.fillRect(wx, wy, 16, 16); }
+       ctx.strokeStyle = COLLISION_PREVIEW_SCOPE;
+-      strokeCssRectInsetOnDeviceGrid(ctx, cellCss(wx, vpX), cellCss(wy, vpY), 16 * zoom, 16 * zoom, 1, dpr);
++      ctx.lineWidth = 1 / zoom;
++      ctx.strokeRect(wx + 0.5 / zoom, wy + 0.5 / zoom, 16 - 1 / zoom, 16 - 1 / zoom);
+     }
+ 
+     // The shape ghost at the cursor cell + a brighter outline.
+     const wx = offset.x + primary.cellCol * 16, wy = offset.y + primary.cellRow * 16;
+     if (profile) drawCollisionShape(ctx as unknown as ShapeDrawCtx, wx, wy, 16, profile, collisionPreviewOpts(zoom));
+     ctx.strokeStyle = COLLISION_PREVIEW_PRIMARY;
+-    strokeCssRectInsetOnDeviceGrid(ctx, cellCss(wx, vpX), cellCss(wy, vpY), 16 * zoom, 16 * zoom, 1.5, dpr);
++    ctx.lineWidth = 1.5 / zoom;
++    ctx.strokeRect(wx + 0.75 / zoom, wy + 0.75 / zoom, 16 - 1.5 / zoom, 16 - 1.5 / zoom);
+ 
+     ctx.restore();
+   }, []);

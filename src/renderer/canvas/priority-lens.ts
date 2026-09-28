@@ -36,6 +36,7 @@
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../core/model/s4-types';
 import { tileWordDrawsAboveSprites } from '../../core/model/nametable-priority';
 import { PRIORITY_FILL, PRIORITY_EDGE } from './canvas-colors';
+import { cameraDeviceMapping } from './device-grid';
 import { drawTileLens, type TileLensDrawn } from './tile-lens';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -65,6 +66,9 @@ export function drawSectionPriority(
   nametable: Uint16Array,
   offsetX: number,
   offsetY: number,
+  /** The map canvas's device scale: the boundary strokes go on the device grid
+   *  (ROADMAP row 239 (d)). Required, never defaulted, for classic's reason. */
+  dpr: number,
 ): TileLensDrawn {
   const { x: vpX, y: vpY, width, height, zoom } = viewport;
   const vpW = width / zoom, vpH = height / zoom;
@@ -88,6 +92,10 @@ export function drawSectionPriority(
     marked: (tx, ty) => tileWordDrawsAboveSprites(nametable[ty * SECTION_TILES_WIDE + tx]),
     fill: PRIORITY_FILL, edge: PRIORITY_EDGE,
     invZoom: 1 / zoom,
+    // ON THE DEVICE GRID (ROADMAP row 239 (d)), under the mapping OverlayRenderer.render
+    // draws in, stated from this viewport rather than asked of the context.
+    dpr,
+    toDevice: cameraDeviceMapping(vpX, vpY, zoom, dpr),
   });
 }
 

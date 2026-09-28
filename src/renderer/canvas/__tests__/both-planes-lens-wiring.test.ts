@@ -28,7 +28,7 @@ function recCtx() {
   const ctx = {
     lineWidth: 0, font: '', textAlign: 'left' as CanvasTextAlign,
     fillStyle: '', strokeStyle: '', globalAlpha: 1, imageSmoothingEnabled: false,
-    save() {}, restore() {}, translate() {}, scale() {}, beginPath() {},
+    save() {}, restore() {}, translate() {}, scale() {}, beginPath() {}, setTransform() {},
     fill() {}, stroke() {}, setLineDash() {}, moveTo() {}, lineTo() {}, arc() {},
     drawImage() {}, strokeRect() {}, fillText() {},
     measureText: () => ({ width: 0 }),
@@ -85,7 +85,7 @@ describe('OverlayRenderer.render: the both-planes lens gate', () => {
   it('draws NOTHING with the toggle off, though the cell IS solid on both', () => {
     const { ctx, fills } = recCtx();
     const lens = new OverlayRenderer().render(
-      ctx, [{ section: bothSolid, offsetX: 0, offsetY: 0 }], overlays(), viewport);
+      ctx, [{ section: bothSolid, offsetX: 0, offsetY: 0 }], overlays(), viewport, 1);
     expect(byColour(fills, BOTH_PLANES_FILL)).toEqual([]);
     expect(lens.bothPlanes).toEqual({ veils: 0, segments: 0, sectionsWithPlaneB: 0 });
   });
@@ -94,7 +94,7 @@ describe('OverlayRenderer.render: the both-planes lens gate', () => {
     const { ctx, fills } = recCtx();
     const lens = new OverlayRenderer().render(
       ctx, [{ section: bothSolid, offsetX: 0, offsetY: 0 }],
-      overlays({ showSolidBothPlanes: true }), viewport);
+      overlays({ showSolidBothPlanes: true }), viewport, 1);
     // 16px cells, so cell (3,2) is world (48,32). A lens that had read the
     // planes at TILE resolution would land at (24,16) with an 8px box.
     expect(byColour(fills, BOTH_PLANES_FILL)).toEqual([{ style: BOTH_PLANES_FILL, x: 48, y: 32, w: 16, h: 16 }]);
@@ -109,7 +109,7 @@ describe('OverlayRenderer.render: the both-planes lens gate', () => {
     const oneSided = section((a) => { put(a, 3, 2, SOLID); });
     new OverlayRenderer().render(
       ctx, [{ section: oneSided, offsetX: 0, offsetY: 0 }],
-      overlays({ showSolidBothPlanes: true }), viewport);
+      overlays({ showSolidBothPlanes: true }), viewport, 1);
     expect(byColour(fills, BOTH_PLANES_FILL)).toEqual([]);
   });
 
@@ -120,7 +120,7 @@ describe('OverlayRenderer.render: the both-planes lens gate', () => {
       ctx, [
         { section: bothSolid, offsetX: 0, offsetY: 0 },
         { section: bothSolid, offsetX: 100, offsetY: 0 },
-      ], overlays({ showSolidBothPlanes: true }), viewport);
+      ], overlays({ showSolidBothPlanes: true }), viewport, 1);
     expect(lens.bothPlanes.veils).toBe(2);
     expect(lens.bothPlanes.sectionsWithPlaneB).toBe(2);
   });

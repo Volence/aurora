@@ -1,0 +1,26 @@
+diff --git a/src/renderer/canvas/both-planes-lens.ts b/src/renderer/canvas/both-planes-lens.ts
+index d30cce91..8cfc0008 100644
+--- a/src/renderer/canvas/both-planes-lens.ts
++++ b/src/renderer/canvas/both-planes-lens.ts
+@@ -99,8 +99,6 @@ export function drawSectionBothPlanes(
+     invZoom: 1 / zoom,
+     // ON THE DEVICE GRID (ROADMAP row 239 (d)), under the mapping OverlayRenderer.render
+     // draws in, stated from this viewport rather than asked of the context.
+-    dpr,
+-    toDevice: cameraDeviceMapping(vpX, vpY, zoom, dpr),
+   });
+ }
+ 
+diff --git a/src/renderer/canvas/priority-lens.ts b/src/renderer/canvas/priority-lens.ts
+index d7e90b6b..84a01681 100644
+--- a/src/renderer/canvas/priority-lens.ts
++++ b/src/renderer/canvas/priority-lens.ts
+@@ -94,8 +94,6 @@ export function drawSectionPriority(
+     invZoom: 1 / zoom,
+     // ON THE DEVICE GRID (ROADMAP row 239 (d)), under the mapping OverlayRenderer.render
+     // draws in, stated from this viewport rather than asked of the context.
+-    dpr,
+-    toDevice: cameraDeviceMapping(vpX, vpY, zoom, dpr),
+   });
+ }
+ 

@@ -69,7 +69,7 @@ const viewportAt = (zoom: number) => ({ x: 0, y: 0, width: 800, height: 600, zoo
 describe('OverlayRenderer.drawObjects labels its no-preview box', () => {
   const draw = (typeId: string, zoom: number) => {
     const { ctx, rec } = recCtx();
-    new OverlayRenderer().drawObjects(ctx, [placement(typeId)], viewportAt(zoom), 0, 0, undefined);
+    new OverlayRenderer().drawObjects(ctx, [placement(typeId)], viewportAt(zoom), 0, 0, 1, undefined);
     return rec;
   };
 

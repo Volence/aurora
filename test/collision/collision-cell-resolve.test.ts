@@ -272,7 +272,7 @@ describe('SECTION_PLANE_WORDS is the space the overlay actually addresses', () =
     }) as unknown as Uint16Array;
 
     const { ctx } = mockCtx();
-    new OverlayRenderer().drawCollisionOverlay(ctx, WHOLE_SECTION, probe, 0, 0, SET, false, probe);
+    new OverlayRenderer().drawCollisionOverlay(ctx, WHOLE_SECTION, probe, 0, 0, SET, false, probe, 1);
 
     expect(reads.length).toBeGreaterThan(0);
     let max = -1;
@@ -299,7 +299,7 @@ describe('OverlayRenderer.render with a mis-sized plane', () => {
         collisionEdit: new Uint16Array(SECTION_PLANE_WORDS),   // all air, full size
         collisionEditB: new Uint16Array(1000),                 // all air, but SHORT
       });
-      new OverlayRenderer().render(ctx, [{ section, offsetX: 0, offsetY: 0 }], BOTH_PLANES, WHOLE_SECTION, undefined, SET);
+      new OverlayRenderer().render(ctx, [{ section, offsetX: 0, offsetY: 0 }], BOTH_PLANES, WHOLE_SECTION, 1, undefined, SET);
       // Both planes are all-air, so no cell disagrees with the other and the
       // diff outline must never be drawn. Reading past the short plane yields
       // `undefined`, and `undefined !== 0` is true, so every cell past its end
@@ -313,7 +313,7 @@ describe('OverlayRenderer.render with a mis-sized plane', () => {
     const b = new Uint16Array(SECTION_PLANE_WORDS);
     b[0] = SOLID; // cell (0,0) only — plane A is air there
     const section = sectionWith({ collisionEdit: new Uint16Array(SECTION_PLANE_WORDS), collisionEditB: b });
-    new OverlayRenderer().render(ctx, [{ section, offsetX: 0, offsetY: 0 }], BOTH_PLANES, WHOLE_SECTION, undefined, SET);
+    new OverlayRenderer().render(ctx, [{ section, offsetX: 0, offsetY: 0 }], BOTH_PLANES, WHOLE_SECTION, 1, undefined, SET);
     expect(calls.strokeRect).toBe(1);
   });
 
@@ -326,7 +326,7 @@ describe('OverlayRenderer.render with a mis-sized plane', () => {
         engineCollision: new Uint8Array(1000),  // SHORT plane A: all air
         engineCollisionB: engineB,
       });
-      new OverlayRenderer().render(ctx, [{ section, offsetX: 0, offsetY: 0 }], BOTH_PLANES, WHOLE_SECTION, undefined, SET);
+      new OverlayRenderer().render(ctx, [{ section, offsetX: 0, offsetY: 0 }], BOTH_PLANES, WHOLE_SECTION, 1, undefined, SET);
       // Every cell disagrees (A air, B solid), so every cell the loop visits is
       // outlined. The expected count is drawCollisionOverlay's own loop bound:
       // cellsW * cellsH, with the viewport covering the whole section.

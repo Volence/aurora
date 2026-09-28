@@ -31,6 +31,11 @@ function recCtx() {
     set fillStyle(v: string) { styles.push(`fill:${v}`); },
     set strokeStyle(v: string) { styles.push(`stroke:${v}`); },
     beginPath() {}, stroke() {},
+    // The boundary strokes go through `segmentsOnDeviceGrid` since ROADMAP row 239 (d):
+    // it reads the transform (PixelViewport's is a translation only, identity here) and
+    // strokes under save / setTransform / restore.
+    getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    save() {}, restore() {}, setTransform() {},
     fillRect(x: number, y: number, w: number, h: number) { rects.push({ x, y, w, h }); },
     moveTo(x: number, y: number) { pts.push({ x, y }); },
     lineTo(x: number, y: number) { pts.push({ x, y }); },

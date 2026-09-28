@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Usage: plant-run.sh <ID>   (run from the worktree root)
+# Applies one plant, records its diff, runs the row-239(d) unit files, records the log,
+# restores every touched file from the COMMITTED HEAD, and proves the tree clean.
+set -u
+ID="$1"
+W=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a89182949c0610033
+EV="$W/docs/reviews/239d-stragglers"
+cd "$W" || exit 9
+if [ -n "$(git status --short -- src)" ]; then echo "REFUSED: src is dirty before the plant"; exit 8; fi
+python3 /tmp/claude-1000/-home-volence-sonic-hacks-aurora/346e4026-f59e-4fc2-963e-dd95dd0cf05c/scratchpad/plant.py "$ID" || exit 7
+git diff -- src > "$EV/$ID-plant.diff"
+echo "--- plant $ID on disk:"; git diff --stat -- src
+TMPDIR=/home/volence/.cache/aurora-tmp npx vitest run \
+  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts \
+  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts \
+  src/renderer/components/__tests__/legend-anchor-device-scale.test.ts > "$EV/$ID-unit.log" 2>&1
+echo "vitest rc=$?"
+grep -E 'Test Files|Tests  ' "$EV/$ID-unit.log"
+for f in $(git diff --name-only -- src); do git show "HEAD:$f" > "$f"; done
+echo "--- restored; git status src:"; git status --short -- src; echo "(end status)"

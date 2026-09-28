@@ -1,0 +1,312 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a89182949c0610033
+
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts (120 tests | 1 failed) 56ms
+     ✓ a flat floor's mark, dpr 1, zoom 3.6250, camera 3.3,1.7 4ms
+     ✓ a flat floor's mark, dpr 1, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ a flat floor's mark, dpr 1, zoom 2.0000, camera 0,0 2ms
+     ✓ a flat floor's mark, dpr 1, zoom 1.0000, camera 13,7 1ms
+     ✓ a flat floor's mark, dpr 1.25, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ a flat floor's mark, dpr 1.25, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ a flat floor's mark, dpr 1.25, zoom 2.0000, camera 0,0 0ms
+     ✓ a flat floor's mark, dpr 1.25, zoom 1.0000, camera 13,7 1ms
+     ✓ a flat floor's mark, dpr 1.35, zoom 3.6250, camera 3.3,1.7 2ms
+     ✓ a flat floor's mark, dpr 1.35, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ a flat floor's mark, dpr 1.35, zoom 2.0000, camera 0,0 0ms
+     ✓ a flat floor's mark, dpr 1.35, zoom 1.0000, camera 13,7 0ms
+     ✓ a flat floor's mark, dpr 1.5, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ a flat floor's mark, dpr 1.5, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ a flat floor's mark, dpr 1.5, zoom 2.0000, camera 0,0 0ms
+     ✓ a flat floor's mark, dpr 1.5, zoom 1.0000, camera 13,7 0ms
+     ✓ a flat floor's mark, dpr 2, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ a flat floor's mark, dpr 2, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ a flat floor's mark, dpr 2, zoom 2.0000, camera 0,0 1ms
+     ✓ a flat floor's mark, dpr 2, zoom 1.0000, camera 13,7 0ms
+     ✓ a flat floor's mark, dpr 3, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ a flat floor's mark, dpr 3, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ a flat floor's mark, dpr 3, zoom 2.0000, camera 0,0 0ms
+     ✓ a flat floor's mark, dpr 3, zoom 1.0000, camera 13,7 0ms
+     ✓ CONTROL: the slope ($20) mark is diagonal and drawn where it was, at its unsnapped CSS width 0ms
+     ✓ dpr 1, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ dpr 1, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1, zoom 0.5000, camera 1.3,0.7 0ms
+     ✓ dpr 1, zoom 0.2500, camera 0,0 0ms
+     ✓ dpr 1.25, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.25, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.25, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.25, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1.25, zoom 0.5000, camera 1.3,0.7 0ms
+     ✓ dpr 1.25, zoom 0.2500, camera 0,0 0ms
+     ✓ dpr 1.35, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.35, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.35, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.35, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1.35, zoom 0.5000, camera 1.3,0.7 0ms
+     ✓ dpr 1.35, zoom 0.2500, camera 0,0 0ms
+     ✓ dpr 1.5, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.5, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.5, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.5, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1.5, zoom 0.5000, camera 1.3,0.7 0ms
+     ✓ dpr 1.5, zoom 0.2500, camera 0,0 0ms
+     ✓ dpr 2, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 2, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 2, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 2, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 2, zoom 0.5000, camera 1.3,0.7 0ms
+     ✓ dpr 2, zoom 0.2500, camera 0,0 0ms
+     ✓ dpr 3, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 3, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 3, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 3, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 3, zoom 0.5000, camera 1.3,0.7 0ms
+     ✓ dpr 3, zoom 0.2500, camera 0,0 0ms
+     ✓ below zoom 0.5 the border is ONE device px at dpr 1, not the parity rule's even minimum of 2 0ms
+     ✓ dpr 1, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ dpr 1, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ dpr 1, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1, zoom 1.0000, camera 13,7 2ms
+     ✓ dpr 1.25, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.25, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.25, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.25, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1.35, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.35, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.35, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.35, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1.5, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.5, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.5, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.5, zoom 1.0000, camera 13,7 1ms
+     ✓ dpr 2, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 2, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 2, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 2, zoom 1.0000, camera 13,7 1ms
+     ✓ dpr 3, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 3, zoom 1.5000, camera 10.25,3.5 1ms
+     ✓ dpr 3, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 3, zoom 1.0000, camera 13,7 1ms
+     ✓ dpr 1, zoom 3.6250, camera 3.3,1.7 1ms
+     ✓ dpr 1, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1.25, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.25, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.25, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.25, zoom 1.0000, camera 13,7 1ms
+     ✓ dpr 1.35, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.35, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.35, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.35, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 1.5, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 1.5, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 1.5, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 1.5, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 2, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 2, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 2, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 2, zoom 1.0000, camera 13,7 0ms
+     ✓ dpr 3, zoom 3.6250, camera 3.3,1.7 0ms
+     ✓ dpr 3, zoom 1.5000, camera 10.25,3.5 0ms
+     ✓ dpr 3, zoom 2.0000, camera 0,0 0ms
+     ✓ dpr 3, zoom 1.0000, camera 13,7 0ms
+     ✓ zoom 1, origin 0,0 1ms
+     ✓ zoom 1, origin 96,64 0ms
+     ✓ zoom 3, origin 0,0 0ms
+     ✓ zoom 3, origin 96,64 0ms
+     ✓ zoom 4, origin 0,0 0ms
+     ✓ zoom 4, origin 96,64 0ms
+     ✓ zoom 8, origin 0,0 0ms
+     ✓ zoom 8, origin 96,64 0ms
+     × CENSUS: AngleSwatch hands drawAngleMark `segmentsOnDeviceGrid(ctx, dpr)`, never the raw context 4ms
+     ✓ the swatch's $20 mark is ALL diagonal, so the routing changes none of its pixels (disclosed, not a snap) 0ms
+ ✓ src/renderer/components/__tests__/legend-anchor-device-scale.test.ts (4 tests) 231ms
+ ✓ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts (49 tests) 454ms
+     ✓ dpr 1, zoom 1.5, camera 0,0  400ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts > site 5: the legend swatch routes its mark through the device-grid adapter (row 239 (d)) > CENSUS: AngleSwatch hands drawAngleMark `segmentsOnDeviceGrid(ctx, dpr)`, never the raw context
+AssertionError: expected 'import React, { useEffect, useRef } f…' to match /drawAngleMark\(\s*segmentsOnDeviceGri…/
+
+- Expected:
+/drawAngleMark\(\s*segmentsOnDeviceGrid\(ctx, dpr\)/
+
++ Received:
+"import React, { useEffect, useRef } from 'react';
+import { useViewStore } from '../state/viewStore';
+import { T } from './ui';
+import {
+  COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES,
+  COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK, COLLISION_ANGLE_CASING, COLLISION_DIFF,
+} from '../canvas/canvas-colors';
+import {
+  angleMark, drawAngleMark, MIN_CELL_PX_FOR_MARK,
+  type MarkDrawCtx,
+} from '../../core/collision/collision-angle-mark';
+import type { CollisionProfile } from '../../core/collision/collision-model';
+import { deviceScale, onDeviceScaleChange, segmentsOnDeviceGrid } from '../canvas/device-grid';
+
+type Row =
+  | { kind: 'fill' | 'line' | 'outline'; color: string; label: string }
+  | { kind: 'mark'; label: string };
+
+
+const LEGEND_PROFILE: CollisionProfile = {
+  heights: new Int8Array(Array.from({ length: 16 }, (_, c) => c + 1)),
+  angle: 0x20,
+  hasAngle: true,
+  solidity: 'all',
+};
+
+
+const SWATCH = 18;
+
+
+export function AngleSwatch({ cellScreenPx }: { cellScreenPx: number }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv) return undefined;
+    const ctx = cv.getContext('2d');
+    if (!ctx) return undefined;
+    
+    
+    
+    
+    
+    const paint = (): void => {
+      const dpr = deviceScale();
+      cv.width = Math.round(SWATCH * dpr);
+      cv.height = Math.round(SWATCH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, SWATCH, SWATCH);
+      const mark = angleMark(LEGEND_PROFILE);
+      if (!mark) return;
+      
+      
+      
+      
+      
+      
+      
+      drawAngleMark(ctx as unknown as MarkDrawCtx, 0, 0, SWATCH, mark, {
+        color: COLLISION_ANGLE_TICK,
+        casing: COLLISION_ANGLE_CASING,
+        coreWidth: 1.25,
+        casingWidth: 3,
+        cellScreenPx,
+      });
+    };
+    paint();
+    return onDeviceScaleChange(paint);
+  }, [cellScreenPx]);
+  return <canvas ref={ref} style={{ width: SWATCH, height: SWATCH, flex: '0 0 auto' }} />;
+}
+
+
+export default function CollisionLegend() {
+  const o = useViewStore((s) => s.overlays);
+  const zoom = useViewStore((s) => s.zoom);
+  if (!o.showCollision && !o.showCollisionPathB) return null;
+
+  
+  
+  
+  
+  
+  const cellScreenPx = 16 * zoom;
+  const marksHidden = cellScreenPx < MIN_CELL_PX_FOR_MARK;
+
+  const rows: Row[] = [
+    { kind: 'fill', color: COLLISION_FILL_ALL, label: 'Solid (all sides)' },
+    { kind: 'fill', color: COLLISION_FILL_TOP, label: 'Jump-through (top)' },
+    { kind: 'fill', color: COLLISION_FILL_SIDES, label: 'Wall / ceiling' },
+    { kind: 'line', color: COLLISION_SURFACE_LINE, label: 'Surface' },
+  ];
+  if (o.showCollisionAngles) {
+    rows.push({
+      kind: 'mark',
+      
+      
+      
+      
+      label: marksHidden ? 'Angle · zoom in to show' : 'Angle · arrow points to the open side',
+    });
+  }
+  if (o.showCollision && o.showCollisionPathB) rows.push({ kind: 'outline', color: COLLISION_DIFF, label: 'Path A / B differ' });
+
+  return (
+    <div style={styles.box}>
+      <div style={styles.title}>Collision</div>
+      {rows.map((r) => (
+        <div key={r.label} style={styles.row}>
+          {r.kind === 'mark' ? <AngleSwatch cellScreenPx={cellScreenPx} /> : <span style={swatch(r)} />}
+          <span style={r.kind === 'mark' && marksHidden ? styles.dim : undefined}>{r.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function swatch({ kind, color }: Exclude<Row, { kind: 'mark' }>): React.CSSProperties {
+  const base: React.CSSProperties = { width: 14, height: 12, flex: '0 0 auto', borderRadius: 2 };
+  if (kind === 'fill') return { ...base, background: color, border: `1px solid ${T.border}` };
+  if (kind === 'outline') return { ...base, border: `2px solid ${color}` };
+  
+  return { ...base, borderTop: `2px solid ${color}`, marginTop: 5, height: 0 };
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  box: {
+    position: 'absolute', top: 8, left: 8, zIndex: 6, pointerEvents: 'none',
+    display: 'flex', flexDirection: 'column', gap: 3, padding: '6px 8px',
+    background: 'rgba(10,12,18,0.82)', border: `1px solid ${T.border}`, borderRadius: T.rMd,
+    fontFamily: T.fontUi, fontSize: T.tXs, color: T.textBase,
+  },
+  title: { color: T.textLo, fontSize: T.t2xs, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  row: { display: 'flex', alignItems: 'center', gap: 7 },
+  dim: { color: T.textLo },
+};
+"
+
+ ❯ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts:323:20
+    321|     const calls = legend.match(/drawAngleMark\(/g) ?? [];
+    322|     expect(calls.length, 'AngleSwatch no longer calls drawAngleMark: t…
+    323|     expect(legend).toMatch(/drawAngleMark\(\s*segmentsOnDeviceGrid\(ct…
+       |                    ^
+    324|   });
+    325|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 172 passed (173)
+   Start at  06:53:13
+   Duration  1.16s (transform 1.95s, setup 1.65s, import 326ms, tests 741ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (3 module(s) reported).
+
+failure-class: 1 failure record(s) in 1 file(s) (1 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        1   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts
+    [ASSERTION] site 5: the legend swatch routes its mark through the device-grid adapter (row 239 (d)) > CENSUS: AngleSwatch hands drawAngleMark `segmentsOnDeviceGrid(ctx, dpr)`, never the raw context
+        AssertionError: expected 'import React, { useEffect, useRef } f…' to match /drawAngleMark\(\s*segmentsOnDeviceGri…/
+        why this bucket: name is AssertionError
+
+failure-class: 1 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 3 of 3 module(s) this run selected finished.
