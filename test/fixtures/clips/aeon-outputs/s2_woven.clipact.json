@@ -20,7 +20,7 @@
         "y": 0
       },
       "id": "wfz_deck",
-      "music": null,
+      "music": "SONG_S2_WFZ",
       "region_id": null,
       "src_rect": {
         "h": 1408,
@@ -167,7 +167,7 @@
         "y": 4304
       },
       "id": "ooz_east",
-      "music": null,
+      "music": "SONG_S2_OOZ",
       "region_id": null,
       "src_rect": {
         "h": 1840,
@@ -536,7 +536,7 @@
       48
     ],
     "rung": "searched",
-    "seconds": 0.508,
+    "seconds": 0.457,
     "stats": {
       "refine_rounds": [
         {
@@ -552,7 +552,7 @@
           "sample_over_target_after": 0,
           "sample_over_target_before": 130,
           "sample_windows": 40960,
-          "seconds": 0.223,
+          "seconds": 0.214,
           "stride": [
             8,
             4
