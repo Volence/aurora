@@ -37,7 +37,7 @@ import type { MapClipboard } from '../../core/editing/map-clipboard';
 import { regionPreviewCanvas, publishPasteGhostReport } from '../canvas/region-preview';
 import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
-import { deviceScale, onDeviceScaleChange } from '../canvas/device-grid';
+import { deviceScale, onDeviceScaleChange, strokeRectOnDeviceGrid } from '../canvas/device-grid';
 import {
   bandPreview, refreshBandPreview, resolveDisplayedBg, resolveBandLens, bandLensCaptionLines,
 } from '../providers/bganim-preview-aeon';
@@ -796,9 +796,15 @@ export default function MapViewport() {
       // block-aligned and must not be warned about.
       ctx.strokeStyle = isBlockAligned(marquee.col, marquee.row, marquee.w, marquee.h)
         ? SELECTION_MARQUEE : MAP_MARQUEE_ART_ONLY;
-      ctx.lineWidth = 2 / mZoom;
-      ctx.setLineDash([4 / mZoom, 4 / mZoom]);
-      ctx.strokeRect(mx, my, mw, mh);
+      // ON THE DEVICE GRID (row 238 (a), under the 237 (b) ruling): the outline goes
+      // through `strokeRectOnDeviceGrid`, which strokes under the canvas's CSS
+      // transform, so the dash is stated in CSS px there (4 CSS px, as it always was).
+      // A 2 px line is an EVEN device width (2 device px at 1 and 1.5), so by the
+      // shared rule its centre sits on a device half-pixel and its two edges each
+      // half-cover a device column: the look `canvas/device-grid.ts` gives every 2 px
+      // line, not whole device pixels.
+      ctx.setLineDash([4, 4]);
+      strokeRectOnDeviceGrid(ctx, mx, my, mw, mh, 2, dpr);
       ctx.setLineDash([]);
       ctx.restore();
     }
@@ -850,8 +856,9 @@ export default function MapViewport() {
             ctx.globalAlpha = 1;
           }
           ctx.strokeStyle = SELECTION_MARQUEE;
-          ctx.lineWidth = 2 / sZoom;
-          ctx.strokeRect(sx, sy, sw, sh);
+          // On the device grid, as the marquee above is (row 238 (a)); the same
+          // even-width caveat applies.
+          strokeRectOnDeviceGrid(ctx, sx, sy, sw, sh, 2, dpr);
           ctx.restore();
         }
       }

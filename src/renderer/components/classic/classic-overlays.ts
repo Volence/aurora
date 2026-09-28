@@ -57,42 +57,10 @@ export const HEX_MARKER_SIZE = 16;
  */
 export const MARKER_STROKE_PX = 1;
 
-/**
- * Outline the rect (x, y, w, h), given in the context's CURRENT user space (the world,
- * under classic's `setTransform(dpr) / scale(zoom) / translate(-cam)`), as a stroke of
- * `cssWidth` CSS px ON THE DEVICE GRID (ROADMAP row 237 (b), ruled 2026-09-28).
- *
- * Drawn under the canvas's own CSS transform, `setTransform(dpr, 0, 0, dpr, 0, 0)`, and
- * snapped through the SAME `snapStroke` / `snapLength` MapViewport's chrome uses
- * (canvas/device-grid.ts, whose docblock is the rule): the top-left corner goes on the
- * device half-pixel nearest where the unsnapped stroke was centred, the size is a whole
- * number of device px, and the width is `deviceStrokeWidth(cssWidth, dpr)` device px. So
- * a 1 CSS px outline covers exactly one device column at every scale, where drawn in
- * world units at 1.5 it was 1.5 device px centred ON the edge and half-covered the
- * column either side. At dpr 1 it is the round(v) + 0.5 of MapViewport's chrome.
- *
- * The world-to-CSS mapping is read off the transform in force, which must be an
- * axis-aligned scale and translation (classic's always is), and the transform is left
- * exactly as it was found.
- */
-export function strokeRectOnDeviceGrid(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number,
-  cssWidth: number,
-  dpr: number,
-): void {
-  const m = ctx.getTransform();
-  const cssX = (x * m.a + m.e) / dpr, cssY = (y * m.d + m.f) / dpr;
-  const cssW = (w * m.a) / dpr, cssH = (h * m.d) / dpr;
-  ctx.save();
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.lineWidth = snapStroke(0, cssWidth, dpr).width;
-  ctx.strokeRect(
-    snapStroke(cssX, cssWidth, dpr).at, snapStroke(cssY, cssWidth, dpr).at,
-    snapLength(cssW, dpr), snapLength(cssH, dpr),
-  );
-  ctx.restore();
-}
+// `strokeRectOnDeviceGrid` lived here (row 237 (b)) and moved to canvas/device-grid.ts
+// at row 238, when MapViewport's own stamp ghost and marquee began using it too. It is
+// re-exported so this module's callers and tests keep their import.
+export { strokeRectOnDeviceGrid } from '../../canvas/device-grid';
 
 function solidityFill(solidity: number): string {
   switch (solidity) {
