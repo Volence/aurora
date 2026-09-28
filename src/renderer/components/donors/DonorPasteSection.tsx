@@ -370,6 +370,17 @@ const POOL_COLUMNS: Array<{ field: PoolRowField; label: string }> = [
 
 const NUM: React.CSSProperties = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
 
+/**
+ * ROW 235 (c): an id is never cut. The four number columns are sized to their
+ * min-content (their headers wrap at the space: "pages" over "touched"), so
+ * the id column gets the rest of the panel, and an id wraps at a space
+ * ("corridor" over "ehz_to_cpz") or, only if one word is wider than the
+ * column, inside it. Truncation with an ellipsis made "ehz_act1" and
+ * "ehz_act2" both read "ehz_a...", two ids as one text; a wrapped id is the
+ * whole id. The cell's title repeats it.
+ */
+const ID_CELL: React.CSSProperties = { color: T.textHi, whiteSpace: 'normal', overflowWrap: 'break-word' };
+
 type PoolKind = 'clip' | 'corridor' | 'shaft' | 'fill';
 
 /** The two sections row 229 adds below the corridors; each is headed by a full-width row when it has rows. */
@@ -406,8 +417,8 @@ export function PoolRowsView({ clipact }: { clipact: Record<string, unknown> }):
   const cell: React.CSSProperties = { ...NOTE, padding: `0 ${T.s1}` };
   const rowCells = (kind: PoolKind, row: PoolRow, label: string) => (
     <React.Fragment key={`${kind}:${row.index}`}>
-      <div role="cell" data-donors-pool-row={`${kind}:${row.index}`} data-donors-pool-id={row.id}
-           style={{ ...cell, color: T.textHi, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div role="cell" data-donors-pool-row={`${kind}:${row.index}`} data-donors-pool-id={row.id} title={row.id}
+           style={{ ...cell, ...ID_CELL }}>
         {label}
       </div>
       {POOL_COLUMNS.map((c) => (
@@ -420,13 +431,13 @@ export function PoolRowsView({ clipact }: { clipact: Record<string, unknown> }):
   return (
     <div data-donors-pool-rows="present" style={{ display: 'flex', flexDirection: 'column', gap: T.s1 }}>
       <div role="table" aria-label="Pool cost per clip, corridor, shaft and fill" style={{
-        display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) repeat(4, auto)', columnGap: T.s2,
+        display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) repeat(4, min-content)', columnGap: T.s2,
         border: `1px solid ${T.border}`, borderRadius: T.rSm, padding: T.s1,
       }}>
-        <div role="columnheader" style={{ ...cell, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>pool cost</div>
+        <div role="columnheader" style={cell}>pool cost</div>
         {POOL_COLUMNS.map((c) => (
           <div key={c.field} role="columnheader" title={pr.fields[c.field]} data-donors-pool-head={c.field}
-               style={{ ...cell, ...NUM, textDecoration: 'underline dotted', cursor: 'help' }}>{c.label}</div>
+               style={{ ...cell, ...NUM, textDecoration: 'underline dotted', cursor: 'help', whiteSpace: 'normal' }}>{c.label}</div>
         ))}
         {rows.map(({ kind, row }) => rowCells(kind, row, kind === 'corridor' ? `corridor ${row.id}` : row.id))}
         {POOL_SECTIONS.filter((sec) => sectionRows[sec.kind].length > 0).map((sec) => (
