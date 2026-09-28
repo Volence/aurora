@@ -216,7 +216,7 @@ view). This is for the overseer's look call; I changed nothing on the page:
 
 ## 5. Suite
 
-Run on the docs commit on top of `82a4f5ab`, from the worktree, `VITEST_MAX_WORKERS=4`, `TMPDIR` under `$HOME`:
+Run twice: on the docs commit on top of `82a4f5ab`, and again after the ruling on `2e9e7668` (same totals: the ruling extends one existing row per marker and adds none). From the worktree, `VITEST_MAX_WORKERS=4`, `TMPDIR` under `$HOME`:
 - `npm test` (every pre-check, `tsc --noEmit`, then vitest): exit 0. **Test Files 674 passed | 3 skipped (677); Tests
   10525 passed | 20 skipped (10545)**; `run-completeness: COMPLETE, 677 of 677`; `failure-class: no failures`;
   `skip-report: OK` (the skips name their reasons: no s4_engine tree, and sibling-root step 3, which is unmeasurable
