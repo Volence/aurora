@@ -50,7 +50,10 @@
 //
 // `EDGE_OUT=<file>` writes each subject's raw cross-section and the legend swatch's
 // pixels; `EDGE_BASELINE=<file>` compares this build's against them byte for byte
-// (`.id` rows). Without a baseline those rows print NOT MEASURED, never a pass.
+// (`.id` rows). Without a baseline those rows print NOT MEASURED, never a pass. An `.id`
+// row is a CLAIM only where the stroke should not have moved: the paste ghost and the
+// object box at dpr 1 (2 device px on a whole edge, as master's world-unit stroke drew)
+// and the legend swatch at every dpr. Elsewhere the count is printed as a note.
 //
 // READ ONLY: the aeon tree is a COPY (AEON_DIR, refused if live); nothing is saved.
 // ⚠ NO EMULATOR. Nothing here touches oracle or any emulator MCP tool.
@@ -179,7 +182,7 @@ const SHOT_PIXELS = String.raw`((b64, pts) => new Promise((res, rej) => {
  *             candidate width set; the row passes if one alternative predicts every pixel
  *   groups    { out: [...offsets], stroke: [...], in: [...] }
  */
-async function edgeRows(c, g, id, what, offB64, onB64, vertical, E, along, alternatives, groups, minN = 12) {
+async function edgeRows(c, g, id, what, offB64, onB64, vertical, E, along, alternatives, groups, minN = 12, sameAsBaseline = false) {
   const offsets = [...new Set(Object.values(groups).flat())].sort((a, b) => a - b);
   const pts = [];
   for (const o of offsets) for (const a of along) pts.push(vertical ? [E + o, a] : [a, E + o]);
@@ -214,19 +217,24 @@ async function edgeRows(c, g, id, what, offB64, onB64, vertical, E, along, alter
   if (groups.out) check(`${id}.out`, `${what}: the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)`, ok(groups.out), say(groups.out));
   if (groups.stroke) check(`${id}.stroke`, `${what}: the stroke's own columns are the whole-pixel composite (both edges whole)`, ok(groups.stroke), say(groups.stroke));
   if (groups.in) check(`${id}.in`, `${what}: the columns INSIDE the stroke are the fill-only composite (nothing past the inner edge)`, ok(groups.in), say(groups.in));
-  identity(`${id}.id`, `${what}: the on-shot cross-section`, on.px.map(hex));
+  identity(`${id}.id`, `${what}: the on-shot cross-section`, on.px.map(hex), sameAsBaseline);
   return best;
 }
 
-/** Byte-for-byte against the baseline build's run, or NOT MEASURED. */
-function identity(id, what, hexes) {
+/**
+ * Byte-for-byte against the baseline build's run, or NOT MEASURED. A CLAIM (a row) only
+ * where the stroke is expected to be unchanged from the baseline (`claim`); elsewhere the
+ * count is printed as a note, because the fix is meant to move those pixels.
+ */
+function identity(id, what, hexes, claim = true) {
   OUT[id] = hexes;
-  if (!BASELINE) return notMeasured(id, `${what} is byte-identical to the baseline build`, 'no EDGE_BASELINE given');
+  if (!BASELINE) return claim ? notMeasured(id, `${what} is byte-identical to the baseline build`, 'no EDGE_BASELINE given') : undefined;
   const base = BASELINE[id];
-  if (!base) return notMeasured(id, `${what} is byte-identical to the baseline build`, 'the baseline has no such key');
+  if (!base) return notMeasured(id, `${what} vs the baseline build`, 'the baseline has no such key');
   const differ = base.length === hexes.length ? hexes.filter((h, i) => h !== base[i]).length : -1;
-  check(id, `${what} is byte-identical to the baseline build`, differ === 0,
-    differ < 0 ? `length ${hexes.length} vs baseline ${base.length}` : `${differ} of ${hexes.length} px differ`);
+  const detail = differ < 0 ? `length ${hexes.length} vs baseline ${base.length}` : `${differ} of ${hexes.length} px differ`;
+  if (claim) check(id, `${what} is byte-identical to the baseline build`, differ === 0, detail);
+  else note(id, `${what} vs the baseline build (not a claim: this stroke is meant to move)`, detail);
 }
 
 /** Device indices from CSS fromCss..toCss (exclusive), skipping CSS coordinates near `avoid`. */
@@ -315,7 +323,7 @@ async function partScale(scale) {
       const along = sampleLine(ox, L + 8, L + Wd - 8, g.dpr, (css) => { const r = (css - L) % 8; return r >= 1 && r <= 3; });
       await edgeRows(c, g, `${id}.top`, 'paste ghost outline, top edge (horizontal, dashed, 2 CSS px)', pOff, pOn, false, Ey, along,
         [{ name: `width ${w}`, layers: [{ col: C.marquee, span: [lo, hi] }] }],
-        { out: [lo - 2, lo - 1], stroke: [lo, hi - 1] });
+        { out: [lo - 2, lo - 1], stroke: [lo, hi - 1] }, 12, g.dpr === 1);
       await keyPress(c, 'Escape'); await keyPress(c, 'Escape');
       await c.evalExpr('window.__dbg.aeon.setTool ? window.__dbg.aeon.setTool("view") : null').catch(() => null);
       await keyPress(c, 'v');
@@ -495,7 +503,7 @@ async function partScale(scale) {
         const along = [...sampleLine(oy, top + 3, top + 10, g.dpr), ...sampleLine(oy, top + 32 - 10, top + 32 - 3, g.dpr)];
         await edgeRows(c, g, `${id}.left`, `object box, left edge (world width ${Z} CSS px)`, bOff, bOn, true, E, along,
           [{ name: `width ${w}`, layers: [{ col: C.boxFill, span: [0, boxDev] }, { col: C.boxStroke, span: [lo, hi] }] }],
-          { out: [lo - 2, lo - 1], stroke: [...Array(hi - lo).keys()].map((k) => lo + k), in: [hi, hi + 1] });
+          { out: [lo - 2, lo - 1], stroke: [...Array(hi - lo).keys()].map((k) => lo + k), in: [hi, hi + 1] }, 12, g.dpr === 1);
       }
     }
 
