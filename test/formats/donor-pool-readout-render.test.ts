@@ -82,6 +82,17 @@ describe('the donor pool grid on a woven act (rendered from aeon\'s real clipact
     }).toEqual({ named: true, sum: 'cannot-check', says: true, broken: false });
   });
 
+  // ROW 235 (c): the grid truncated ids ("ehz_a...", "corrid..."), which can print
+  // two ids as one text. Held here as markup: every id cell's text contains its
+  // id whole and its style does not cut it (no ellipsis, no hidden overflow, no
+  // nowrap). That the laid-out cell really shows it is DP.11i in the harness.
+  it('every id cell prints its id whole: the text holds the id and nothing in its style cuts it (s2_ehz_cpz)', () => {
+    const raw = load('s2_ehz_cpz');
+    const cellsById = [...render(raw).matchAll(/data-donors-pool-id="([^"]+)"[^>]*style="([^"]*)"[^>]*>([^<]*)</g)]
+      .map((m) => ({ id: m[1], cut: /text-overflow:\s*ellipsis|overflow:\s*hidden|white-space:\s*nowrap/.test(m[2]), whole: m[3].includes(m[1]) }));
+    expect(cellsById).toEqual([...raw.pool.per_clip, ...raw.pool.per_corridor].map((r) => ({ id: r.id, cut: false, whole: true })));
+  });
+
   it('a file without shafts or a fill (s2_ehz_cpz) renders no shaft or fill section', () => {
     expect(order(render(load('s2_ehz_cpz'))).filter((k) => /^(section|shaft|fill)/.test(k))).toEqual([]);
   });

@@ -1061,7 +1061,7 @@ async function rows(d, O, COPY, dpr) {
     const uw = T11.rect.width - 2 * O.FIT_MARGIN_PX; const uh = T11.rect.height - 2 * O.FIT_MARGIN_PX;
     const paintedBottom = Math.max(...[...man.clips, ...corridors].map((k) => k.dst_rect.y + k.dst_rect.h));
     const fillOk = inView && aw <= uw + 1 && ah <= uh + 1 && (Math.abs(aw - uw) <= 1 || Math.abs(ah - uh) <= 1);
-    check('DP.11f', `the whole ${gw} x ${gh} act is fitted as large as whole-act view allows: it spans the pane's ${Math.abs(ah - uh) <= 1 ? 'height' : 'width'} less the tree's ${O.FIT_MARGIN_PX}-px margins, and its other axis fits`,
+    check('DP.11f', `the whole ${gw} x ${gh} act is fitted as large as whole-act view allows: it spans the pane's ${uh / H <= uw / W ? 'height' : 'width'} (the binding axis) less the tree's ${O.FIT_MARGIN_PX}-px margins, and its other axis fits`,
       fillOk,
       `pane ${T11.rect.width} x ${T11.rect.height}; act on screen ${aw.toFixed(1)} x ${ah.toFixed(1)} (${(aw / T11.rect.width * 100).toFixed(1)}% x ${(ah / T11.rect.height * 100).toFixed(1)}% of the pane); usable ${uw} x ${uh}; `
         + `painted rows reach y ${paintedBottom} of ${H} (${(paintedBottom / H * 100).toFixed(1)}% of the act's height, ${(paintedBottom * T11.view.scale / T11.rect.height * 100).toFixed(1)}% of the pane's)`);
