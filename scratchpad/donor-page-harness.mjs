@@ -36,6 +36,33 @@
 //   DP.7s the R10 refusal is shown STRUCTURALLY: the rule tag reads R10 and the
 //         subjects name both clips, first claimant first, ids read from the file
 //         on disk and the draft (not from the app's store).
+//   ROW 222 (open half) and ROW 213 (b), 2026-09-28, add:
+//   DP.5s before the first paste the form names the song the paste inherits: for
+//         a new act, "none inherited" and why (the tree's zoneSongLine of the
+//         act, and the harness sees the act has no file on disk).
+//   DP.6s the success summary repeats that sentence word for word.
+//   DP.7o the R10 refusal outlines BOTH subjects on the target pane: the pane's
+//         own paint report carries two dashed warning outlines tagged R10 at the
+//         clip on disk and the draft; the CANVAS, read back along the refused
+//         rectangle's top edge, shows the warning colour in dashes, where the
+//         same edge read just before the refusal showed none (the control).
+//   DP.7l leaving the page (real clicks: another facet pill, then Donors) clears
+//         the refusal and its outlines, canvas read back again.
+//   DP.7e the same paste refused again (anti-vacuous for this row), then a REAL
+//         edit of the clip id clears it, canvas read back again.
+//   DP.9s a real click on the copy's s2_ehz_cpz act: the form names the song its
+//         EHZ clips carry, read by the harness from that clips.json on disk.
+//   DP.10 A REAL BAKE REFUSAL ON SCREEN (the row the bake-json packet booked):
+//         the harness paints the copy's EHZ collision (aeon's own C4 paint: the
+//         reserved bits 15:14 on one cell inside the marquee, both planes), then
+//         a real paste into a fresh act passes aeon's loader and is REFUSED by
+//         aeon's BAKE: the page shows stage bake, the rule and the clip exactly
+//         as the harness's OWN bake --json of the same manifest names them, the
+//         clip is outlined dashed with that rule, and nothing is written.
+//   DP.10t the rule tag is drawn UNDER the clip's id label, not over it: the
+//         canvas read back in the id label's band holds no warning pixel and
+//         the band below it does (found by eye in this parcel's first shot,
+//         where "C4" printed over "ehz_2x").
 //
 // EXPECTATIONS COME FROM THE TREE: CONVERTER_COMMAND, marqueeRect, marqueeReadout,
 // clipsManifestPath and suggestDestination are bundled from the tree under test
@@ -133,7 +160,7 @@ async function loadOracle() {
   const marq = await bundle('src/core/formats/donors/donor-marquee.ts');
   const doc = await bundle('src/core/formats/donors/clip-manifest-doc.ts');
   for (const [m, f] of [[tree, 'CONVERTER_COMMAND'], [tree, 'parseZoneManifest'], [marq, 'marqueeRect'], [marq, 'marqueeReadout'],
-    [doc, 'clipsManifestPath'], [doc, 'suggestDestination'], [doc, 'newClipManifest']]) {
+    [doc, 'clipsManifestPath'], [doc, 'suggestDestination'], [doc, 'newClipManifest'], [doc, 'zoneSong'], [doc, 'zoneSongLine']]) {
     if (m[f] === undefined) throw new Error(`ORACLE: ${f} missing from the tree`);
   }
   return { ...tree, ...marq, ...doc };
@@ -369,6 +396,47 @@ async function rows(d, O, COPY, dpr) {
     writeFileSync(f, Buffer.from(r.data, 'base64'));
     console.log(`    shot         : ${f}`);
   };
+  // The target canvas READ BACK along the inside of a world rectangle's top
+  // edge (the 2px stroke band), counting pixels in DONOR_MARK_WARN (#FBBF24)
+  // and the runs they form: a dashed warning edge has several runs, a solid one
+  // one, none has zero. Aimed through the pane's own published view and rect.
+  const WARN_RGB = [0xFB, 0xBF, 0x24];
+  const edgeRead = async (r) => {
+    const T = await d.pane('target');
+    const x0 = T.rect.left + (r.x - T.view.ox) * T.view.scale; const x1 = T.rect.left + (r.x + r.w - T.view.ox) * T.view.scale;
+    const y = T.rect.top + (r.y - T.view.oy) * T.view.scale;
+    const got = await c.json(String.raw`(() => { const cv = document.querySelector('[data-zone-pane-canvas="target"]'); if (!cv) return null;
+      const b = cv.getBoundingClientRect(); const k = cv.width / b.width; const ctx = cv.getContext('2d');
+      const px0 = Math.max(0, Math.ceil((${x0} - b.left + 8) * k)), px1 = Math.min(cv.width, Math.floor((${x1} - b.left - 8) * k));
+      const py = Math.round((${y} - b.top + 1) * k);
+      if (px1 <= px0 || py < 0 || py >= cv.height) return { n: 0 };
+      const img = ctx.getImageData(px0, py, px1 - px0, 1).data; let warn = 0, runs = 0, prev = false;
+      for (let i = 0; i < img.length; i += 4) {
+        const on = Math.abs(img[i] - ${WARN_RGB[0]}) < 12 && Math.abs(img[i + 1] - ${WARN_RGB[1]}) < 12 && Math.abs(img[i + 2] - ${WARN_RGB[2]}) < 12;
+        if (on) warn++; if (on && !prev) runs++; prev = on;
+      }
+      return { n: img.length / 4, warn, runs, k, py }; })()`);
+    return { ...got, view: T.view, paints: T.paints };
+  };
+  // Warning pixels in a box given in screen px from the rectangle's top-left
+  // corner on the target canvas (the label bands; the dashed edge is excluded
+  // by starting 4 px in).
+  const bandRead = async (r, box) => {
+    const T = await d.pane('target');
+    const ox = T.rect.left + (r.x - T.view.ox) * T.view.scale; const oy = T.rect.top + (r.y - T.view.oy) * T.view.scale;
+    return c.json(String.raw`(() => { const cv = document.querySelector('[data-zone-pane-canvas="target"]'); if (!cv) return null;
+      const b = cv.getBoundingClientRect(); const k = cv.width / b.width; const ctx = cv.getContext('2d');
+      const x0 = Math.round((${ox} - b.left + ${box.x0}) * k), y0 = Math.round((${oy} - b.top + ${box.y0}) * k);
+      const w = Math.round((${box.x1} - ${box.x0}) * k), h = Math.round((${box.y1} - ${box.y0}) * k);
+      const img = ctx.getImageData(x0, y0, w, h).data; let warn = 0, lit = 0;
+      for (let i = 0; i < img.length; i += 4) {
+        if (Math.abs(img[i] - ${WARN_RGB[0]}) < 40 && Math.abs(img[i + 1] - ${WARN_RGB[1]}) < 40 && Math.abs(img[i + 2] - ${WARN_RGB[2]}) < 40) warn++;
+        if (img[i] + img[i + 1] + img[i + 2] > 200) lit++;
+      }
+      return { n: img.length / 4, warn, lit }; })()`);
+  };
+  const dashedOf = (P) => (P && Array.isArray(P.outlines) ? P.outlines.filter((o) => o.dashed) : null);
+
   // ── DP.0 ────────────────────────────────────────────────────────────────
   const opened = await c.evalExpr(`window.__dbg.aeon.open(${J(COPY)})`).catch((e) => `threw: ${e.message}`);
   let s0 = null;
@@ -479,6 +547,15 @@ async function rows(d, O, COPY, dpr) {
     !!(idIn && idIn.hitOk) && !!(start && start.hitOk) && s5.paste.target.onDisk === false && !existsSync(join(COPY, O.clipsManifestPath(ACT))),
     `target ${J(s5.paste.target)}; draft ${J(s5.draft)}`);
 
+  // ── DP.5s the song line, before the paste (row 222) ─────────────────────
+  const songDom = () => c.evalExpr('(document.querySelector("[data-donors-song]") || {}).textContent || null');
+  await sleep(300);
+  const song5 = await songDom();
+  const wantSong5 = O.zoneSongLine(O.zoneSong(O.newClipManifest(ACT, 1, 1), 's2disasm', 'EHZ'));
+  check('DP.5s', 'before the first paste the form names the song it inherits: none, because the act has no s2disasm EHZ clip (no file on disk), in the tree\'s own sentence',
+    song5 === wantSong5 && /^Song: none inherited \(/.test(song5 ?? '') && !existsSync(join(COPY, O.clipsManifestPath(ACT))),
+    `DOM ${J(song5)}; tree ${J(wantSong5)}`);
+
   // ── DP.6 paste, and read everything back from disk ──────────────────────
   const hold = { gridW: Math.ceil(m.w / 2048), gridH: Math.ceil(m.h / 2048) };
   const wantDst = O.suggestDestination(O.newClipManifest(ACT, hold.gridW, hold.gridH), hold.gridW, hold.gridH, m);
@@ -494,6 +571,9 @@ async function rows(d, O, COPY, dpr) {
     !!(pasteBtn && pasteBtn.hitOk) && s6.paste.outcome.kind === 'pasted' && !!clip && file.clips.length === 1 && J(clip) === J(wantClip)
       && file.schema === 1 && file.units === 'world_px' && file.id === ACT && !('region_id' in clip),
     `outcome ${J(s6.paste.outcome)}; on disk ${fileText ? fileText.replace(/\s+/g, ' ') : 'ABSENT'}; want ${J(wantClip)}`);
+  const song6 = await c.evalExpr('(document.querySelector("[data-donors-outcome-song]") || {}).textContent || null');
+  check('DP.6s', 'the success summary repeats the song sentence the form showed before the paste, word for word',
+    !!song5 && song6 === song5, `summary ${J(song6)}; form before ${J(song5)}`);
   if (!fileText) return;
   const v = aeonTool(COPY, ['tools/clip_manifest.py', 'validate', path, '--donor-root', donorsDir]);
   check('DP.6b', 'aeon\'s own loader, run by the harness on the file ON DISK, accepts it',
@@ -563,6 +643,9 @@ async function rows(d, O, COPY, dpr) {
   const tAim = { x: Math.round(tp.x), y: Math.round(tp.y) };
   await d.clickAt(tAim);
   const s7a = await d.waitFor((s) => s.draft.dst !== null && s.draft.dst.x === wantDst.x && s.draft.dst.y === wantDst.y && s.draft.clipId !== '', 'the overlapping placement');
+  const refusedRect = { x: wantDst.x, y: wantDst.y, w: m.w, h: m.h };
+  await sleep(300);
+  const edgeBefore = await edgeRead(refusedRect);
   await d.realClick('document.querySelector("[data-donors-paste-button]")');
   const s7 = await d.waitFor((s) => s.paste.outcome && !s.paste.busy && s.paste.outcome.kind !== 'pasted', 'the refusal', 160);
   const shown = await c.evalExpr('(document.querySelector("[data-donors-refusal]") || {}).textContent || null');
@@ -579,6 +662,48 @@ async function rows(d, O, COPY, dpr) {
     !!dom7 && dom7.rule === 'R10' && dom7.attr === 'R10' && dom7.subjects === wantSubjects && dom7.stage === 'validate',
     `DOM ${J(dom7)}; want subjects ${J(wantSubjects)}`);
 
+  // ── DP.7o the refused subjects, outlined on the target pane (row 213 (b)) ─
+  const clip0 = JSON.parse(readFileSync(path, 'utf8')).clips[0].dst_rect;
+  const s7o = await d.waitFor((s) => (dashedOf(s.targetPane) ?? []).length > 0, 'the refused outlines', 40, 250, { soft: true });
+  await sleep(300);
+  const dash7 = dashedOf(s7o.targetPane);
+  const want7 = [{ rect: clip0, tone: 'warning', dashed: true, tag: 'R10' }, { rect: refusedRect, tone: 'warning', dashed: true, tag: 'R10' }];
+  const edge7 = await edgeRead(refusedRect);
+  check('DP.7o', 'the R10 refusal outlines BOTH subjects: the pane painted two dashed warning outlines tagged R10 (clip 0 as on disk, clip 1 the draft), and the canvas edge, read back, shows the warning colour in DASHES where it showed none just before the refusal',
+    J(dash7) === J(want7) && edgeBefore.warn === 0 && edge7.warn > 0.2 * edge7.n && edge7.warn < 0.9 * edge7.n && edge7.runs >= 3,
+    `dpr ${dpr}; dashed ${J(dash7)}; want ${J(want7)}; edge before ${J(edgeBefore)}; edge now ${J(edge7)}`);
+
+  // ── DP.7l leaving the page clears the refusal ───────────────────────────
+  const pills = await c.json('[...document.querySelectorAll(\'[aria-label="Facets"] button\')].map((b) => b.textContent.trim())');
+  const other = pills.find((t) => t !== 'Donors') ?? null;
+  const away = other ? await d.realClick(d.FACET(other)) : null;
+  await sleep(600);
+  const gone = await c.evalExpr('!document.querySelector("[data-donors-canvas]")');
+  const back7 = await d.realClick(d.FACET('Donors'));
+  const s7l = await d.waitFor((s) => s.targetPane && s.targetPane.paints > 0 && (dashedOf(s.targetPane) ?? [1]).length === 0, 'the target pane repainted without outlines', 40, 250, { soft: true });
+  await sleep(400);
+  const edge7l = await edgeRead(refusedRect);
+  check('DP.7l', `leaving the page (a REAL click on the ${J(other)} pill, which unmounts the page, then back on Donors) clears the refusal and its outlines; the canvas edge reads no warning`,
+    !!(away && away.hitOk) && gone && !!(back7 && back7.hitOk) && (s7l.paste.outcome === null || s7l.paste.outcome.kind !== 'refused')
+      && J(dashedOf(s7l.targetPane)) === '[]' && edge7l.warn === 0,
+    `pills ${J(pills)}; unmounted ${gone}; outcome ${J(s7l.paste.outcome && s7l.paste.outcome.kind)}; dashed ${J(dashedOf(s7l.targetPane))}; edge ${J(edge7l)}`);
+
+  // ── DP.7e the same paste refused again, then a real edit clears it ──────
+  await d.realClick('document.querySelector("[data-donors-paste-button]")');
+  const s7r = await d.waitFor((s) => s.paste.outcome && !s.paste.busy && s.paste.outcome.kind === 'refused' && (dashedOf(s.targetPane) ?? []).length === 2, 'the refusal again', 160, 250, { soft: true });
+  const edge7r = await edgeRead(refusedRect);
+  const idBox = await d.realClick('document.querySelector("[data-donors-clip-id]")');
+  await c.evalExpr('(() => { const el = document.querySelector("[data-donors-clip-id]"); el.setSelectionRange(el.value.length, el.value.length); })()');
+  await d.typeText('x');
+  const s7e = await d.waitFor((s) => s.paste.outcome === null, 'the refusal cleared', 40, 250, { soft: true });
+  await sleep(400);
+  const edge7e = await edgeRead(refusedRect);
+  check('DP.7e', 'the same paste is refused again with both outlines (anti-vacuous), and a REAL keystroke in the clip id clears the refusal and its outlines; the canvas edge reads no warning',
+    s7r.paste.outcome && s7r.paste.outcome.kind === 'refused' && edge7r.warn > 0 && !!(idBox && idBox.hitOk)
+      && s7e.paste.outcome === null && J(dashedOf(s7e.targetPane)) === '[]' && edge7e.warn === 0
+      && !(await c.evalExpr('!!document.querySelector("[data-donors-refusal]")')),
+    `again ${J(s7r.paste.outcome && s7r.paste.outcome.kind)}, edge ${J(edge7r)}; draft after ${J(s7e.draft)}; outcome ${J(s7e.paste.outcome)}; dashed ${J(dashedOf(s7e.targetPane))}; edge ${J(edge7e)}`);
+
   // ── DP.8 undo by a real Ctrl+Z, redo by a real click ────────────────────
   const pasted = readFileSync(path);
   await c.evalExpr('document.activeElement && document.activeElement !== document.body && document.activeElement.blur()');
@@ -594,6 +719,95 @@ async function rows(d, O, COPY, dpr) {
   const back = existsSync(path) ? readFileSync(path) : null;
   check('DP.8b', 'a REAL click on Redo writes the paste back, byte-identical to what the paste wrote',
     !!back && Buffer.compare(back, pasted) === 0, `outcome ${J(s8b.paste.outcome)}; bytes ${back ? back.length : 'ABSENT'} vs ${pasted.length}`);
+
+  // ── DP.9s the song an existing act's zone carries (row 222) ─────────────
+  const EXIST = 's2_ehz_cpz';
+  const existPath = join(COPY, O.clipsManifestPath(EXIST));
+  if (!existsSync(existPath)) {
+    check('DP.9s', `the form names ${EXIST}'s EHZ song`, 'UNMEASURABLE', `${existPath} is not in the copy`);
+  } else {
+    const ehzSongs = [...new Set(JSON.parse(readFileSync(existPath, 'utf8')).clips.filter((k) => k.donor === 's2disasm' && k.zone === 'EHZ').map((k) => k.music ?? null))];
+    const actBtn = await d.realClick(`document.querySelector('[data-donors-act="${EXIST}"]')`);
+    const s9 = await d.waitFor((s) => s.paste.target && s.paste.target.actId === EXIST && !s.paste.busy, `${EXIST} chosen`, 240);
+    await sleep(300);
+    const song9 = await songDom();
+    check('DP.9s', `a REAL click on ${EXIST}: the form names the song its s2disasm EHZ clips carry, read by the harness from that clips.json ON DISK`,
+      !!(actBtn && actBtn.hitOk) && ehzSongs.length === 1 && typeof ehzSongs[0] === 'string' && song9 === `Song: ${ehzSongs[0]} (from s2disasm EHZ)`,
+      `songs on disk ${J(ehzSongs)}; DOM ${J(song9)}; target ${J(s9.paste.target && s9.paste.target.actId)}`);
+  }
+
+  // ── DP.10 a real bake refusal, on screen ────────────────────────────────
+  // aeon's own C4 paint (tools/test_clip_bake_json.py, and gen_bake_json.py
+  // here): 2 << PLANE_RESERVED_SHIFT on plane A and 1 << it on plane B, one
+  // cell, inside the marquee. The copy is this run's own and is deleted.
+  const shiftRun = aeonTool(COPY, ['-c', 'import sys; sys.path.insert(0, "tools"); import collision_pipeline as CP; print(CP.PLANE_RESERVED_SHIFT)']);
+  const SHIFT = Number(String(shiftRun.stdout).trim());
+  if (shiftRun.status !== 0 || !Number.isInteger(SHIFT)) {
+    check('DP.10', 'a real bake refusal on screen', 'UNMEASURABLE', `could not read PLANE_RESERVED_SHIFT from the copy: exit ${shiftRun.status} ${J(String(shiftRun.stderr).slice(-300))}`);
+    return;
+  }
+  const st10 = zone.grid.section_px / 8;
+  const cell = { r: m.y / 8 + 4, c: m.x / 8 + 4 };
+  const secN10 = Math.floor(cell.r / st10) * zone.grid.w + Math.floor(cell.c / st10);
+  const off10 = ((cell.r % st10) * st10 + (cell.c % st10)) * 2;
+  for (const [suffix, word] of [['collattr', 2 << SHIFT], ['collattrb', 1 << SHIFT]]) {
+    const f = join(zoneDir, `section_${secN10}.${suffix}.bin`);
+    const buf = readFileSync(f);
+    buf.writeUInt16BE(word, off10);
+    writeFileSync(f, buf);
+  }
+  const ACT10 = 'hx_c4_act';
+  await d.realClick('document.querySelector("[data-donors-act-new]")');
+  await d.realClick('document.querySelector("[data-donors-new-act-id]")');
+  await d.typeText(ACT10);
+  await d.realClick('document.querySelector("[data-donors-new-act-start]")');
+  const s10a = await d.waitFor((s) => s.paste.target && s.paste.target.actId === ACT10 && s.draft.clipId !== '' && s.draft.dst !== null, 'the C4 act and draft');
+  // The candidate the page will send, rebuilt by the tree's own document code,
+  // baked by the HARNESS with aeon's own CLI: that answer is the expectation.
+  const d10 = s10a.draft;
+  const cand = { schema: 1, units: 'world_px', id: ACT10, act: { grid_w: Math.ceil(m.w / 2048), grid_h: Math.ceil(m.h / 2048) },
+    clips: [{ id: d10.clipId, donor: 's2disasm', zone: 'EHZ', src_rect: { x: m.x, y: m.y, w: m.w, h: m.h }, dst_rect: { x: d10.dst.x, y: d10.dst.y, w: m.w, h: m.h } }] };
+  const candDir = mkdtempSync(join(os.tmpdir(), 'donor-page-c4-'));
+  let own = null;
+  try {
+    writeFileSync(join(candDir, 'clips.json'), `${JSON.stringify(cand, null, 2)}\n`);
+    const vv = aeonTool(COPY, ['tools/clip_manifest.py', 'validate', join(candDir, 'clips.json'), '--donor-root', donorsDir, '--json']);
+    const bb = aeonTool(COPY, ['tools/clip_act_bake.py', 'bake', join(candDir, 'clips.json'), '--out', join(candDir, 'out'), '--json']);
+    own = { validateExit: vv.status, bakeExit: bb.status, bake: (() => { try { return JSON.parse(bb.stdout); } catch { return null; } })() };
+  } finally { rmSync(candDir, { recursive: true, force: true }); }
+  const ownRefusal = own && own.bake && own.bake.refusals && own.bake.refusals[0];
+  await sleep(300);
+  const edge10before = await edgeRead({ x: d10.dst.x, y: d10.dst.y, w: m.w, h: m.h });
+  const paste10 = await d.realClick('document.querySelector("[data-donors-paste-button]")');
+  const s10 = await d.waitFor((s) => s.paste.outcome && !s.paste.busy, 'the C4 outcome', 240);
+  const dom10 = await c.json(String.raw`(() => { const n = document.querySelector('[data-donors-refusal-note]');
+    return n ? { rule: (n.querySelector('[data-donors-note-rule]') || {}).textContent, subjects: (n.querySelector('[data-donors-note-subjects]') || {}).textContent,
+      stage: (document.querySelector('[data-donors-stage]') || { getAttribute: () => null }).getAttribute('data-donors-stage') } : null; })()`);
+  const s10o = await d.waitFor((s) => (dashedOf(s.targetPane) ?? []).length > 0, 'the C4 outline', 40, 250, { soft: true });
+  await sleep(300);
+  const rect10 = { x: d10.dst.x, y: d10.dst.y, w: m.w, h: m.h };
+  const edge10 = await edgeRead(rect10);
+  const wantSubj10 = ownRefusal ? ownRefusal.subjects.map((x) => `${x.kind} ${x.index} ${x.id}`).join(' and ') : null;
+  await shot('bake-refused');
+  check('DP.10', 'A REAL BAKE REFUSAL ON SCREEN: over the painted donor, aeon\'s loader accepts and aeon\'s BAKE refuses the paste; the page shows stage bake with the rule and clip exactly as the harness\'s own bake --json names them (C4, the pasted clip), outlines that clip dashed and tagged with the rule, and writes nothing',
+    !!own && own.validateExit === 0 && own.bakeExit === 1 && !!ownRefusal && ownRefusal.rule === 'C4' && !!(paste10 && paste10.hitOk)
+      && s10.paste.outcome.kind === 'refused' && s10.paste.outcome.stage === 'bake'
+      && !!dom10 && dom10.stage === 'bake' && dom10.rule === ownRefusal.rule && dom10.subjects === wantSubj10
+      && J(dashedOf(s10o.targetPane)) === J([{ rect: rect10, tone: 'warning', dashed: true, tag: ownRefusal.rule }])
+      && edge10before.warn === 0 && edge10.warn > 0.2 * edge10.n && edge10.runs >= 3
+      && !existsSync(join(COPY, O.clipsManifestPath(ACT10))),
+    `painted cell ${J(cell)} (section ${secN10}, shift ${SHIFT}); harness's own validate exit ${own && own.validateExit}, bake exit ${own && own.bakeExit}, refusal ${J(ownRefusal).slice(0, 300)}; `
+      + `page outcome ${J(s10.paste.outcome && { kind: s10.paste.outcome.kind, stage: s10.paste.outcome.stage })}; DOM ${J(dom10)} (want subjects ${J(wantSubj10)}); dashed ${J(dashedOf(s10o.targetPane))}; edge before ${J(edge10before)}, after ${J(edge10)}`);
+
+  // ── DP.10t the tag sits under the id label ──────────────────────────────
+  // ZonePane draws an outline's label with its baseline 13 px below the top
+  // edge (11 px font) and the tag's 26 px below (10 px bold): the id band is
+  // rows 3..14, the tag band rows 17..28, both from 4 px in, 40 px wide.
+  const idBand = await bandRead(rect10, { x0: 4, x1: 44, y0: 3, y1: 15 });
+  const tagBand = await bandRead(rect10, { x0: 4, x1: 44, y0: 17, y1: 29 });
+  check('DP.10t', 'the rule tag is drawn UNDER the clip\'s id label, not over it: the id band holds the (accent) label and no warning pixel, the band below holds the warning tag',
+    !!idBand && !!tagBand && idBand.lit > 5 && idBand.warn === 0 && tagBand.warn > 5,
+    `id band ${J(idBand)}; tag band ${J(tagBand)}; rect ${J(rect10)}`);
 }
 
 main().catch((e) => { console.error(e); process.exit(3); });

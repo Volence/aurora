@@ -146,10 +146,13 @@ export default function ZonePane(props: ZonePaneProps): React.ReactElement {
         ctx.fillText(o.label, x + 4, y + 13);
       }
       if (o.tag) {
-        // Under the clip's own id label, so a refused clip reads "ehz_1" then "R3".
+        // ALWAYS on the second line: a refused rectangle is always also drawn
+        // by another outline that carries the id on the first (the clip's faint
+        // one, or the pending paste's accent one), so a first-line tag would
+        // print over it ("C4" over "ehz_2x" read "C4z_2x" in the harness shot).
         ctx.font = 'bold 10px sans-serif';
         ctx.fillStyle = col;
-        ctx.fillText(o.tag, x + 4, y + (o.label ? 26 : 13));
+        ctx.fillText(o.tag, x + 4, y + 26);
       }
     }
     paintsRef.current += 1;
