@@ -370,6 +370,26 @@ const POOL_COLUMNS: Array<{ field: PoolRowField; label: string }> = [
 
 const NUM: React.CSSProperties = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
 
+/**
+ * ROW 235 (c): an id is never cut. The four number columns are sized to their
+ * min-content (their headers wrap at the space: "pages" over "touched"), so
+ * the id column gets the rest of the panel, and the cell wraps at a space
+ * (the kind tag below the id) or, only if one word is wider than the column,
+ * inside it. Truncation with an ellipsis made "ehz_act1" and
+ * "ehz_act2" both read "ehz_a...", two ids as one text; a wrapped id is the
+ * whole id. The cell's title repeats it.
+ */
+const ID_CELL: React.CSSProperties = { color: T.textHi, whiteSpace: 'normal', overflowWrap: 'break-word' };
+
+/**
+ * Overseer ruling on row 235 (c): the id comes FIRST, on the line with the
+ * row's numbers, and the kind follows as a muted, smaller tag. Kind first
+ * ("corridor ehz_to_cpz") wrapped the id alone onto a second line, which read
+ * as a fifth row with blank values; now what a wrap drops is the tag, which
+ * reads as an annotation. Harness DP.11r measures the line.
+ */
+const KIND_TAG: React.CSSProperties = { color: T.textLo, fontSize: T.t2xs };
+
 type PoolKind = 'clip' | 'corridor' | 'shaft' | 'fill';
 
 /** The two sections row 229 adds below the corridors; each is headed by a full-width row when it has rows. */
@@ -404,14 +424,18 @@ export function PoolRowsView({ clipact }: { clipact: Record<string, unknown> }):
   ];
   const sectionRows: Record<'shaft' | 'fill', PoolRow[]> = { shaft: pr.perShaft, fill: pr.perFill };
   const cell: React.CSSProperties = { ...NOTE, padding: `0 ${T.s1}` };
-  const rowCells = (kind: PoolKind, row: PoolRow, label: string) => (
+  // A hairline over every data row (the existing border token), so a cell that
+  // wraps visibly belongs to its row and not to the one below.
+  const rowCell: React.CSSProperties = { ...cell, borderTop: `1px solid ${T.border}` };
+  const rowCells = (kind: PoolKind, row: PoolRow, kindTag?: string) => (
     <React.Fragment key={`${kind}:${row.index}`}>
-      <div role="cell" data-donors-pool-row={`${kind}:${row.index}`} data-donors-pool-id={row.id}
-           style={{ ...cell, color: T.textHi, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {label}
+      <div role="cell" data-donors-pool-row={`${kind}:${row.index}`} data-donors-pool-id={row.id} title={row.id}
+           style={{ ...rowCell, ...ID_CELL }}>
+        {row.id}
+        {kindTag && <>{' '}<span data-donors-pool-kind={kindTag} style={KIND_TAG}>{kindTag}</span></>}
       </div>
       {POOL_COLUMNS.map((c) => (
-        <div key={c.field} role="cell" data-donors-pool-cell={`${kind}:${row.index}:${c.field}`} style={{ ...cell, ...NUM }}>
+        <div key={c.field} role="cell" data-donors-pool-cell={`${kind}:${row.index}:${c.field}`} style={{ ...rowCell, ...NUM }}>
           {row[c.field]}
         </div>
       ))}
@@ -420,22 +444,22 @@ export function PoolRowsView({ clipact }: { clipact: Record<string, unknown> }):
   return (
     <div data-donors-pool-rows="present" style={{ display: 'flex', flexDirection: 'column', gap: T.s1 }}>
       <div role="table" aria-label="Pool cost per clip, corridor, shaft and fill" style={{
-        display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) repeat(4, auto)', columnGap: T.s2,
+        display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) repeat(4, min-content)', columnGap: T.s2,
         border: `1px solid ${T.border}`, borderRadius: T.rSm, padding: T.s1,
       }}>
-        <div role="columnheader" style={{ ...cell, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>pool cost</div>
+        <div role="columnheader" style={cell}>pool cost</div>
         {POOL_COLUMNS.map((c) => (
           <div key={c.field} role="columnheader" title={pr.fields[c.field]} data-donors-pool-head={c.field}
-               style={{ ...cell, ...NUM, textDecoration: 'underline dotted', cursor: 'help' }}>{c.label}</div>
+               style={{ ...cell, ...NUM, textDecoration: 'underline dotted', cursor: 'help', whiteSpace: 'normal' }}>{c.label}</div>
         ))}
-        {rows.map(({ kind, row }) => rowCells(kind, row, kind === 'corridor' ? `corridor ${row.id}` : row.id))}
+        {rows.map(({ kind, row }) => rowCells(kind, row, kind === 'corridor' ? 'corridor' : undefined))}
         {POOL_SECTIONS.filter((sec) => sectionRows[sec.kind].length > 0).map((sec) => (
           <React.Fragment key={sec.kind}>
             <div role="rowheader" data-donors-pool-section={sec.kind}
                  style={{ ...cell, gridColumn: '1 / -1', marginTop: T.s1, borderTop: `1px solid ${T.border}`, color: T.textHi }}>
               {sec.heading}
             </div>
-            {sectionRows[sec.kind].map((row) => rowCells(sec.kind, row, row.id))}
+            {sectionRows[sec.kind].map((row) => rowCells(sec.kind, row))}
           </React.Fragment>
         ))}
       </div>

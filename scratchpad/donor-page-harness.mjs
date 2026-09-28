@@ -91,6 +91,22 @@
 //         writes that dst_rect (read from disk); a real click on Undo puts the
 //         file back byte for byte. DP.11b's "untouched sections are blank"
 //         leaves out the sections the draft's own outline touches.
+//   ROW 235 (b)-(d), 2026-09-28: the target pane's LOOK, measured:
+//   DP.7b where the draft sits on clip 0 (the booked "ehz_2xct1"), every id and
+//         the R10 tag print on their own chip: no two chips the pane's paint
+//         report publishes intersect, the second R10 is the first's twin, and
+//         the canvas read back inside each chip holds only that chip's colour
+//         and its text colour (and blends between them): one label per chip.
+//   DP.11l the same over s2_ehz_cpz: every clip and corridor id ON DISK and the
+//         draft's (the booked case: the corridor's id ran into cpz_act1's).
+//   DP.11i the pool grid prints every id whole: each id cell's visible text
+//         contains its id (the harness's own bake), the cell does not clip it
+//         (no scroll overflow, the text's rects inside the cell), and no two
+//         different ids read the same.
+//   DP.11f the whole act is fitted as large as whole-act view allows: on its
+//         binding axis it spans the pane less the tree's FIT_MARGIN_PX (bundled
+//         from pane-view.ts) each side; the painted share is printed.
+//   DP.10t now reads the id and tag chips from the paint report, not typed bands.
 //
 // EXPECTATIONS COME FROM THE TREE: CONVERTER_COMMAND, marqueeRect, marqueeReadout,
 // clipsManifestPath and suggestDestination are bundled from the tree under test
@@ -187,11 +203,13 @@ async function loadOracle() {
   const tree = await bundle('src/core/formats/donors/donor-tree.ts');
   const marq = await bundle('src/core/formats/donors/donor-marquee.ts');
   const doc = await bundle('src/core/formats/donors/clip-manifest-doc.ts');
+  const view = await bundle('src/renderer/components/donors/pane-view.ts');
   for (const [m, f] of [[tree, 'CONVERTER_COMMAND'], [tree, 'parseZoneManifest'], [marq, 'marqueeRect'], [marq, 'marqueeReadout'],
-    [doc, 'clipsManifestPath'], [doc, 'suggestDestination'], [doc, 'newClipManifest'], [doc, 'zoneSong'], [doc, 'zoneSongLine']]) {
+    [doc, 'clipsManifestPath'], [doc, 'suggestDestination'], [doc, 'newClipManifest'], [doc, 'zoneSong'], [doc, 'zoneSongLine'],
+    [view, 'FIT_MARGIN_PX']]) {
     if (m[f] === undefined) throw new Error(`ORACLE: ${f} missing from the tree`);
   }
-  return { ...tree, ...marq, ...doc };
+  return { ...tree, ...marq, ...doc, FIT_MARGIN_PX: view.FIT_MARGIN_PX };
 }
 
 // ═══ CDP ═══════════════════════════════════════════════════════════════════
@@ -447,22 +465,51 @@ async function rows(d, O, COPY, dpr) {
       return { n: img.length / 4, warn, runs, k, py }; })()`);
     return { ...got, view: T.view, paints: T.paints };
   };
-  // Warning pixels in a box given in screen px from the rectangle's top-left
-  // corner on the target canvas (the label bands; the dashed edge is excluded
-  // by starting 4 px in).
-  const bandRead = async (r, box) => {
-    const T = await d.pane('target');
-    const ox = T.rect.left + (r.x - T.view.ox) * T.view.scale; const oy = T.rect.top + (r.y - T.view.oy) * T.view.scale;
-    return c.json(String.raw`(() => { const cv = document.querySelector('[data-zone-pane-canvas="target"]'); if (!cv) return null;
+  // ROW 235 (b): the target canvas READ BACK inside every chip the pane's paint
+  // report says it printed a label on (1 CSS px in from each edge, where the chip
+  // edge blends with what lies under it). A label's own pixels are its chip
+  // colour, its text colour, or a blend on the straight line between the two
+  // (antialiasing); anything else is FOREIGN: art, another label, an edge. So
+  // "foreign 0 and some text pixels" says the chip holds exactly one label's
+  // text, whatever the layout claims. `warn` counts DONOR_MARK_WARN pixels.
+  const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const labelRead = async (P) => {
+    const want = (P && Array.isArray(P.labels) ? P.labels : []).map((l, i) => ({ i, box: l.box, fg: hexRgb(l.fg), bg: hexRgb(l.bg) })).filter((l) => l.box);
+    const got = await c.json(String.raw`(() => { const cv = document.querySelector('[data-zone-pane-canvas="target"]'); if (!cv) return null;
       const b = cv.getBoundingClientRect(); const k = cv.width / b.width; const ctx = cv.getContext('2d');
-      const x0 = Math.round((${ox} - b.left + ${box.x0}) * k), y0 = Math.round((${oy} - b.top + ${box.y0}) * k);
-      const w = Math.round((${box.x1} - ${box.x0}) * k), h = Math.round((${box.y1} - ${box.y0}) * k);
-      const img = ctx.getImageData(x0, y0, w, h).data; let warn = 0, lit = 0;
-      for (let i = 0; i < img.length; i += 4) {
-        if (Math.abs(img[i] - ${WARN_RGB[0]}) < 40 && Math.abs(img[i + 1] - ${WARN_RGB[1]}) < 40 && Math.abs(img[i + 2] - ${WARN_RGB[2]}) < 40) warn++;
-        if (img[i] + img[i + 1] + img[i + 2] > 200) lit++;
-      }
-      return { n: img.length / 4, warn, lit }; })()`);
+      return ${J(want)}.map((l) => { const x0 = Math.ceil((l.box.x + 1) * k), y0 = Math.ceil((l.box.y + 1) * k);
+        const x1 = Math.floor((l.box.x + l.box.w - 1) * k), y1 = Math.floor((l.box.y + l.box.h - 1) * k);
+        if (x1 <= x0 || y1 <= y0 || x0 < 0 || y0 < 0 || x1 > cv.width || y1 > cv.height) return { i: l.i, n: 0 };
+        const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data; let foreign = 0, text = 0, warn = 0;
+        const d = [0, 1, 2].map((q) => l.fg[q] - l.bg[q]); const dd = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+        for (let p = 0; p < img.length; p += 4) {
+          const v = [0, 1, 2].map((q) => img[p + q] - l.bg[q]);
+          const t = Math.max(0, Math.min(1, (v[0] * d[0] + v[1] * d[1] + v[2] * d[2]) / dd));
+          const off = Math.max(...[0, 1, 2].map((q) => Math.abs(v[q] - t * d[q])));
+          if (img[p + 3] < 250 || off > 24) foreign++; else if (t > 0.5) text++;
+          if (Math.abs(img[p] - ${WARN_RGB[0]}) < 40 && Math.abs(img[p + 1] - ${WARN_RGB[1]}) < 40 && Math.abs(img[p + 2] - ${WARN_RGB[2]}) < 40) warn++;
+        }
+        return { i: l.i, n: img.length / 4, foreign, text, warn }; }); })()`);
+    return got;
+  };
+  // THE LABEL ROW, over one paint: every text in `wantLabels` (ids read from
+  // disk and the draft) and `wantTags` is printed; no two printed chips
+  // intersect; a text not printed is either hidden (the hover names it) or the
+  // twin of an identical text at the same corner; and the canvas, read back,
+  // holds exactly one label's pixels in every chip.
+  const labelsJudge = async (P, wantLabels, wantTags) => {
+    const L = P && Array.isArray(P.labels) ? P.labels : [];
+    const shown = L.filter((l) => l.box);
+    const pairs = [];
+    for (let a = 0; a < shown.length; a++) for (let b = a + 1; b < shown.length; b++) if (hits(shown[a].box, shown[b].box)) pairs.push([shown[a].text, shown[b].text]);
+    const printed = (kind, t) => shown.some((l) => l.kind === kind && l.text === t);
+    const missing = [...wantLabels.filter((t) => !printed('label', t)), ...wantTags.filter((t) => !printed('tag', t))];
+    const accounted = L.every((l) => l.box || l.hidden || (l.twinOf !== null && L[l.twinOf] && L[l.twinOf].box && L[l.twinOf].text === l.text));
+    const read = await labelRead(P);
+    const canvasOk = !!read && read.length === shown.length && read.every((r) => r.n > 0 && r.foreign === 0 && r.text > 0);
+    return { ok: shown.length > 0 && pairs.length === 0 && missing.length === 0 && accounted && canvasOk,
+      detail: `labels ${J(L.map((l) => ({ t: l.text, k: l.kind, o: l.outline, box: l.box && [l.box.x, l.box.y, l.box.w, l.box.h].map((v) => +v.toFixed(1)), line: l.line, hidden: l.hidden, twin: l.twinOf })))}; `
+        + `intersecting ${J(pairs)}; missing ${J(missing)}; accounted ${accounted}; canvas ${J(read)}` };
   };
   const dashedOf = (P) => (P && Array.isArray(P.outlines) ? P.outlines.filter((o) => o.dashed) : null);
   const accentOf = (P) => (P && Array.isArray(P.outlines) ? P.outlines.filter((o) => o.tone === 'accent') : null);
@@ -735,6 +782,13 @@ async function rows(d, O, COPY, dpr) {
   check('DP.7o', 'the R10 refusal outlines BOTH subjects: the pane painted two dashed warning outlines tagged R10 (clip 0 as on disk, clip 1 the draft), and the canvas edge, read back, shows the warning colour in DASHES where it showed none just before the refusal',
     J(dash7) === J(want7) && edgeBefore.warn === 0 && edge7.warn > 0.2 * edge7.n && edge7.warn < 0.9 * edge7.n && edge7.runs >= 3,
     `dpr ${dpr}; dashed ${J(dash7)}; want ${J(want7)}; edge before ${J(edgeBefore)}; edge now ${J(edge7)}`);
+  // ── DP.7b the labels on that one rectangle do not print over each other (row 235 (b)) ─
+  // The booked collision: clip 0 (on disk) and the draft share a corner, so
+  // their ids both want the first line ("ehz_2xct1"), and the R10 tag is named
+  // twice, once per subject.
+  const lab7 = await labelsJudge(s7o.targetPane, [firstId, s7a.draft.clipId], ['R10']);
+  check('DP.7b', `no label is drawn over another where the draft sits on clip 0: ${J(firstId)} (on disk), ${J(s7a.draft.clipId)} (the draft) and the R10 tag each print on their own chip, no two chips intersect, the second R10 is the first's twin, and the canvas, read back, holds one label's pixels per chip`,
+    lab7.ok, lab7.detail);
 
   // ── DP.7l leaving the page clears the refusal ───────────────────────────
   const pills = await c.json('[...document.querySelectorAll(\'[aria-label="Facets"] button\')].map((b) => b.textContent.trim())');
@@ -972,6 +1026,65 @@ async function rows(d, O, COPY, dpr) {
         && J(dom11.cells) === J(wantCells) && J(dom11.ids) === J(wantIds) && dom11.sum === 'holds' && !dom11.broken
         && J(dom11.clipLines) === J(wantClipLines) && wantClipLines.length === man.clips.length,
       `DOM ${J(dom11).slice(0, 900)}; want act ${J(wantAct)}; want ids ${J(wantIds)}; want collision lines ${J(wantClipLines)}`);
+
+    // ── DP.11l the act's labels do not print over each other (row 235 (b)) ─
+    // The booked case: the corridor's id ran into cpz_act1's. Every clip and
+    // corridor id is read from the clips.json ON DISK; the draft's from the page.
+    const draftIds = (accentOf(T11) ?? []).map((o) => o.label).filter(Boolean);
+    const lab11 = await labelsJudge(T11, [...man.clips.map((k) => k.id), ...corridors.map((k) => k.id), ...draftIds], []);
+    check('DP.11l', `no label is drawn over another on ${actId}: every clip and corridor id on disk (${J([...man.clips, ...corridors].map((k) => k.id))}) and the draft's print on their own chips, no two chips intersect, and the canvas, read back, holds one label's pixels per chip`,
+      lab11.ok, lab11.detail);
+
+    // ── DP.11i the pool grid's ids are whole and distinct (row 235 (c)) ────
+    // Read from the DOM as laid out: each id cell's visible text contains its
+    // id (from the harness's own bake) whole, the cell does not clip it (no
+    // scroll overflow, and the text's own rects lie inside the cell), and two
+    // different ids never read as the same text.
+    const idCells = await c.json(String.raw`[...document.querySelectorAll('[data-donors-pool-id]')].map((el) => {
+      const r = el.getBoundingClientRect(); const rg = document.createRange(); rg.selectNodeContents(el);
+      const tr = [...rg.getClientRects()];
+      return { id: el.getAttribute('data-donors-pool-id'), text: el.innerText, sw: el.scrollWidth, cw: el.clientWidth, sh: el.scrollHeight, ch: el.clientHeight,
+        inside: tr.length > 0 && tr.every((q) => q.left >= r.left - 0.5 && q.right <= r.right + 0.5 && q.top >= r.top - 0.5 && q.bottom <= r.bottom + 0.5) }; })`);
+    const whole = idCells.every((x) => x.text.includes(x.id) && x.sw <= x.cw && x.sh <= x.ch && x.inside);
+    const texts = new Map(); let clash = null;
+    for (const x of idCells) { const prev = texts.get(x.text); if (prev !== undefined && prev !== x.id) clash = [prev, x.id]; texts.set(x.text, x.id); }
+    check('DP.11i', `the pool grid prints every id whole and distinct: each of ${J(wantIds)} (the harness's own bake) is in its cell's visible text, uncut (no overflow, text inside the cell), and no two different ids read the same`,
+      J(idCells.map((x) => x.id)) === J(wantIds) && whole && clash === null,
+      `cells ${J(idCells)}; clash ${J(clash)}`);
+
+    // ── DP.11r each row's id is on its numbers' line (row 235 (c), overseer ruling) ─
+    // "corridor ehz_to_cpz" wrapped with "corridor" beside the numbers and the id
+    // alone below, reading as a fifth row of blanks. Read from the DOM as laid
+    // out: the id's OWN text (a Range over the text node holding it, found by
+    // the id from the harness's bake) has its first line box at the same top as
+    // the text of that row's first number cell, within 1 px (getClientRects).
+    const idLines = await c.json(String.raw`[...document.querySelectorAll('[data-donors-pool-id]')].map((el) => {
+      const id = el.getAttribute('data-donors-pool-id'); const row = el.getAttribute('data-donors-pool-row');
+      const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n = null; let at = -1;
+      while (tw.nextNode()) { const i = tw.currentNode.data.indexOf(id); if (i >= 0) { n = tw.currentNode; at = i; break; } }
+      const num = document.querySelector('[data-donors-pool-cell="' + row + ':tiles"]');
+      if (!n || !num) return { id, row, idTop: null, numTop: null };
+      const r1 = document.createRange(); r1.setStart(n, at); r1.setEnd(n, at + id.length);
+      const r2 = document.createRange(); r2.selectNodeContents(num);
+      const a = [...r1.getClientRects()]; const b = [...r2.getClientRects()];
+      return { id, row, idTop: a.length ? +a[0].top.toFixed(2) : null, numTop: b.length ? +b[0].top.toFixed(2) : null, idLines: a.length }; })`);
+    check('DP.11r', `every pool row's id sits on the same line box as that row's first number: for each of ${J(wantIds)}, the id text's first line top equals the tiles cell's text top within 1 px`,
+      J(idLines.map((x) => x.id)) === J(wantIds) && idLines.every((x) => x.idTop !== null && x.numTop !== null && Math.abs(x.idTop - x.numTop) <= 1),
+      `rows ${J(idLines)}`);
+
+    // ── DP.11f the whole act is fitted as large as the pane allows (row 235 (d)) ─
+    // Decided: fit the WHOLE act (DP.11b's corners), not its painted rows. The
+    // act must then be as large as that allows: on its binding axis it spans
+    // the pane less the tree's own FIT_MARGIN_PX each side, and on the other
+    // it does not exceed it. The painted share is printed for the record.
+    const aw = W * T11.view.scale; const ah = H * T11.view.scale;
+    const uw = T11.rect.width - 2 * O.FIT_MARGIN_PX; const uh = T11.rect.height - 2 * O.FIT_MARGIN_PX;
+    const paintedBottom = Math.max(...[...man.clips, ...corridors].map((k) => k.dst_rect.y + k.dst_rect.h));
+    const fillOk = inView && aw <= uw + 1 && ah <= uh + 1 && (Math.abs(aw - uw) <= 1 || Math.abs(ah - uh) <= 1);
+    check('DP.11f', `the whole ${gw} x ${gh} act is fitted as large as whole-act view allows: it spans the pane's ${uh / H <= uw / W ? 'height' : 'width'} (the binding axis) less the tree's ${O.FIT_MARGIN_PX}-px margins, and its other axis fits`,
+      fillOk,
+      `pane ${T11.rect.width} x ${T11.rect.height}; act on screen ${aw.toFixed(1)} x ${ah.toFixed(1)} (${(aw / T11.rect.width * 100).toFixed(1)}% x ${(ah / T11.rect.height * 100).toFixed(1)}% of the pane); usable ${uw} x ${uh}; `
+        + `painted rows reach y ${paintedBottom} of ${H} (${(paintedBottom / H * 100).toFixed(1)}% of the act's height, ${(paintedBottom * T11.view.scale / T11.rect.height * 100).toFixed(1)}% of the pane's)`);
     await shot(`real-${actId}`);
     // For a person: the target pane magnified 2x, and aeon's readout scrolled into
     // view (it sits below the fold of the side panel on this window).
@@ -1045,16 +1158,21 @@ async function rows(d, O, COPY, dpr) {
       + `page outcome ${J(s10.paste.outcome && { kind: s10.paste.outcome.kind, stage: s10.paste.outcome.stage })}; DOM ${J(dom10)} (want subjects ${J(wantSubj10)}); dashed ${J(dashedOf(s10o.targetPane))}; edge before ${J(edge10before)}, after ${J(edge10)}`);
 
   // ── DP.10t the tag sits under the id label ──────────────────────────────
-  // ZonePane draws an outline's label with its baseline 13 px below the top
-  // edge (11 px font) and the tag's 26 px below (10 px bold): the id band is
-  // rows 3..14, the tag band rows 17..28, both from 4 px in, 40 px wide.
-  const idBand = await bandRead(rect10, { x0: 4, x1: 44, y0: 3, y1: 15 });
-  const tagBand = await bandRead(rect10, { x0: 4, x1: 44, y0: 17, y1: 29 });
-  // (`lit` is printed, not judged: the art under the rectangle is bright, so it
-  // read 480/480 in both bands and could not tell a label from no label.)
-  check('DP.10t', 'the rule tag is drawn UNDER the clip\'s id label, not over it: the id band holds no warning pixel, the band below holds the warning tag',
-    !!idBand && !!tagBand && idBand.warn === 0 && tagBand.warn > 5,
-    `id band ${J(idBand)}; tag band ${J(tagBand)}; rect ${J(rect10)}`);
+  // Row 235 (b) re-derived this row from the pane's own label layout (it read
+  // two bands at typed offsets before): the id and the tag on rect10 are the
+  // chips the paint report says it printed them on, and the canvas is read back
+  // inside each.
+  const P10 = s10o.targetPane;
+  const L10 = P10 && Array.isArray(P10.labels) ? P10.labels : [];
+  const onRect10 = (l) => { const o = P10.outlines[l.outline]; return !!o && J(o.rect) === J(rect10); };
+  const idL = L10.find((l) => l.kind === 'label' && l.box && onRect10(l)) ?? null;
+  const tagL = L10.find((l) => l.kind === 'tag' && l.box && onRect10(l) && l.text === (ownRefusal && ownRefusal.rule)) ?? null;
+  const read10 = await labelRead(P10);
+  const idR = idL && read10 ? read10.find((r) => r.i === L10.indexOf(idL)) : null;
+  const tagR = tagL && read10 ? read10.find((r) => r.i === L10.indexOf(tagL)) : null;
+  check('DP.10t', 'the rule tag is drawn UNDER the clip\'s id label, not over it: the pane printed the id and the tag on chips, the tag\'s wholly below the id\'s, and the canvas, read back, shows no warning pixel in the id chip and the warning tag in the other',
+    !!idL && !!tagL && tagL.box.y >= idL.box.y + idL.box.h && !!idR && !!tagR && idR.warn === 0 && idR.text > 0 && tagR.warn > 5 && tagR.foreign === 0,
+    `id ${J(idL)} read ${J(idR)}; tag ${J(tagL)} read ${J(tagR)}; rect ${J(rect10)}`);
 }
 
 main().catch((e) => { console.error(e); process.exit(3); });

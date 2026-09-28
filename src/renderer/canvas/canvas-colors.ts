@@ -546,3 +546,12 @@ export const DONOR_MARK_WARN = '#FBBF24';
 /** Clips already in the target act: present, not selected. */
 export const DONOR_MARK_FAINT = 'rgba(255, 255, 255, 0.5)';
 export const DONOR_MARK_FAINT_FILL = 'rgba(255, 255, 255, 0.06)';
+/**
+ * ROW 235 (b): the opaque chip every outline label prints on, so an id reads
+ * over the art it sits on (the void's own dark, mirrors --void), and the faint
+ * label's text colour made opaque over that chip (DONOR_MARK_FAINT is white at
+ * half alpha; over the chip that is this grey), so a reader of the canvas can
+ * tell a label's pixels from anything else by two colours.
+ */
+export const DONOR_LABEL_CHIP = '#0A0C12';
+export const DONOR_LABEL_FAINT = '#858689';
