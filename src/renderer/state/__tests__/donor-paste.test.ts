@@ -431,6 +431,20 @@ describe('the target pane outlines what a refusal names (row 213 (b))', () => {
     expect(outlinesNow().map((x) => [x.rect, x.tag])).toEqual(subjects.map((s) => [clips[s.index].dst_rect, 'R10']));
   });
 
+  it('a pair whose two clips sit on ONE rectangle (a paste placed exactly over a clip) still gives two outlines', async () => {
+    // aeon's real R10 pair answer, over s2_two_clip with clip 1 moved onto clip 0's rectangle: the
+    // overlap R10 names, in its most extreme form (the harness's DP.7 places its paste exactly so).
+    const raw = JSON.parse(TWO) as { clips: Array<{ dst_rect: unknown }> };
+    raw.clips[1].dst_rect = raw.clips[0].dst_rect;
+    const { parseClipManifest } = await import('../../../core/formats/donors/clip-manifest-doc');
+    const refusals = JSON.parse(CASES.refuse_r10_pair.stdout).refusals;
+    const got = refusedOutlines({
+      outcome: { kind: 'refused', stage: 'validate', refusals, warnings: [], text: '', command: '', judged: parseClipManifest(JSON.stringify(raw)) },
+      bakeRefused: null,
+    });
+    expect(got.map((x) => [x.rect, x.tag])).toEqual([[raw.clips[0].dst_rect, 'R10'], [raw.clips[0].dst_rect, 'R10']]);
+  });
+
   it('an EDIT of the drafted clip clears the refusal and its outlines', async () => {
     await refusedR3Paste();
     expect(outlinesNow().length).toBe(1);

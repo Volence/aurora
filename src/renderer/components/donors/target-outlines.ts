@@ -28,13 +28,19 @@ export interface TargetOutlineInput {
   bakeRefused: { refusals: ClipNote[]; doc: ClipManifestDoc } | null;
 }
 
-/** The refused-subject outlines alone: dashed, warning, tagged with the rule. One per (rule, subject). */
+/**
+ * The refused-subject outlines alone: dashed, warning, tagged with the rule. One
+ * per (rule, subject): a pair rule whose two subjects sit on the SAME rectangle
+ * (a paste placed exactly over a clip, aeon's R10) still gives two, so the
+ * count says both were named. The same subject named by the same rule twice
+ * (the paste refusal and the re-bake note agreeing) gives one.
+ */
 export function refusedOutlines(input: Pick<TargetOutlineInput, 'outcome' | 'bakeRefused'>): PaneOutline[] {
   const out: PaneOutline[] = [];
   const seen = new Set<string>();
   const add = (refusals: readonly ClipNote[], doc: ClipManifestDoc) => {
     for (const p of resolveRefusedSubjects(refusals, doc).placed) {
-      const key = `${p.rule}|${p.subject.kind}|${p.rect.x},${p.rect.y},${p.rect.w},${p.rect.h}`;
+      const key = `${p.rule}|${p.subject.kind}|${p.subject.index}|${p.rect.x},${p.rect.y},${p.rect.w},${p.rect.h}`;
       if (seen.has(key)) continue;
       seen.add(key);
       out.push({ rect: p.rect, tone: 'warning', dashed: true, tag: p.rule });
