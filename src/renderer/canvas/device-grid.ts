@@ -107,8 +107,26 @@ export function strokeRectOnDeviceGrid(
   dpr: number,
 ): void {
   const m = ctx.getTransform();
-  const cssX = (x * m.a + m.e) / dpr, cssY = (y * m.d + m.f) / dpr;
-  const cssW = (w * m.a) / dpr, cssH = (h * m.d) / dpr;
+  strokeCssRectOnDeviceGrid(
+    ctx,
+    (x * m.a + m.e) / dpr, (y * m.d + m.f) / dpr, (w * m.a) / dpr, (h * m.d) / dpr,
+    cssWidth, dpr,
+  );
+}
+
+/**
+ * `strokeRectOnDeviceGrid` for a rect the caller already has in CSS px (the canvas's own
+ * frame), with no transform to read. MapViewport's ghost layer knows its camera and zoom
+ * outright, so its stamp ghost and marquee outlines (row 238 (a)) come here with the
+ * rect mapped by hand rather than through `getTransform()`. The same snap, the same
+ * width, and `ctx`'s transform and state are left exactly as they were found.
+ */
+export function strokeCssRectOnDeviceGrid(
+  ctx: CanvasRenderingContext2D,
+  cssX: number, cssY: number, cssW: number, cssH: number,
+  cssWidth: number,
+  dpr: number,
+): void {
   ctx.save();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.lineWidth = snapStroke(0, cssWidth, dpr).width;
