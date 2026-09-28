@@ -46,6 +46,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createServer, request, type Server } from 'http';
 import { AddressInfo } from 'net';
 import { EDITOR_METHODS } from '../editor-methods';
+import { RETIRED_PAINT_COLLISION_KEYS } from '../../core/agent/validation';
 
 /** Every payload handed to `requestAgent`, in call order. */
 const captured: unknown[] = [];
@@ -225,4 +226,59 @@ describe('an off-schema value is refused on both roads, by a named gate', () => 
     // not just "an error": the point of the row is which gate refused.
     expect(res.error).toMatchObject({ code: -32602, message: 'invalid params' });
   });
+});
+
+/**
+ * ROADMAP row 225(a): paint_collision's RETIRED keys are REFUSED on both roads,
+ * not stripped. Before the row, `z.object` stripped a stale `crossover`, so the
+ * bridge received a clean paint and the shape was painted with no refusal.
+ *
+ * The retired keys are read from the list the handler itself refuses
+ * (`RETIRED_PAINT_COLLISION_KEYS`), and the declared keys from the registry
+ * entry, so no expectation here is a hand-typed copy of either.
+ */
+describe('paint_collision refuses a retired key on both roads (row 225(a))', () => {
+  const pc = EDITOR_METHODS.find((m) => m.name === 'paint_collision');
+  const valid = { section: 0, plane: 'a', x: 0, y: 0, w: 1, h: 1, word: 0 };
+
+  it('the registry entry exists and the retired list is not empty (loud if it cannot measure)', () => {
+    expect(pc, 'paint_collision is missing from EDITOR_METHODS').toBeDefined();
+    expect(RETIRED_PAINT_COLLISION_KEYS.length).toBeGreaterThan(0);
+    for (const k of Object.keys(valid)) expect(allowedKeys(pc!).has(k), `${k} is not declared`).toBe(true);
+    for (const k of RETIRED_PAINT_COLLISION_KEYS) expect(allowedKeys(pc!).has(k), `${k} is declared again`).toBe(false);
+  });
+
+  it('CONTROL, MCP road: a valid request is forwarded with exactly its declared keys', async () => {
+    const res = await callMcp('paint_collision', valid);
+    expect(JSON.stringify(res)).not.toMatch(/isError|Input validation error/);
+    expect(captured.length).toBe(1);
+    expect(Object.keys(captured[0] as object).sort()).toEqual(['kind', ...Object.keys(valid)].sort());
+  });
+
+  it('CONTROL, Aether road: a valid request is forwarded with exactly its declared keys', async () => {
+    const res = await callAether('paint_collision', valid);
+    expect(res.error, 'a valid paint was refused on the Aether road').toBeUndefined();
+    expect(captured.length).toBe(1);
+    expect(Object.keys(captured[0] as object).sort()).toEqual(['kind', ...Object.keys(valid)].sort());
+  });
+
+  for (const key of RETIRED_PAINT_COLLISION_KEYS) {
+    it(`MCP road: ${key} is refused naming the key, and nothing reaches the bridge`, async () => {
+      const res = await callMcp('paint_collision', { ...valid, [key]: 1 });
+      expect(captured, `${key} was stripped and the paint forwarded on the MCP road`).toEqual([]);
+      const text = JSON.stringify(res);
+      expect(text).toMatch(/Input validation error/);
+      expect(text).toContain(key);
+    });
+
+    it(`Aether road: ${key} is refused naming the key, and nothing reaches the bridge`, async () => {
+      const res = await callAether('paint_collision', { ...valid, [key]: 1 });
+      expect(captured, `${key} was stripped and the paint forwarded on the Aether road`).toEqual([]);
+      expect(res.error).toMatchObject({ code: -32602, message: 'invalid params' });
+      const issues = (res.error as { data: { issues: Array<{ code: string; keys?: string[]; message: string }> } }).data.issues;
+      const unrec = issues.find((i) => i.code === 'unrecognized_keys');
+      expect(unrec?.keys, 'the refusal does not name the offending key').toEqual([key]);
+      expect(unrec?.message).toContain(key);
+    });
+  }
 });

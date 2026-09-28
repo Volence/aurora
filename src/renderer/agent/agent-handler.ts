@@ -14,7 +14,7 @@ import {
 // omitted state got answered with "off". See core/editing/brush-word.ts.
 import { brushNametableWord, brushPriorityFromOptional } from '../../core/editing/brush-word';
 import type { Tile, Zone, Act } from '../../core/model/s4-types';
-import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane, validatePaintCollisionRect, validateCollisionWrite, validateCollisionReadPlane, validateCollisionWritePlane, validateLayoutWritePlane } from '../../core/agent/validation';
+import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane, validatePaintCollisionRect, validateCollisionWrite, validateCollisionReadPlane, validateCollisionWritePlane, validateLayoutWritePlane, RETIRED_PAINT_COLLISION_KEYS } from '../../core/agent/validation';
 import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
 import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
@@ -495,9 +495,10 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // the only mechanism and aeon retired the marks (ROADMAP rows 223+224).
       // A caller still asking for a handoff must learn it got none; painting the
       // shape and saying nothing would be a success report for a write that did
-      // not happen. (The zod-validated roads strip unknown keys before this
-      // point; see the review packet's Open section.)
-      const retired = ['crossover', 'crossoverSpan'].filter((k) => (req as Record<string, unknown>)[k] !== undefined);
+      // not happen. (The MCP and Aether roads refuse these before this point,
+      // as unknown keys: paint_collision's schema is strict, ROADMAP row 225(a).
+      // This check stays for any road that reaches the handler without it.)
+      const retired = RETIRED_PAINT_COLLISION_KEYS.filter((k) => (req as Record<string, unknown>)[k] !== undefined);
       if (retired.length) {
         throw new Error(`paint_collision: ${retired.join(' and ')} ${retired.length === 1 ? 'is' : 'are'} RETIRED `
           + '(2026-09-26): the painted loop crossover mark no longer exists, and aeon refuses bits 15:14 of a '

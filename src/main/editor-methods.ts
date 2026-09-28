@@ -115,6 +115,33 @@ export interface EditorMethod {
   description: string;
   params: z.ZodRawShape;        // {} for no-arg methods
   result: 'json' | 'image';
+  /**
+   * REFUSE unknown keys instead of stripping them. `z.object(shape)` STRIPS an
+   * undeclared key, so a stale caller sending a retired parameter gets the rest
+   * of its request carried out and no refusal; a strict method answers
+   * INVALID_PARAMS naming the key (zod's `unrecognized_keys`) on BOTH roads,
+   * because both build the schema through `methodSchema` below.
+   *
+   * Opt-in per method, and set on `paint_collision` only (ROADMAP row 225(a)):
+   * its retired `crossover`/`crossoverSpan` keys used to be stripped and the
+   * shape painted. Every other method still strips; the census of them is in
+   * row 225, and widening strictness to them is the overseer's call.
+   */
+  strict?: true;
+}
+
+/**
+ * THE one place a method's params shape becomes a zod object, read by the MCP
+ * server and the Aether adapter alike so the two roads cannot disagree about
+ * whether an unknown key is refused. A non-strict method returns its RAW shape
+ * for MCP (the SDK builds the object itself, which is what it always did), so
+ * only a strict method's registration changes.
+ */
+export function methodSchema(m: EditorMethod): z.ZodObject<z.ZodRawShape> {
+  return m.strict ? z.strictObject(m.params) : z.object(m.params);
+}
+export function mcpInputSchema(m: EditorMethod): z.ZodRawShape | z.ZodObject<z.ZodRawShape> {
+  return m.strict ? methodSchema(m) : m.params;
 }
 
 export const EDITOR_METHODS: EditorMethod[] = [
@@ -154,7 +181,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
   { name: 'paint_region', kind: 'paint-region', result: 'json',
     params: { section: z.number().int().min(0), x: z.number().int().min(0), y: z.number().int().min(0), w: z.number().int().min(1), h: z.number().int().min(1), entries: z.array(entrySchema) },
     description: 'Paint a w*h tile rectangle of a section with nametable entries (row-major). Each entry names a PICTURE: tile, palette and flips come from the entry, and an omitted "pri" leaves that cell\'s existing priority bit alone (pass pri:false to clear it). One undo step. Reply includes updated VRAM budget.' },
-  { name: 'paint_collision', kind: 'paint-collision', result: 'json',
+  { name: 'paint_collision', kind: 'paint-collision', result: 'json', strict: true,
     params: {
       section: z.number().int().min(0),
       // "both" is a MODE, not a third plane: it writes A and B in ONE undo

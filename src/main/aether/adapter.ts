@@ -1,6 +1,5 @@
-import { z } from 'zod';
 import type { ServerResponse } from 'http';
-import { EDITOR_METHODS } from '../editor-methods';
+import { EDITOR_METHODS, methodSchema } from '../editor-methods';
 import type { AgentRequest } from '../../shared/agent-protocol';
 import {
   PROTOCOL_VERSION, ERR, ok, err,
@@ -22,7 +21,7 @@ const SERVER_NAME = 'aurora';
 const SERVER_VERSION = '0.1.0';
 
 const byMethod = new Map(EDITOR_METHODS.map((m) => [`editor/${m.name}`, m]));
-const schemaByMethod = new Map(EDITOR_METHODS.map((m) => [`editor/${m.name}`, z.object(m.params)]));
+const schemaByMethod = new Map(EDITOR_METHODS.map((m) => [`editor/${m.name}`, methodSchema(m)]));
 
 /** The events this server can push (advertised in `initialize`). */
 export const EVENTS = ['editor/ready'] as const;
