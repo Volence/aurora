@@ -287,7 +287,7 @@
       0
     ],
     "rung": "shipped",
-    "seconds": 0.04,
+    "seconds": 0.045,
     "stats": {
       "shipped_worst_pin0": 11
     }
@@ -575,6 +575,7 @@
   ],
   "source_manifest": "games/sonic4/data/clips/s2_ehz_cpz/clips.json",
   "verdict_at_placement": {
+    "budget_name": "PAGE_FRAMES",
     "frames": 12,
     "ok": true,
     "over": 0,
@@ -596,6 +597,7 @@
     }
   },
   "verdict_at_recount": {
+    "budget_name": "PAGE_FRAMES",
     "frames": 12,
     "ok": true,
     "over": 0,

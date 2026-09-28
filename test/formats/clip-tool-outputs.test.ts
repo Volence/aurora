@@ -30,9 +30,16 @@ import {
   BAKE_JSON_SCHEMA, FILL_SUBJECT_LABEL, readBakeJson, readValidateJson, subjectsLabel, VALIDATE_JSON_SCHEMA,
 } from '../../src/core/formats/donors/clip-validate-json';
 import { peerRepo, resolveRev, readAtRev } from '../support/peer-repo';
-import { ConstantSource, definingLine, EMP_PARSES, EmpParseError, PARSER_SOURCE_LINES, readerValues, type EmpReader } from '../support/emp-constants';
+import { ConstantSource, definingLine, EMP_PARSES, EmpParseError, PARSER_SOURCE_LINES, readerSource, readerValues, type EmpReader } from '../support/emp-constants';
 
 const DIR = resolve(__dirname, '../fixtures/clips/aeon-outputs');
+/**
+ * Where a reader's build define comes from in the recorded run (aeon 925ee395: STRESS_EVICT,
+ * set by fg_page_order.load_budget_constants's `stress_evict` parameter): `module` holds
+ * `def function(... parameter=<default> ...)` and the `.define("NAME", parameter)` call;
+ * `callers` are the loaded modules the recorded run reaches `function` through.
+ */
+interface DefineSource { module: string; function: string; parameter: string; callers: string[]; why: string }
 const clipact = (name: string) => JSON.parse(readFileSync(resolve(DIR, `${name}.clipact.json`), 'utf8')) as {
   pool: Record<string, unknown> & { per_clip: Record<string, unknown>[]; per_corridor: Record<string, unknown>[]; per_clip_fields: Record<string, string>; tiles: number; pages: number };
   clips: { id: string }[]; corridors: { id: string }[];
@@ -43,10 +50,12 @@ const CASES = JSON.parse(readFileSync(resolve(DIR, 'validate-json.cases.json'), 
  * blob (constants.emp: a blob pin reds on every unrelated constant). `readers` are the
  * reader contexts (the parse, the files it loads in order, name -> value at `revision`);
  * `names_not_read` are constants a loaded module names that no recorded run reads, each
- * group resting on a data file `data_not_opened` records no run opening.
+ * group resting on a data file `data_not_opened` records no run opening. A ConstantSource
+ * reader may also carry `defines` (the build defines the recorded run passed) and, for each,
+ * its `define_sources` entry (DefineSource).
  */
 interface ByValue {
-  path: string; why: string; readers: EmpReader[];
+  path: string; why: string; readers: (EmpReader & { define_sources?: Record<string, DefineSource> })[];
   names_not_read: { names: string[]; because_not_opened: string; why: string }[];
 }
 interface Marker {
@@ -724,6 +733,66 @@ describe('CURRENCY: the INPUTS those tools read, at aeon origin/master', () => {
       }
     });
 
+    // THE BUILD DEFINES a value-pin reader records (aeon 925ee395: STRESS_EVICT, read through
+    // fg_page_order.load_budget_constants). A define is an input of the parse, so its value is
+    // DERIVED here, at the marker's revision, from how the recorded run reached it, never typed:
+    // the module's `def function(... parameter=D ...)` default, the `.define("NAME", parameter)`
+    // that passes it on, and every call of `function` in the callers the run reaches (and in the
+    // generator) leaving `parameter` at that default. Nothing else sets it: neither
+    // fixture.command nor the generator names NAME, and no loaded module reads NAME from the
+    // environment. A call the run never reaches (ojz_strip_gen's generate(), fg_page_order's
+    // check) is outside `callers` by the marker's word and its trace; this row cannot re-trace.
+    it(`${m.fixture.path}: each build define a value pin records is the value the recorded run passed (the tool's own default, left in place by every call it reaches), at the marker's revision`, (ctx) => {
+      const readers = (m.aeon.inputs_by_value ?? []).flatMap((b) => b.readers);
+      const withDefines = readers.filter((r) => r.defines !== undefined);
+      expect(readers.filter((r) => r.defines === undefined && r.define_sources !== undefined).length, `${m.fixture.path}: define_sources without defines`).toBe(0);
+      if (withDefines.length === 0) return;
+      const aeon = peerRepo('aeon');
+      if (aeon === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR); CANNOT MEASURE ${m.fixture.path}'s recorded defines`);
+        return;
+      }
+      const rev = resolveRev(aeon, m.aeon.revision);
+      if (rev === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: ${m.aeon.revision} does not resolve in ${aeon} (unfetched?); CANNOT MEASURE ${m.fixture.path}'s recorded defines`);
+        return;
+      }
+      const text = (p: string) => {
+        const at = readAtRev(aeon, rev, p);
+        if (!at.ok) throw new Error(`${m.fixture.path}: ${at.why}`);
+        return at.text;
+      };
+      const loaded = [m.aeon.tool_path, ...(m.aeon.inputs ?? []).map((i) => i.path)].filter((p) => p.startsWith('tools/') && p.endsWith('.py'));
+      const generator = m.generator ? readFileSync(resolve(__dirname, '../..', m.generator.path), 'utf8') : null;
+      for (const r of withDefines) {
+        expect(Object.keys(r.define_sources ?? {}).sort(), `${m.fixture.path}: every define needs its define_sources entry`).toEqual(Object.keys(r.defines!).sort());
+        for (const [name, recorded] of Object.entries(r.defines!)) {
+          const s = r.define_sources![name];
+          expect(s.why.length, `${name}: define_sources with no why`).toBeGreaterThan(0);
+          expect(loaded, `${name}: ${s.module} sets it, but is not a loaded (blob-pinned) module`).toContain(s.module);
+          for (const c of s.callers) expect(loaded, `${name}: caller ${c} is not a loaded (blob-pinned) module`).toContain(c);
+          const src = text(s.module);
+          const sig = new RegExp(`^def ${s.function}\\(([^)]*)\\):`, 'm').exec(src);
+          expect(sig, `${s.module} at ${rev} has no \`def ${s.function}(...)\``).not.toBeNull();
+          const dflt = new RegExp(`\\b${s.parameter}\\s*=\\s*(-?\\d+)\\b`).exec(sig![1]);
+          expect(dflt, `${s.module}: ${s.function} has no integer default for ${s.parameter}`).not.toBeNull();
+          expect(new RegExp(`\\.define\\(\\s*"${name}"\\s*,\\s*${s.parameter}\\s*\\)`).test(src), `${s.module} at ${rev} no longer passes ${s.parameter} to .define("${name}", ...)`).toBe(true);
+          const callRe = new RegExp(`\\b${s.function}\\(([^)]*)\\)`, 'g');
+          const argsOf = (t: string) => t.split('\n').filter((l) => !/^\s*def\s/.test(l)).flatMap((l) => [...l.matchAll(callRe)].map((x) => x[1]));
+          const reached = s.callers.flatMap((c) => argsOf(text(c)));
+          // Anti-vacuous: the run reaches the function through at least one call.
+          expect(reached.length, `${name}: no call of ${s.function} in ${s.callers.join(', ')}`).toBeGreaterThan(0);
+          const all = [...reached, ...(generator === null ? [] : argsOf(generator))];
+          expect(all.filter((a) => new RegExp(`\\b${s.parameter}\\b`).test(a)), `${name}: a reached call of ${s.function} passes ${s.parameter}, so the run did not use the default`).toEqual([]);
+          expect(m.fixture.command.includes(name), `${m.fixture.path}: fixture.command names ${name}`).toBe(false);
+          if (generator !== null) expect(generator.includes(name), `${m.generator!.path} names ${name}`).toBe(false);
+          const envReads = loaded.flatMap((p) => text(p).split('\n').filter((l) => /environ|getenv/.test(l) && l.includes(name)).map((l) => `${p}: ${l.trim()}`));
+          expect(envReads, `${name}: a loaded module reads it from the environment`).toEqual([]);
+          expect(recorded, `${m.fixture.path}: define ${name} recorded as ${recorded}, but the run passed ${s.module}'s default ${dflt![1]}`).toBe(Number(dflt![1]));
+        }
+      }
+    });
+
     // ROADMAP row 234's whole point, as a census rather than one plant: over constants.emp
     // at the marker's revision, an edit to ANY constant no reader resolves leaves every
     // pinned value where it was (the file's blob moves, the pin does not), and an edit to
@@ -761,8 +830,7 @@ describe('CURRENCY: the INPUTS those tools read, at aeon origin/master', () => {
         const closure = new Set<string>();
         for (const r of b.readers) {
           if (r.parse === 'ConstantSource') {
-            const s = new ConstantSource();
-            for (const p of r.loads) s.loadText(atRev(p), p);
+            const s = readerSource(r, atRev);
             for (const n of Object.keys(r.values)) s.get(n);
             for (const n of s.resolved()) closure.add(n);
           } else for (const n of Object.keys(r.values)) closure.add(n);
@@ -802,6 +870,20 @@ describe('CURRENCY: the INPUTS those tools read, at aeon origin/master', () => {
           }
         });
         current = base;
+        // (3) THE BUILD DEFINES. A define is part of the parse's input, so changing the value
+        // the marker records must move a value the reader pins (else the define pins nothing),
+        // and DECLARING the define in the file must be refused, as aeon's
+        // ConstantSource.define refuses a name the source declares ("a define would shadow it").
+        b.readers.forEach((r) => {
+          for (const [d, dv] of Object.entries(r.defines ?? {})) {
+            const flipped = readerValues({ ...r, defines: { ...r.defines, [d]: dv + 1 } }, withText(base));
+            planted++;
+            if (Object.entries(r.values).every(([name, v]) => flipped[name] === v)) still.push(`define ${d} ${dv} -> ${dv + 1}: no pinned value of ${r.parse} moved`);
+            const declared = readerValues(r, withText(`pub const ${d} = ${dv}\n${base}`));
+            planted++;
+            if (Object.entries(r.values).some(([name, v]) => declared[name] === v)) still.push(`declaring define ${d} in ${b.path}: ${r.parse} still resolved a pinned value (aeon refuses the shadow)`);
+          }
+        });
         expect(planted, `${b.path}: no pinned constant was planted`).toBeGreaterThan(0);
         expect(still, `${b.path}: an edit to a pinned constant did NOT move its value (the pin would stay green on a real change)`).toEqual([]);
         process.stdout.write(`clip-tool-outputs value-pin census: ${m.fixture.path}: ${unread.length} unread constants edited, 0 pins moved; ${planted} plants on pinned constants, each moved (at ${rev})\n`);

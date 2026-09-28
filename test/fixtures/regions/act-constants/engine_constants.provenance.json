@@ -6,18 +6,18 @@
     "repo": "git@github.com:Volence/aeon.git",
     "path": "engine/system/constants.emp",
     "branch_that_answers_currency": "origin/master",
-    "revision": "41697d3685fb615322c15e859e55153b97b131c5",
-    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log -1 0c33e88b -- engine/system/constants.emp` names 41697d36 (single parent, not a merge), on aeon's 2d006c4c landing notice to aurora: aeon origin/master 0c33e88bec4380179a956b129c7da0d704a3ee57, read 2026-09-28T09:21:11Z after a fetch. act_descriptor.emp is unchanged at that tip (`git log -1 0c33e88b -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` still names adb700d1), so the pair still agrees.",
-    "blob": "2915ee3555b00f9a9c0d185a9daf6268d4cfa442",
-    "last_changed_by": "41697d36 engine(tile cache): arming run is HORIZONTAL only. Since the previous pin 3d369bc7, two commits: bced71c0 (arming run added) and 41697d36; net diff is ADDITIONS ONLY (19 lines, 0 removed): H_PFX_ARM = BLOCK_TILE_SIZE * 8 (128 px) with its comment and an ensure. No existing constant changed value, so no rule-4 leaf moved (SCREEN_WIDTH, SCREEN_HEIGHT, CAM_SCREEN_HALF_W, CAM_SCREEN_HALF_H, CAM_MAX_Y_STEP are untouched declarations; only their line numbers shift).",
-    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> /home/volence/sonic_hacks/aeon engine/system/constants.emp 41697d3685fb615322c15e859e55153b97b131c5 - bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
-    "revision_published": "41697d36 is an ancestor of aeon origin/master (0c33e88b); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run."
+    "revision": "925ee3955773463f8672dc684407b7746a092e3c",
+    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log -1 origin/master -- engine/system/constants.emp` names 925ee395 (single parent edf04aa0, not a merge; the tip of aeon's fix/stress-evict-pins-at-clamp, merged at b8e0de6a), read 2026-09-28 after a fetch with aeon origin/master at 936439fa; `git log 41697d36..origin/master -- engine/system/constants.emp` lists 925ee395 alone. act_descriptor.emp is unchanged at that tip (`git log -1 origin/master -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` still names adb700d1, blob 50c4ae70), so the pair still agrees.",
+    "blob": "71c9fadf6001ac034b68cddc639c4244b1c0c823",
+    "last_changed_by": "925ee395 docs: P1-FAMINE-PINNED-CAPACITY CLOSED with evidence; stale famine-defect reasons corrected. Since the previous pin 41697d36, that one commit: two hunks, BOTH INSIDE `//` COMMENT BLOCKS (the STRESS_EVICT fixture's comment above STRESS_EVICT_FRAMES, and the page-frame floor's comment above POOL_TILE_CEILING), 12 lines added, 5 removed, no declaration line touched. Measured through Aurora's own reader (src/core/formats/regions/act-constants.ts) over the old and new bytes with the vendored act descriptor: resolveRegionRules gives the same 12 resolved constants (name, value, initializer, source file) and the same rules (minSpan 32, centreX 160..5984, centreY 112..6032 for the 6144 x 6144 act), and empConstDecls gives the same 359 names with the same initializers and conditions (only line numbers shift). Positive control: planting CAM_MAX_Y_STEP + 1 in the new bytes makes both comparisons differ. So no rule-4 leaf moved (SCREEN_WIDTH 320, SCREEN_HEIGHT 224, CAM_SCREEN_HALF_W 160, CAM_SCREEN_HALF_H 112, CAM_MAX_Y_STEP 16).",
+    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> /home/volence/sonic_hacks/aeon engine/system/constants.emp 925ee3955773463f8672dc684407b7746a092e3c - bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
+    "revision_published": "925ee395 is an ancestor of aeon origin/master (936439fa); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run."
   },
   "fixture": {
     "path": "test/fixtures/regions/act-constants/engine_constants.emp",
-    "bytes": 97765,
-    "sha256": "d66a47153ebef90a1d75e986b4846031a25143c9d303ea57cd178812cb2ddb83",
-    "git_blob": "2915ee3555b00f9a9c0d185a9daf6268d4cfa442",
+    "bytes": 98389,
+    "sha256": "8de19260f6767a27daccc9151853e2f5f59eb87318c7bf4d347fdcce6859847f",
+    "git_blob": "71c9fadf6001ac034b68cddc639c4244b1c0c823",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
   },
   "paired_with": {
@@ -31,6 +31,7 @@
     "d37c00bb, fe4a94ab, the nine commits in last_changed_by (rows 223+224, pin d3b98868)",
     "99728748, cc0921e6, b8752518 + cc0921e6 (GPL-A3: PAGE_LIVE_UNITS/PAGE_LIVE_COL_OFFSET added, PF_EVICTABLE removed; row 226, pin 11238bb3)",
     "b86134bf, 3d369bc7, ff0fba0b + 3d369bc7 (WATERLINE_* derived extent, RING_FRAME_TILES added; row 228, pin cffdf716)",
-    "2915ee35, 41697d36, bced71c0 + 41697d36 (H_PFX_ARM added; aeon perf/oscillation-thrash 2d006c4c, pin 0c33e88b)"
+    "2915ee35, 41697d36, bced71c0 + 41697d36 (H_PFX_ARM added; aeon perf/oscillation-thrash 2d006c4c, pin 0c33e88b)",
+    "71c9fadf, 925ee395, 925ee395 alone (comments only: the STRESS_EVICT clamp and page-frame floor notes; aeon fix/stress-evict-pins-at-clamp b8e0de6a, pin 925ee395)"
   ]
 }

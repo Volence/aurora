@@ -48,6 +48,15 @@ export const PARSER_SOURCE_LINES: Record<string, string[]> = {
     'self._raw.setdefault(name, (expr, path))',
     'for ident in set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", py)):',
     'val = eval(py, {"__builtins__": {}}, env)  # noqa: S307 - closed env',
+    // ConstantSource.define and the first two lines of get (aeon 925ee395): a build define
+    // is a stored value that get returns before any declaration; see `define` below.
+    'if name in self._raw:',
+    'raise ValueError(f"{name} is declared in {self._raw[name][1]}; a define would shadow it")',
+    'if name in self.values and self.values[name] != value:',
+    'raise ValueError(f"define {name} already set to {self.values[name]}, not {value}")',
+    'self.values[name] = int(value)',
+    'if name in self.values:',
+    'return self.values[name]',
   ],
   'tools/layer_lines.py': [
     'm = re.search(rf"^pub const {name}\\s*=\\s*(\\$[0-9A-Fa-f]+|\\d+)\\b", text, re.M)',
@@ -112,6 +121,27 @@ export class ConstantSource {
   /** Every name defined, with the file that won it (first definition). */
   definitions(): { name: string; file: string }[] {
     return [...this.raw].map(([name, d]) => ({ name, file: d.file }));
+  }
+
+  /**
+   * `define`: a BUILD define (sigil's `defines`, e.g. STRESS_EVICT), a name the engine
+   * source reads but never declares. Transcribed from aeon's tools/fg_working_set.py at
+   * 925ee395, ConstantSource.define (the lines listed in PARSER_SOURCE_LINES):
+   *   * a name a loaded file DECLARES is refused ("a define would shadow it"), so a define
+   *     never overrides a declaration;
+   *   * a name already set to a DIFFERENT value is refused;
+   *   * otherwise the value is stored where `get` looks FIRST (`if name in self.values`).
+   * There is NO DEFAULT: an undefined, undeclared name is `get`'s loud not-found, exactly
+   * as aeon's KeyError. aeon's caller, fg_page_order.load_budget_constants, loads the file
+   * and THEN defines (`src.load_file(path)`, then `src.define("STRESS_EVICT", stress_evict)`),
+   * so readerValues loads every file of a reader before applying its defines.
+   */
+  define(name: string, value: bigint): void {
+    const declared = this.raw.get(name);
+    if (declared !== undefined) throw new EmpParseError(`${name} is declared in ${declared.file}; a define would shadow it`);
+    const had = this.values.get(name);
+    if (had !== undefined && had !== value) throw new EmpParseError(`define ${name} already set to ${had}, not ${value}`);
+    this.values.set(name, value);
   }
 
   /** `get`: resolve a name, loudly (never a default). */
@@ -263,8 +293,22 @@ export function definingLine(text: string, name: string): number {
 export type EmpParse = 'ConstantSource' | 'layer_lines.engine_constants';
 export const EMP_PARSES: readonly EmpParse[] = ['ConstantSource', 'layer_lines.engine_constants'];
 
-/** One reader context: the parse, the files it loads (in order), the pinned values. */
-export interface EmpReader { parse: EmpParse; loads: string[]; values: Record<string, number> }
+/**
+ * One reader context: the parse, the files it loads (in order), the pinned values, and the
+ * build defines the recorded run passed (ConstantSource only; name -> the integer value).
+ */
+export interface EmpReader { parse: EmpParse; loads: string[]; values: Record<string, number>; defines?: Record<string, number> }
+
+/** A ConstantSource over `reader.loads`, every file loaded, THEN its defines applied (aeon's order). */
+export function readerSource(reader: EmpReader, read: (path: string) => string): ConstantSource {
+  const src = new ConstantSource();
+  for (const p of reader.loads) src.loadText(read(p), p);
+  for (const [name, v] of Object.entries(reader.defines ?? {})) {
+    if (!Number.isSafeInteger(v)) throw new EmpParseError(`define ${name} = ${v}: not an integer`);
+    src.define(name, BigInt(v));
+  }
+  return src;
+}
 
 /**
  * Evaluate every pinned name of `reader` over `read(path)` (the file's text at some
@@ -276,9 +320,16 @@ export function readerValues(reader: EmpReader, read: (path: string) => string):
   const texts = reader.loads.map((p) => ({ p, text: read(p) }));
   let src: ConstantSource | null = null;
   if (reader.parse === 'ConstantSource') {
-    src = new ConstantSource();
-    for (const { p, text } of texts) src.loadText(text, p);
-  } else if (reader.parse !== 'layer_lines.engine_constants' || texts.length !== 1) {
+    try {
+      src = readerSource(reader, (p) => texts.find((x) => x.p === p)!.text);
+    } catch (e) {
+      // A refused define (it would shadow a declaration, or it is not an integer) refuses
+      // the whole reader, as aeon's ValueError aborts load_budget_constants.
+      if (!(e instanceof EmpParseError)) throw e;
+      for (const name of Object.keys(reader.values)) out[name] = e.message;
+      return out;
+    }
+  } else if (reader.parse !== 'layer_lines.engine_constants' || texts.length !== 1 || reader.defines !== undefined) {
     throw new EmpParseError(`reader ${reader.parse} over ${reader.loads.join(', ')}: not a parse this file transcribes`);
   }
   for (const name of Object.keys(reader.values)) {

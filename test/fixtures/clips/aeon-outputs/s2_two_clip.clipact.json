@@ -103,7 +103,7 @@
       0
     ],
     "rung": "searched",
-    "seconds": 0.086,
+    "seconds": 0.081,
     "stats": {
       "refine_rounds": [
         {
@@ -119,7 +119,7 @@
           "sample_over_target_after": 0,
           "sample_over_target_before": 180,
           "sample_windows": 4096,
-          "seconds": 0.058,
+          "seconds": 0.054,
           "stride": [
             8,
             4
@@ -210,6 +210,7 @@
   ],
   "source_manifest": "games/sonic4/data/clips/s2_two_clip/clips.json",
   "verdict_at_placement": {
+    "budget_name": "PAGE_FRAMES",
     "frames": 12,
     "ok": true,
     "over": 0,
@@ -231,6 +232,7 @@
     }
   },
   "verdict_at_recount": {
+    "budget_name": "PAGE_FRAMES",
     "frames": 12,
     "ok": true,
     "over": 0,
