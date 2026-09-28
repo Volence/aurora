@@ -14,6 +14,7 @@ import { columnSolidRun } from '../../../core/collision/collision-render';
 import { angleNeedle } from './collision-needle';
 import { angleMarkFromColumns, drawAngleMark, MIN_CELL_PX_FOR_MARK } from '../../../core/collision/collision-angle-mark';
 import type { MarkDrawCtx } from '../../../core/collision/collision-angle-mark';
+import { deviceStrokeWidth } from '../../canvas/device-grid';
 import { objectFrameRect } from '../../../core/level-classic/object-sprite';
 import { objectArtKey } from '../../../core/project/profiles/object-subtype-rules';
 import { s1ObjectIsInvisible, s1ObjectName } from '../../../core/project/profiles/s1-objects';
@@ -76,6 +77,10 @@ export function drawCollision(
   row: number,
   chunkId: number,
   showAngles: boolean,
+  /** The canvas's device scale (the `dpr` its base transform carries). REQUIRED:
+   *  `getTransform().a` is zoom TIMES this, and a default of 1 would silently
+   *  size the angle mark and its density gate in device px (row 194). */
+  dpr: number,
 ): void {
   const index = chunkIndexForId(d, chunkId);
   if (index === null) return; // air / out-of-range → no collision to draw
@@ -85,9 +90,12 @@ export function drawCollision(
   const baseY = row * CHUNK_PX;
   const heights = d.collision.shapes.heights;
   const angles = d.collision.shapes.angles;
-  // Live canvas scale: screen px per world px. Named once so the angle mark's
-  // density gate and its screen-space stroke widths read off one quantity.
-  const zoomScale = ctx.getTransform().a;
+  // Live canvas scale: CSS px per world px. Named once so the angle mark's
+  // density gate and its screen-space stroke widths read off one quantity. The
+  // transform's `a` is zoom x dpr on the device-sized classic store (row 194), so
+  // the device scale comes back out: the gate and the widths stay in CSS px,
+  // which is what aeon's overlay states them in and what the constants mean.
+  const zoomScale = ctx.getTransform().a / dpr;
   for (let i = 0; i < 256; i++) {
     const cell = chunk.cells[i];
     // Block 0 first, because that is the order the engine tests in: FindFloor
@@ -149,7 +157,10 @@ export function drawCollision(
   }
   // Crisp surface line along each column's collidable edge.
   ctx.strokeStyle = COLLISION_SURFACE_LINE;
-  ctx.lineWidth = 1 / ctx.getTransform().a;
+  // One CSS px, snapped to a whole device width by the codebase's rule
+  // (canvas/device-grid.ts): 1 device px at 1, 1.5 and 2, 3 at 3. At dpr 1 this is
+  // the pre-row-194 `1 / a` exactly.
+  ctx.lineWidth = deviceStrokeWidth(1, dpr) / ctx.getTransform().a;
   for (let i = 0; i < 256; i++) {
     const cell = chunk.cells[i];
     // Block 0 first, because that is the order the engine tests in: FindFloor

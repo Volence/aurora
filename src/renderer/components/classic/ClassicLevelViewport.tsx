@@ -30,11 +30,12 @@ import { reportCollisionGesture } from './collision-gesture-report';
 import { s1ObjectIsInvisible, s1ObjectName } from '../../../core/project/profiles/s1-objects';
 import { s1PlacementWarning } from '../../../core/project/profiles/s1-object-presentation';
 import {
-  CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld, clampInt, fitCamera,
+  CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld, clampInt, fitCamera, classicBackingStore,
   worldToLayoutCell, addStampCell, stampAccumToCells, hitTestObjectFrames, hitTestPoint,
   worldToCollisionCell, rectFromCorners, COLLISION_CELL_PX,
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
+import { deviceScale } from '../../canvas/device-grid';
 import {
   buildHiPriChunkCanvas, drawAnimatedArt, drawCollision, drawObjects, drawPriority, drawStart,
   GHOST_MARKER_BOUNDS, type SpriteOcclusion,
@@ -189,11 +190,16 @@ export default function ClassicLevelViewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const camRef = useRef<Camera>({ x: 0, y: 0, zoom: 1 });
-  // Cached canvas backing-store size. Written ONLY by the measure/ResizeObserver
-  // path below — the render pass reads it and never resizes the canvas (assigning
-  // width/height reinitializes the backing store) nor forces layout via
-  // getBoundingClientRect, so drags stay cheap.
-  const sizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
+  // Cached canvas size. Written ONLY by the measure/ResizeObserver path below — the
+  // render pass reads it and never resizes the canvas (assigning width/height
+  // reinitializes the backing store) nor forces layout via getBoundingClientRect,
+  // so drags stay cheap.
+  //
+  // `w`/`h` are CSS PIXELS (the frame every draw below and every pointer mapping
+  // uses) and `dpr` is the device scale the backing store was sized at, which the
+  // draw pass must reuse rather than re-read: a store sized at one factor and drawn
+  // at another would draw the wrong scale (row 194, see measure()).
+  const sizeRef = useRef<{ w: number; h: number; dpr: number }>({ w: 0, h: 0, dpr: 1 });
   const [, forceRedraw] = useState(0);
   // Coalesce redraws through requestAnimationFrame: a pan/stamp/object drag can
   // fire redraw() on every mousemove (a high-poll mouse emits hundreds/sec), and
@@ -632,13 +638,20 @@ export default function ClassicLevelViewport() {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
-    const { w, h } = sizeRef.current;
+    const { w, h, dpr } = sizeRef.current;
     if (w === 0 || h === 0) return; // not yet measured — measure() will redraw
     ctx.imageSmoothingEnabled = false;
     // Paint timing start (AURORA_PERF): inert when off.
     const perfDraw0 = PERF ? performance.now() : 0;
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // THE BASE TRANSFORM IS THE DEVICE SCALE, and everything below draws in CSS
+    // pixels on top of it (row 194). The backing store is `w * dpr` device px, so
+    // this maps the CSS box onto the whole store; with smoothing off (above) every
+    // chunk blit is nearest-neighbour at the device grid, so a 100% and a 150%
+    // display show the same hard pixel edges. It was `setTransform(1, ...)` on a
+    // CSS-sized store, which the browser then stretched and filtered. `dpr` is the
+    // factor measure() SIZED the store at, never a fresh read (see sizeRef).
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = CANVAS_VOID;
     ctx.fillRect(0, 0, w, h);
     if (!doc) return;
@@ -807,7 +820,7 @@ export default function ClassicLevelViewport() {
           for (let col = range.startCol; col < range.endCol; col++) {
             const cell = layoutCellAt(grid, col, row);
             if (cell === undefined) continue;
-            drawCollision(ctx, doc, col, row, cell & 0x7f, overlays.showCollisionAngles);
+            drawCollision(ctx, doc, col, row, cell & 0x7f, overlays.showCollisionAngles, dpr);
           }
         }
       }
@@ -1027,22 +1040,43 @@ export default function ClassicLevelViewport() {
   // rect (forcing layout) here, off the render path, then triggers a redraw. Runs
   // on mount, whenever the container resizes, and when `status` flips (the canvas
   // is conditionally mounted, so a fresh element needs re-measuring).
+  //
+  // ⚠ THE STORE IS IN DEVICE PIXELS AND THE CSS BOX IS SET EXPLICITLY (row 194,
+  // CLASSIC-CANVAS-BLUR-DPR). The store used to be `floor(rect)` CSS px and the
+  // canvas carried no CSS width, so its CSS box WAS that attribute and above 100%
+  // the browser stretched it up to the device box with its default filter: blurred
+  // pixel art. Now `classicBackingStore` gives a device-sized store and the CSS box
+  // it must be laid out at (store / dpr, exactly), and BOTH are written here. The
+  // CSS box has to be written: a device-sized attribute with no CSS width would lay
+  // the canvas out `dpr` times too big. The pointer mapping is untouched: every
+  // handler reads `clientX - rect.left` in CSS px through `screenToWorld`.
+  //
+  // A SCALE CHANGE WITH NO RESIZE (the window dragged to a display with another
+  // factor) does not re-run this: no surface in this codebase listens for one, and
+  // MapViewport only re-reads the factor when something else makes it redraw. A
+  // browser ZOOM change does re-run it, because it changes the container's CSS rect.
+  // Until the next resize the store keeps its old factor and the draw uses that same
+  // factor (sizeRef.dpr), so it stays self-consistent, only not sharp.
   useEffect(() => {
     const measure = () => {
       const canvas = canvasRef.current;
       const container = containerRef.current;
       if (!canvas || !container) return;
       const rect = container.getBoundingClientRect();
-      const w = Math.max(1, Math.floor(rect.width));
-      const h = Math.max(1, Math.floor(rect.height));
+      const store = classicBackingStore(rect.width, rect.height, deviceScale());
       const prev = sizeRef.current;
-      sizeRef.current = { w, h };
+      sizeRef.current = { w: store.cssWidth, h: store.cssHeight, dpr: store.dpr };
       // Assigning width/height reinitializes the backing store — only do it when
       // the size actually changed (or the canvas element was just remounted).
-      if (canvas.width !== w || canvas.height !== h || prev.w !== w || prev.h !== h) {
-        canvas.width = w;
-        canvas.height = h;
+      if (canvas.width !== store.deviceWidth || canvas.height !== store.deviceHeight
+        || prev.w !== store.cssWidth || prev.h !== store.cssHeight || prev.dpr !== store.dpr) {
+        canvas.width = store.deviceWidth;
+        canvas.height = store.deviceHeight;
       }
+      // Written every measure, not only on a change: the element can be remounted
+      // (conditional render) with React's style object, which does not carry these.
+      canvas.style.width = `${store.cssWidth}px`;
+      canvas.style.height = `${store.cssHeight}px`;
       redraw();
     };
     measure();
@@ -1680,6 +1714,10 @@ export default function ClassicLevelViewport() {
               onContextMenu={onContextMenu}
               style={{
                 position: 'absolute', inset: 0,
+                // The store is shown 1:1 (see measure()), so this only decides the
+                // filter if a sub-pixel layout ever makes the compositor resample:
+                // nearest-neighbour, as MapViewport's map canvas does.
+                imageRendering: 'pixelated',
                 cursor: tool === 'stamp-chunk' ? 'crosshair'
                   : armedId != null ? 'copy'
                   : tool === 'select' || tool === 'place-object' ? 'default'

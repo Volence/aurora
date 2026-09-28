@@ -156,7 +156,7 @@ describe('drawCollision angle mark', () => {
 
   it('draws the bar along angleNeedle, not its vertical mirror', () => {
     const { ctx, pts } = needleCtx(DETAIL_SCALE);
-    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
+    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true, 1);
     const core = corePts(pts);
     expect(core.length).toBe(4);
     const dy = core[BAR_B].y - core[BAR_A].y;
@@ -165,7 +165,7 @@ describe('drawCollision angle mark', () => {
 
   it('honours the chunk cell flips the heights already honour', () => {
     const { ctx, pts } = needleCtx(DETAIL_SCALE);
-    drawCollision(ctx, collisionDoc(true, false), 0, 0, 1, true);
+    drawCollision(ctx, collisionDoc(true, false), 0, 0, 1, true, 1);
     const core = corePts(pts);
     expect(core.length).toBe(4);
     const dy = core[BAR_B].y - core[BAR_A].y;
@@ -177,7 +177,7 @@ describe('drawCollision angle mark', () => {
   // if the stem is ever dropped back to a plain segment.
   it('the stem leaves the surface on the open side (up, for a floor)', () => {
     const { ctx, pts } = needleCtx(DETAIL_SCALE);
-    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
+    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true, 1);
     const core = corePts(pts);
     // The stem is rooted at the bar's midpoint...
     expect(core[STEM_ROOT].x).toBeCloseTo((core[BAR_A].x + core[BAR_B].x) / 2, 10);
@@ -195,7 +195,7 @@ describe('drawCollision angle mark', () => {
 
   it('the mark sits on the surface, not at the cell centre', () => {
     const { ctx, pts } = needleCtx(DETAIL_SCALE);
-    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
+    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true, 1);
     const core = corePts(pts);
     // Heights are all 8 -> columnSolidRun(8) = { y: 8, h: 8 } -> surface y 8.
     // Cell 0 is at world y 0, so the anchor is world y 8. That coincides with
@@ -210,7 +210,7 @@ describe('drawCollision angle mark', () => {
   // — two core points, not four, and the one that survives is the NORMAL.
   it('at a cell size under DETAIL_CELL_PX the stem is drawn ALONE', () => {
     const { ctx, pts } = needleCtx(1); // 16 screen px per cell: over the gate, under detail
-    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
+    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true, 1);
     const core = corePts(pts);
     expect(core.length).toBe(2);
     // Rooted on the surface (y 8) and pointing out of the solid, i.e. up.
@@ -226,11 +226,27 @@ describe('drawCollision angle mark', () => {
   // mark is skipped outright. At scale 0.5 a cell is 8 screen px.
   it('is suppressed when a cell is too small to hold it', () => {
     const { ctx, pts } = needleCtx(0.5);
-    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
+    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true, 1);
     expect(corePts(pts).length).toBe(0);
     // Anti-vacuous: the overlay still ran and still drew the surface line, so
     // the zero above is the gate and not a fixture that drew nothing at all.
     expect(pts.length).toBeGreaterThan(0);
+  });
+
+  // ROW 194: ON THE DEVICE-SIZED CLASSIC STORE `getTransform().a` IS ZOOM x DPR, and
+  // the mark's tier is a CSS-px rule. The zoom here puts a cell BELOW DETAIL_CELL_PX
+  // in CSS px but ABOVE it in device px at 1.5, so reading `a` raw would promote the
+  // mark to the four-point detail tier on a HiDPI display and not on a 100% one.
+  it('at a device scale of 1.5 the tier is decided in CSS px, exactly as at 1', () => {
+    const zoom = DETAIL_SCALE / 1.2;
+    expect(zoom * 16, 'fixture: under the detail tier in CSS px').toBeLessThan(DETAIL_CELL_PX);
+    expect(zoom * 1.5 * 16, 'fixture: over it in device px').toBeGreaterThan(DETAIL_CELL_PX);
+    const at1 = needleCtx(zoom);
+    drawCollision(at1.ctx, collisionDoc(false, false), 0, 0, 1, true, 1);
+    const at15 = needleCtx(zoom * 1.5);
+    drawCollision(at15.ctx, collisionDoc(false, false), 0, 0, 1, true, 1.5);
+    expect(corePts(at1.pts).length).toBe(2);
+    expect(corePts(at15.pts).length, 'the device scale leaked into the tier').toBe(2);
   });
 });
 
@@ -254,7 +270,7 @@ describe('drawCollision block 0', () => {
     const { ctx, pts } = needleCtx();
     let fills = 0;
     (ctx as unknown as { fillRect: () => void }).fillRect = () => { fills++; };
-    drawCollision(ctx, doc, 0, 0, 1, true);
+    drawCollision(ctx, doc, 0, 0, 1, true, 1);
     expect(fills).toBe(0);
     expect(pts.length).toBe(0);
   });

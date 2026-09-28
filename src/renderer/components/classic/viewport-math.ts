@@ -121,6 +121,43 @@ export function visibleChunkRange(
   };
 }
 
+/** The Sonic 1 level canvas's two sizes: its backing store and its CSS box. */
+export interface ClassicBackingStore {
+  /** `canvas.width` / `canvas.height`: whole DEVICE pixels. */
+  deviceWidth: number;
+  deviceHeight: number;
+  /** The CSS box the store is laid out at, which is ALSO the frame every draw and
+   *  every pointer mapping on this canvas uses. Exactly the store over `dpr`. */
+  cssWidth: number;
+  cssHeight: number;
+  /** The factor the store was sized at, which the draw pass must reuse. */
+  dpr: number;
+}
+
+/**
+ * How big to make the Sonic 1 level canvas for a container of `rectWidth` x
+ * `rectHeight` CSS px on a display at `dpr` (ROADMAP row 194).
+ *
+ * THE STORE IS IN DEVICE PIXELS: `max(1, floor(rect * dpr))`. It was `floor(rect)` and
+ * never times the factor, and the canvas had no CSS width, so above 100% the browser
+ * stretched that bitmap up to the device box with its default filter and every
+ * pixel-art edge came out blended. FLOOR, not round, so the canvas never overhangs
+ * its overflow-hidden container, and so that at a factor of 1 this is exactly the
+ * pre-fix `floor(rect)` and a 100% display does not change by one pixel.
+ *
+ * THE CSS BOX IS DERIVED BACK FROM THE STORE, `device / dpr`, never taken from the
+ * rect. Laid out at that size the element covers exactly `device` device pixels, so
+ * the compositor shows the store 1:1 with no resample at all; `setTransform(dpr, ...)`
+ * then maps this CSS box onto the whole store. MapViewport's `redraw` makes the same
+ * move for its `cssWidth` (`canvas.width / dpr`). The pointer never sees any of it:
+ * `screenToWorld` reads `clientX - rect.left` in CSS pixels, as before.
+ */
+export function classicBackingStore(rectWidth: number, rectHeight: number, dpr: number): ClassicBackingStore {
+  const deviceWidth = Math.max(1, Math.floor(rectWidth * dpr));
+  const deviceHeight = Math.max(1, Math.floor(rectHeight * dpr));
+  return { deviceWidth, deviceHeight, cssWidth: deviceWidth / dpr, cssHeight: deviceHeight / dpr, dpr };
+}
+
 /**
  * The chunk id at layout cell (col, row), or `undefined` when the cell is
  * outside the declared grid OR beyond the bytes actually present in the blob.
