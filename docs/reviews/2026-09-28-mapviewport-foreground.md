@@ -218,6 +218,11 @@ Questions for the owner, each with its numbers. Nothing here decides them.
    That is a design choice. **Reproduction:** `PART=hb npm run harness:mapviewport-foreground`
    and read the `HBW.find` line.
 
+   **Update, later 2026-09-28 (ROADMAP row 244): FIXED.** The overseer ruled the wrap.
+   `styles.hoverBar` gained `overflowWrap: 'anywhere'` (`a5d09d64`). HBW.a now gates 700 px too
+   (`431c51fe`, red first at 188/176). With the fix, 700 reads 176/176 in 5 lines (89 px), and
+   1400/1100/900 are unchanged. The text above is left as it was written.
+
 ---
 
 ## 5. What each already-covered row does NOT check (limits, not new claims)
@@ -273,6 +278,7 @@ The totals are unchanged because this parcel adds no vitest file. The after run 
   Unchanged.
 - **For the owner:** item 9's three questions (section 4). HBW.find (the cut at a 700 px window)
   is booked with a reproduction.
+  *Update (row 244): the cut is fixed and gated in HBW.a at 700; see finding 3's update.*
 - **CANNOT BE A ROW TODAY:** unchanged.
 - **Not exercised:** the dpr 1.35 path, since every run today came up at 1.
 
