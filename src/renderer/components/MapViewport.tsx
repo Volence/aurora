@@ -37,7 +37,7 @@ import type { MapClipboard } from '../../core/editing/map-clipboard';
 import { regionPreviewCanvas, publishPasteGhostReport } from '../canvas/region-preview';
 import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
-import { deviceScale, onDeviceScaleChange } from '../canvas/device-grid';
+import { deviceScale, onDeviceScaleChange, strokeCssRectOnDeviceGrid } from '../canvas/device-grid';
 import {
   bandPreview, refreshBandPreview, resolveDisplayedBg, resolveBandLens, bandLensCaptionLines,
 } from '../providers/bganim-preview-aeon';
@@ -796,9 +796,16 @@ export default function MapViewport() {
       // block-aligned and must not be warned about.
       ctx.strokeStyle = isBlockAligned(marquee.col, marquee.row, marquee.w, marquee.h)
         ? SELECTION_MARQUEE : MAP_MARQUEE_ART_ONLY;
-      ctx.lineWidth = 2 / mZoom;
-      ctx.setLineDash([4 / mZoom, 4 / mZoom]);
-      ctx.strokeRect(mx, my, mw, mh);
+      // ON THE DEVICE GRID (row 238 (a), under the 237 (b) ruling): the outline's rect
+      // is mapped to CSS px from the camera this block already holds and stroked by
+      // `strokeCssRectOnDeviceGrid` under the canvas's CSS transform, so the dash is
+      // stated in CSS px there (4 CSS px, as it always was).
+      // A 2 px line is an EVEN device width (2 device px at 1 and 1.5), so the helper
+      // centres it on a whole device pixel and both of its edges are whole device
+      // pixels: at dpr 1 the same two columns the world-unit `2 / zoom` stroke covered
+      // on an integer edge (`snapStrokeEdges`, canvas/device-grid.ts).
+      ctx.setLineDash([4, 4]);
+      strokeCssRectOnDeviceGrid(ctx, (mx - mvpX) * mZoom, (my - mvpY) * mZoom, mw * mZoom, mh * mZoom, 2, dpr);
       ctx.setLineDash([]);
       ctx.restore();
     }
@@ -850,8 +857,9 @@ export default function MapViewport() {
             ctx.globalAlpha = 1;
           }
           ctx.strokeStyle = SELECTION_MARQUEE;
-          ctx.lineWidth = 2 / sZoom;
-          ctx.strokeRect(sx, sy, sw, sh);
+          // On the device grid, as the marquee above is (row 238 (a)): both edges on
+          // whole device pixels.
+          strokeCssRectOnDeviceGrid(ctx, (sx - svpX) * sZoom, (sy - svpY) * sZoom, sw * sZoom, sh * sZoom, 2, dpr);
           ctx.restore();
         }
       }

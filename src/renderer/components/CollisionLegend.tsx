@@ -10,6 +10,7 @@ import {
   type MarkDrawCtx,
 } from '../../core/collision/collision-angle-mark';
 import type { CollisionProfile } from '../../core/collision/collision-model';
+import { deviceScale, onDeviceScaleChange } from '../canvas/device-grid';
 
 type Row =
   | { kind: 'fill' | 'line' | 'outline'; color: string; label: string }
@@ -50,27 +51,36 @@ const SWATCH = 18;
  * one angle byte two ways). Routing it through `drawAngleMark` means the key
  * cannot disagree with the map: there is one function and it is this one.
  */
-function AngleSwatch({ cellScreenPx }: { cellScreenPx: number }) {
+export function AngleSwatch({ cellScreenPx }: { cellScreenPx: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const cv = ref.current;
-    if (!cv) return;
+    if (!cv) return undefined;
     const ctx = cv.getContext('2d');
-    if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    cv.width = Math.round(SWATCH * dpr);
-    cv.height = Math.round(SWATCH * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, SWATCH, SWATCH);
-    const mark = angleMark(LEGEND_PROFILE);
-    if (!mark) return;
-    drawAngleMark(ctx as unknown as MarkDrawCtx, 0, 0, SWATCH, mark, {
-      color: COLLISION_ANGLE_TICK,
-      casing: COLLISION_ANGLE_CASING,
-      coreWidth: 1.25,
-      casingWidth: 3,
-      cellScreenPx,
-    });
+    if (!ctx) return undefined;
+    // THE STORE FOLLOWS THE DISPLAY SCALE, WITH OR WITHOUT A RESIZE (ROADMAP row 238
+    // (b)). The swatch is a device-sized store drawn in CSS px, so a move to a monitor
+    // with another scale (which resizes nothing) left it at the old store until the
+    // zoom next changed. `paint` reads the scale through `deviceScale`, the map
+    // surfaces' rule, and runs again on every `onDeviceScaleChange`.
+    const paint = (): void => {
+      const dpr = deviceScale();
+      cv.width = Math.round(SWATCH * dpr);
+      cv.height = Math.round(SWATCH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, SWATCH, SWATCH);
+      const mark = angleMark(LEGEND_PROFILE);
+      if (!mark) return;
+      drawAngleMark(ctx as unknown as MarkDrawCtx, 0, 0, SWATCH, mark, {
+        color: COLLISION_ANGLE_TICK,
+        casing: COLLISION_ANGLE_CASING,
+        coreWidth: 1.25,
+        casingWidth: 3,
+        cellScreenPx,
+      });
+    };
+    paint();
+    return onDeviceScaleChange(paint);
   }, [cellScreenPx]);
   return <canvas ref={ref} style={{ width: SWATCH, height: SWATCH, flex: '0 0 auto' }} />;
 }

@@ -29,6 +29,12 @@ function makeRecordingCtx(): CanvasRenderingContext2D & { __rec: RecCtx } {
     lineWidth: 0, font: '', textAlign: 'center', fillStyle: '', strokeStyle: '',
     globalAlpha: 1, globalCompositeOperation: 'source-over', imageSmoothingEnabled: false,
     save() {}, restore() {}, translate() {}, scale() {}, beginPath() {}, fill() {}, stroke() {}, setLineDash() {},
+    // Row 238 (c): the marker and selection outlines, the crosshair and the lens edges
+    // are stroked on the device grid, which reads the matrix in force and strokes
+    // under the canvas's CSS transform. An identity matrix at dpr 1 keeps this
+    // stand-in's world coordinates what they were.
+    getTransform() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
+    setTransform() {},
     drawImage(...args: unknown[]) { rec.drawImageArgs.push(args); rec.ops.push('drawImage'); },
     fillRect() { rec.fillRects++; rec.ops.push('fillRect'); },
     strokeRect() {}, fillText() {}, arc() {},
@@ -100,7 +106,7 @@ describe('drawObjects sprite occlusion pass', () => {
   it('no hi-pri overlay anywhere → only the sprite blit, cost still reported', () => {
     const ctx = makeRecordingCtx();
     const o = occl(null);
-    drawObjects(ctx, doc(), 1, new Map([['16', sprite(false)]]), '', null, null, undefined, o);
+    drawObjects(ctx, doc(), 1, 1, new Map([['16', sprite(false)]]), '', null, null, undefined, o);
     expect(tagsOf(ctx)).toEqual(['sprite']);
     expect(o.costs.length).toBe(1); // the meter always reports, even a ~0
   });
@@ -109,7 +115,7 @@ describe('drawObjects sprite occlusion pass', () => {
     const ctx = makeRecordingCtx();
     const hi = makeFakeCanvas('hipri');
     const o = occl(hi);
-    drawObjects(ctx, doc(), 1, new Map([['16', sprite(false)]]), '', null, null, undefined, o);
+    drawObjects(ctx, doc(), 1, 1, new Map([['16', sprite(false)]]), '', null, null, undefined, o);
     // Order matters: sprite first, then the occluding map pixels, then the ghost.
     expect(tagsOf(ctx)).toEqual(['sprite', 'scratch', 'scratch']);
     // The ghost scratch composed: sprite drawn into it, then destination-in
@@ -123,14 +129,14 @@ describe('drawObjects sprite occlusion pass', () => {
   it('a frame with hi-pri pieces is re-raised ABOVE the ghost when occluded', () => {
     const ctx = makeRecordingCtx();
     const hi = makeFakeCanvas('hipri');
-    drawObjects(ctx, doc(), 1, new Map([['16', sprite(true)]]), '', null, null, undefined, occl(hi));
+    drawObjects(ctx, doc(), 1, 1, new Map([['16', sprite(true)]]), '', null, null, undefined, occl(hi));
     // sprite → occluder → ghost → priBitmap re-raise, in that order.
     expect(tagsOf(ctx)).toEqual(['sprite', 'scratch', 'scratch', 'pri']);
   });
 
   it('no re-raise when nothing was occluded, even with a priBitmap present', () => {
     const ctx = makeRecordingCtx();
-    drawObjects(ctx, doc(), 1, new Map([['16', sprite(true)]]), '', null, null, undefined, occl(null));
+    drawObjects(ctx, doc(), 1, 1, new Map([['16', sprite(true)]]), '', null, null, undefined, occl(null));
     expect(tagsOf(ctx)).toEqual(['sprite']);
   });
 
@@ -138,7 +144,7 @@ describe('drawObjects sprite occlusion pass', () => {
     const ctx = makeRecordingCtx();
     const hi = makeFakeCanvas('hipri');
     const o = occl(hi, { left: 5000, top: 5000, width: 100, height: 100 });
-    drawObjects(ctx, doc(), 1, new Map([['16', sprite(false)]]), '', null, null, undefined, o);
+    drawObjects(ctx, doc(), 1, 1, new Map([['16', sprite(false)]]), '', null, null, undefined, o);
     expect(tagsOf(ctx)).toEqual(['sprite']);
   });
 
@@ -152,7 +158,7 @@ describe('drawObjects sprite occlusion pass', () => {
       // Must be handed the occluder scratch's context (scratch A), not the main ctx.
       expect(actx).not.toBe(ctx);
     };
-    drawObjects(ctx, doc(), 1, new Map([['16', sprite(false)]]), '', null, null, undefined, o);
+    drawObjects(ctx, doc(), 1, 1, new Map([['16', sprite(false)]]), '', null, null, undefined, o);
     // The 32x32 frame at (100,100) sits inside chunk (0,0) only.
     expect(calls).toEqual([{ col: 0, row: 0, dx: -84, dy: -84 }]);
   });
@@ -160,7 +166,7 @@ describe('drawObjects sprite occlusion pass', () => {
   it('fallback hex-box objects (no sprite) are editor chrome: never occluded', () => {
     const ctx = makeRecordingCtx();
     const hi = makeFakeCanvas('hipri');
-    drawObjects(ctx, doc(), 1, new Map(), '', null, null, undefined, occl(hi));
+    drawObjects(ctx, doc(), 1, 1, new Map(), '', null, null, undefined, occl(hi));
     expect(ctx.__rec.drawImageArgs.length).toBe(0); // hex box is fills/strokes only
     expect(ctx.__rec.fillRects).toBeGreaterThan(0);
   });

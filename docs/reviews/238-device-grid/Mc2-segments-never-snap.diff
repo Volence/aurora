@@ -1,0 +1,19 @@
+diff --git a/src/renderer/canvas/device-grid.ts b/src/renderer/canvas/device-grid.ts
+index fd859d9c..e5218de0 100644
+--- a/src/renderer/canvas/device-grid.ts
++++ b/src/renderer/canvas/device-grid.ts
+@@ -186,12 +186,12 @@ export function segmentsOnDeviceGrid(
+       let axisAligned = 0;
+       for (const seg of segs) {
+         const [x0, y0, x1, y1] = seg;
+-        if (Math.abs(y1 - y0) < 1e-6) {
++        if (false && Math.abs(y1 - y0) < 1e-6) {
+           const at = snapStroke(y0, w, dpr).at;
+           ctx.moveTo(snapLength(x0, dpr), at);
+           ctx.lineTo(snapLength(x1, dpr), at);
+           axisAligned++;
+-        } else if (Math.abs(x1 - x0) < 1e-6) {
++        } else if (false && Math.abs(x1 - x0) < 1e-6) {
+           const at = snapStroke(x0, w, dpr).at;
+           ctx.moveTo(at, snapLength(y0, dpr));
+           ctx.lineTo(at, snapLength(y1, dpr));

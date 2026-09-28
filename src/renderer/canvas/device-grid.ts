@@ -31,9 +31,19 @@
 //   - a stroke's CENTRE goes on a device half-pixel: `(round(v * dpr) + 0.5) / dpr`;
 //   - its WIDTH is a whole number of device pixels: the one nearest `w * dpr` with the
 //     same parity as `w`, ties going thinner. So a 1 px line stays an ODD device width
-//     and covers whole device rows, as it always did at dpr 1, and a 2 px line keeps the
-//     half-covered edges it has always had at dpr 1. The look class of every line is the
-//     dpr-1 one, scaled.
+//     and covers whole device rows, as it always did at dpr 1.
+//
+// ⚠ `snapStroke` CENTRES EVERY WIDTH ON A HALF-PIXEL, which gives an EVEN device width
+// (every 2 px line, at every dpr) a half-covered row or column at each edge. That was
+// true of the chrome this file was written for at dpr 1 too, because that chrome drew at
+// `Math.round(v) + 0.5` before it came here, and it is what dpr-chrome.test.ts's golden
+// holds. It is NOT "the look every 2 px line always had": an outline stroked at `2 / zoom`
+// in world units on an integer device edge covers two WHOLE columns, which is how
+// MapViewport's stamp ghost and marquee and classic's stamp-drag preview drew before rows
+// 237 and 238 (measured, docs/reviews/2026-09-28-device-grid-238.md). The pre-existing
+// chrome callers are left on `snapStroke` (a separate row; the packet counts which of
+// them draw an even width). Rows 237/238's helpers below go through `snapStrokeEdges`
+// instead, which puts BOTH edges of every width on whole device pixels.
 //
 // AT dpr 1 BOTH REDUCE TO MASTER'S ARITHMETIC EXACTLY (`Math.round(v) + 0.5`, width
 // `w`, `Math.round(len)`), so a dpr-1 display does not change by one pixel. That is
@@ -73,12 +83,185 @@ export function snapStroke(cssAt: number, cssWidth: number, dpr: number): Snappe
 }
 
 /**
+ * Where a stroke of `cssWidth` nearest the CSS coordinate `cssAt` goes so that BOTH of
+ * its edges are on whole device pixels, at every dpr (ROADMAP row 238, ruled 2026-09-28
+ * under the owner's 2026-09-18 look permission): PARITY-AWARE CENTRING. The width is
+ * `deviceStrokeWidth(cssWidth, dpr)` device px, as for `snapStroke`; an ODD width centres
+ * on the device half-pixel `snapStroke` picks (the same answer, so every 1 px line is
+ * unchanged), and an EVEN width centres on the whole device pixel `round(cssAt * dpr)`.
+ *
+ * At dpr 1 a 2 px stroke on an integer edge E therefore covers columns E-1 and E, which
+ * is exactly what the world-unit `2 / zoom` outlines drew before rows 237/238 snapped
+ * them. Used by `strokeRectOnDeviceGrid`, `strokeCssRectOnDeviceGrid`,
+ * `segmentsOnDeviceGrid` and classic's surface line; NOT by the older chrome, which stays
+ * on `snapStroke` under its golden (see the file docblock).
+ */
+export function snapStrokeEdges(cssAt: number, cssWidth: number, dpr: number): SnappedStroke {
+  const w = deviceStrokeWidth(cssWidth, dpr);
+  const c = Math.round(cssAt * dpr);
+  return { at: (w % 2 === 1 ? c + 0.5 : c) / dpr, width: w / dpr };
+}
+
+/**
  * A CSS length or edge rounded to a whole number of device pixels, in CSS px: the device
  * spelling of the `Math.round(v)` the chrome used to do at dpr 1, and the same number
  * there.
  */
 export function snapLength(cssLength: number, dpr: number): number {
   return Math.round(cssLength * dpr) / dpr;
+}
+
+/**
+ * Outline the rect (x, y, w, h), given in the context's CURRENT user space (the world,
+ * under classic's `setTransform(dpr) / scale(zoom) / translate(-cam)`, or
+ * MapViewport's ghost layer's `setTransform(dpr) / scale(zoom) / translate(-vp)`), as a stroke of
+ * `cssWidth` CSS px ON THE DEVICE GRID (ROADMAP row 237 (b), ruled 2026-09-28).
+ *
+ * Drawn under the canvas's own CSS transform, `setTransform(dpr, 0, 0, dpr, 0, 0)`: the
+ * top-left corner goes where `snapStrokeEdges` puts the stroke's centre (a device
+ * half-pixel for an odd device width, a whole device pixel for an even one), the size is
+ * a whole number of device px (`snapLength`), and the width is
+ * `deviceStrokeWidth(cssWidth, dpr)` device px. So BOTH edges of every side are on whole
+ * device pixels at every scale: a 1 CSS px outline covers exactly one device column, and
+ * a 2 CSS px one covers two whole columns, as the world-unit `2 / zoom` outline did at
+ * dpr 1 on an integer edge. (Rows 237/238 first centred every width on a half-pixel,
+ * which left a 2 px outline half-covering a column at each edge; ruled a defect of this
+ * helper 2026-09-28, and repaired.)
+ *
+ * The world-to-CSS mapping is read off the transform in force, which must be an
+ * axis-aligned scale and translation (both callers' always are), and the transform is left
+ * exactly as it was found.
+ */
+export function strokeRectOnDeviceGrid(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  cssWidth: number,
+  dpr: number,
+): void {
+  const m = ctx.getTransform();
+  strokeCssRectOnDeviceGrid(
+    ctx,
+    (x * m.a + m.e) / dpr, (y * m.d + m.f) / dpr, (w * m.a) / dpr, (h * m.d) / dpr,
+    cssWidth, dpr,
+  );
+}
+
+/**
+ * `strokeRectOnDeviceGrid` for a rect the caller already has in CSS px (the canvas's own
+ * frame), with no transform to read. MapViewport's ghost layer knows its camera and zoom
+ * outright, so its stamp ghost and marquee outlines (row 238 (a)) come here with the
+ * rect mapped by hand rather than through `getTransform()`. The same snap, the same
+ * width, and `ctx`'s transform and state are left exactly as they were found.
+ */
+export function strokeCssRectOnDeviceGrid(
+  ctx: CanvasRenderingContext2D,
+  cssX: number, cssY: number, cssW: number, cssH: number,
+  cssWidth: number,
+  dpr: number,
+): void {
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.lineWidth = snapStrokeEdges(0, cssWidth, dpr).width;
+  ctx.strokeRect(
+    snapStrokeEdges(cssX, cssWidth, dpr).at, snapStrokeEdges(cssY, cssWidth, dpr).at,
+    snapLength(cssW, dpr), snapLength(cssH, dpr),
+  );
+  ctx.restore();
+}
+
+/** The path calls `segmentsOnDeviceGrid` answers: the shape of `MarkDrawCtx`. */
+export interface SegmentPathCtx {
+  strokeStyle: string;
+  lineWidth: number;
+  beginPath(): void;
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  stroke(): void;
+}
+
+/**
+ * A path context, in the CURRENT user space of `ctx` (the world, under an axis-aligned
+ * `setTransform(dpr) / scale(zoom) / translate(-cam)`), whose straight segments are
+ * stroked ON THE DEVICE GRID by the same rule as `strokeRectOnDeviceGrid` (ROADMAP row
+ * 238 (c)): each segment is drawn under the canvas's CSS transform, and
+ *
+ *   - a HORIZONTAL segment's row goes on `snapStrokeEdges(y, w).at`, a VERTICAL one's
+ *     column on `snapStrokeEdges(x, w).at` (so both of its edges are whole device px, for
+ *     an odd or an even width), its two ends on `snapLength`, and its width is
+ *     `deviceStrokeWidth(w, dpr)` device px, where `w` is the `lineWidth` set (in the
+ *     caller's world units) mapped to CSS px;
+ *   - a DIAGONAL segment is drawn where it was, at its unsnapped CSS width. The shared
+ *     rule is about device rows and columns, and a slanted line crosses both; it cannot
+ *     be given whole device pixels, and no rule for it is invented here.
+ *
+ * A segment counts as horizontal or vertical when its other axis moves less than 1e-6
+ * CSS px, because the directions reaching this function come from `Math.cos` /
+ * `Math.sin` (collision-needle.ts `angleNeedle`), where a quarter turn leaves ~6e-17
+ * rather than zero.
+ *
+ * `strokeStyle` and `lineWidth` are forwarded as state; `ctx`'s transform, dash and
+ * everything else are left exactly as they were found. The world-to-CSS mapping is read
+ * once, when this is called.
+ */
+export function segmentsOnDeviceGrid(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  dpr: number,
+): SegmentPathCtx {
+  const m = ctx.getTransform();
+  const cssX = (wx: number): number => (wx * m.a + m.e) / dpr;
+  const cssY = (wy: number): number => (wy * m.d + m.f) / dpr;
+  let segs: [number, number, number, number][] = [];
+  let pen: [number, number] | null = null;
+  const out: SegmentPathCtx = {
+    strokeStyle: '',
+    lineWidth: 1,
+    beginPath() { segs = []; pen = null; },
+    moveTo(x, y) { pen = [cssX(x), cssY(y)]; },
+    lineTo(x, y) {
+      const next: [number, number] = [cssX(x), cssY(y)];
+      if (pen) segs.push([pen[0], pen[1], next[0], next[1]]);
+      pen = next;
+    },
+    stroke() {
+      const w = (out.lineWidth * Math.abs(m.a)) / dpr;
+      const snapped = snapStrokeEdges(0, w, dpr).width;
+      // ONE PATH PER WIDTH, so a caller's single stroke (the priority lens's many
+      // boundary segments) stays one stroke: the snapped segments first, then any
+      // diagonal ones.
+      const diagonal: [number, number, number, number][] = [];
+      ctx.save();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.strokeStyle = out.strokeStyle;
+      ctx.lineWidth = snapped;
+      ctx.beginPath();
+      let axisAligned = 0;
+      for (const seg of segs) {
+        const [x0, y0, x1, y1] = seg;
+        if (Math.abs(y1 - y0) < 1e-6) {
+          const at = snapStrokeEdges(y0, w, dpr).at;
+          ctx.moveTo(snapLength(x0, dpr), at);
+          ctx.lineTo(snapLength(x1, dpr), at);
+          axisAligned++;
+        } else if (Math.abs(x1 - x0) < 1e-6) {
+          const at = snapStrokeEdges(x0, w, dpr).at;
+          ctx.moveTo(at, snapLength(y0, dpr));
+          ctx.lineTo(at, snapLength(y1, dpr));
+          axisAligned++;
+        } else {
+          diagonal.push(seg);
+        }
+      }
+      if (axisAligned > 0) ctx.stroke();
+      if (diagonal.length > 0) {
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        for (const [x0, y0, x1, y1] of diagonal) { ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); }
+        ctx.stroke();
+      }
+      ctx.restore();
+    },
+  };
+  return out;
 }
 
 /**

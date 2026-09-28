@@ -63,6 +63,7 @@
 
 import React from 'react';
 import { T, Chip } from '../ui';
+import { deviceScale, onDeviceScaleChange } from '../../canvas/device-grid';
 import type { EffectsPresetAnchorSweep } from '../../../core/formats/effects/preset';
 import {
   anchorOffsetAtTick, anchorPeriodRungOf, anchorAmpRungOf,
@@ -121,10 +122,19 @@ export function AnchorSweepPreview({ sweep, channel }: {
 
     // dpr VARIES RUN TO RUN ON THIS MACHINE, so the backing store is derived
     // from it at mount and every drawing coordinate below is in CSS pixels.
-    const dpr = window.devicePixelRatio || 1;
-    cv.width = Math.round(W * dpr);
-    cv.height = Math.round(H * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    //
+    // AND IT MOVES WITH NO RESIZE (ROADMAP row 238 (b)): a window dragged to a
+    // monitor with another scale keeps its CSS box, so the store is re-sized on
+    // every `onDeviceScaleChange` too, through `deviceScale`, the map surfaces'
+    // rule. The loop's next frame repaints into the new store.
+    const size = (): void => {
+      const dpr = deviceScale();
+      cv.width = Math.round(W * dpr);
+      cv.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    size();
+    const stopScale = onDeviceScaleChange(size);
 
     let raf = 0;
     let stopped = false;
@@ -205,6 +215,7 @@ export function AnchorSweepPreview({ sweep, channel }: {
       stopped = true;
       cancelAnimationFrame(raf);
       document.removeEventListener('visibilitychange', onVisibility);
+      stopScale();
     };
   }, [running]);
 

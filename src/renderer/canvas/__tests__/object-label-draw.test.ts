@@ -41,6 +41,12 @@ function recCtx() {
     save() {}, restore() {}, translate() {}, scale() {}, beginPath() {},
     fill() {}, stroke() {}, setLineDash() {}, moveTo() {}, lineTo() {}, arc() {},
     drawImage() {},
+    // Row 238 (c): the marker and selection outlines, the crosshair and the lens edges
+    // are stroked on the device grid, which reads the matrix in force and strokes
+    // under the canvas's CSS transform. An identity matrix at dpr 1 keeps this
+    // stand-in's world coordinates what they were.
+    getTransform() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
+    setTransform() {},
     measureText: monoMeasureText,
     fillRect(...a: number[]) { rec.fillRect.push(a); },
     strokeRect(...a: number[]) { rec.strokeRect.push(a); },
@@ -131,7 +137,7 @@ const UNLINKED = 0x10; // no sprite, not invisible => the $XX hex fallback
 describe('classic drawObjects labels its ghost marker', () => {
   const draw = (id: number, zoom: number) => {
     const { ctx, rec } = recCtx();
-    drawClassicObjects(ctx, classicDoc(id), 1 / zoom, new Map(), '');
+    drawClassicObjects(ctx, classicDoc(id), 1 / zoom, 1, new Map(), '');
     return rec;
   };
 
@@ -163,7 +169,7 @@ describe('classic drawObjects labels its ghost marker', () => {
 describe('classic drawObjects labels its hex fallback', () => {
   const draw = (zoom: number) => {
     const { ctx, rec } = recCtx();
-    drawClassicObjects(ctx, classicDoc(UNLINKED), 1 / zoom, new Map(), '');
+    drawClassicObjects(ctx, classicDoc(UNLINKED), 1 / zoom, 1, new Map(), '');
     return rec;
   };
 

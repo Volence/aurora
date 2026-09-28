@@ -1,0 +1,16 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ae14a22e230463e67
+
+ ✓ src/renderer/components/__tests__/legend-anchor-device-scale.test.ts (4 tests) 275ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  04:59:37
+   Duration  1.10s (transform 805ms, setup 672ms, import 73ms, tests 275ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: no failures in this run (1 module(s) reported).
+
+run-completeness: COMPLETE, 1 of 1 module(s) this run selected finished.

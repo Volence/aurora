@@ -1,0 +1,62 @@
+diff --git a/src/renderer/components/classic/classic-overlays.ts b/src/renderer/components/classic/classic-overlays.ts
+index fdc2af1d..56e1f809 100644
+--- a/src/renderer/components/classic/classic-overlays.ts
++++ b/src/renderer/components/classic/classic-overlays.ts
+@@ -101,7 +101,7 @@ export function drawCollision(
+   // the device scale comes back out: the gate and the widths stay in CSS px,
+   // which is what aeon's overlay states them in and what the constants mean.
+   const zoomScale = ctx.getTransform().a / dpr;
+-  const markPath = segmentsOnDeviceGrid(ctx, dpr);
++  const markPath = ctx;
+   for (let i = 0; i < 256; i++) {
+     const cell = chunk.cells[i];
+     // Block 0 first, because that is the order the engine tests in: FindFloor
+@@ -257,7 +257,7 @@ export function drawPriority(
+     tilePx: 8,
+     originX: col * CHUNK_PX, originY: row * CHUNK_PX,
+     marked: (tx, ty) => mask[ty * CHUNK_TILES + tx] !== 0,
+-    fill: PRIORITY_FILL, edge: PRIORITY_EDGE, invZoom, dpr,
++    fill: PRIORITY_FILL, edge: PRIORITY_EDGE, invZoom,
+   });
+ }
+ 
+@@ -575,8 +575,8 @@ export function drawObjects(
+       ctx.strokeStyle = GHOST_BOX_STROKE;
+       // On the device grid (row 238 (c)). The outline is stroked under the CSS
+       // transform, so the dash is stated in CSS px there: the 3/2 it always was.
+-      ctx.setLineDash([3, 2]);
+-      strokeRectOnDeviceGrid(ctx, gl, gt, gw, gh, MARKER_STROKE_PX, dpr);
++      ctx.setLineDash([3 * invZoom, 2 * invZoom]);
++      ctx.strokeRect(gl, gt, gw, gh);
+       ctx.setLineDash([]);
+       ctx.fillStyle = GHOST_LABEL;
+       // MEASURED (ROADMAP §5.1 item 17). These names are object NAMES, not hex:
+@@ -593,7 +593,7 @@ export function drawObjects(
+       ctx.fillStyle = OBJECT_BOX_FILL;
+       ctx.fillRect(ox - hh, oy - hh, HEX_MARKER_SIZE, HEX_MARKER_SIZE);
+       ctx.strokeStyle = OBJECT_BOX_STROKE;
+-      strokeRectOnDeviceGrid(ctx, ox - hh, oy - hh, HEX_MARKER_SIZE, HEX_MARKER_SIZE, MARKER_STROKE_PX, dpr);
++      ctx.strokeRect(ox - hh, oy - hh, HEX_MARKER_SIZE, HEX_MARKER_SIZE);
+       ctx.fillStyle = OBJECT_LABEL;
+       // Two hex digits fit this box comfortably at zoom 1 (8px of glyph in 14px
+       // of room) — but the font is screen-constant and the box is not, so by
+@@ -609,7 +609,9 @@ export function drawObjects(
+       // 1.5, so by the shared rule each edge half-covers a device column.
+       ctx.strokeStyle = OBJECT_SELECTED_STROKE;
+       const pad = 2 * invZoom;
+-      strokeRectOnDeviceGrid(ctx, selRect.left - pad, selRect.top - pad, selRect.width + pad * 2, selRect.height + pad * 2, 2, dpr);
++      ctx.lineWidth = 2 * invZoom;
++      ctx.strokeRect(selRect.left - pad, selRect.top - pad, selRect.width + pad * 2, selRect.height + pad * 2);
++      ctx.lineWidth = 1 * invZoom;
+     }
+   });
+   // Re-raise pass: HIGH-priority sprite pieces sit above even high plane tiles
+@@ -657,7 +659,7 @@ export function drawStart(
+   // drawn where it was: the shared rule has no whole-pixel answer for a circle. The
+   // crosshair is 2 CSS px, an even device width at 1 and 1.5, so each of its edges
+   // half-covers a device row or column, as every 2 px line does by the shared rule.
+-  const cross = segmentsOnDeviceGrid(ctx, dpr);
++  const cross = ctx as unknown as ReturnType<typeof segmentsOnDeviceGrid>;
+   cross.strokeStyle = START_MARKER;
+   cross.lineWidth = 2 * invZoom;
+   cross.beginPath();

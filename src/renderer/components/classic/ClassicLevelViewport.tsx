@@ -806,7 +806,7 @@ export default function ClassicLevelViewport() {
         for (let col = range.startCol; col < range.endCol; col++) {
           const cell = layoutCellAt(grid, col, row);
           if (cell === undefined) continue;
-          drawPriority(ctx, doc, col, row, cell & 0x7f, invZoom);
+          drawPriority(ctx, doc, col, row, cell & 0x7f, invZoom, dpr);
         }
       }
     }
@@ -888,7 +888,7 @@ export default function ClassicLevelViewport() {
           };
         }
         const objT0 = animFor ? performance.now() : 0;
-        drawObjects(ctx, doc, invZoom, objectSprites, ref?.zone ?? '', selIndex, previewPos, animFor, occlusion);
+        drawObjects(ctx, doc, invZoom, dpr, objectSprites, ref?.zone ?? '', selIndex, previewPos, animFor, occlusion);
         if (occlusion) {
           const acc = occlPerfRef.current;
           acc.draws++;
@@ -911,7 +911,7 @@ export default function ClassicLevelViewport() {
       if (overlays.showStart) {
         // During a start drag the ref carries the live (clamped) preview position.
         const sdrag = startDragRef.current;
-        drawStart(ctx, doc, invZoom, sdrag ? sdrag.preview : null);
+        drawStart(ctx, doc, invZoom, dpr, sdrag ? sdrag.preview : null);
       }
     }
 
@@ -963,7 +963,7 @@ export default function ClassicLevelViewport() {
         // rather than duplicating the sprite/ghost-marker/hex-box branching here.
         // The fallback marker is still correct for an id whose art genuinely does
         // not resolve, and for the invisible/trigger ids that have none.
-        drawObjects(ctx, { ...doc, objects: [ghostObj] }, invZoom, ghostSprites, ref?.zone ?? '', null, null);
+        drawObjects(ctx, { ...doc, objects: [ghostObj] }, invZoom, dpr, ghostSprites, ref?.zone ?? '', null, null);
         ctx.restore();
       }
     }
@@ -977,7 +977,8 @@ export default function ClassicLevelViewport() {
       ctx.strokeStyle = STAMP_PREVIEW_STROKE;
       for (const c of stroke.values()) {
         ctx.fillRect(c.x * CHUNK_PX, c.y * CHUNK_PX, CHUNK_PX, CHUNK_PX);
-        // On the device grid (row 237 (b)), 2 CSS px as before.
+        // On the device grid (row 237 (b)), 2 CSS px as before, both edges on whole
+        // device pixels since row 238 (237 first left each edge half-covered).
         strokeRectOnDeviceGrid(ctx, c.x * CHUNK_PX, c.y * CHUNK_PX, CHUNK_PX, CHUNK_PX, 2, dpr);
       }
     }
@@ -1012,7 +1013,8 @@ export default function ClassicLevelViewport() {
         // different box than the one that gets written.
         const r = rectFromCorners(cstroke.anchor, cstroke.current);
         // On the device grid (row 237 (b)), 1.5 CSS px as before, which the shared
-        // rule draws as an even (2 device px) width.
+        // rule draws as an even (2 device px) width, centred on a whole device pixel
+        // since row 238 so both edges are whole device pixels.
         ctx.strokeStyle = COLLISION_PREVIEW_PRIMARY;
         strokeRectOnDeviceGrid(
           ctx,

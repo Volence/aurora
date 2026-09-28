@@ -1,0 +1,25 @@
+css 1: 1->1 odd, 1.25->1 odd, 1.35->1 odd, 1.5->1 odd, 2->1 odd, 3->3 odd
+css 2: 1->2 EVEN, 1.25->2 EVEN, 1.35->2 EVEN, 1.5->2 EVEN, 2->4 EVEN, 3->6 EVEN
+css 3: 1->3 odd, 1.25->3 odd, 1.35->5 odd, 1.5->5 odd, 2->5 odd, 3->9 odd
+dpr 1: 2px snapStroke device span [9.5, 11.5]
+dpr 1.25: 2px snapStroke device span [12.5, 14.5]
+dpr 1.35: 2px snapStroke device span [13.5, 15.5]
+dpr 1.5: 2px snapStroke device span [14.5, 16.5]
+dpr 2: 2px snapStroke device span [18.5, 22.5]
+dpr 3: 2px snapStroke device span [27.5, 33.5]
+src/renderer/canvas/screen-frame.ts:149:  const x = snapStroke(r.x, lw, dpr).at;
+src/renderer/canvas/screen-frame.ts:150:  const y = snapStroke(r.y, lw, dpr).at;
+src/renderer/canvas/screen-frame.ts:153:  ctx.lineWidth = snapStroke(r.x, lw, dpr).width;
+src/renderer/canvas/effects-guides.ts:396:    const y = snapStroke(row.canvasY, 1, dpr).at;
+src/renderer/canvas/effects-guides.ts:404:    ctx.lineWidth = snapStroke(row.canvasY, 3, dpr).width;
+src/renderer/canvas/effects-guides.ts:411:    ctx.lineWidth = snapStroke(row.canvasY, 1, dpr).width;
+src/renderer/canvas/effects-guides.ts:552:    const stroke = snapStroke(row.canvasY, active || row.notice !== null ? 2 : 1, dpr);
+src/renderer/canvas/region-overlay.ts:316:    ctx.lineWidth = snapStroke(0, REGION_OUTLINE_PX, dpr).width;
+src/renderer/canvas/region-overlay.ts:330:        snapStroke(c.x, REGION_OUTLINE_PX, dpr).at, snapStroke(c.y, REGION_OUTLINE_PX, dpr).at,
+src/renderer/canvas/region-overlay.ts:361:    ctx.lineWidth = snapStroke(0, REGION_OUTLINE_PX, dpr).width;
+src/renderer/canvas/region-overlay.ts:368:    ctx.lineWidth = snapStroke(0, lw, dpr).width;
+src/renderer/canvas/region-overlay.ts:374:      const at = snapStroke(vertical ? a.x : a.y, lw, dpr).at;
+src/renderer/canvas/region-overlay.ts:467:    ctx.lineWidth = snapStroke(0, REGION_OUTLINE_PX, dpr).width;
+src/renderer/canvas/region-overlay.ts:473:      const at = snapStroke(vertical ? a.x : a.y, REGION_OUTLINE_PX, dpr).at;
+src/renderer/canvas/region-overlay.ts:487:      ctx.lineWidth = snapStroke(0, lw, dpr).width;
+src/renderer/canvas/region-overlay.ts:489:        snapStroke(c.x, lw, dpr).at, snapStroke(c.y, lw, dpr).at,

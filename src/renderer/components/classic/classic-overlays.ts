@@ -14,7 +14,7 @@ import { columnSolidRun } from '../../../core/collision/collision-render';
 import { angleNeedle } from './collision-needle';
 import { angleMarkFromColumns, drawAngleMark, MIN_CELL_PX_FOR_MARK } from '../../../core/collision/collision-angle-mark';
 import type { MarkDrawCtx } from '../../../core/collision/collision-angle-mark';
-import { snapStroke, snapLength } from '../../canvas/device-grid';
+import { snapStrokeEdges, snapLength, strokeRectOnDeviceGrid, segmentsOnDeviceGrid } from '../../canvas/device-grid';
 import { objectFrameRect } from '../../../core/level-classic/object-sprite';
 import { objectArtKey } from '../../../core/project/profiles/object-subtype-rules';
 import { s1ObjectIsInvisible, s1ObjectName } from '../../../core/project/profiles/s1-objects';
@@ -57,42 +57,10 @@ export const HEX_MARKER_SIZE = 16;
  */
 export const MARKER_STROKE_PX = 1;
 
-/**
- * Outline the rect (x, y, w, h), given in the context's CURRENT user space (the world,
- * under classic's `setTransform(dpr) / scale(zoom) / translate(-cam)`), as a stroke of
- * `cssWidth` CSS px ON THE DEVICE GRID (ROADMAP row 237 (b), ruled 2026-09-28).
- *
- * Drawn under the canvas's own CSS transform, `setTransform(dpr, 0, 0, dpr, 0, 0)`, and
- * snapped through the SAME `snapStroke` / `snapLength` MapViewport's chrome uses
- * (canvas/device-grid.ts, whose docblock is the rule): the top-left corner goes on the
- * device half-pixel nearest where the unsnapped stroke was centred, the size is a whole
- * number of device px, and the width is `deviceStrokeWidth(cssWidth, dpr)` device px. So
- * a 1 CSS px outline covers exactly one device column at every scale, where drawn in
- * world units at 1.5 it was 1.5 device px centred ON the edge and half-covered the
- * column either side. At dpr 1 it is the round(v) + 0.5 of MapViewport's chrome.
- *
- * The world-to-CSS mapping is read off the transform in force, which must be an
- * axis-aligned scale and translation (classic's always is), and the transform is left
- * exactly as it was found.
- */
-export function strokeRectOnDeviceGrid(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number,
-  cssWidth: number,
-  dpr: number,
-): void {
-  const m = ctx.getTransform();
-  const cssX = (x * m.a + m.e) / dpr, cssY = (y * m.d + m.f) / dpr;
-  const cssW = (w * m.a) / dpr, cssH = (h * m.d) / dpr;
-  ctx.save();
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.lineWidth = snapStroke(0, cssWidth, dpr).width;
-  ctx.strokeRect(
-    snapStroke(cssX, cssWidth, dpr).at, snapStroke(cssY, cssWidth, dpr).at,
-    snapLength(cssW, dpr), snapLength(cssH, dpr),
-  );
-  ctx.restore();
-}
+// `strokeRectOnDeviceGrid` lived here (row 237 (b)) and moved to canvas/device-grid.ts
+// at row 238, when MapViewport's own stamp ghost and marquee began using it too. It is
+// re-exported so this module's callers and tests keep their import.
+export { strokeRectOnDeviceGrid } from '../../canvas/device-grid';
 
 function solidityFill(solidity: number): string {
   switch (solidity) {
@@ -133,6 +101,7 @@ export function drawCollision(
   // the device scale comes back out: the gate and the widths stay in CSS px,
   // which is what aeon's overlay states them in and what the constants mean.
   const zoomScale = ctx.getTransform().a / dpr;
+  const markPath = segmentsOnDeviceGrid(ctx, dpr);
   for (let i = 0; i < 256; i++) {
     const cell = chunk.cells[i];
     // Block 0 first, because that is the order the engine tests in: FindFloor
@@ -182,7 +151,11 @@ export function drawCollision(
         { tx: dx, ty: dy },
       );
       if (mark) {
-        drawAngleMark(ctx as unknown as MarkDrawCtx, cx, cy, 16, mark, {
+        // ON THE DEVICE GRID (row 238 (c)): a flat floor's bar and a wall's stem are
+        // axis-aligned and snap like every other classic stroke; a slope's bar and
+        // stem are diagonal and are drawn where they were (segmentsOnDeviceGrid says
+        // why). The widths still arrive in world units and are mapped there.
+        drawAngleMark(markPath as unknown as MarkDrawCtx, cx, cy, 16, mark, {
           color: COLLISION_ANGLE_TICK,
           casing: COLLISION_ANGLE_CASING,
           coreWidth: 1.25 / zoomScale,
@@ -195,7 +168,7 @@ export function drawCollision(
   // Crisp surface line along each column's collidable edge, ON THE DEVICE GRID (row
   // 237 (b)): drawn under the canvas's CSS transform and snapped through
   // canvas/device-grid.ts, as strokeRectOnDeviceGrid is. Its row goes on the device
-  // half-pixel nearest the surface (snapStroke), its ends on whole device px
+  // half-pixel nearest the surface (snapStrokeEdges, odd width), its ends on whole device px
   // (snapLength, so the 16 segments of a cell tile it with no gap), its width
   // `deviceStrokeWidth(1, dpr)`: 1 device px at 1, 1.5 and 2, 3 at 3. Drawn in world
   // units it sat centred ON a device row boundary whenever the surface did, and
@@ -206,7 +179,7 @@ export function drawCollision(
   ctx.save();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.strokeStyle = COLLISION_SURFACE_LINE;
-  ctx.lineWidth = snapStroke(0, 1, dpr).width;
+  ctx.lineWidth = snapStrokeEdges(0, 1, dpr).width;
   for (let i = 0; i < 256; i++) {
     const cell = chunk.cells[i];
     // Block 0 first, because that is the order the engine tests in: FindFloor
@@ -226,7 +199,9 @@ export function drawCollision(
       if (!run) continue;
       let surfaceY = h >= 0 ? run.y : run.y + run.h;
       if (cell.yf) surfaceY = 16 - surfaceY;
-      const lineY = snapStroke(cssY(cy + surfaceY), 1, dpr).at;
+      // snapStrokeEdges (row 238's parity-aware centring): a 1 px line is an odd device
+      // width at every dpr, so this is the same half-pixel snapStroke gave.
+      const lineY = snapStrokeEdges(cssY(cy + surfaceY), 1, dpr).at;
       ctx.beginPath();
       ctx.moveTo(snapLength(cssX(cx + c), dpr), lineY);
       ctx.lineTo(snapLength(cssX(cx + c + 1), dpr), lineY);
@@ -271,6 +246,9 @@ export function drawPriority(
   row: number,
   chunkId: number,
   invZoom: number,
+  /** The canvas's device scale: the high/low boundary strokes go on the device grid
+   *  (row 238 (c)). REQUIRED, for `drawCollision`'s reason. */
+  dpr: number,
 ): void {
   const mask = chunkPriorityMask(d, chunkId);
   if (!mask) return; // air / out-of-range
@@ -281,7 +259,7 @@ export function drawPriority(
     tilePx: 8,
     originX: col * CHUNK_PX, originY: row * CHUNK_PX,
     marked: (tx, ty) => mask[ty * CHUNK_TILES + tx] !== 0,
-    fill: PRIORITY_FILL, edge: PRIORITY_EDGE, invZoom,
+    fill: PRIORITY_FILL, edge: PRIORITY_EDGE, invZoom, dpr,
   });
 }
 
@@ -508,6 +486,9 @@ export function drawObjects(
   ctx: CanvasRenderingContext2D,
   d: LevelDoc,
   invZoom: number,
+  /** The canvas's device scale: the marker, ghost-marker and selection outlines go on
+   *  the device grid (row 238 (c)). REQUIRED, for `drawCollision`'s reason. */
+  dpr: number,
   sprites: Map<string, ObjectSprite>,
   zone: string,
   selectedIndex?: number | null,
@@ -594,8 +575,10 @@ export function drawObjects(
       ctx.fillStyle = GHOST_BOX_FILL;
       ctx.fillRect(gl, gt, gw, gh);
       ctx.strokeStyle = GHOST_BOX_STROKE;
-      ctx.setLineDash([3 * invZoom, 2 * invZoom]);
-      ctx.strokeRect(gl, gt, gw, gh);
+      // On the device grid (row 238 (c)). The outline is stroked under the CSS
+      // transform, so the dash is stated in CSS px there: the 3/2 it always was.
+      ctx.setLineDash([3, 2]);
+      strokeRectOnDeviceGrid(ctx, gl, gt, gw, gh, MARKER_STROKE_PX, dpr);
       ctx.setLineDash([]);
       ctx.fillStyle = GHOST_LABEL;
       // MEASURED (ROADMAP §5.1 item 17). These names are object NAMES, not hex:
@@ -612,7 +595,7 @@ export function drawObjects(
       ctx.fillStyle = OBJECT_BOX_FILL;
       ctx.fillRect(ox - hh, oy - hh, HEX_MARKER_SIZE, HEX_MARKER_SIZE);
       ctx.strokeStyle = OBJECT_BOX_STROKE;
-      ctx.strokeRect(ox - hh, oy - hh, HEX_MARKER_SIZE, HEX_MARKER_SIZE);
+      strokeRectOnDeviceGrid(ctx, ox - hh, oy - hh, HEX_MARKER_SIZE, HEX_MARKER_SIZE, MARKER_STROKE_PX, dpr);
       ctx.fillStyle = OBJECT_LABEL;
       // Two hex digits fit this box comfortably at zoom 1 (8px of glyph in 14px
       // of room) — but the font is screen-constant and the box is not, so by
@@ -624,11 +607,11 @@ export function drawObjects(
     }
     if (isSel) {
       // Highlight box around the drawn frame, drawn last so it sits on top.
+      // On the device grid (row 238 (c)): 2 CSS px, an even device width, centred on a
+      // whole device pixel so both edges are whole device pixels.
       ctx.strokeStyle = OBJECT_SELECTED_STROKE;
-      ctx.lineWidth = 2 * invZoom;
       const pad = 2 * invZoom;
-      ctx.strokeRect(selRect.left - pad, selRect.top - pad, selRect.width + pad * 2, selRect.height + pad * 2);
-      ctx.lineWidth = 1 * invZoom;
+      strokeRectOnDeviceGrid(ctx, selRect.left - pad, selRect.top - pad, selRect.width + pad * 2, selRect.height + pad * 2, 2, dpr);
     }
   });
   // Re-raise pass: HIGH-priority sprite pieces sit above even high plane tiles
@@ -658,6 +641,9 @@ export function drawStart(
   ctx: CanvasRenderingContext2D,
   d: LevelDoc,
   invZoom: number,
+  /** The canvas's device scale: the crosshair goes on the device grid (row 238 (c)).
+   *  REQUIRED, for `drawCollision`'s reason. */
+  dpr: number,
   previewPos?: { x: number; y: number } | null,
 ): void {
   const { x, y } = previewPos ?? d.start;
@@ -669,10 +655,17 @@ export function drawStart(
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x - r - 4, y); ctx.lineTo(x + r + 4, y);
-  ctx.moveTo(x, y - r - 4); ctx.lineTo(x, y + r + 4);
-  ctx.stroke();
+  // The crosshair ON THE DEVICE GRID (row 238 (c)). The ring above is a curve and is
+  // drawn where it was: the shared rule has no whole-pixel answer for a circle. The
+  // crosshair is 2 CSS px, an even device width, centred on a whole device pixel so
+  // both of its edges are whole device pixels (`snapStrokeEdges`).
+  const cross = segmentsOnDeviceGrid(ctx, dpr);
+  cross.strokeStyle = START_MARKER;
+  cross.lineWidth = 2 * invZoom;
+  cross.beginPath();
+  cross.moveTo(x - r - 4, y); cross.lineTo(x + r + 4, y);
+  cross.moveTo(x, y - r - 4); cross.lineTo(x, y + r + 4);
+  cross.stroke();
   ctx.font = `${9 * invZoom}px monospace`;
   ctx.textAlign = 'left';
   ctx.fillText('START', x + r + 6, y - r);

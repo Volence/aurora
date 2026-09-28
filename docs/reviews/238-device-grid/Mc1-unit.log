@@ -1,0 +1,1514 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ae14a22e230463e67
+
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts (221 tests | 97 failed) 63ms
+     ✓ 1 CSS px at dpr 1, zoom 1, camera 0,0 2ms
+     ✓ 1 CSS px at dpr 1, zoom 2, camera 3032,472 0ms
+     ✓ 1 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     ✓ 1 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1 CSS px at dpr 1.25, zoom 1, camera 0,0 0ms
+     ✓ 1 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     ✓ 1 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     ✓ 1 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     ✓ 1 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     ✓ 1 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     ✓ 1 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     ✓ 1 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     ✓ 1 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     ✓ 1 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     ✓ 1 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     ✓ 1 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     ✓ 1 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     ✓ 1 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     ✓ 1 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     ✓ 1 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 2 CSS px at dpr 1, zoom 1, camera 0,0 0ms
+     ✓ 2 CSS px at dpr 1, zoom 2, camera 3032,472 0ms
+     ✓ 2 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     ✓ 2 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 2 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 2 CSS px at dpr 1.25, zoom 1, camera 0,0 0ms
+     ✓ 2 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     ✓ 2 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     ✓ 2 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 2 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 2 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     ✓ 2 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     ✓ 2 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     ✓ 2 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 2 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 2 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     ✓ 2 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     ✓ 2 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     ✓ 2 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 2 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 2 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     ✓ 2 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     ✓ 2 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     ✓ 2 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 2 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 2 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     ✓ 2 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     ✓ 2 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     ✓ 2 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 2 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1.25 CSS px at dpr 1, zoom 1, camera 0,0 0ms
+     ✓ 1.25 CSS px at dpr 1, zoom 2, camera 3032,472 0ms
+     ✓ 1.25 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     ✓ 1.25 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1.25 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1.25 CSS px at dpr 1.25, zoom 1, camera 0,0 0ms
+     ✓ 1.25 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     ✓ 1.25 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     ✓ 1.25 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1.25 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1.25 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     ✓ 1.25 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     ✓ 1.25 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     ✓ 1.25 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1.25 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1.25 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     ✓ 1.25 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     ✓ 1.25 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     ✓ 1.25 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1.25 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1.25 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     ✓ 1.25 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     ✓ 1.25 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     ✓ 1.25 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1.25 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1.25 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     ✓ 1.25 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     ✓ 1.25 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     ✓ 1.25 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1.25 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 3 CSS px at dpr 1, zoom 1, camera 0,0 0ms
+     ✓ 3 CSS px at dpr 1, zoom 2, camera 3032,472 0ms
+     ✓ 3 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     ✓ 3 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 3 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 3 CSS px at dpr 1.25, zoom 1, camera 0,0 0ms
+     ✓ 3 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     ✓ 3 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     ✓ 3 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 3 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 3 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     ✓ 3 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     ✓ 3 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     ✓ 3 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 3 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 3 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     ✓ 3 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     ✓ 3 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     ✓ 3 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 3 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 3 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     ✓ 3 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     ✓ 3 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     ✓ 3 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 3 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 3 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     ✓ 3 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     ✓ 3 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     ✓ 3 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 3 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ a quarter-turn direction from Math.cos/sin (~6e-17 off axis) counts as vertical 0ms
+     × dpr 1, zoom 1, camera 0,0 5ms
+     × dpr 1, zoom 2, camera 3032,472 1ms
+     × dpr 1, zoom 0.5, camera 13,7 0ms
+     × dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1, zoom 3.3, camera 250.4,99.9 1ms
+     × dpr 1.25, zoom 1, camera 0,0 0ms
+     × dpr 1.25, zoom 2, camera 3032,472 0ms
+     × dpr 1.25, zoom 0.5, camera 13,7 0ms
+     × dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1.35, zoom 1, camera 0,0 0ms
+     × dpr 1.35, zoom 2, camera 3032,472 0ms
+     × dpr 1.35, zoom 0.5, camera 13,7 0ms
+     × dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1.5, zoom 1, camera 0,0 0ms
+     × dpr 1.5, zoom 2, camera 3032,472 0ms
+     × dpr 1.5, zoom 0.5, camera 13,7 0ms
+     × dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 2, zoom 1, camera 0,0 0ms
+     × dpr 2, zoom 2, camera 3032,472 0ms
+     × dpr 2, zoom 0.5, camera 13,7 0ms
+     × dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 3, zoom 1, camera 0,0 0ms
+     × dpr 3, zoom 2, camera 3032,472 0ms
+     × dpr 3, zoom 0.5, camera 13,7 0ms
+     × dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1, zoom 1, camera 0,0 0ms
+     × dpr 1, zoom 2, camera 3032,472 0ms
+     × dpr 1, zoom 0.5, camera 13,7 0ms
+     × dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1.25, zoom 1, camera 0,0 0ms
+     × dpr 1.25, zoom 2, camera 3032,472 0ms
+     × dpr 1.25, zoom 0.5, camera 13,7 3ms
+     × dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1.35, zoom 1, camera 0,0 0ms
+     × dpr 1.35, zoom 2, camera 3032,472 0ms
+     × dpr 1.35, zoom 0.5, camera 13,7 0ms
+     × dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1.5, zoom 1, camera 0,0 0ms
+     × dpr 1.5, zoom 2, camera 3032,472 0ms
+     × dpr 1.5, zoom 0.5, camera 13,7 0ms
+     × dpr 1.5, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 2, zoom 1, camera 0,0 0ms
+     × dpr 2, zoom 2, camera 3032,472 0ms
+     × dpr 2, zoom 0.5, camera 13,7 0ms
+     × dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 3, zoom 1, camera 0,0 0ms
+     × dpr 3, zoom 2, camera 3032,472 0ms
+     × dpr 3, zoom 0.5, camera 13,7 0ms
+     × dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1, zoom 1, camera 0,0 1ms
+     × dpr 1, zoom 2, camera 3032,472 0ms
+     × dpr 1, zoom 0.5, camera 13,7 0ms
+     × dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1.25, zoom 1, camera 0,0 0ms
+     × dpr 1.25, zoom 2, camera 3032,472 0ms
+     × dpr 1.25, zoom 0.5, camera 13,7 0ms
+     × dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1.35, zoom 1, camera 0,0 0ms
+     × dpr 1.35, zoom 2, camera 3032,472 0ms
+     × dpr 1.35, zoom 0.5, camera 13,7 0ms
+     × dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1.5, zoom 1, camera 0,0 0ms
+     × dpr 1.5, zoom 2, camera 3032,472 0ms
+     × dpr 1.5, zoom 0.5, camera 13,7 0ms
+     × dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 2, zoom 1, camera 0,0 0ms
+     × dpr 2, zoom 2, camera 3032,472 0ms
+     × dpr 2, zoom 0.5, camera 13,7 0ms
+     × dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 3, zoom 1, camera 0,0 0ms
+     × dpr 3, zoom 2, camera 3032,472 0ms
+     × dpr 3, zoom 0.5, camera 13,7 0ms
+     × dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     × a flat floor's bar and stem are on the device grid at dpr 1 1ms
+     × a flat floor's bar and stem are on the device grid at dpr 1.25 0ms
+     × a flat floor's bar and stem are on the device grid at dpr 1.35 0ms
+     × a flat floor's bar and stem are on the device grid at dpr 1.5 1ms
+     × a flat floor's bar and stem are on the device grid at dpr 2 0ms
+     × a flat floor's bar and stem are on the device grid at dpr 3 0ms
+     ✓ a slope ($E0) is diagonal and is drawn where it was, at its unsnapped width 0ms
+     ✓ the census read both files (anti-vacuous) 0ms
+     × no raw strokeRect is left in classic-overlays.ts 1ms
+     ✓ the loop glyph strokes nothing (a filled disc and a glyph), so it has nothing to snap 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 97 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1, zoom 1, camera 0,0
+AssertionError: corner x 92.25: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:73:68
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+       |                                                                    ^
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+     75|   expect(Math.min(...xs)).toBeCloseTo(Math.round(dev(world.x, v.x, v, …
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1, zoom 2, camera 3032,472
+AssertionError: corner y -839: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:73:115
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+       |                                                                                                                   ^
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+     75|   expect(Math.min(...xs)).toBeCloseTo(Math.round(dev(world.x, v.x, v, …
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1, zoom 0.5, camera 13,7
+AssertionError: corner x 39.625: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:73:68
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+       |                                                                    ^
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+     75|   expect(Math.min(...xs)).toBeCloseTo(Math.round(dev(world.x, v.x, v, …
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 123: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:73:68
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+       |                                                                    ^
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+     75|   expect(Math.min(...xs)).toBeCloseTo(Math.round(dev(world.x, v.x, v, …
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x -521.895: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:73:68
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+       |                                                                    ^
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+     75|   expect(Math.min(...xs)).toBeCloseTo(Math.round(dev(world.x, v.x, v, …
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.25, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.25, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.25, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.25, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.25, zoom 3.3, camera 250.4,99.9
+AssertionError: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:72:19
+     70|   cssWidth: number, v: { zoom: number; x: number; y: number }, dpr: nu…
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.35, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.35, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.35, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.35, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.35, zoom 3.3, camera 250.4,99.9
+AssertionError: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:72:19
+     70|   cssWidth: number, v: { zoom: number; x: number; y: number }, dpr: nu…
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.5, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.5, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.5, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.5, zoom 1.5, camera 10.25,3.5
+AssertionError: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:72:19
+     70|   cssWidth: number, v: { zoom: number; x: number; y: number }, dpr: nu…
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 1.5, zoom 3.3, camera 250.4,99.9
+AssertionError: expected 1.4999999999999998 to be close to 1, received difference is 0.4999999999999998, but expected 5e-10
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:72:19
+     70|   cssWidth: number, v: { zoom: number; x: number; y: number }, dpr: nu…
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 2, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 2, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 2, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 2, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 2, zoom 3.3, camera 250.4,99.9
+AssertionError: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:72:19
+     70|   cssWidth: number, v: { zoom: number; x: number; y: number }, dpr: nu…
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 3, zoom 1, camera 0,0
+AssertionError: corner x 276.75: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:73:68
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+       |                                                                    ^
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+     75|   expect(Math.min(...xs)).toBeCloseTo(Math.round(dev(world.x, v.x, v, …
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 3, zoom 2, camera 3032,472
+AssertionError: corner y -2517: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:73:115
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+       |                                                                                                                   ^
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+     75|   expect(Math.min(...xs)).toBeCloseTo(Math.round(dev(world.x, v.x, v, …
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 3, zoom 0.5, camera 13,7
+AssertionError: corner x 118.875: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:73:68
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+       |                                                                    ^
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+     75|   expect(Math.min(...xs)).toBeCloseTo(Math.round(dev(world.x, v.x, v, …
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 3, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 369: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:73:68
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+       |                                                                    ^
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+     75|   expect(Math.min(...xs)).toBeCloseTo(Math.round(dev(world.x, v.x, v, …
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawObjects: the marker and selection outlines are on the device grid > dpr 3, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x -1565.6849999999997: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectRectOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:73:68
+     71|   expect(s.kind).toBe('rect');
+     72|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+     73|   for (const [x, y] of s.pts) { expect(onHalf(x), `corner x ${x}`).toB…
+       |                                                                    ^
+     74|   const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]);
+     75|   expect(Math.min(...xs)).toBeCloseTo(Math.round(dev(world.x, v.x, v, …
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1, zoom 1, camera 0,0
+AssertionError: horizontal segment row 40.6: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1, zoom 2, camera 3032,472
+AssertionError: horizontal segment row -862.8: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1, zoom 0.5, camera 13,7
+AssertionError: horizontal segment row 16.8: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1, zoom 1.5, camera 10.25,3.5
+AssertionError: horizontal segment row 55.650000000000006: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1, zoom 3.3, camera 250.4,99.9
+AssertionError: horizontal segment row -195.69000000000003: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.25, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.25, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.25, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.25, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.25, zoom 3.3, camera 250.4,99.9
+AssertionError: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:84:19
+     82| function expectSegmentsOnGrid(s: DeviceStroke, cssWidth: number, dpr: …
+     83|   expect(s.kind).toBe('path');
+     84|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     85|   expect(s.pts.length % 2).toBe(0);
+     86|   for (let i = 0; i < s.pts.length; i += 2) {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.35, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.35, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.35, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.35, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.35, zoom 3.3, camera 250.4,99.9
+AssertionError: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:84:19
+     82| function expectSegmentsOnGrid(s: DeviceStroke, cssWidth: number, dpr: …
+     83|   expect(s.kind).toBe('path');
+     84|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     85|   expect(s.pts.length % 2).toBe(0);
+     86|   for (let i = 0; i < s.pts.length; i += 2) {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.5, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.5, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.5, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.5, zoom 1.5, camera 10.25,3.5
+AssertionError: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:84:19
+     82| function expectSegmentsOnGrid(s: DeviceStroke, cssWidth: number, dpr: …
+     83|   expect(s.kind).toBe('path');
+     84|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     85|   expect(s.pts.length % 2).toBe(0);
+     86|   for (let i = 0; i < s.pts.length; i += 2) {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 1.5, zoom 3.3, camera 250.4,99.9
+AssertionError: expected 2.9999999999999996 to be close to 2, received difference is 0.9999999999999996, but expected 5e-10
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:84:19
+     82| function expectSegmentsOnGrid(s: DeviceStroke, cssWidth: number, dpr: …
+     83|   expect(s.kind).toBe('path');
+     84|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     85|   expect(s.pts.length % 2).toBe(0);
+     86|   for (let i = 0; i < s.pts.length; i += 2) {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 2, zoom 1, camera 0,0
+AssertionError: horizontal segment row 81.2: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 2, zoom 2, camera 3032,472
+AssertionError: horizontal segment row -1725.6: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 2, zoom 0.5, camera 13,7
+AssertionError: horizontal segment row 33.6: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 2, zoom 1.5, camera 10.25,3.5
+AssertionError: horizontal segment row 111.30000000000001: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 2, zoom 3.3, camera 250.4,99.9
+AssertionError: horizontal segment row -391.38000000000005: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 3, zoom 1, camera 0,0
+AssertionError: horizontal segment row 121.80000000000001: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 3, zoom 2, camera 3032,472
+AssertionError: horizontal segment row -2588.4: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 3, zoom 0.5, camera 13,7
+AssertionError: horizontal segment row 50.400000000000006: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 3, zoom 1.5, camera 10.25,3.5
+AssertionError: horizontal segment row 166.95000000000002: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawStart: the crosshair is on the device grid > dpr 3, zoom 3.3, camera 250.4,99.9
+AssertionError: horizontal segment row -587.0699999999999: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:189:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1, zoom 1, camera 0,0
+AssertionError: horizontal segment row 16: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1, zoom 2, camera 3032,472
+AssertionError: horizontal segment row -912: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1, zoom 0.5, camera 13,7
+AssertionError: horizontal segment ends 1.5, 5.5: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:90:82
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+       |                                                                                  ^
+     91|     } else {
+     92|       expect(Math.abs(x1 - x0) < EPS, `segment ${i / 2} is neither hor…
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1, zoom 1.5, camera 10.25,3.5
+AssertionError: horizontal segment row 18.75: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[38/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1, zoom 3.3, camera 250.4,99.9
+AssertionError: horizontal segment row -276.87: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.25, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.25, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.25, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.25, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.25, zoom 3.3, camera 250.4,99.9
+AssertionError: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:84:19
+     82| function expectSegmentsOnGrid(s: DeviceStroke, cssWidth: number, dpr: …
+     83|   expect(s.kind).toBe('path');
+     84|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     85|   expect(s.pts.length % 2).toBe(0);
+     86|   for (let i = 0; i < s.pts.length; i += 2) {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[40/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.35, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.35, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.35, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.35, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.35, zoom 3.3, camera 250.4,99.9
+AssertionError: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:84:19
+     82| function expectSegmentsOnGrid(s: DeviceStroke, cssWidth: number, dpr: …
+     83|   expect(s.kind).toBe('path');
+     84|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     85|   expect(s.pts.length % 2).toBe(0);
+     86|   for (let i = 0; i < s.pts.length; i += 2) {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[41/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.5, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.5, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.5, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.5, zoom 1.5, camera 10.25,3.5
+AssertionError: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:84:19
+     82| function expectSegmentsOnGrid(s: DeviceStroke, cssWidth: number, dpr: …
+     83|   expect(s.kind).toBe('path');
+     84|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     85|   expect(s.pts.length % 2).toBe(0);
+     86|   for (let i = 0; i < s.pts.length; i += 2) {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[42/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 1.5, zoom 3.3, camera 250.4,99.9
+AssertionError: expected 1.4999999999999998 to be close to 1, received difference is 0.4999999999999998, but expected 5e-10
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:84:19
+     82| function expectSegmentsOnGrid(s: DeviceStroke, cssWidth: number, dpr: …
+     83|   expect(s.kind).toBe('path');
+     84|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     85|   expect(s.pts.length % 2).toBe(0);
+     86|   for (let i = 0; i < s.pts.length; i += 2) {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[43/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 2, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 2, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 2, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 2, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 2, zoom 3.3, camera 250.4,99.9
+AssertionError: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:84:19
+     82| function expectSegmentsOnGrid(s: DeviceStroke, cssWidth: number, dpr: …
+     83|   expect(s.kind).toBe('path');
+     84|   expect(s.width).toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
+       |                   ^
+     85|   expect(s.pts.length % 2).toBe(0);
+     86|   for (let i = 0; i < s.pts.length; i += 2) {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[44/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 3, zoom 1, camera 0,0
+AssertionError: horizontal segment row 48: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[45/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 3, zoom 2, camera 3032,472
+AssertionError: horizontal segment row -2736: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[46/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 3, zoom 0.5, camera 13,7
+AssertionError: horizontal segment ends 4.5, 16.5: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:90:82
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+       |                                                                                  ^
+     91|     } else {
+     92|       expect(Math.abs(x1 - x0) < EPS, `segment ${i / 2} is neither hor…
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[47/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 3, zoom 1.5, camera 10.25,3.5
+AssertionError: horizontal segment row 56.25: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[48/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawPriority: the high/low boundary edges are on the device grid > dpr 3, zoom 3.3, camera 250.4,99.9
+AssertionError: horizontal segment row -830.6099999999999: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectSegmentsOnGrid src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:89:58
+     87|     const [[x0, y0], [x1, y1]] = [s.pts[i], s.pts[i + 1]];
+     88|     if (Math.abs(y1 - y0) < EPS) {
+     89|       expect(onHalf(y0), `horizontal segment row ${y0}`).toBe(true);
+       |                                                          ^
+     90|       expect(isWhole(x0) && isWhole(x1), `horizontal segment ends ${x0…
+     91|     } else {
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[49/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawCollision: the angle mark > a flat floor's bar and stem are on the device grid at dpr 1
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawCollision: the angle mark > a flat floor's bar and stem are on the device grid at dpr 1.25
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawCollision: the angle mark > a flat floor's bar and stem are on the device grid at dpr 1.35
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawCollision: the angle mark > a flat floor's bar and stem are on the device grid at dpr 1.5
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawCollision: the angle mark > a flat floor's bar and stem are on the device grid at dpr 2
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > drawCollision: the angle mark > a flat floor's bar and stem are on the device grid at dpr 3
+AssertionError: its row/column is a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:256:87
+    254|         const horizontal = Math.abs(y1 - y0) < EPS, vertical = Math.ab…
+    255|         expect(horizontal || vertical, 'a flat floor\'s mark is axis-a…
+    256|         expect(onHalf(horizontal ? y0 : x0), 'its row/column is a devi…
+       |                                                                                       ^
+    257|         expect(isWhole(horizontal ? x0 : y0) && isWhole(horizontal ? x…
+    258|         expect(isWhole(s.width), 'its width is whole device px').toBe(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[50/97]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts > classic-overlays and the loop glyph > no raw strokeRect is left in classic-overlays.ts
+AssertionError: expected [ Array(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   ".strokeRect(",
++   ".strokeRect(",
++   ".strokeRect(",
++ ]
+
+ ❯ src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts:293:53
+    291|
+    292|   it('no raw strokeRect is left in classic-overlays.ts', () => {
+    293|     expect(overlays.match(/\.strokeRect\(/g) ?? []).toEqual([]);
+       |                                                     ^
+    294|   });
+    295|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[51/97]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  97 failed | 124 passed (221)
+   Start at  05:05:09
+   Duration  874ms (transform 488ms, setup 564ms, import 73ms, tests 63ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 97 failure record(s) in 1 file(s) (97 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION       97   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/classic/__tests__/classic-marks-device-grid.test.ts
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1, zoom 1, camera 0,0
+        AssertionError: corner x 92.25: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1, zoom 2, camera 3032,472
+        AssertionError: corner y -839: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1, zoom 0.5, camera 13,7
+        AssertionError: corner x 39.625: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 123: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x -521.895: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.25, zoom 1, camera 0,0
+        AssertionError: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.25, zoom 2, camera 3032,472
+        AssertionError: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.25, zoom 0.5, camera 13,7
+        AssertionError: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.25, zoom 1.5, camera 10.25,3.5
+        AssertionError: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.25, zoom 3.3, camera 250.4,99.9
+        AssertionError: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.35, zoom 1, camera 0,0
+        AssertionError: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.35, zoom 2, camera 3032,472
+        AssertionError: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.35, zoom 0.5, camera 13,7
+        AssertionError: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.35, zoom 1.5, camera 10.25,3.5
+        AssertionError: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.35, zoom 3.3, camera 250.4,99.9
+        AssertionError: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.5, zoom 1, camera 0,0
+        AssertionError: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.5, zoom 2, camera 3032,472
+        AssertionError: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.5, zoom 0.5, camera 13,7
+        AssertionError: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.5, zoom 1.5, camera 10.25,3.5
+        AssertionError: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 1.5, zoom 3.3, camera 250.4,99.9
+        AssertionError: expected 1.4999999999999998 to be close to 1, received difference is 0.4999999999999998, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 2, zoom 1, camera 0,0
+        AssertionError: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 2, zoom 2, camera 3032,472
+        AssertionError: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 2, zoom 0.5, camera 13,7
+        AssertionError: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 2, zoom 1.5, camera 10.25,3.5
+        AssertionError: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 2, zoom 3.3, camera 250.4,99.9
+        AssertionError: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 3, zoom 1, camera 0,0
+        AssertionError: corner x 276.75: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 3, zoom 2, camera 3032,472
+        AssertionError: corner y -2517: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 3, zoom 0.5, camera 13,7
+        AssertionError: corner x 118.875: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 3, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 369: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawObjects: the marker and selection outlines are on the device grid > dpr 3, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x -1565.6849999999997: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1, zoom 1, camera 0,0
+        AssertionError: horizontal segment row 40.6: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1, zoom 2, camera 3032,472
+        AssertionError: horizontal segment row -862.8: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1, zoom 0.5, camera 13,7
+        AssertionError: horizontal segment row 16.8: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1, zoom 1.5, camera 10.25,3.5
+        AssertionError: horizontal segment row 55.650000000000006: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1, zoom 3.3, camera 250.4,99.9
+        AssertionError: horizontal segment row -195.69000000000003: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.25, zoom 1, camera 0,0
+        AssertionError: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.25, zoom 2, camera 3032,472
+        AssertionError: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.25, zoom 0.5, camera 13,7
+        AssertionError: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.25, zoom 1.5, camera 10.25,3.5
+        AssertionError: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.25, zoom 3.3, camera 250.4,99.9
+        AssertionError: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.35, zoom 1, camera 0,0
+        AssertionError: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.35, zoom 2, camera 3032,472
+        AssertionError: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.35, zoom 0.5, camera 13,7
+        AssertionError: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.35, zoom 1.5, camera 10.25,3.5
+        AssertionError: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.35, zoom 3.3, camera 250.4,99.9
+        AssertionError: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.5, zoom 1, camera 0,0
+        AssertionError: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.5, zoom 2, camera 3032,472
+        AssertionError: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.5, zoom 0.5, camera 13,7
+        AssertionError: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.5, zoom 1.5, camera 10.25,3.5
+        AssertionError: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 1.5, zoom 3.3, camera 250.4,99.9
+        AssertionError: expected 2.9999999999999996 to be close to 2, received difference is 0.9999999999999996, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 2, zoom 1, camera 0,0
+        AssertionError: horizontal segment row 81.2: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 2, zoom 2, camera 3032,472
+        AssertionError: horizontal segment row -1725.6: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 2, zoom 0.5, camera 13,7
+        AssertionError: horizontal segment row 33.6: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 2, zoom 1.5, camera 10.25,3.5
+        AssertionError: horizontal segment row 111.30000000000001: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 2, zoom 3.3, camera 250.4,99.9
+        AssertionError: horizontal segment row -391.38000000000005: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 3, zoom 1, camera 0,0
+        AssertionError: horizontal segment row 121.80000000000001: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 3, zoom 2, camera 3032,472
+        AssertionError: horizontal segment row -2588.4: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 3, zoom 0.5, camera 13,7
+        AssertionError: horizontal segment row 50.400000000000006: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 3, zoom 1.5, camera 10.25,3.5
+        AssertionError: horizontal segment row 166.95000000000002: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawStart: the crosshair is on the device grid > dpr 3, zoom 3.3, camera 250.4,99.9
+        AssertionError: horizontal segment row -587.0699999999999: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1, zoom 1, camera 0,0
+        AssertionError: horizontal segment row 16: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1, zoom 2, camera 3032,472
+        AssertionError: horizontal segment row -912: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1, zoom 0.5, camera 13,7
+        AssertionError: horizontal segment ends 1.5, 5.5: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1, zoom 1.5, camera 10.25,3.5
+        AssertionError: horizontal segment row 18.75: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1, zoom 3.3, camera 250.4,99.9
+        AssertionError: horizontal segment row -276.87: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.25, zoom 1, camera 0,0
+        AssertionError: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.25, zoom 2, camera 3032,472
+        AssertionError: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.25, zoom 0.5, camera 13,7
+        AssertionError: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.25, zoom 1.5, camera 10.25,3.5
+        AssertionError: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.25, zoom 3.3, camera 250.4,99.9
+        AssertionError: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.35, zoom 1, camera 0,0
+        AssertionError: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.35, zoom 2, camera 3032,472
+        AssertionError: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.35, zoom 0.5, camera 13,7
+        AssertionError: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.35, zoom 1.5, camera 10.25,3.5
+        AssertionError: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.35, zoom 3.3, camera 250.4,99.9
+        AssertionError: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.5, zoom 1, camera 0,0
+        AssertionError: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.5, zoom 2, camera 3032,472
+        AssertionError: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.5, zoom 0.5, camera 13,7
+        AssertionError: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.5, zoom 1.5, camera 10.25,3.5
+        AssertionError: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 1.5, zoom 3.3, camera 250.4,99.9
+        AssertionError: expected 1.4999999999999998 to be close to 1, received difference is 0.4999999999999998, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 2, zoom 1, camera 0,0
+        AssertionError: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 2, zoom 2, camera 3032,472
+        AssertionError: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 2, zoom 0.5, camera 13,7
+        AssertionError: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 2, zoom 1.5, camera 10.25,3.5
+        AssertionError: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 2, zoom 3.3, camera 250.4,99.9
+        AssertionError: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 3, zoom 1, camera 0,0
+        AssertionError: horizontal segment row 48: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 3, zoom 2, camera 3032,472
+        AssertionError: horizontal segment row -2736: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 3, zoom 0.5, camera 13,7
+        AssertionError: horizontal segment ends 4.5, 16.5: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 3, zoom 1.5, camera 10.25,3.5
+        AssertionError: horizontal segment row 56.25: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawPriority: the high/low boundary edges are on the device grid > dpr 3, zoom 3.3, camera 250.4,99.9
+        AssertionError: horizontal segment row -830.6099999999999: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the angle mark > a flat floor's bar and stem are on the device grid at dpr 1
+        AssertionError: its row/column is a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the angle mark > a flat floor's bar and stem are on the device grid at dpr 1.25
+        AssertionError: its row/column is a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the angle mark > a flat floor's bar and stem are on the device grid at dpr 1.35
+        AssertionError: its row/column is a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the angle mark > a flat floor's bar and stem are on the device grid at dpr 1.5
+        AssertionError: its row/column is a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the angle mark > a flat floor's bar and stem are on the device grid at dpr 2
+        AssertionError: its row/column is a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the angle mark > a flat floor's bar and stem are on the device grid at dpr 3
+        AssertionError: its row/column is a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classic-overlays and the loop glyph > no raw strokeRect is left in classic-overlays.ts
+        AssertionError: expected [ Array(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+
+failure-class: 97 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 1 of 1 module(s) this run selected finished.

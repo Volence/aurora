@@ -1,0 +1,796 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ae14a22e230463e67
+
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts (48 tests | 48 failed) 564ms
+     × dpr 1, zoom 1.5, camera 0,0 485ms
+     × dpr 1, zoom 1.5, camera 10.25,3.5 2ms
+     × dpr 1, zoom 0.5, camera 13,7 3ms
+     × dpr 1, zoom 3.3, camera 250.4,99.9 2ms
+     × dpr 1.25, zoom 1.5, camera 0,0 2ms
+     × dpr 1.25, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 1.25, zoom 0.5, camera 13,7 1ms
+     × dpr 1.25, zoom 3.3, camera 250.4,99.9 1ms
+     × dpr 1.35, zoom 1.5, camera 0,0 1ms
+     × dpr 1.35, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 1.35, zoom 0.5, camera 13,7 1ms
+     × dpr 1.35, zoom 3.3, camera 250.4,99.9 1ms
+     × dpr 1.5, zoom 1.5, camera 0,0 1ms
+     × dpr 1.5, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 1.5, zoom 0.5, camera 13,7 1ms
+     × dpr 1.5, zoom 3.3, camera 250.4,99.9 1ms
+     × dpr 2, zoom 1.5, camera 0,0 1ms
+     × dpr 2, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 2, zoom 0.5, camera 13,7 1ms
+     × dpr 2, zoom 3.3, camera 250.4,99.9 1ms
+     × dpr 3, zoom 1.5, camera 0,0 1ms
+     × dpr 3, zoom 1.5, camera 10.25,3.5 3ms
+     × dpr 3, zoom 0.5, camera 13,7 1ms
+     × dpr 3, zoom 3.3, camera 250.4,99.9 1ms
+     × dpr 1, zoom 1.5, camera 0,0 3ms
+     × dpr 1, zoom 1.5, camera 10.25,3.5 2ms
+     × dpr 1, zoom 0.5, camera 13,7 2ms
+     × dpr 1, zoom 3.3, camera 250.4,99.9 2ms
+     × dpr 1.25, zoom 1.5, camera 0,0 2ms
+     × dpr 1.25, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 1.25, zoom 0.5, camera 13,7 1ms
+     × dpr 1.25, zoom 3.3, camera 250.4,99.9 2ms
+     × dpr 1.35, zoom 1.5, camera 0,0 1ms
+     × dpr 1.35, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 1.35, zoom 0.5, camera 13,7 1ms
+     × dpr 1.35, zoom 3.3, camera 250.4,99.9 2ms
+     × dpr 1.5, zoom 1.5, camera 0,0 2ms
+     × dpr 1.5, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 1.5, zoom 0.5, camera 13,7 1ms
+     × dpr 1.5, zoom 3.3, camera 250.4,99.9 1ms
+     × dpr 2, zoom 1.5, camera 0,0 2ms
+     × dpr 2, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 2, zoom 0.5, camera 13,7 1ms
+     × dpr 2, zoom 3.3, camera 250.4,99.9 2ms
+     × dpr 3, zoom 1.5, camera 0,0 1ms
+     × dpr 3, zoom 1.5, camera 10.25,3.5 2ms
+     × dpr 3, zoom 0.5, camera 13,7 2ms
+     × dpr 3, zoom 3.3, camera 250.4,99.9 7ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 48 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1, zoom 1.5, camera 0,0
+AssertionError: corner x 72 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 56.625 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1, zoom 0.5, camera 13,7
+AssertionError: expected 17.5 to be close to 18.5, received difference is 1, but expected 5e-10
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:106:15
+    104|   }
+    105|   const b = box(s);
+    106|   expect(b.l).toBeCloseTo(Math.round((world.x - v.x) * v.zoom * dpr) +…
+       |               ^
+    107|   expect(b.t).toBeCloseTo(Math.round((world.y - v.y) * v.zoom * dpr) +…
+    108|   expect(b.w).toBeCloseTo(Math.round(world.w * v.zoom * dpr), 9);
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x -667.92 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 1.5, camera 0,0
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 3.3, camera 250.4,99.9
+AssertionError: width: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:100:28
+     98|   v: { x: number; y: number; zoom: number }, dpr: number): void {
+     99|   expect(s.kind).toBe('rect');
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+       |                            ^
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 1.5, camera 0,0
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 3.3, camera 250.4,99.9
+AssertionError: width: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:100:28
+     98|   v: { x: number; y: number; zoom: number }, dpr: number): void {
+     99|   expect(s.kind).toBe('rect');
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+       |                            ^
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 1.5, camera 0,0
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 0.5, camera 13,7
+AssertionError: width: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:100:28
+     98|   v: { x: number; y: number; zoom: number }, dpr: number): void {
+     99|   expect(s.kind).toBe('rect');
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+       |                            ^
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 3.3, camera 250.4,99.9
+AssertionError: width: expected 2.9999999999999996 to be close to 2, received difference is 0.9999999999999996, but expected 5e-10
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:100:28
+     98|   v: { x: number; y: number; zoom: number }, dpr: number): void {
+     99|   expect(s.kind).toBe('rect');
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+       |                            ^
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 2, zoom 1.5, camera 0,0
+AssertionError: corner x 144 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 2, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 113.25 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 2, zoom 0.5, camera 13,7
+AssertionError: corner x 35 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 2, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x -1335.84 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 3, zoom 1.5, camera 0,0
+AssertionError: corner x 216 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 3, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 169.875 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 3, zoom 0.5, camera 13,7
+AssertionError: expected 52.5 to be close to 53.5, received difference is 1, but expected 5e-10
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:106:15
+    104|   }
+    105|   const b = box(s);
+    106|   expect(b.l).toBeCloseTo(Math.round((world.x - v.x) * v.zoom * dpr) +…
+       |               ^
+    107|   expect(b.t).toBeCloseTo(Math.round((world.y - v.y) * v.zoom * dpr) +…
+    108|   expect(b.w).toBeCloseTo(Math.round(world.w * v.zoom * dpr), 9);
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the marquee outline is on the device grid (row 238 (a)) > dpr 3, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x -2003.7599999999998 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:155:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1, zoom 1.5, camera 0,0
+AssertionError: corner x 96 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 80.625 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1, zoom 0.5, camera 13,7
+AssertionError: expected 25.5 to be close to 26.5, received difference is 1, but expected 5e-10
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:106:15
+    104|   }
+    105|   const b = box(s);
+    106|   expect(b.l).toBeCloseTo(Math.round((world.x - v.x) * v.zoom * dpr) +…
+       |               ^
+    107|   expect(b.t).toBeCloseTo(Math.round((world.y - v.y) * v.zoom * dpr) +…
+    108|   expect(b.w).toBeCloseTo(Math.round(world.w * v.zoom * dpr), 9);
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x -615.1199999999999 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 1.5, camera 0,0
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 3.3, camera 250.4,99.9
+AssertionError: width: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:100:28
+     98|   v: { x: number; y: number; zoom: number }, dpr: number): void {
+     99|   expect(s.kind).toBe('rect');
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+       |                            ^
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 1.5, camera 0,0
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 3.3, camera 250.4,99.9
+AssertionError: width: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:100:28
+     98|   v: { x: number; y: number; zoom: number }, dpr: number): void {
+     99|   expect(s.kind).toBe('rect');
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+       |                            ^
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 1.5, camera 0,0
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 0.5, camera 13,7
+AssertionError: width: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:100:28
+     98|   v: { x: number; y: number; zoom: number }, dpr: number): void {
+     99|   expect(s.kind).toBe('rect');
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+       |                            ^
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 3.3, camera 250.4,99.9
+AssertionError: width: expected 2.9999999999999996 to be close to 2, received difference is 0.9999999999999996, but expected 5e-10
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:100:28
+     98|   v: { x: number; y: number; zoom: number }, dpr: number): void {
+     99|   expect(s.kind).toBe('rect');
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+       |                            ^
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 2, zoom 1.5, camera 0,0
+AssertionError: corner x 192 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 2, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 161.25 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 2, zoom 0.5, camera 13,7
+AssertionError: corner x 51 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 2, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x -1230.2399999999998 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 3, zoom 1.5, camera 0,0
+AssertionError: corner x 288 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 3, zoom 1.5, camera 10.25,3.5
+AssertionError: corner x 241.875 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 3, zoom 0.5, camera 13,7
+AssertionError: expected 76.5 to be close to 77.5, received difference is 1, but expected 5e-10
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:106:15
+    104|   }
+    105|   const b = box(s);
+    106|   expect(b.l).toBeCloseTo(Math.round((world.x - v.x) * v.zoom * dpr) +…
+       |               ^
+    107|   expect(b.t).toBeCloseTo(Math.round((world.y - v.y) * v.zoom * dpr) +…
+    108|   expect(b.w).toBeCloseTo(Math.round(world.w * v.zoom * dpr), 9);
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/48]⎯
+
+ FAIL  src/renderer/components/__tests__/map-ghost-device-grid.test.ts > the stamp ghost outline is on the device grid (row 238 (a)) > dpr 3, zoom 3.3, camera 250.4,99.9
+AssertionError: corner x -1845.3599999999997 is not on a device half-pixel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectOnGrid src/renderer/components/__tests__/map-ghost-device-grid.test.ts:102:70
+    100|   expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(2, dpr), 9);
+    101|   for (const [x, y] of s.pts) {
+    102|     expect(onHalf(x), `corner x ${x} is not on a device half-pixel`).t…
+       |                                                                      ^
+    103|     expect(onHalf(y), `corner y ${y} is not on a device half-pixel`).t…
+    104|   }
+ ❯ src/renderer/components/__tests__/map-ghost-device-grid.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/48]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  48 failed (48)
+   Start at  04:57:02
+   Duration  1.29s (transform 872ms, setup 590ms, import 37ms, tests 564ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 48 failure record(s) in 1 file(s) (48 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION       48   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/__tests__/map-ghost-device-grid.test.ts
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1, zoom 1.5, camera 0,0
+        AssertionError: corner x 72 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 56.625 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1, zoom 0.5, camera 13,7
+        AssertionError: expected 17.5 to be close to 18.5, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x -667.92 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 1.5, camera 0,0
+        AssertionError: width: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 1.5, camera 10.25,3.5
+        AssertionError: width: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 0.5, camera 13,7
+        AssertionError: width: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 3.3, camera 250.4,99.9
+        AssertionError: width: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 1.5, camera 0,0
+        AssertionError: width: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 1.5, camera 10.25,3.5
+        AssertionError: width: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 0.5, camera 13,7
+        AssertionError: width: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 3.3, camera 250.4,99.9
+        AssertionError: width: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 1.5, camera 0,0
+        AssertionError: width: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 1.5, camera 10.25,3.5
+        AssertionError: width: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 0.5, camera 13,7
+        AssertionError: width: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 3.3, camera 250.4,99.9
+        AssertionError: width: expected 2.9999999999999996 to be close to 2, received difference is 0.9999999999999996, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 2, zoom 1.5, camera 0,0
+        AssertionError: corner x 144 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 2, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 113.25 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 2, zoom 0.5, camera 13,7
+        AssertionError: corner x 35 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 2, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x -1335.84 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 3, zoom 1.5, camera 0,0
+        AssertionError: corner x 216 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 3, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 169.875 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 3, zoom 0.5, camera 13,7
+        AssertionError: expected 52.5 to be close to 53.5, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the marquee outline is on the device grid (row 238 (a)) > dpr 3, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x -2003.7599999999998 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1, zoom 1.5, camera 0,0
+        AssertionError: corner x 96 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 80.625 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1, zoom 0.5, camera 13,7
+        AssertionError: expected 25.5 to be close to 26.5, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x -615.1199999999999 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 1.5, camera 0,0
+        AssertionError: width: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 1.5, camera 10.25,3.5
+        AssertionError: width: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 0.5, camera 13,7
+        AssertionError: width: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.25, zoom 3.3, camera 250.4,99.9
+        AssertionError: width: expected 2.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 1.5, camera 0,0
+        AssertionError: width: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 1.5, camera 10.25,3.5
+        AssertionError: width: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 0.5, camera 13,7
+        AssertionError: width: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.35, zoom 3.3, camera 250.4,99.9
+        AssertionError: width: expected 2.7 to be close to 2, received difference is 0.7000000000000002, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 1.5, camera 0,0
+        AssertionError: width: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 1.5, camera 10.25,3.5
+        AssertionError: width: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 0.5, camera 13,7
+        AssertionError: width: expected 3 to be close to 2, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 1.5, zoom 3.3, camera 250.4,99.9
+        AssertionError: width: expected 2.9999999999999996 to be close to 2, received difference is 0.9999999999999996, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 2, zoom 1.5, camera 0,0
+        AssertionError: corner x 192 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 2, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 161.25 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 2, zoom 0.5, camera 13,7
+        AssertionError: corner x 51 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 2, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x -1230.2399999999998 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 3, zoom 1.5, camera 0,0
+        AssertionError: corner x 288 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 3, zoom 1.5, camera 10.25,3.5
+        AssertionError: corner x 241.875 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 3, zoom 0.5, camera 13,7
+        AssertionError: expected 76.5 to be close to 77.5, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] the stamp ghost outline is on the device grid (row 238 (a)) > dpr 3, zoom 3.3, camera 250.4,99.9
+        AssertionError: corner x -1845.3599999999997 is not on a device half-pixel: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 48 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 1 of 1 module(s) this run selected finished.
