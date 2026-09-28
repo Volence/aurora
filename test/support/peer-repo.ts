@@ -89,10 +89,143 @@ export function peerRepo(name: string): string | null {
   return git(dir, ['rev-parse', '--is-inside-work-tree']) === null ? null : dir;
 }
 
-/** Full 40-hex commit SHA for `rev` in `repo`, or null when it does not resolve there. */
+/**
+ * Full 40-hex commit SHA for `rev` in `repo`, or null when it does not resolve there.
+ *
+ * WHEN `rev` IS A REF NAME (`origin/master`, not a pinned SHA) THIS ALSO DECLARES
+ * IT, once per module, through `announcePeerRef` below. That is ROADMAP row 187:
+ * every currency gate in this repo resolves its peer tip here, so this is the one
+ * place the declaration can come from without touching the gates themselves.
+ */
 export function resolveRev(repo: string, rev: string): string | null {
-  const sha = git(repo, ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`])?.trim();
-  return sha && /^[0-9a-f]{40}$/.test(sha) ? sha : null;
+  const out = git(repo, ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`])?.trim();
+  const sha = out && /^[0-9a-f]{40}$/.test(out) ? out : null;
+  if (sha !== null) announcePeerRef(repo, rev, sha);
+  return sha;
+}
+
+/**
+ * HOW STALE IS THE PEER REF A GATE JUST COMPARED AGAINST (ROADMAP row 187).
+ *
+ * Every currency gate here reads a peer's LOCAL remote-tracking ref through git
+ * objects and never fetches. That is deliberate and stays so: a fetching gate
+ * makes its verdict depend on the network and on when it ran. The price is that
+ * its green is only as fresh as whoever last moved that ref, and until this
+ * existed nothing in the output said how fresh that was. So the gate now
+ * DECLARES what it compared: the ref, the SHA it resolved to, and when the ref
+ * last MOVED in the peer's local repo.
+ *
+ * ⚠ THE QUANTITY IS THE REFLOG ENTRY'S TIME, NOT THE COMMIT'S DATE. They are
+ * different things and easy to confuse, because `git log -g --format=%ct` prints
+ * the COMMIT date while walking the reflog. The commit date says when somebody
+ * made the commit; a fetch today of a commit made last month moves the ref today.
+ * What bounds staleness is when this repo last learned the value, which is the
+ * reflog entry, read here from `%gd` under `--date=unix` (`origin/master@{<t>}`).
+ * It is still only a BOUND: a fetch that found nothing new moves no ref and
+ * writes no entry, so the ref may have been confirmed current more recently
+ * than the time printed. The printed age is the conservative one.
+ *
+ * WHEN THE TIME CANNOT BE KNOWN it says UNKNOWN and why, in words, never a zero
+ * or an invented date: no reflog at all (logging off, expired, a ref written
+ * without logging), or a newest entry naming a different commit from the one
+ * the ref resolves to (the ref moved without being logged, so the logged time
+ * belongs to another value).
+ *
+ * Read only: `rev-parse` and `log -g` read refs and logs, fetch nothing and
+ * write nothing, because every peer repo is some other lane's live checkout.
+ *
+ * Returns null when `rev` is not a ref name at all (a SHA pin, which names its
+ * bytes forever and has no freshness to declare).
+ */
+export type PeerRefDeclaration = {
+  /** The ref's full name, `refs/remotes/origin/master`. */
+  fullRef: string;
+  sha: string;
+  /** When the ref last moved, or null when that cannot be determined. */
+  updatedAt: Date | null;
+  /** Why `updatedAt` is null, written to be read; null when it is known. */
+  unknownWhy: string | null;
+  /** The sentence printed into the run's output. */
+  line: string;
+};
+
+/** The marker every printed declaration starts with, so a reader can grep a run for it. */
+export const PEER_REF_MARKER = '[peer-ref]';
+
+function ago(ms: number): string {
+  const future = ms < 0;
+  const min = Math.floor(Math.abs(ms) / 60000);
+  const span = min < 1 ? 'under 1 min'
+    : min < 60 ? `${min} min`
+    : min < 48 * 60 ? `${Math.floor(min / 60)} h ${min % 60} min`
+    : `${Math.floor(min / 1440)} d ${Math.floor((min % 1440) / 60)} h`;
+  return future
+    ? `${span} AFTER this run started, so the two clocks disagree`
+    : `${span} before this run`;
+}
+
+export function declarePeerRef(repo: string, rev: string, now: Date = new Date()): PeerRefDeclaration | null {
+  const fullRef = git(repo, ['rev-parse', '--symbolic-full-name', rev])?.trim() ?? '';
+  if (!fullRef.startsWith('refs/')) return null;
+  const sha = resolveShaQuietly(repo, fullRef);
+  const peer = `peer ${repo.split(/[\\/]/).filter(Boolean).pop() ?? repo} ${rev}`;
+  if (sha === null) {
+    // Named a ref, but the ref does not resolve to a commit. The caller's own
+    // resolve already said so; this is here so the function never lies.
+    const why = `${fullRef} does not resolve to a commit in ${repo}`;
+    return { fullRef, sha: '', updatedAt: null, unknownWhy: why, line: `${peer} = (unresolved), ref update time UNKNOWN: ${why}` };
+  }
+  const head = `${peer} = ${sha.slice(0, 8)}`;
+  const unknown = (why: string): PeerRefDeclaration => ({
+    fullRef, sha, updatedAt: null, unknownWhy: why, line: `${head}, ref update time UNKNOWN: ${why}`,
+  });
+  const entry = git(repo, ['log', '-g', '-n1', '--date=unix', '--format=%H%x00%gd%x00%gs', fullRef]);
+  if (entry === null) return unknown(`git log -g could not read the reflog of ${fullRef} in ${repo}`);
+  if (entry.trim() === '') {
+    return unknown(`${fullRef} has NO REFLOG in ${repo} (logging off, entries expired, or the ref was `
+      + 'written without logging), so nothing records when it last moved');
+  }
+  const [logged = '', selector = '', subject = ''] = entry.replace(/\n$/, '').split('\0');
+  const t = /@\{(\d+)\}$/.exec(selector);
+  if (t === null) return unknown(`the reflog selector "${selector}" for ${fullRef} carries no unix time`);
+  if (logged !== sha) {
+    return unknown(`the newest reflog entry of ${fullRef} names ${logged.slice(0, 8)}, not the `
+      + `${sha.slice(0, 8)} the ref resolves to, so the ref moved without being logged`);
+  }
+  const updatedAt = new Date(Number(t[1]) * 1000);
+  const iso = updatedAt.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  return {
+    fullRef, sha, updatedAt, unknownWhy: null,
+    line: `${head}, ref last updated ${iso} (${ago(now.getTime() - updatedAt.getTime())}; reflog: "${subject}")`,
+  };
+}
+
+function resolveShaQuietly(repo: string, rev: string): string | null {
+  const out = git(repo, ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`])?.trim();
+  return out && /^[0-9a-f]{40}$/.test(out) ? out : null;
+}
+
+/**
+ * Print a ref's declaration into the run's output, once per module and value.
+ *
+ * `console.log` is the route because it already reaches a human on a PASSING
+ * run: vitest.config.ts names its reporters explicitly precisely so a passing
+ * test's console output is not swallowed, and
+ * `test/config/reporter-visibility.test.ts` guards that. No reporter carries a
+ * note for a pass today (the skip reporter reads notes only off skips), so this
+ * reuses the one surface that is already proven visible rather than adding one.
+ *
+ * Keyed on the resolved SHA as well as the ref, so a ref that moves mid-file
+ * is declared again rather than hidden behind its first value.
+ */
+const announced = new Set<string>();
+
+function announcePeerRef(repo: string, rev: string, sha: string): void {
+  const key = `${repo}\0${rev}\0${sha}`;
+  if (announced.has(key)) return;
+  announced.add(key);
+  const d = declarePeerRef(repo, rev);
+  if (d !== null) console.log(`${PEER_REF_MARKER} ${d.line}`);
 }
 
 export type PeerBlob =
