@@ -1,8 +1,9 @@
 # Aeon pins re-measured after the stress-evict fix (2026-09-28)
 
 Branch `parcel/pins-aeon-stress-evict`. There are two commits: 92a3c5c4 re-pins the clip markers and
-1fd7d89d re-vendors the engine constants. This page is the report. **One item is BLOCKED (section 6).
-After this branch, 4 tests stay red.**
+1fd7d89d re-vendors the engine constants. This page is the report. One item was BLOCKED (section 6).
+The overseer then authorised the test-logic change, and 699d8c8d resolves it (section 10). **The suite
+is now 0 failed.**
 
 ## 1. Why master was red
 
@@ -199,7 +200,7 @@ origin/master is **936439fa** (936439faee52e89aacb0daef141b2e48ff613fc2). That i
 pin was derived against, so nothing new needed folding in. The last check is in the commit message
 of this page.
 
-## 9. Suite
+## 9. Suite (before section 10)
 
 Full `npm test` (VITEST_MAX_WORKERS=4, TMPDIR under $HOME, foreground) on this branch at 1fd7d89d
 exited 1:
@@ -213,3 +214,101 @@ The four failures are the BLOCKED rows in section 6: "the constants pinned by va
 its loaded modules name" for bake-json, s2_ehz_cpz, s2_two_clip and s2_woven. Each one names
 `PAGE_FRAMES_CLAMP`. On master 2226c4da there were 7 failures. The six input-currency rows and the
 engine_constants row are now green.
+
+## 10. The BLOCKED item, resolved under the overseer's ruling
+
+The overseer authorised the test-logic change as a separate commit on this branch: **699d8c8d**.
+
+**Aeon's define semantics, mirrored.** These are the aeon lines at 925ee395 that I mirrored, in
+aeon's `tools/fg_working_set.py`, `ConstantSource`:
+- `define(self, name, value)`:
+  - `if name in self._raw:` raises "a define would shadow it": a name a loaded file declares cannot
+    be defined.
+  - `if name in self.values and self.values[name] != value:` raises "already set": a different
+    re-definition is refused.
+  - `self.values[name] = int(value)` stores the value.
+- `get` checks `if name in self.values:` / `return self.values[name]` before any declaration, so a
+  define is what `get` returns.
+- **There is no default.** An undefined, undeclared name hits `get`'s `KeyError` ("not found in any
+  loaded .emp source"). Aurora's transcription keeps that loud refusal.
+
+The caller is aeon's `tools/fg_page_order.py`: `def load_budget_constants(path=CONSTANTS_EMP,
+stress_evict=0):` does `src.load_file(path)` and THEN `src.define("STRESS_EVICT", stress_evict)`.
+So Aurora's `readerSource` loads every file of a reader first and applies its defines after.
+
+aeon's `build.sh` passes `STRESS_EVICT=1` only to its STRESS_EVICT build profile. The clip bake
+never reads it from the environment: no loaded module has an `environ`/`getenv` line naming it, and
+the new row checks this.
+
+**What changed in `test/support/emp-constants.ts`:**
+- `ConstantSource.define` added, following the semantics above.
+- The seven mirrored aeon lines join `PARSER_SOURCE_LINES`, so the provenance row reds if aeon
+  rewrites them.
+- `EmpReader` gains optional `defines`.
+- `readerSource` is new, and `readerValues` goes through it. A refused define refuses the whole
+  reader, just as aeon's `ValueError` aborts `load_budget_constants`.
+- A `layer_lines` reader with defines is refused.
+
+No other parser code changed.
+
+**The recorded define, and how it was derived.** Every call of `load_budget_constants` that
+`clip_act_bake` makes passes no `stress_evict` (aeon's `tools/clip_act_bake.py` lines 293, 384, 688,
+729). The same holds for gen_bake_json's one call. `fixture.command` sets nothing. So the run used
+the signature default, **0**.
+
+The four markers that load the budget code (bake-json, s2_ehz_cpz, s2_two_clip, s2_woven) now
+record `defines: {STRESS_EVICT: 0}` on their ConstantSource reader, with a `define_sources` entry
+(module, function, parameter, callers, why). They pin **PAGE_FRAMES_CLAMP 12**. That is aeon's own
+answer: `load_budget_constants(stress_evict=0)` in the materialised copy gives 12, and gives 9 at
+`stress_evict=1`.
+
+Two calls pass something other than the default, and both sit outside `callers`: `ojz_strip_gen`'s
+`load_budget_constants(stress_evict=1)` inside `generate()`, and `fg_page_order`'s `check`. The
+trace saw no generated OJZ file opened, so the run did not reach them. The row cannot re-trace this;
+it holds only on the marker's word. paste-music and validate-json keep PAGE_FRAMES_CLAMP in
+names_not_read.
+
+**Test rows** in `test/formats/clip-tool-outputs.test.ts`:
+- **New row: "each build define a value pin records is the value the recorded run passed".** At the
+  marker's revision it derives the value from:
+  - the `def function(... parameter=D ...)` default;
+  - the `.define("NAME", parameter)` call;
+  - every call in the reached callers, and in the generator, leaving `parameter` unset (with at
+    least one such call);
+  - no mention of the name in `fixture.command` or the generator;
+  - no environment read.
+  It then requires the recorded value to equal D.
+- **Census.** The census now builds its closure through `readerSource`, and each define gets two
+  new plants:
+  - (a) the recorded value +1 must move a pinned value;
+  - declaring the define in the file must be refused, as aeon refuses a shadowing define.
+  (b) An edit to the clamp expression's line, and a shadow above it, are the existing plants on a
+  now-pinned PAGE_FRAMES_CLAMP. **Not covered, and why:** editing STRESS_EVICT_FRAMES cannot move
+  the value at define 0 (0 times anything), in aeon or here. So it correctly counts as neither a
+  red plant nor an unread green edit: it sits in the resolve closure.
+
+**Proof (invariant 8).** I committed the fix before mutating anything. Each plant was shown with
+`git diff -U0` and run under vitest. Each restore used `git restore --source=HEAD` and was followed
+by a re-run of `test/formats/clip-tool-outputs.test.ts`, which came back 111 passed every time.
+
+| plant (on disk) | red rows | define-derivation row |
+|---|---|---|
+| P1: s2_woven marker `"STRESS_EVICT": 0` -> `1` | 4: by-value parse, define-derivation ("recorded as 1, but the run passed ... default 0"), census, origin/master value | **RED** |
+| P2: s2_woven marker `"PAGE_FRAMES_CLAMP": 12` -> `13` | 3: by-value parse, census, origin/master value | **GREEN** |
+| P3: `define()` stores `0n` whatever it is given (the default, a broken lookup) | 4: the census row of each of the four define markers ("define STRESS_EVICT 0 -> 1: no pinned value ... moved") | green |
+
+The cross-plant: P1 is caught by the define-derivation row, which stays green under P2, so the two
+plants are caught independently rather than by one test with two entrances. P3 is invisible to the
+value rows, because the recorded define equals the value the broken lookup returns. That is exactly
+why the census's define-flip plant exists, and it catches P3.
+
+**Suite.** Full `npm test` (VITEST_MAX_WORKERS=4, TMPDIR under $HOME, foreground) at 699d8c8d,
+exit 0:
+
+- Test Files: 695 passed, 3 skipped (698); 0 failed
+- Tests: 11942 passed, 20 skipped (11962); 0 failed
+- `failure-class: no failures in this run (698 module(s) reported).`
+- `run-completeness: COMPLETE, 698 of 698 module(s) this run selected finished.`
+
+**Aeon re-checked before the final commit.** I fetched at 2026-09-28T23:25:05Z: origin/master is
+still 936439fa, the tip the pin was derived against, so there was nothing to fold in.
