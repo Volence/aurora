@@ -15,13 +15,15 @@ import React from 'react';
 import { T } from '../ui/theme';
 import type { PxRect } from '../../../core/formats/donors/donor-tree';
 import {
-  DONOR_CROP_EDGE, DONOR_CROP_SHADE, DONOR_MARK, DONOR_MARK_FAINT, DONOR_MARK_FAINT_FILL, DONOR_MARK_FILL,
-  DONOR_MARK_WARN, DONOR_WORLD_EDGE,
+  DONOR_CROP_EDGE, DONOR_CROP_SHADE, DONOR_LABEL_CHIP, DONOR_LABEL_FAINT, DONOR_MARK, DONOR_MARK_FAINT,
+  DONOR_MARK_FAINT_FILL, DONOR_MARK_FILL, DONOR_MARK_WARN, DONOR_WORLD_EDGE,
 } from '../../canvas/canvas-colors';
+import { fitView, MAX_SCALE, MIN_SCALE, type PaneView } from './pane-view';
+import { layoutLabels, type LabelBox, type LabelItem } from './pane-labels';
+
+export type { PaneView } from './pane-view';
 
 export interface PaneBitmap { x: number; y: number; size: number; bitmap: ImageBitmap }
-
-export interface PaneView { scale: number; ox: number; oy: number }
 
 /**
  * One outlined rectangle. `dashed` draws a 2px DASHED edge with no fill, and
@@ -50,6 +52,15 @@ export interface ZonePaneReport {
   paints: number;
   /** The outlines this paint drew, in world pixels, as the pane was given them. */
   outlines: PaneOutline[];
+  /**
+   * ROW 235 (b): every label and tag this paint laid out (pane-labels.ts), in
+   * CSS px from the canvas's top-left. `box` is the opaque chip it printed on
+   * (null when hidden, or when an identical twin at the same corner printed
+   * it); `fg` and `bg` are the text and chip colours, so a reader of the canvas
+   * can tell the label's own pixels from anything else.
+   */
+  labels: Array<{ text: string; kind: 'label' | 'tag'; outline: number; box: LabelBox | null; line: number | null;
+    hidden: boolean; twinOf: number | null; fg: string; bg: string }>;
 }
 
 const reports = new Map<string, ZonePaneReport>();
@@ -59,8 +70,8 @@ export function lastZonePaneReport(pane: string): ZonePaneReport | null {
 }
 
 const DRAG_SLOP_PX = 4;
-const MIN_SCALE = 1 / 64;
-const MAX_SCALE = 8;
+const LABEL_FONT = '11px sans-serif';
+const TAG_FONT = 'bold 10px sans-serif';
 
 export interface ZonePaneProps {
   pane: string;
@@ -79,11 +90,9 @@ export interface ZonePaneProps {
   style?: React.CSSProperties;
 }
 
-function fitView(w: number, h: number, r: PxRect): PaneView {
-  const margin = 16;
-  const scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE,
-    Math.min((w - margin * 2) / r.w, (h - margin * 2) / r.h)));
-  return { scale, ox: r.x - (w / scale - r.w) / 2, oy: r.y - (h / scale - r.h) / 2 };
+/** The text colour of an outline's label: its tone, opaque (a faint label is read over a chip, not blended). */
+function labelColour(o: PaneOutline): string {
+  return o.tone === 'warning' ? DONOR_MARK_WARN : o.tone === 'faint' ? DONOR_LABEL_FAINT : DONOR_MARK;
 }
 
 export default function ZonePane(props: ZonePaneProps): React.ReactElement {
@@ -127,7 +136,10 @@ export default function ZonePane(props: ZonePaneProps): React.ReactElement {
     // The world's own edge, so an empty act still reads as a place.
     ctx.strokeStyle = DONOR_WORLD_EDGE;
     ctx.strokeRect(sx(0) + 0.5, sy(0) + 0.5, worldW * view.scale - 1, worldH * view.scale - 1);
-    for (const o of outlines ?? []) {
+    // PASS 1: every outline's fill and edge. Labels go on top in pass 2, so no
+    // later rectangle's fill or edge can cross a chip.
+    const items: LabelItem[] = [];
+    (outlines ?? []).forEach((o, i) => {
       const col = o.tone === 'warning' ? DONOR_MARK_WARN : o.tone === 'faint' ? DONOR_MARK_FAINT : DONOR_MARK;
       const x = sx(o.rect.x); const y = sy(o.rect.y);
       const rw = o.rect.w * view.scale; const rh = o.rect.h * view.scale;
@@ -140,26 +152,41 @@ export default function ZonePane(props: ZonePaneProps): React.ReactElement {
       ctx.setLineDash(o.dashed ? [...OUTLINE_DASH] : []);
       ctx.strokeRect(x + 1, y + 1, Math.max(0, rw - 2), Math.max(0, rh - 2));
       ctx.setLineDash([]);
+      const rect = { x, y, w: rw, h: rh };
       if (o.label) {
-        ctx.font = '11px sans-serif';
-        ctx.fillStyle = col;
-        ctx.fillText(o.label, x + 4, y + 13);
+        ctx.font = LABEL_FONT;
+        items.push({ text: o.label, kind: 'label', outline: i, rect, line: 0, width: ctx.measureText(o.label).width });
       }
+      // A rule tag wants the SECOND line: a refused rectangle is always also
+      // drawn by another outline that carries the id on the first (the clip's
+      // faint one, or the pending paste's accent one); the layout keeps it off
+      // that id ("C4" over "ehz_2x" read "C4z_2x" in the row-213 harness shot).
       if (o.tag) {
-        // ALWAYS on the second line: a refused rectangle is always also drawn
-        // by another outline that carries the id on the first (the clip's faint
-        // one, or the pending paste's accent one), so a first-line tag would
-        // print over it ("C4" over "ehz_2x" read "C4z_2x" in the harness shot).
-        ctx.font = 'bold 10px sans-serif';
-        ctx.fillStyle = col;
-        ctx.fillText(o.tag, x + 4, y + 26);
+        ctx.font = TAG_FONT;
+        items.push({ text: o.tag, kind: 'tag', outline: i, rect, line: 1, width: ctx.measureText(o.tag).width });
       }
+    });
+    // PASS 2: the labels, laid out so none is drawn over another (pane-labels.ts).
+    const laid = layoutLabels(items);
+    const labels: ZonePaneReport['labels'] = [];
+    for (const l of laid) {
+      const o = (outlines ?? [])[l.outline];
+      const fg = labelColour(o);
+      labels.push({ text: l.text, kind: l.kind, outline: l.outline, box: l.box ? { ...l.box } : null, line: l.placedLine,
+        hidden: l.hidden, twinOf: l.twinOf, fg, bg: DONOR_LABEL_CHIP });
+      if (!l.box || !l.baseline) continue;
+      ctx.fillStyle = DONOR_LABEL_CHIP;
+      ctx.fillRect(l.box.x, l.box.y, l.box.w, l.box.h);
+      ctx.font = l.kind === 'tag' ? TAG_FONT : LABEL_FONT;
+      ctx.fillStyle = fg;
+      ctx.fillText(l.text, l.baseline.x, l.baseline.y);
     }
     paintsRef.current += 1;
     const r = canvas.getBoundingClientRect();
     reports.set(pane, {
       pane, view: { ...view }, dpr, bitmaps: bitmaps.length, worldW, worldH, paints: paintsRef.current,
       outlines: (outlines ?? []).map((o) => ({ ...o, rect: { ...o.rect } })),
+      labels,
       rect: { left: r.left, top: r.top, width: r.width, height: r.height },
     });
   }, [bitmaps, crop, outlines, pane, worldW, worldH]);
@@ -217,6 +244,15 @@ export default function ZonePane(props: ZonePaneProps): React.ReactElement {
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
+    if (!d && viewRef.current && canvasRef.current) {
+      // Every id under the pointer, so a label the layout had to hide is still
+      // one hover away (row 235 (b)).
+      const p = toWorld(e.clientX, e.clientY);
+      const names = [...new Set((outlines ?? []).filter((o) => o.label && p.x >= o.rect.x && p.x < o.rect.x + o.rect.w
+        && p.y >= o.rect.y && p.y < o.rect.y + o.rect.h).map((o) => o.label as string))];
+      const title = names.join('\n');
+      if (canvasRef.current.title !== title) canvasRef.current.title = title;
+    }
     if (!d || !viewRef.current) return;
     if (!d.moved && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) >= DRAG_SLOP_PX) d.moved = true;
     if (!d.moved) return;
