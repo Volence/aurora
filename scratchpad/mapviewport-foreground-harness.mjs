@@ -52,10 +52,15 @@
 //         discriminate the gate; it proves the aim is on a live guide's row).
 //   GT.a  in LAYOUT the same world row's press does not move world_y and goes to
 //         the marquee tool.  plant: activeGuideScene's facet check dropped.
-//   HBW.a nothing of the longest readout is cut at 1400, 1100, 900.  plant:
-//         styles.hoverBar gains `whiteSpace: 'nowrap'` (red at 900 only; 1400
-//         and 1100 fit one line either way, so they do not discriminate).
+//   HBW.a nothing of the longest readout is cut at 1400, 1100, 900, 700.
+//         plants: styles.hoverBar gains `whiteSpace: 'nowrap'` (red at 900, the
+//         packet's plant; 1400 and 1100 fit one line either way, so they do not
+//         discriminate); styles.hoverBar loses `overflowWrap: 'anywhere'` (red
+//         at 700 only: the collision arm's sparkline is one run with no break
+//         opportunity, wider than the bar's content box; ROADMAP row 244).
 //   HBW.find, HB.numbers, HB.lines, CLV   NOTES: measured, never counted.
+//         (HBW.find was the 700 px finding; since row 244 700 is GATED in
+//         HBW.a and HBW.find only prints the 700 line boxes.)
 //
 // EXPECTATIONS COME FROM THE TREE, NOT FROM A RUN (see loadOracle): the
 // collision tables are decoded outside the app from the run's copy by the
@@ -1066,17 +1071,18 @@ async function hbPart(d, O) {
   const cut = (r) => !(r.inside && r.scrollW <= r.clientW);
   const summary = (rs) => J(rs.map((r) => ({ W: r.W, lines: r.lines, inside: r.inside, scroll: [r.scrollW, r.clientW], h: r.bar && +r.bar.h.toFixed(1), canvasW: r.canvas && r.canvas.w, collArm: mentions(r) })));
   // GATED widths: the app's default (src/main/index.ts), 1100 (the narrower window
-  // harness:map-behaviour-fixes' aob census treats as real) and 900. 700 is
-  // MEASURED and printed as a finding on every run, not gated: at it the map
-  // canvas is 176 px wide and the collision arm's sparkline, one unbreakable run,
-  // is wider than the bar (docs/reviews/2026-09-28-mapviewport-foreground.md).
-  const gated = per.filter((r) => r.W !== 700);
+  // harness:map-behaviour-fixes' aob census treats as real), 900 and 700. At 700
+  // the map canvas is 176 px wide and the collision arm's sparkline is one run
+  // wider than the bar's content box: it was a finding printed as HBW.find
+  // (docs/reviews/2026-09-28-mapviewport-foreground.md) and is gated since
+  // ROADMAP row 244 (the ruled fix: the run wraps; no ellipsis, no minWidth).
+  const gated = per;
   const couldNot = per.filter((r) => r.resized === false || r.onMap === false || r.display !== 'flex' || !mentions(r));
   check('HBW.a', `NOTHING OF THE READOUT IS CUT at the window widths ${J(gated.map((r) => r.W))} (the first is the app's own default): at each, the bar shows the longest arm (a known collision cell), every line box of its text lies inside the map container (overflow ${J(per[0] && per[0].cont && per[0].cont.overflow)}), and its scrollWidth does not exceed its clientWidth`,
     couldNot.length ? 'UNMEASURABLE' : gated.every((r) => !cut(r)),
     `cell ${J(cell)}; ${summary(gated)}${couldNot.length ? `; COULD NOT MEASURE ${J(couldNot.map((r) => ({ W: r.W, resized: r.resized, onMap: r.onMap, display: r.display })))}` : ''}`);
   const at700 = per.find((r) => r.W === 700);
-  note('HBW.find', `FINDING (not counted), window 700 px: ${at700 && at700.display === 'flex' ? (cut(at700) ? 'the readout IS CUT' : 'nothing cut') : 'NOT MEASURED'}: ${at700 ? summary([at700]) : 'n/a'}; line boxes ${J(at700 && at700.rects)}`);
+  note('HBW.find', `window 700 px (GATED in HBW.a since row 244; this line only prints its line boxes): ${at700 && at700.display === 'flex' ? (cut(at700) ? 'the readout IS CUT' : 'nothing cut') : 'NOT MEASURED'}: ${at700 ? summary([at700]) : 'n/a'}; line boxes ${J(at700 && at700.rects)}`);
   // THE NUMBERS FOR THE LOOK CALL (not rows): contrast on the pixels actually
   // behind the bar, and on the worst case the 0.9 background allows.
   await d.geometry('hb default again');
