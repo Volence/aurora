@@ -1,0 +1,63 @@
+// ONE-OFF GENERATOR, NEVER COMMITTED (ROADMAP row 239 (a), ruled 2026-09-28): re-records
+// the two call-for-call goldens the row-239 source change moves, from THIS tree's code,
+// through the same recorder and the same scenarios the rows that read them use, in the
+// same file format. It is the mechanism the originals were made by (a one-off vitest
+// spec: docs/captures/2026-09-12-dpr-guides-offset/dpr1-golden-generator.ts.txt for the
+// chrome golden, docs/reviews/2026-09-25-regions-middrag-preview.md section 3 for the
+// region golden). Deleted after it runs; the packet keeps its text.
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { drawLayerGuides, drawSurfaceMarks, surfaceGeometry } from '../effects-guides';
+import { drawScreenFrame, screenFrameRect } from '../screen-frame';
+import { drawCameraPreview, cameraPreviewPlan } from '../camera-preview';
+import { drawBandLensLabel } from '../band-lens';
+import { drawRegionOverlay } from '../region-overlay';
+import {
+  recordingContext, GUIDE_CASES, SURFACE_CASES, FRAME_CASES, CAMERA_CASES, LENS_LABEL_CASES,
+  CAMERA_SOURCES,
+} from './chrome-recorder';
+import { fullCases, CASE_VP } from './region-overlay-cases';
+
+const FROM = process.env.REGEN_FROM;
+
+it('re-records the dpr-1 chrome golden and the full region-overlay golden', () => {
+  if (!FROM) throw new Error('REGEN_FROM must name the tree the goldens are recorded from');
+  const cases: Record<string, unknown> = {};
+  for (const c of GUIDE_CASES) {
+    const r = recordingContext(); drawLayerGuides(r.ctx, 1, c.vp, c.layers, c.opts); cases[`guides: ${c.name}`] = r.calls;
+  }
+  for (const c of SURFACE_CASES) {
+    const r = recordingContext(); drawSurfaceMarks(r.ctx, 1, c.vp, surfaceGeometry(c.layers, c.vp)); cases[`surfaces: ${c.name}`] = r.calls;
+  }
+  for (const c of FRAME_CASES) {
+    const r = recordingContext(); drawScreenFrame(r.ctx, 1, c.vp, c.anchor, c.opts); cases[`frame: ${c.name}`] = r.calls;
+  }
+  for (const c of CAMERA_CASES) {
+    const r = recordingContext();
+    drawCameraPreview(r.ctx, 1, screenFrameRect(c.anchor, c.vp), c.vp.zoom,
+      cameraPreviewPlan(c.scene, c.camX, c.camY), CAMERA_SOURCES, { captions: c.captions });
+    cases[`camera: ${c.name}`] = r.calls;
+  }
+  for (const c of LENS_LABEL_CASES) {
+    const r = recordingContext(); drawBandLensLabel(r.ctx, 1, c.vp, c.lines, c.anchor); cases[`lens label: ${c.name}`] = r.calls;
+  }
+  writeFileSync(fileURLToPath(new URL('./dpr1-chrome-master.golden.json', import.meta.url)), `${JSON.stringify({
+    generatedFrom: `row 239 (a) ${FROM}, ruled 2026-09-28: even-width strokes on whole-pixel centres; every other call as master 803e8a301895709142cad70cc15763bd33a40ae2 recorded`,
+    cases,
+  }, null, 1)}\n`);
+
+  const parts: string[] = [];
+  for (const c of fullCases()) {
+    const r = recordingContext();
+    const rep = drawRegionOverlay(r.ctx, c.dpr, CASE_VP, c.input);
+    const report = {
+      regions: rep.regions, selectedId: rep.selectedId, unassignedRects: rep.unassignedRects,
+      unassignedArea: rep.unassignedArea, visual: rep.visual,
+    };
+    parts.push(`${JSON.stringify(c.name)}:{"report":${JSON.stringify(report)},"calls":[\n${r.calls.map((k) => JSON.stringify(k)).join(',\n')}\n]}`);
+  }
+  const head = JSON.stringify(`row 239 (a) ${FROM}, ruled 2026-09-28: even-width strokes on whole-pixel centres; every other call as master 6072f9df0fa3f45afd750025110397eda7169974 recorded (drawRegionOverlay before row 208)`);
+  writeFileSync(fileURLToPath(new URL('./region-overlay-full-master.golden.json', import.meta.url)),
+    `{"generatedFrom":${head},"cases":{\n${parts.join(',\n')}\n}}\n`);
+});

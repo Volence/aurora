@@ -1,0 +1,36 @@
+old: master 803e8a301895709142cad70cc15763bd33a40ae2, signatures without a dpr argument
+new: row 239 (a) parcel/even-chrome-239 (base 9d8fcee9, the row 239 source change), ruled 2026-09-28: even-width strokes on whole-pixel centres; every other call as master 803e8a301895709142cad70cc15763bd33a40ae2 recorded
+
+== guides: act space, three layers, one disabled, fractional pan and zoom: 44 calls, 0 moved
+
+== guides: screen space, hover on 1, a refusal notice on 2 (plate + caption): 77 calls, 4 moved
+  #18 moveTo [0, 200.5] -> [0, 200]  (device lineWidth 2, EVEN)
+  #19 lineTo [912, 200.5] -> [912, 200]  (device lineWidth 2, EVEN)
+  #31 moveTo [0, 221.5] -> [0, 221]  (device lineWidth 2, EVEN)
+  #32 lineTo [912, 221.5] -> [912, 221]  (device lineWidth 2, EVEN)
+
+== guides: a drag in flight on 0, zoom 2.5, a guide near the top edge: 31 calls, 2 moved
+  #5 moveTo [0, 31.5] -> [0, 31]  (device lineWidth 2, EVEN)
+  #6 lineTo [1097.6, 31.5] -> [1097.6, 31]  (device lineWidth 2, EVEN)
+
+== surfaces: two remapped layers, one rule near the top edge: 48 calls, 0 moved
+
+== surfaces: zoom 2.5, one rule: 29 calls, 0 moved
+
+== frame: at rest, fractional pan, zoom 1.5: 14 calls, 0 moved
+
+== frame: active, zoom 2.5, caption override: 14 calls, 1 moved
+  #5 strokeRect [60.5, 80.5, 800, 560] -> [60, 80, 800, 560]  (device lineWidth 2, EVEN)
+
+== frame: half off the top edge: 14 calls, 0 moved
+
+== camera: four bands, camera 320, fractional frame: 42 calls, 0 moved
+
+== camera: four bands, camera 900 (wraps), zoom 2.5, no captions: 19 calls, 0 moved
+
+== lens label: anchored to coverage, fractional anchor: 19 calls, 0 moved
+
+== lens label: no coverage on screen: the corner: 15 calls, 0 moved
+
+TOTAL moved calls: 7
+VERDICT: every moved call is stroke geometry (moveTo/lineTo/strokeRect) under an EVEN device lineWidth; op sequence, call counts, matrices and reports unchanged

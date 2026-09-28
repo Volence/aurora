@@ -1,0 +1,125 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a — dist/main/index.mjs is 21s newer than the newest of 1060 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a/src/renderer/canvas/region-overlay.ts)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-28T10:16:14.152Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-28T10:16:14.152Z), so window.__dbg is in this bundle
+NOTE       baseline scene
+        dpr_base written into the COPY: v_factor 0, tops [4000]
+NOTE       environment
+        uptime 415618s, load 6.79 10.38 12.99; built tree /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a at HEAD 7435c6a3996823f0773bd3f05296acdd236b8358; dist/main mtime 2026-09-28T10:16:13.515Z; aeon copy /home/volence/.cache/aeon-copy-239-dgo-fix1; SCALE=unset EMULATE=1.35 TAG=fix1
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /home/volence/.cache/aurora-tmp-239/aurora-harness-profiles/dpr-guides-offset-harness-861506-82441e9d — see HAZARD 6
+PASS  [0a] [anti-vacuous] the build under test has the guide, frame and camera-preview probes
+        /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a/dist
+        aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  [1a] [anti-vacuous] the aeon COPY is open, with sections
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  [1b] [anti-vacuous] the Effects facet was entered by a real click
+        {"x":404,"y":54,"hitOk":true}
+PASS  [1c] [anti-vacuous] the probe scene exists, is LOCKED, and has its two tops parked
+        scenes before ["dpr_base","ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start"]; probe {"v_factor":15,"tops":[60,200]}
+PASS  [N.I0] [anti-vacuous] the identity states draw what they are for: the band lens label, and the floor composite with the camera off 0
+        band lens {"active":true,"cells":1220,"drawn":1220}; camera preview {"active":true,"sceneId":"ojz_act1_floor","camX":64,"blits":4}; frame x 0 -> 64 -> 0
+PASS  [N.I1] [anti-vacuous] DETERMINISM: each fixed state hashes the same on two repaints in one run (dpr 1)
+        probe a55232571f3233f4 / a55232571f3233f4 (816x742); floor 81860e4ef2e51081 / 81860e4ef2e51081; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a/scratchpad/shots-dpr-guides-offset/state-probe-a-N-fix1.png, /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a/scratchpad/shots-dpr-guides-offset/state-floor-a-N-fix1.png
+PASS  [N.I2] PIXEL IDENTITY at dpr 1: both states hash the same as the baseline build (unknown)
+        this build 7435c6a3996823f0773bd3f05296acdd236b8358: probe a55232571f3233f4 floor 81860e4ef2e51081 (816x742); baseline unknown: probe a55232571f3233f4 floor 81860e4ef2e51081 (816x742), from /home/volence/.cache/aurora-tmp-239/identity-master.json
+
+=== PHASE N: native (Xvfb default, no switch): dpr 1
+    GEOMETRY dpr 1; map canvas rect {"left":284,"top":106,"width":816,"height":742}; backing store 816x742; view {"x":0,"y":0,"zoom":1}; uptime 415650s, load 5.75 9.73 12.68
+PASS  [N.0] [anti-vacuous] the map canvas backing store is dpr-scaled in this phase (native (Xvfb default, no switch): dpr 1)
+        store/rect 1.0000 x 1.0000 against dpr 1; view {"x":0,"y":0,"zoom":1}
+PASS  [N.1] [anti-vacuous] the guides report is active, for the probe scene, at the parked tops
+        rows [60,200] sceneId dpr_probe paints 46
+PASS  [N.2] the guide lines are DRAWN where the hit test measures: one differing run per reported row, within 1.5 CSS px, and none elsewhere
+        column CSS x 416 (device 416); runs (CSS) [[60,61],[200,201]]; reported rows [60,200]; identity-transform prediction [60,200]
+PASS  [N.3] a real press on the VISIBLE line of layer 1 grabs layer 1
+        aim client (700, 307) = canvas row 201.00 on the drawn run [200,201]; report {"dragIndex":1,"hoverIndex":1,"frameDragging":false,"committed":{"from":[60,200],"to":[60,201],"afterUndo":[60,200]}}; dpr 1; rect.top 106
+PASS  [N.4] a real drag from that line moves LAYER 1 to the contract row and leaves layer 0 alone
+        pressed client y 307, released at 276 (canvas row 170.00); contract 170; tops now [60,170]; view after {"x":0,"y":0,"zoom":1}
+NOTE       N.5
+        n/a at dpr 1: the identity-transform position 200.00 is the reported row 200 (the rows the fix separates coincide here)
+PASS  [N.6] the frame's right edge is DRAWN where the hit test measures (the rightmost differing run within 1.5 CSS px of rect.x + rect.w)
+        row CSS y 112 (device 112); runs (CSS) [[0,1],[320,321]]; report rect {"x":0,"y":0,"w":320,"h":224} (right 320); identity-transform prediction right 320.00
+PASS  [N.7] a real press on the VISIBLE right edge of the frame grabs the frame
+        aim client (605, 218) = canvas (321.00, 112.00) on the drawn run [320,321]; report {"dragIndex":null,"hoverIndex":null,"frameDragging":true,"committed":null}
+PASS  [N.8] a real drag of that edge moves the frame by the contract delta, and a drag back restores it
+        anchor {"x":0,"y":0} -> {"x":40,"y":0} (contract x 40, dragged 605 -> 645) -> {"x":0,"y":0}
+NOTE       N.9
+        n/a at dpr 1: the identity-transform position 320.00 is the reported edge 320
+NOTE       N.10 last device column
+        store column 815 (CSS 815.00..816.00); rows where it differs, RGBA with the composite on and off: none
+NOTE       N.10 runs
+        per row, CSS [from, to) of the differing columns: 310:[[65,75],[77,87],[89,92],[93,102],[114,115],[116,118],[122,125],[127,131],[133,140],[146,147],[154,155],[163,164],[170,171],[172,179],[181,187],[193,203],[205,215],[217,220],[221,230],[242,243],[244,246],[250,253],[255,259],[261,268],[274,275],[282,283],[291,292],[298,299],[300,307],[309,315],[321,331],[333,343],[345,348],[349,358],[370,371],[372,374],[378,381],[383,384]] 333:[[66,67],[70,79],[82,84],[85,93],[95,98],[99,100],[103,105],[107,109],[111,138],[139,154],[156,157],[175,180],[182,187],[194,195],[198,207],[210,212],[213,221],[223,226],[227,228],[231,233],[235,237],[239,266],[267,282],[284,285],[303,308],[310,315],[322,323],[326,335],[338,340],[341,349],[351,354],[355,356],[359,361],[363,365],[367,384]] 355:[[68,69],[79,81],[91,100],[103,109],[110,112],[122,123],[138,139],[144,146],[147,151],[152,155],[156,157],[158,162],[171,172],[178,186],[188,189],[196,197],[207,209],[219,228],[231,237],[238,240],[250,251],[266,267],[272,274],[275,279],[280,283],[284,285],[286,290],[299,300],[306,314],[316,317],[324,325],[335,337],[347,356],[359,365],[366,368],[378,379]] 378:[[65,68],[69,72],[80,81],[85,88],[92,94],[100,104],[105,108],[114,115],[118,121],[123,125],[127,128],[130,132],[135,141],[156,157],[160,161],[165,172],[174,182],[183,188],[190,192],[193,196],[197,200],[208,209],[213,216],[220,222],[228,232],[233,236],[242,243],[246,249],[251,253],[255,256],[258,260],[263,269],[284,285],[288,289],[293,300],[302,310],[311,316],[318,320],[321,324],[325,328],[336,337],[341,344],[348,350],[356,360],[361,364],[370,371],[374,377],[379,381],[383,384]] 400:[[64,384]] 422:[[64,384]] 445:[[64,384]] 467:[[64,384]] 490:[[64,384]]
+PASS  [N.10a] [anti-vacuous] the camera moved off 0 and back, the composite is active, the frame is the same rect with it off, and the composite differs from the map across at least a quarter of the frame's interior in some row
+        frame x 0 -> 64 -> 0; composite {"active":true,"camX":64,"blits":4}; rect on {"x":64,"y":288,"w":320,"h":224} off {"x":64,"y":288,"w":320,"h":224}; best interior coverage 100.0%
+PASS  [N.10] the camera preview composite fills the frame it is drawn in: its differing columns start at the left edge, reach the right edge, and nothing outside the frame differs
+        ojz_act1_floor frame {"x":64,"y":288,"w":320,"h":224} (left 64, right 384); differing CSS columns span 64.00..384.00 over 9 rows [310,333,355,378,400,422,445,467,490] (163 runs); identity-transform prediction 64.00..384.00
+PASS  [3a] [anti-vacuous] the emulation took: devicePixelRatio reads 1.35
+        dpr 1.350000023841858
+PASS  [E.I0] [anti-vacuous] the identity states draw what they are for: the band lens label, and the floor composite with the camera off 0
+        band lens {"active":true,"cells":1220,"drawn":1220}; camera preview {"active":true,"sceneId":"ojz_act1_floor","camX":64,"blits":4}; frame x 0 -> 64 -> 0
+PASS  [E.I1] [anti-vacuous] DETERMINISM: each fixed state hashes the same on two repaints in one run (dpr 1.350000023841858)
+        probe d491a7676aa1ba00 / d491a7676aa1ba00 (1102x1002); floor 4960a2c21ad4525d / 4960a2c21ad4525d; /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a/scratchpad/shots-dpr-guides-offset/state-probe-a-E-fix1.png, /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a/scratchpad/shots-dpr-guides-offset/state-floor-a-E-fix1.png
+NOTE       E.look
+        dpr 1.350000023841858: the two fixed states saved for the eye, not compared: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a/scratchpad/shots-dpr-guides-offset/state-probe-a-E-fix1.png, /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a/scratchpad/shots-dpr-guides-offset/state-floor-a-E-fix1.png
+
+=== PHASE E: EMULATED (Emulation.setDeviceMetricsOverride deviceScaleFactor 1.35): dpr 1.350000023841858
+    GEOMETRY dpr 1.350000023841858; map canvas rect {"left":284,"top":106,"width":816,"height":742}; backing store 1102x1002; view {"x":0,"y":0,"zoom":1}; uptime 415696s, load 5.52 9.12 12.33
+PASS  [E.0] [anti-vacuous] the map canvas backing store is dpr-scaled in this phase (EMULATED (Emulation.setDeviceMetricsOverride deviceScaleFactor 1.35): dpr 1.350000023841858)
+        store/rect 1.3505 x 1.3504 against dpr 1.350000023841858; view {"x":0,"y":0,"zoom":1}
+PASS  [E.1] [anti-vacuous] the guides report is active, for the probe scene, at the parked tops
+        rows [60,200] sceneId dpr_probe paints 154
+PASS  [E.2] the guide lines are DRAWN where the hit test measures: one differing run per reported row, within 1.5 CSS px, and none elsewhere
+        column CSS x 416 (device 561); runs (CSS) [[59.98,60.72],[199.94,200.68]]; reported rows [60,200]; identity-transform prediction [44.44,148.15]
+PASS  [E.3] a real press on the VISIBLE line of layer 1 grabs layer 1
+        aim client (700, 306) = canvas row 200.00 on the drawn run [199.94,200.68]; report {"dragIndex":1,"hoverIndex":1,"frameDragging":false,"committed":null}; dpr 1.350000023841858; rect.top 106
+PASS  [E.4] a real drag from that line moves LAYER 1 to the contract row and leaves layer 0 alone
+        pressed client y 306, released at 276 (canvas row 170.00); contract 170; tops now [60,170]; view after {"x":0,"y":0,"zoom":1}
+PASS  [E.5] a press where the identity transform would draw layer 1 (canvasY / dpr) grabs nothing
+        aim client (700, 254) = canvas row 148.00 (200 / 1.350000023841858 = 148.15); report {"dragIndex":null,"hoverIndex":null,"frameDragging":false,"committed":null}
+PASS  [E.6] the frame's right edge is DRAWN where the hit test measures (the rightmost differing run within 1.5 CSS px of rect.x + rect.w)
+        row CSS y 112 (device 151); runs (CSS) [[0,0.74],[319.88,320.62]]; report rect {"x":0,"y":0,"w":320,"h":224} (right 320); identity-transform prediction right 237.04
+PASS  [E.7] a real press on the VISIBLE right edge of the frame grabs the frame
+        aim client (604, 218) = canvas (320.00, 112.00) on the drawn run [319.88,320.62]; report {"dragIndex":null,"hoverIndex":null,"frameDragging":true,"committed":null}
+PASS  [E.8] a real drag of that edge moves the frame by the contract delta, and a drag back restores it
+        anchor {"x":0,"y":0} -> {"x":40,"y":0} (contract x 40, dragged 604 -> 644) -> {"x":0,"y":0}
+PASS  [E.9] a press where the identity transform would draw the right edge ((x + w) / dpr) does not grab the frame
+        aim client (521, 218) = canvas x 237.00 (320 / 1.350000023841858 = 237.04); report {"dragIndex":null,"hoverIndex":null,"frameDragging":false,"committed":null}; anchor {"x":0,"y":0} -> {"x":0,"y":0}
+NOTE       E.10 last device column
+        store column 1101 (CSS 815.26..816.00); rows where it differs, RGBA with the composite on and off: none
+NOTE       E.10 runs
+        per row, CSS [from, to) of the differing columns: 310:[[65.16,74.79],[77.75,85.15],[88.12,102.93],[120.7,125.88],[126.62,131.06],[133.28,139.95],[145.87,146.61],[156.98,162.16],[162.9,163.64],[170.31,171.05],[171.79,179.19],[180.68,185.12],[193.26,202.89],[205.85,213.26],[216.22,231.03],[248.8,253.98],[254.72,259.17],[260.65,268.05],[273.97,274.72],[285.08,290.26],[291.01,291.75],[297.67,299.15],[299.89,306.56],[308.78,313.22],[320.62,330.99],[333.95,340.62],[343.58,359.13],[376.9,382.08],[382.82,383.56]] 333:[[68.12,68.86],[71.09,77.01],[77.75,79.23],[79.97,82.93],[85.15,93.3],[94.04,94.78],[97,97.74],[102.93,105.15],[106.63,108.85],[111.81,116.99],[117.74,134.77],[139.95,154.02],[173.27,179.93],[182.16,185.86],[196.23,196.97],[199.19,205.11],[205.85,206.59],[208.07,211.03],[213.26,220.66],[222.14,222.88],[225.1,225.84],[231.03,233.25],[234.73,236.95],[239.91,245.1],[245.84,262.87],[268.05,282.12],[300.63,308.04],[310.26,313.96],[323.59,325.07],[326.55,333.21],[333.95,334.69],[336.17,339.14],[340.62,348.76],[350.24,350.98],[353.21,353.95],[359.13,360.61],[362.83,365.05],[368.01,373.2],[373.94,383.56]] 355:[[68.12,68.86],[79.23,80.71],[91.08,99.96],[102.93,108.85],[110.33,111.81],[122.18,122.92],[137.73,139.21],[143.65,145.87],[146.61,151.06],[151.8,154.76],[156.24,156.98],[157.72,162.16],[171.05,171.79],[177.71,185.86],[188.08,188.82],[196.23,196.97],[206.59,208.81],[219.18,228.07],[231.03,236.95],[237.69,239.91],[250.28,251.02],[265.83,266.57],[271.75,273.97],[274.72,279.16],[279.9,282.86],[283.6,285.08],[285.82,290.26],[299.15,299.89],[305.81,313.96],[316.18,316.92],[323.59,325.07],[334.69,336.91],[346.54,356.17],[359.13,365.05],[365.79,368.01],[377.64,379.12]] 378:[[65.16,68.12],[68.86,71.83],[79.97,80.71],[85.15,88.12],[91.82,94.04],[99.96,103.67],[105.15,108.11],[114.03,114.77],[117.74,120.7],[122.92,125.14],[126.62,128.1],[130.32,131.8],[134.77,140.69],[156.24,156.98],[159.94,160.68],[165.13,171.79],[174.01,182.16],[182.9,188.08],[190.3,191.78],[193.26,196.23],[196.97,199.93],[208.07,208.81],[213.26,216.22],[219.92,222.14],[228.07,231.77],[233.25,236.21],[242.13,242.87],[245.84,248.8],[251.02,253.24],[254.72,256.2],[257.68,259.91],[262.87,268.79],[283.6,285.08],[288.04,288.78],[293.23,299.89],[302.11,310.26],[311,316.18],[317.66,319.88],[320.62,323.59],[325.07,328.03],[336.17,336.91],[340.62,343.58],[348.02,350.24],[356.17,359.87],[360.61,363.57],[370.24,370.98],[373.94,376.9],[379.12,380.6],[382.82,383.56]] 400:[[63.68,383.56]] 422:[[63.68,383.56]] 445:[[63.68,383.56]] 467:[[63.68,383.56]] 490:[[63.68,383.56]]
+PASS  [E.10a] [anti-vacuous] the camera moved off 0 and back, the composite is active, the frame is the same rect with it off, and the composite differs from the map across at least a quarter of the frame's interior in some row
+        frame x 0 -> 64 -> 0; composite {"active":true,"camX":64,"blits":4}; rect on {"x":64,"y":288,"w":320,"h":224} off {"x":64,"y":288,"w":320,"h":224}; best interior coverage 100.0%
+PASS  [E.10] the camera preview composite fills the frame it is drawn in: its differing columns start at the left edge, reach the right edge, and nothing outside the frame differs
+        ojz_act1_floor frame {"x":64,"y":288,"w":320,"h":224} (left 64, right 384); differing CSS columns span 63.68..383.56 over 9 rows [310,333,355,378,400,422,445,467,490] (158 runs); identity-transform prediction 47.41..284.44
+NOTE       emulation cleared
+        devicePixelRatio 1 (native 1); canvas {"dpr":1,"left":284,"top":106,"width":816,"height":742,"storeW":816,"storeH":742}
+PASS  [9a] [anti-vacuous] the session undoes back to the fixture: nothing was saved
+        4 undos; left ["dpr_base","ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start"], found ["dpr_base","ojz_act1_depth","ojz_act1_floor","ojz_act1_sec7_worldwater","ojz_act1_start"]
+
+33/33 rows passed
+NOTE       environment at end
+        uptime 415729s, load 5.96 8.81 12.11
+cleanup: tree under pid 861543 (11 process(es)):
+           861543 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           861555 Xvfb :664 -screen 0 1680x1050x24 -nolisten tcp
+           861847 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/home/vol
+           861854 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/home
+           861857 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           861858 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           861860 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           861904 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           861910 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           861912 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           861920 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 49 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 349 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+END-MARKER exit 0

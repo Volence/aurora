@@ -7,13 +7,18 @@
 // (canvas/device-grid.ts). These rows hold the pieces that are separable from a canvas:
 //
 //   - AT dpr 1 NOTHING CHANGED: every call each of the five chrome draws issues equals
-//     the call log recorded from master's own code (dpr1-chrome-master.golden.json);
+//     the call log recorded from master's own code (dpr1-chrome-master.golden.json),
+//     EXCEPT the even-width strokes row 239 (a) moved on purpose (see the golden rows);
 //   - AT EVERY SCALE THE LINE IS WHERE THE GRAB IS: the device row a guide is stroked on,
 //     divided by dpr, is within one device pixel of the row `layerGuideGeometry`
 //     reports, and `guideAtCanvasY` at that row returns that guide; the same for the
 //     frame's four edges and `screenFrameEdgeAt`, and for the `plane_y` rule;
 //   - THE CRISPNESS THE IDENTITY RESET WAS FOR IS KEPT: every stroke is a whole number
-//     of device pixels, of the parity it has at dpr 1, centred on a device half-pixel;
+//     of device pixels, of the parity it has at dpr 1, with BOTH edges on whole device
+//     pixels (a half-pixel centre for an odd width, a whole-pixel one for an even
+//     width: ROADMAP row 239 (a), ruled 2026-09-28);
+//   - A LOCK: no renderer code calls `snapStroke`, which half-covers the edges of an
+//     even width (row 239);
 //   - THE COMPOSITE AND THE LENS CAPTION ARE THE dpr-1 DRAWING SCALED BY dpr;
 //   - A CENSUS: no identity reset is left in the renderer except on the two canvases
 //     whose backing stores are not dpr-scaled.
@@ -33,13 +38,14 @@ import {
 import { drawScreenFrame, screenFrameRect, screenFrameEdgeAt } from '../screen-frame';
 import { drawCameraPreview, cameraPreviewPlan } from '../camera-preview';
 import { drawBandLensLabel } from '../band-lens';
-import { deviceStrokeWidth, snapStroke, snapLength } from '../device-grid';
+import { deviceStrokeWidth, snapStroke, snapStrokeEdges, snapLength } from '../device-grid';
 import {
   recordingContext, GUIDE_CASES, SURFACE_CASES, FRAME_CASES, CAMERA_CASES, LENS_LABEL_CASES,
   CAMERA_SOURCES,
   type Recording, type GuideCase, type SurfaceCase, type FrameCase, type CameraCase,
   type LensLabelCase, type DeviceStroke,
 } from './chrome-recorder';
+import { edgesWhole } from './grid-edges';
 
 const golden = JSON.parse(readFileSync(
   fileURLToPath(new URL('./dpr1-chrome-master.golden.json', import.meta.url)), 'utf8',
@@ -80,14 +86,24 @@ const ALL: { key: string; run: (dpr: number) => Recording }[] = [
 
 /** JSON's view of a value: what the golden was written through (it also folds -0 to 0). */
 const roundTrip = (v: unknown): unknown => JSON.parse(JSON.stringify(v));
-const frac = (v: number): number => v - Math.floor(v);
 const isWhole = (v: number): boolean => Math.abs(v - Math.round(v)) < EPS;
-const onHalf = (v: number): boolean => Math.abs(frac(v) - 0.5) < EPS;
 const lineStrokes = (r: Recording): DeviceStroke[] => r.strokes.filter((s) => s.kind === 'path');
 
-describe('at dpr 1 the chrome issues exactly the calls master issued', () => {
-  it('the golden was recorded from master, and it and the scenarios name the same cases (anti-vacuous)', () => {
-    expect(golden.generatedFrom).toMatch(/^master 803e8a30/);
+// ⚠ THE GOLDEN WAS RE-RECORDED FOR ROADMAP ROW 239 (a), RULED 2026-09-28 by the overseer
+// under the owner's 2026-09-18 look permission: EVEN WIDTHS MOVED TO WHOLE-PIXEL CENTRES.
+// The hovered, dragged or refused guide and the active frame (2 CSS px) now draw through
+// `snapStrokeEdges`, so at dpr 1 their stroke geometry sits on `Math.round(v)` where
+// master's sat on `Math.round(v) + 0.5` (two whole device rows, where master half-covered
+// three). It was re-recorded by the one-off generator the original came from, re-run on
+// the row 239 tree (docs/reviews/239-even-chrome/golden-generator.ts.txt; the same
+// generator on the pre-239 tree reproduced the old file byte for byte but for
+// `generatedFrom`). EXACTLY 7 calls moved, all moveTo/lineTo/strokeRect of a 2-device-px
+// stroke, with every op, count and matrix unchanged
+// (docs/reviews/239-even-chrome/golden-moved-dpr1-chrome.txt). Every other call is
+// still master 803e8a30's, so "nothing else changed at dpr 1" is still what this holds.
+describe('at dpr 1 the chrome issues exactly the calls master issued, but for row 239\'s even-width strokes', () => {
+  it('the golden is master\'s re-recorded for row 239 (a), and it and the scenarios name the same cases (anti-vacuous)', () => {
+    expect(golden.generatedFrom).toMatch(/^row 239 \(a\) .*every other call as master 803e8a30/);
     expect(Object.keys(golden.cases).sort()).toEqual(ALL.map((a) => a.key).sort());
     expect(ALL.length).toBeGreaterThan(0);
   });
@@ -104,14 +120,24 @@ describe('at dpr 1 the chrome issues exactly the calls master issued', () => {
 });
 
 describe('the snap reduces to master\'s dpr-1 arithmetic', () => {
-  it('centre, width and length at dpr 1 are Math.round(v) + 0.5, w and Math.round(len)', () => {
+  // Row 239 (a): the chrome draws through `snapStrokeEdges`, so this row now asks it,
+  // not `snapStroke` (which no renderer code calls any more, and whose half-pixel rule
+  // for every width the second row keeps stating). Odd widths are master's arithmetic
+  // exactly; an even width is `Math.round(v)`, the ruled whole-pixel centre.
+  it('centre, width and length at dpr 1: Math.round(v) + 0.5 for an odd width, Math.round(v) for an even one, w and Math.round(len)', () => {
     for (const v of [-3.5, -0.25, 0, 0.5, 7.125, 48.375, 185.625, 374.625, 1023.5]) {
       for (const w of [1, 2, 3]) {
-        const s = snapStroke(v, w, 1);
-        expect(Object.is(s.at, Math.round(v) + 0.5)).toBe(true);
+        const s = snapStrokeEdges(v, w, 1);
+        expect(Object.is(s.at, w % 2 === 1 ? Math.round(v) + 0.5 : Math.round(v))).toBe(true);
         expect(s.width).toBe(w);
       }
       expect(snapLength(v, 1)).toBe(Math.round(v));
+    }
+  });
+
+  it('snapStroke itself is unchanged: Math.round(v) + 0.5 for every width at dpr 1', () => {
+    for (const v of [-3.5, 0, 7.125, 1023.5]) {
+      for (const w of [1, 2, 3]) expect(Object.is(snapStroke(v, w, 1).at, Math.round(v) + 0.5)).toBe(true);
     }
   });
 
@@ -194,7 +220,7 @@ describe("the screen frame's four edges are drawn where screenFrameEdgeAt grabs 
   }
 });
 
-describe('every stroke keeps the crispness the identity reset was for', () => {
+describe('every stroke keeps the crispness the identity reset was for: both edges on whole device pixels', () => {
   const stroked = [
     ...GUIDE_CASES.map((c) => ({ key: `guides: ${c.name}`, run: (d: number) => runGuides(d, c) })),
     ...SURFACE_CASES.map((c) => ({ key: `surfaces: ${c.name}`, run: (d: number) => runSurfaces(d, c) })),
@@ -211,10 +237,14 @@ describe('every stroke keeps the crispness the identity reset was for', () => {
           // A whole number of device pixels, of the parity the same stroke has at dpr 1.
           expect(isWhole(s.width)).toBe(true);
           expect(Math.round(s.width) % 2).toBe(Math.round(at1[i].width) % 2);
-          // Centred on a device half-pixel: every line stroke's row, and every corner
-          // of a stroked rect, since its size is a whole number of device pixels.
-          if (s.kind === 'path') expect(onHalf(s.pts[0][1])).toBe(true);
-          else for (const [x, y] of s.pts) { expect(onHalf(x)).toBe(true); expect(onHalf(y)).toBe(true); }
+          // BOTH EDGES ON WHOLE DEVICE PIXELS (ROADMAP row 239 (a), ruled 2026-09-28):
+          // every line stroke's row, and every corner of a stroked rect, since its size
+          // is a whole number of device pixels. For an odd width that is a half-pixel
+          // centre, as it always was; for an even width (the hovered, dragged or refused
+          // guide, the active frame) it is a WHOLE-pixel centre, where `snapStroke` had
+          // put it on a half-pixel and left each edge half-covering a device row.
+          if (s.kind === 'path') expect(edgesWhole(s.pts[0][1], s.width)).toBe(true);
+          else for (const [x, y] of s.pts) { expect(edgesWhole(x, s.width)).toBe(true); expect(edgesWhole(y, s.width)).toBe(true); }
         });
       });
     }
@@ -292,5 +322,42 @@ describe('no identity reset is left in the renderer except on canvases that are 
 
   it('and each of those sites still has one, so the list cannot outlive what it names', () => {
     for (const site of Object.keys(UNSCALED)) expect(hits).toContain(site);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ROW 239 (a), RULED 2026-09-28: the chrome snaps through `snapStrokeEdges`. A LOCK,
+// not a reader (the crispness rows above are the readers): `snapStroke` centres EVERY
+// width on a device half-pixel, which is right for an odd width and half-covers a
+// device row at each edge of an even one, so a renderer call to it is the defect
+// class this row closed, whatever width it passes today. Comments are stripped first,
+// because the docblocks still NAME `snapStroke` when they explain the history.
+// ---------------------------------------------------------------------------
+
+describe('row 239: no renderer code snaps a stroke through snapStroke', () => {
+  const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+  const files: string[] = [];
+  const walk = (dir: string): void => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) { if (name !== '__tests__') walk(p); } else if (/\.tsx?$/.test(name) && !/\.test\./.test(name)) files.push(p);
+    }
+  };
+  walk(ROOT);
+  const code = (src: string): string => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  // device-grid.ts DEFINES it (`function snapStroke(`); a definition is not a call.
+  const calls = files.flatMap((f) => (code(readFileSync(f, 'utf8')).replace(/function\s+snapStroke\s*\(/g, '')
+    .match(/\bsnapStroke\s*\(/g) ?? []).map(() => relative(ROOT, f)));
+
+  it('the census read the renderer tree, and device-grid.ts still defines the old helper (anti-vacuous)', () => {
+    expect(files.length).toBeGreaterThan(100);
+    for (const f of ['canvas/screen-frame.ts', 'canvas/region-overlay.ts', 'canvas/effects-guides.ts']) {
+      expect(files).toContain(join(ROOT, f));
+    }
+    expect(readFileSync(join(ROOT, 'canvas/device-grid.ts'), 'utf8')).toMatch(/export function snapStroke\(/);
+  });
+
+  it('no file outside the tests calls snapStroke(: every chrome stroke goes through snapStrokeEdges', () => {
+    expect(calls).toEqual([]);
   });
 });

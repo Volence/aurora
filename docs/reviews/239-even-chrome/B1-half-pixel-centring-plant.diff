@@ -1,0 +1,13 @@
+diff --git a/src/renderer/canvas/device-grid.ts b/src/renderer/canvas/device-grid.ts
+index a1d07912..c3606dd2 100644
+--- a/src/renderer/canvas/device-grid.ts
++++ b/src/renderer/canvas/device-grid.ts
+@@ -113,7 +113,7 @@ export function snapStroke(cssAt: number, cssWidth: number, dpr: number): Snappe
+ export function snapStrokeEdges(cssAt: number, cssWidth: number, dpr: number): SnappedStroke {
+   const w = deviceStrokeWidth(cssWidth, dpr);
+   const c = Math.round(cssAt * dpr);
+-  return { at: (w % 2 === 1 ? c + 0.5 : c) / dpr, width: w / dpr };
++  return { at: (c + 0.5) / dpr, width: w / dpr }; // PLANT R1 (row 237 centring)
+ }
+ 
+ /**

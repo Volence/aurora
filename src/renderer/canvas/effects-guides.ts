@@ -43,7 +43,7 @@ import {
   EFFECTS_SURFACE_LINE, EFFECTS_SURFACE_CASING,
   EFFECTS_SURFACE_LABEL_BG, EFFECTS_SURFACE_LABEL_TEXT,
 } from './canvas-colors';
-import { snapStroke, snapLength } from './device-grid';
+import { snapStrokeEdges, snapLength } from './device-grid';
 
 /** The map viewport, in the shape the draw pass already has one. */
 export interface GuideViewport {
@@ -393,7 +393,7 @@ export function drawSurfaceMarks(
     if (!row.onScreen) continue;
     // On a device half-pixel, same reason as the guides: a 1px line on an integer
     // device coordinate straddles two device rows and smears (canvas/device-grid.ts).
-    const y = snapStroke(row.canvasY, 1, dpr).at;
+    const y = snapStrokeEdges(row.canvasY, 1, dpr).at;
 
     // The casing first, unbroken, so the dashes read on white art as well as on
     // black. A dashed white line alone vanishes over OJZ's bright water tiles,
@@ -401,14 +401,14 @@ export function drawSurfaceMarks(
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(vp.width, y);
-    ctx.lineWidth = snapStroke(row.canvasY, 3, dpr).width;
+    ctx.lineWidth = snapStrokeEdges(row.canvasY, 3, dpr).width;
     ctx.strokeStyle = EFFECTS_SURFACE_CASING;
     ctx.stroke();
 
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(vp.width, y);
-    ctx.lineWidth = snapStroke(row.canvasY, 1, dpr).width;
+    ctx.lineWidth = snapStrokeEdges(row.canvasY, 1, dpr).width;
     ctx.strokeStyle = EFFECTS_SURFACE_LINE;
     // A long dash, not the guides' short one: the two dash patterns are what
     // separate a referent from a division at a glance, before either label is
@@ -546,11 +546,17 @@ export function drawLayerGuides(
   for (const row of rows) {
     if (!row.onScreen) continue;
     const active = opts.dragIndex === row.index || opts.hoverIndex === row.index;
-    // Centre on a device half-pixel, width in whole device pixels: a 1px line on
-    // an integer device coordinate straddles two device rows and renders as a 2px
-    // smear (canvas/device-grid.ts).
-    const stroke = snapStroke(row.canvasY, active || row.notice !== null ? 2 : 1, dpr);
+    // BOTH edges on whole device pixels, width in whole device pixels
+    // (canvas/device-grid.ts `snapStrokeEdges`): a 1 px line centres on a device
+    // half-pixel (on an integer device coordinate it would straddle two rows and
+    // smear), and the 2 px hovered, dragged or refused line on a WHOLE pixel, where
+    // `snapStroke` had half-covered a row at each edge (ROADMAP row 239 (a), ruled
+    // 2026-09-28).
+    const stroke = snapStrokeEdges(row.canvasY, active || row.notice !== null ? 2 : 1, dpr);
     const y = stroke.at;
+    // The label is ANCHORED ON THE 1 px LINE'S ROW whatever the width, so hovering
+    // a guide does not move its label by half a device pixel.
+    const labelY = snapStrokeEdges(row.canvasY, 1, dpr).at;
 
     ctx.beginPath();
     ctx.moveTo(0, y);
@@ -572,7 +578,7 @@ export function drawLayerGuides(
     const w = ctx.measureText(text).width;
     // Below the line when the line is near the top edge, above it otherwise, so
     // a guide at world 0 does not print its label off-canvas.
-    const boxY = row.canvasY < 16 ? y + 2 : y - 15;
+    const boxY = row.canvasY < 16 ? labelY + 2 : labelY - 15;
     ctx.fillStyle = row.notice !== null ? EFFECTS_GUIDE_REFUSED_BG : EFFECTS_GUIDE_LABEL_BG;
     ctx.fillRect(4, boxY, w + 8, 13);
     ctx.fillStyle = row.notice !== null ? EFFECTS_GUIDE_REFUSED

@@ -1,0 +1,4043 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a55bd9edf8182a90a
+
+ ✓ src/renderer/canvas/__tests__/compose-nametable.test.ts (6 tests) 32ms
+ ✓ src/renderer/canvas/__tests__/donor-compose.test.ts (3 tests) 317ms
+     ✓ every painted cell of a section draws exactly its tile's non-zero pixels  310ms
+ ✓ src/renderer/canvas/__tests__/region-overlay.test.ts (28 tests) 38ms
+ ✓ src/renderer/canvas/__tests__/section-renderer.test.ts (7 tests) 311ms
+ ✓ src/renderer/canvas/__tests__/effects-guides.test.ts (38 tests) 39ms
+ ✓ src/renderer/canvas/__tests__/camera-preview.test.ts (38 tests) 69ms
+ ✓ src/renderer/canvas/__tests__/bg-wrap.test.ts (21 tests) 86ms
+ ✓ src/renderer/canvas/__tests__/row-remap-span.test.ts (21 tests) 81ms
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts (97 tests | 64 failed) 236ms
+     ✓ dpr 1, integral view: full overlay, at rest, nothing selected 10ms
+     × dpr 1, integral view: full overlay, at rest, west selected 20ms
+     ✓ dpr 1, integral view: full overlay, at rest, a hole where south was 2ms
+     × dpr 1, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected 10ms
+     × dpr 1, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35 17ms
+     × dpr 1, integral view: the gesture draw (dragged rect and trimmed outline) 3ms
+     ✓ dpr 1, fractional pan, zoom 1.5: full overlay, at rest, nothing selected 3ms
+     × dpr 1, fractional pan, zoom 1.5: full overlay, at rest, west selected 5ms
+     ✓ dpr 1, fractional pan, zoom 1.5: full overlay, at rest, a hole where south was 0ms
+     × dpr 1, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected 3ms
+     × dpr 1, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35 3ms
+     × dpr 1, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline) 1ms
+     ✓ dpr 1.25, integral view: full overlay, at rest, nothing selected 1ms
+     × dpr 1.25, integral view: full overlay, at rest, west selected 4ms
+     ✓ dpr 1.25, integral view: full overlay, at rest, a hole where south was 1ms
+     × dpr 1.25, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected 1ms
+     × dpr 1.25, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35 1ms
+     × dpr 1.25, integral view: the gesture draw (dragged rect and trimmed outline) 1ms
+     ✓ dpr 1.25, fractional pan, zoom 1.5: full overlay, at rest, nothing selected 4ms
+     × dpr 1.25, fractional pan, zoom 1.5: full overlay, at rest, west selected 1ms
+     ✓ dpr 1.25, fractional pan, zoom 1.5: full overlay, at rest, a hole where south was 3ms
+     × dpr 1.25, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected 5ms
+     × dpr 1.25, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35 5ms
+     × dpr 1.25, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline) 5ms
+     ✓ dpr 1.35, integral view: full overlay, at rest, nothing selected 1ms
+     × dpr 1.35, integral view: full overlay, at rest, west selected 1ms
+     ✓ dpr 1.35, integral view: full overlay, at rest, a hole where south was 0ms
+     × dpr 1.35, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected 3ms
+     × dpr 1.35, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35 1ms
+     × dpr 1.35, integral view: the gesture draw (dragged rect and trimmed outline) 5ms
+     ✓ dpr 1.35, fractional pan, zoom 1.5: full overlay, at rest, nothing selected 0ms
+     × dpr 1.35, fractional pan, zoom 1.5: full overlay, at rest, west selected 1ms
+     ✓ dpr 1.35, fractional pan, zoom 1.5: full overlay, at rest, a hole where south was 0ms
+     × dpr 1.35, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected 3ms
+     × dpr 1.35, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35 1ms
+     × dpr 1.35, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline) 2ms
+     ✓ dpr 1.5, integral view: full overlay, at rest, nothing selected 1ms
+     × dpr 1.5, integral view: full overlay, at rest, west selected 2ms
+     ✓ dpr 1.5, integral view: full overlay, at rest, a hole where south was 2ms
+     × dpr 1.5, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected 3ms
+     × dpr 1.5, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35 1ms
+     × dpr 1.5, integral view: the gesture draw (dragged rect and trimmed outline) 3ms
+     ✓ dpr 1.5, fractional pan, zoom 1.5: full overlay, at rest, nothing selected 2ms
+     × dpr 1.5, fractional pan, zoom 1.5: full overlay, at rest, west selected 1ms
+     ✓ dpr 1.5, fractional pan, zoom 1.5: full overlay, at rest, a hole where south was 1ms
+     × dpr 1.5, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected 4ms
+     × dpr 1.5, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35 3ms
+     × dpr 1.5, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline) 1ms
+     ✓ dpr 1.75, integral view: full overlay, at rest, nothing selected 0ms
+     × dpr 1.75, integral view: full overlay, at rest, west selected 2ms
+     ✓ dpr 1.75, integral view: full overlay, at rest, a hole where south was 3ms
+     × dpr 1.75, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected 19ms
+     × dpr 1.75, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35 1ms
+     × dpr 1.75, integral view: the gesture draw (dragged rect and trimmed outline) 1ms
+     ✓ dpr 1.75, fractional pan, zoom 1.5: full overlay, at rest, nothing selected 0ms
+     × dpr 1.75, fractional pan, zoom 1.5: full overlay, at rest, west selected 1ms
+     ✓ dpr 1.75, fractional pan, zoom 1.5: full overlay, at rest, a hole where south was 0ms
+     × dpr 1.75, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected 2ms
+     × dpr 1.75, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35 1ms
+     × dpr 1.75, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline) 1ms
+     ✓ dpr 2, integral view: full overlay, at rest, nothing selected 0ms
+     × dpr 2, integral view: full overlay, at rest, west selected 1ms
+     ✓ dpr 2, integral view: full overlay, at rest, a hole where south was 0ms
+     × dpr 2, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected 2ms
+     × dpr 2, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35 2ms
+     × dpr 2, integral view: the gesture draw (dragged rect and trimmed outline) 1ms
+     ✓ dpr 2, fractional pan, zoom 1.5: full overlay, at rest, nothing selected 0ms
+     × dpr 2, fractional pan, zoom 1.5: full overlay, at rest, west selected 1ms
+     ✓ dpr 2, fractional pan, zoom 1.5: full overlay, at rest, a hole where south was 1ms
+     × dpr 2, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected 1ms
+     × dpr 2, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35 1ms
+     × dpr 2, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline) 1ms
+     ✓ dpr 2.5, integral view: full overlay, at rest, nothing selected 1ms
+     × dpr 2.5, integral view: full overlay, at rest, west selected 1ms
+     ✓ dpr 2.5, integral view: full overlay, at rest, a hole where south was 0ms
+     × dpr 2.5, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected 1ms
+     × dpr 2.5, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35 2ms
+     × dpr 2.5, integral view: the gesture draw (dragged rect and trimmed outline) 2ms
+     ✓ dpr 2.5, fractional pan, zoom 1.5: full overlay, at rest, nothing selected 1ms
+     × dpr 2.5, fractional pan, zoom 1.5: full overlay, at rest, west selected 2ms
+     ✓ dpr 2.5, fractional pan, zoom 1.5: full overlay, at rest, a hole where south was 0ms
+     × dpr 2.5, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected 1ms
+     × dpr 2.5, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35 1ms
+     × dpr 2.5, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline) 2ms
+     ✓ dpr 3, integral view: full overlay, at rest, nothing selected 0ms
+     × dpr 3, integral view: full overlay, at rest, west selected 2ms
+     ✓ dpr 3, integral view: full overlay, at rest, a hole where south was 0ms
+     × dpr 3, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected 2ms
+     × dpr 3, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35 2ms
+     × dpr 3, integral view: the gesture draw (dragged rect and trimmed outline) 3ms
+     ✓ dpr 3, fractional pan, zoom 1.5: full overlay, at rest, nothing selected 0ms
+     × dpr 3, fractional pan, zoom 1.5: full overlay, at rest, west selected 1ms
+     ✓ dpr 3, fractional pan, zoom 1.5: full overlay, at rest, a hole where south was 4ms
+     × dpr 3, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected 2ms
+     × dpr 3, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35 2ms
+     × dpr 3, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline) 4ms
+     ✓ the rows above read an EVEN-width stroke: the selected outline is 2 CSS px, an even device width at every dpr (anti-vacuous) 2ms
+ ✓ src/renderer/canvas/__tests__/both-planes-lens-wiring.test.ts (4 tests) 29ms
+ ✓ src/renderer/canvas/__tests__/raster-timeline-non-bands-preset.test.ts (44 tests) 26ms
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts (178 tests | 28 failed) 166ms
+     ✓ the golden is master's re-recorded for row 239 (a), and it and the scenarios name the same cases (anti-vacuous) 2ms
+     ✓ guides: act space, three layers, one disabled, fractional pan and zoom 9ms
+     × guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 46ms
+     × guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 13ms
+     ✓ surfaces: two remapped layers, one rule near the top edge 2ms
+     ✓ surfaces: zoom 2.5, one rule 2ms
+     ✓ frame: at rest, fractional pan, zoom 1.5 1ms
+     × frame: active, zoom 2.5, caption override 3ms
+     ✓ frame: half off the top edge 1ms
+     ✓ camera: four bands, camera 320, fractional frame 5ms
+     ✓ camera: four bands, camera 900 (wraps), zoom 2.5, no captions 1ms
+     ✓ lens label: anchored to coverage, fractional anchor 0ms
+     ✓ lens label: no coverage on screen: the corner 0ms
+     ✓ the comparison can fail: at 1.35 the same draws differ from master (anti-vacuous) 3ms
+     ✓ centre, width and length at dpr 1: Math.round(v) + 0.5 for an odd width, Math.round(v) for an even one, w and Math.round(len) 1ms
+     ✓ snapStroke itself is unchanged: Math.round(v) + 0.5 for every width at dpr 1 0ms
+     ✓ a device width keeps the parity of its CSS width and is the nearest such integer 2ms
+     ✓ dpr 1: act space, three layers, one disabled, fractional pan and zoom 1ms
+     ✓ dpr 1: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.25: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1.25: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1.25: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.35: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1.35: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1.35: a drag in flight on 0, zoom 2.5, a guide near the top edge 1ms
+     ✓ dpr 1.5: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1.5: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1.5: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.75: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1.75: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1.75: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 2: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 2: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 2: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 2.5: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 2.5: screen space, hover on 1, a refusal notice on 2 (plate + caption) 1ms
+     ✓ dpr 2.5: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 3: act space, three layers, one disabled, fractional pan and zoom 1ms
+     ✓ dpr 3: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 3: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1: two remapped layers, one rule near the top edge 1ms
+     ✓ dpr 1: zoom 2.5, one rule 0ms
+     ✓ dpr 1.25: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.25: zoom 2.5, one rule 0ms
+     ✓ dpr 1.35: two remapped layers, one rule near the top edge 1ms
+     ✓ dpr 1.35: zoom 2.5, one rule 0ms
+     ✓ dpr 1.5: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.5: zoom 2.5, one rule 0ms
+     ✓ dpr 1.75: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.75: zoom 2.5, one rule 0ms
+     ✓ dpr 2: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 2: zoom 2.5, one rule 0ms
+     ✓ dpr 2.5: two remapped layers, one rule near the top edge 1ms
+     ✓ dpr 2.5: zoom 2.5, one rule 0ms
+     ✓ dpr 3: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 3: zoom 2.5, one rule 0ms
+     ✓ dpr 1: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1: active, zoom 2.5, caption override 1ms
+     ✓ dpr 1: half off the top edge 0ms
+     ✓ dpr 1.25: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1.25: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.25: half off the top edge 0ms
+     ✓ dpr 1.35: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1.35: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.35: half off the top edge 0ms
+     ✓ dpr 1.5: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1.5: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.5: half off the top edge 0ms
+     ✓ dpr 1.75: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1.75: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.75: half off the top edge 0ms
+     ✓ dpr 2: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 2: active, zoom 2.5, caption override 0ms
+     ✓ dpr 2: half off the top edge 0ms
+     ✓ dpr 2.5: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 2.5: active, zoom 2.5, caption override 0ms
+     ✓ dpr 2.5: half off the top edge 0ms
+     ✓ dpr 3: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 3: active, zoom 2.5, caption override 0ms
+     ✓ dpr 3: half off the top edge 0ms
+     ✓ dpr 1: guides: act space, three layers, one disabled, fractional pan and zoom 1ms
+     × dpr 1: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 1ms
+     × dpr 1: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 1ms
+     ✓ dpr 1: surfaces: two remapped layers, one rule near the top edge 1ms
+     ✓ dpr 1: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 1: frame: at rest, fractional pan, zoom 1.5 0ms
+     × dpr 1: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1: frame: half off the top edge 0ms
+     ✓ dpr 1.25: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     × dpr 1.25: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 1ms
+     × dpr 1.25: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.25: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.25: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 1.25: frame: at rest, fractional pan, zoom 1.5 0ms
+     × dpr 1.25: frame: active, zoom 2.5, caption override 1ms
+     ✓ dpr 1.25: frame: half off the top edge 0ms
+     ✓ dpr 1.35: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     × dpr 1.35: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     × dpr 1.35: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.35: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.35: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 1.35: frame: at rest, fractional pan, zoom 1.5 0ms
+     × dpr 1.35: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.35: frame: half off the top edge 0ms
+     ✓ dpr 1.5: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     × dpr 1.5: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     × dpr 1.5: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.5: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.5: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 1.5: frame: at rest, fractional pan, zoom 1.5 0ms
+     × dpr 1.5: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.5: frame: half off the top edge 0ms
+     ✓ dpr 1.75: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     × dpr 1.75: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     × dpr 1.75: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.75: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.75: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 1.75: frame: at rest, fractional pan, zoom 1.5 0ms
+     × dpr 1.75: frame: active, zoom 2.5, caption override 1ms
+     ✓ dpr 1.75: frame: half off the top edge 0ms
+     ✓ dpr 2: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     × dpr 2: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 1ms
+     × dpr 2: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 2: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 2: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 2: frame: at rest, fractional pan, zoom 1.5 0ms
+     × dpr 2: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 2: frame: half off the top edge 1ms
+     ✓ dpr 2.5: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     × dpr 2.5: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     × dpr 2.5: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 2.5: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 2.5: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 2.5: frame: at rest, fractional pan, zoom 1.5 0ms
+     × dpr 2.5: frame: active, zoom 2.5, caption override 1ms
+     ✓ dpr 2.5: frame: half off the top edge 0ms
+     ✓ dpr 3: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     × dpr 3: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     × dpr 3: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 3: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 3: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 3: frame: at rest, fractional pan, zoom 1.5 0ms
+     × dpr 3: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 3: frame: half off the top edge 1ms
+     ✓ dpr 1.25: camera: four bands, camera 320, fractional frame 1ms
+     ✓ dpr 1.25: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 1ms
+     ✓ dpr 1.25: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 1.25: lens label: no coverage on screen: the corner 1ms
+     ✓ dpr 1.35: camera: four bands, camera 320, fractional frame 1ms
+     ✓ dpr 1.35: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 1ms
+     ✓ dpr 1.35: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 1.35: lens label: no coverage on screen: the corner 0ms
+     ✓ dpr 1.5: camera: four bands, camera 320, fractional frame 1ms
+     ✓ dpr 1.5: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 1ms
+     ✓ dpr 1.5: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 1.5: lens label: no coverage on screen: the corner 0ms
+     ✓ dpr 1.75: camera: four bands, camera 320, fractional frame 1ms
+     ✓ dpr 1.75: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 1ms
+     ✓ dpr 1.75: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 1.75: lens label: no coverage on screen: the corner 0ms
+     ✓ dpr 2: camera: four bands, camera 320, fractional frame 1ms
+     ✓ dpr 2: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 1ms
+     ✓ dpr 2: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 2: lens label: no coverage on screen: the corner 0ms
+     ✓ dpr 2.5: camera: four bands, camera 320, fractional frame 1ms
+     ✓ dpr 2.5: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 11ms
+     ✓ dpr 2.5: lens label: anchored to coverage, fractional anchor 1ms
+     ✓ dpr 2.5: lens label: no coverage on screen: the corner 0ms
+     ✓ dpr 3: camera: four bands, camera 320, fractional frame 2ms
+     ✓ dpr 3: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 2ms
+     ✓ dpr 3: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 3: lens label: no coverage on screen: the corner 0ms
+     ✓ the census read the renderer tree (anti-vacuous) 0ms
+     ✓ every identity reset left is on a canvas whose backing store is not dpr-scaled 0ms
+     ✓ and each of those sites still has one, so the list cannot outlive what it names 0ms
+     ✓ the census read the renderer tree, and device-grid.ts still defines the old helper (anti-vacuous) 0ms
+     × no file outside the tests calls snapStroke(: every chrome stroke goes through snapStrokeEdges 1ms
+ ❯ src/renderer/canvas/__tests__/region-overlay-middrag.test.ts (20 tests | 3 failed) 570ms
+     ✓ the golden is master 6072f9df's re-recorded for row 239 (a) and names the same cases (anti-vacuous) 15ms
+     ✓ at rest, nothing selected: same calls, same report 31ms
+     × at rest, west selected: same calls, same report 250ms
+     ✓ at rest, a hole where south was: same calls, same report 12ms
+     × mid-drag with the tint ON: the preview pieces, west selected: same calls, same report 113ms
+     × mid-drag with the tint ON, at dpr 1.35: same calls, same report 121ms
+     ✓ the comparison can fail: selecting a different region changes the calls (anti-vacuous) 2ms
+     ✓ tint OFF with a drag live: the gesture arm, the dragged rectangle under its region 3ms
+     ✓ tint OFF with a drag live: the trimmed pieces are what the carve leaves of east, and only that 2ms
+     ✓ tint OFF with a drag live: the pieces are the release's own transform (regionDragPreview) 0ms
+     ✓ tint OFF and no drag: nothing at all (the owner's toggle) 1ms
+     ✓ tint ON: the full overlay, over the preview mid-drag and the document at rest (unchanged) 1ms
+     ✓ no regions document: nothing, whatever the tint and the drag 0ms
+     ✓ draws no label, no plate, no clip, no alpha wash and no unassigned red 2ms
+     ✓ draws no hatch: the only line length is the trimmed region's boundary 1ms
+     ✓ outlines what the carve leaves of east, in east's hue, at the unselected width 2ms
+     ✓ outlines the dragged rectangle, in west's hue, at the selected width, where it is 0ms
+     ✓ draws in the canvas`s own dpr frame, never resetting to identity 1ms
+     ✓ publishes mode gesture, advances paints, and counts what it drew 0ms
+     ✓ the absence rows can fail: the FULL draw of the same pieces has labels, clips, alpha and hatch (anti-vacuous) 4ms
+ ✓ src/renderer/canvas/__tests__/raster-timeline.test.ts (48 tests) 92ms
+ ✓ src/renderer/canvas/__tests__/label-fit.test.ts (26 tests) 76ms
+ ✓ src/renderer/canvas/__tests__/priority-lens.test.ts (10 tests) 33ms
+ ✓ src/renderer/canvas/__tests__/tile-lens.test.ts (13 tests) 14ms
+ ✓ src/renderer/canvas/__tests__/device-scale-change.test.ts (15 tests) 16ms
+ ✓ src/renderer/canvas/__tests__/screen-frame.test.ts (10 tests) 7ms
+ ✓ src/renderer/canvas/__tests__/overlay-priority-wiring.test.ts (4 tests) 21ms
+ ✓ src/renderer/canvas/__tests__/composer-priority-lens.test.ts (9 tests) 24ms
+ ✓ src/renderer/canvas/__tests__/object-label-draw.test.ts (12 tests) 13ms
+ ✓ src/renderer/canvas/__tests__/vsplit-vdeform-surfaces.test.ts (18 tests) 16ms
+ ↓ src/renderer/canvas/__tests__/compose-bench.test.ts (1 test | 1 skipped)
+ ✓ src/renderer/canvas/__tests__/composer-priority-wiring.test.ts (14 tests) 28ms
+ ✓ src/renderer/canvas/__tests__/region-preview.test.ts (5 tests) 16ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 95 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued, but for row 239's even-width strokes > guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+AssertionError: expected [ …(77) ] to deeply equal [ …(77) ]
+
+- Expected
++ Received
+
+@@ -256,11 +256,11 @@
+      "op": "beginPath",
+    },
+    {
+      "args": [
+        0,
+-       200,
++       200.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -271,11 +271,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        912,
+-       200,
++       200.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -441,11 +441,11 @@
+      "op": "beginPath",
+    },
+    {
+      "args": [
+        0,
+-       221,
++       221.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -456,11 +456,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        912,
+-       221,
++       221.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:113:41
+    111|   for (const a of ALL) {
+    112|     it(`${a.key}`, () => {
+    113|       expect(roundTrip(a.run(1).calls)).toEqual(golden.cases[a.key]);
+       |                                         ^
+    114|     });
+    115|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued, but for row 239's even-width strokes > guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+AssertionError: expected [ …(31) ] to deeply equal [ …(31) ]
+
+- Expected
++ Received
+
+@@ -71,11 +71,11 @@
+      "op": "beginPath",
+    },
+    {
+      "args": [
+        0,
+-       31,
++       31.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -86,11 +86,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        1097.6,
+-       31,
++       31.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:113:41
+    111|   for (const a of ALL) {
+    112|     it(`${a.key}`, () => {
+    113|       expect(roundTrip(a.run(1).calls)).toEqual(golden.cases[a.key]);
+       |                                         ^
+    114|     });
+    115|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > at dpr 1 the chrome issues exactly the calls master issued, but for row 239's even-width strokes > frame: active, zoom 2.5, caption override
+AssertionError: expected [ …(14) ] to deeply equal [ …(14) ]
+
+- Expected
++ Received
+
+@@ -72,12 +72,12 @@
+      ],
+      "op": "setLineDash",
+    },
+    {
+      "args": [
+-       60,
+-       80,
++       60.5,
++       80.5,
+        800,
+        560,
+      ],
+      "m": [
+        1,
+
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:113:41
+    111|   for (const a of ALL) {
+    112|     it(`${a.key}`, () => {
+    113|       expect(roundTrip(a.run(1).calls)).toEqual(golden.cases[a.key]);
+       |                                         ^
+    114|     });
+    115|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.25: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.25: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.35: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.35: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.5: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.5: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.75: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.75: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 2: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 2: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 2.5: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 2.5: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 3: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 3: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:246:75
+    244|           // guide, the active frame) it is a WHOLE-pixel centre, wher…
+    245|           // put it on a half-pixel and left each edge half-covering a…
+    246|           if (s.kind === 'path') expect(edgesWhole(s.pts[0][1], s.widt…
+       |                                                                           ^
+    247|           else for (const [x, y] of s.pts) { expect(edgesWhole(x, s.wi…
+    248|         });
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:236:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1: frame: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.25: frame: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.35: frame: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.5: frame: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.75: frame: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 2: frame: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 2.5: frame: active, zoom 2.5, caption override
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 3: frame: active, zoom 2.5, caption override
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:247:77
+    245|           // put it on a half-pixel and left each edge half-covering a…
+    246|           if (s.kind === 'path') expect(edgesWhole(s.pts[0][1], s.widt…
+    247|           else for (const [x, y] of s.pts) { expect(edgesWhole(x, s.wi…
+       |                                                                             ^
+    248|         });
+    249|       });
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:236:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > row 239: no renderer code snaps a stroke through snapStroke > no file outside the tests calls snapStroke(: every chrome stroke goes through snapStrokeEdges
+AssertionError: expected [ 'canvas/effects-guides.ts', …(17) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "canvas/effects-guides.ts",
++   "canvas/effects-guides.ts",
++   "canvas/effects-guides.ts",
++   "canvas/effects-guides.ts",
++   "canvas/region-overlay.ts",
++   "canvas/region-overlay.ts",
++   "canvas/region-overlay.ts",
++   "canvas/region-overlay.ts",
++   "canvas/region-overlay.ts",
++   "canvas/region-overlay.ts",
++   "canvas/region-overlay.ts",
++   "canvas/region-overlay.ts",
++   "canvas/region-overlay.ts",
++   "canvas/region-overlay.ts",
++   "canvas/region-overlay.ts",
++   "canvas/screen-frame.ts",
++   "canvas/screen-frame.ts",
++   "canvas/screen-frame.ts",
++ ]
+
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:361:19
+    359|
+    360|   it('no file outside the tests calls snapStroke(: every chrome stroke…
+    361|     expect(calls).toEqual([]);
+       |                   ^
+    362|   });
+    363| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, integral view: full overlay, at rest, west selected
+AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 320.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 448.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 320.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 448.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 400.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 496.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 96.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 192.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, integral view: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ { at: 400.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 400.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 96.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 496.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 96.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 496.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 192.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 400.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 192.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, fractional pan, zoom 1.5: full overlay, at rest, west selected
+AssertionError: expected [ { at: -4.5, width: 2, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -4.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 475.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": -10.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 661.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: -4.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -4.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 475.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": -10.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 661.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 595.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 739.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 133.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 277.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ { at: 595.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 595.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 133.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 739.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 133.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 739.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 277.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 595.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 277.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, integral view: full overlay, at rest, west selected
+AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 400.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 560.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 400.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 560.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 500.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 620.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 120.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 240.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, integral view: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ { at: 500.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 500.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 120.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 620.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 120.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 620.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 240.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 500.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 240.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, fractional pan, zoom 1.5: full overlay, at rest, west selected
+AssertionError: expected [ { at: -5.5, width: 2, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -5.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 594.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": -13.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 826.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: -5.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -5.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 594.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": -13.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 826.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 744.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 924.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 166.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 346.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ { at: 744.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 744.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 166.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 924.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 166.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 924.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 346.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 744.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 346.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, integral view: full overlay, at rest, west selected
+AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 432.49999999999994,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 605.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 432.49999999999994,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 605.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 540.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 670.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 130.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 259.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, integral view: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ { at: 540.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 540.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 130.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 670.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 130.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 670.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 260.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 540.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 260.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, fractional pan, zoom 1.5: full overlay, at rest, west selected
+AssertionError: expected [ …(4) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -6.500000000000001,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 641.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": -14.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 892.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ …(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -6.500000000000001,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 641.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": -14.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 892.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 803.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 998.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 179.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 374.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ { at: 803.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 803.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 179.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 997.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 179.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 997.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 373.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 803.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 373.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, integral view: full overlay, at rest, west selected
+AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 480.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 672.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 480.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 672.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 600.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 744.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 144.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 288.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, integral view: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ { at: 600.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 600.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 144.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 744.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 144.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 744.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 288.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 600.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 288.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, fractional pan, zoom 1.5: full overlay, at rest, west selected
+AssertionError: expected [ { at: -6.5, width: 2, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -6.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 713.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": -16.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 991.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: -6.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -6.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 713.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": -16.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 991.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 893.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 1109.5,
++     "what": "vertical segment",
++     "width": 2,
++   },
++   {
++     "at": 199.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++   {
++     "at": 415.5,
++     "what": "horizontal segment",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ { at: 893.5, width: 2, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 893.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 199.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 1109.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 199.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 1109.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 415.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++   {
++     "at": 893.5,
++     "what": "rect corner x",
++     "width": 2,
++   },
++   {
++     "at": 415.5,
++     "what": "rect corner y",
++     "width": 2,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, integral view: full overlay, at rest, west selected
+AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 560.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 784.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 560.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 784.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 700.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 868.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 168.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 336.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, integral view: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ { at: 700.5, width: 4, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 700.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 168.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 868.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 168.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 868.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 336.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 700.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 336.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, fractional pan, zoom 1.5: full overlay, at rest, west selected
+AssertionError: expected [ { at: -8.5, width: 4, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -8.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 831.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": -19.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 1156.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: -8.5, width: 4, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -8.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 831.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": -19.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 1156.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 1041.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 1293.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 232.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 484.49999999999994,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ Array(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 1041.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 232.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 1293.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 232.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 1293.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 484.50000000000006,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 1041.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 484.50000000000006,
++     "what": "rect corner y",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, integral view: full overlay, at rest, west selected
+AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 640.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 896.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 640.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 896.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 800.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 992.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 192.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 384.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[38/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, integral view: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ { at: 800.5, width: 4, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 800.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 192.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 992.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 192.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 992.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 384.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 800.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 384.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, fractional pan, zoom 1.5: full overlay, at rest, west selected
+AssertionError: expected [ { at: -9.5, width: 4, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -9.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 950.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": -21.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 1322.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[40/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: -9.5, width: 4, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -9.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 950.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": -21.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 1322.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 1190.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 1478.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 266.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 554.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[41/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ Array(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 1190.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 266.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 1478.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 266.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 1478.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 554.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 1190.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 554.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[42/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, integral view: full overlay, at rest, west selected
+AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 800.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 1120.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[43/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 800.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 1120.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 1000.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 1240.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 240.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 480.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[44/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, integral view: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ Array(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 1000.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 240.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 1240.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 240.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 1240.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 480.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 1000.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 480.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[45/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, fractional pan, zoom 1.5: full overlay, at rest, west selected
+AssertionError: expected [ { at: -11.5, width: 4, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -11.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 1188.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": -27.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 1652.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[46/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: -11.5, width: 4, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -11.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 1188.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": -27.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 1652.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 1488.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 1848.5,
++     "what": "vertical segment",
++     "width": 4,
++   },
++   {
++     "at": 332.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++   {
++     "at": 692.5,
++     "what": "horizontal segment",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[47/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ Array(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 1488.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 332.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 1848.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 332.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 1848.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 692.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++   {
++     "at": 1488.5,
++     "what": "rect corner x",
++     "width": 4,
++   },
++   {
++     "at": 692.5,
++     "what": "rect corner y",
++     "width": 4,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[48/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, integral view: full overlay, at rest, west selected
+AssertionError: expected [ { at: 0.5, width: 6, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 6,
++   },
++   {
++     "at": 960.5,
++     "what": "vertical segment",
++     "width": 6,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 6,
++   },
++   {
++     "at": 1344.5,
++     "what": "horizontal segment",
++     "width": 6,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[49/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: 0.5, width: 6, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 0.5,
++     "what": "vertical segment",
++     "width": 6,
++   },
++   {
++     "at": 960.5,
++     "what": "vertical segment",
++     "width": 6,
++   },
++   {
++     "at": 0.5,
++     "what": "horizontal segment",
++     "width": 6,
++   },
++   {
++     "at": 1344.5,
++     "what": "horizontal segment",
++     "width": 6,
++   },
++   {
++     "at": 1200.5,
++     "what": "vertical segment",
++     "width": 6,
++   },
++   {
++     "at": 1488.5,
++     "what": "vertical segment",
++     "width": 6,
++   },
++   {
++     "at": 288.5,
++     "what": "horizontal segment",
++     "width": 6,
++   },
++   {
++     "at": 576.5,
++     "what": "horizontal segment",
++     "width": 6,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[50/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, integral view: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ Array(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 1200.5,
++     "what": "rect corner x",
++     "width": 6,
++   },
++   {
++     "at": 288.5,
++     "what": "rect corner y",
++     "width": 6,
++   },
++   {
++     "at": 1488.5,
++     "what": "rect corner x",
++     "width": 6,
++   },
++   {
++     "at": 288.5,
++     "what": "rect corner y",
++     "width": 6,
++   },
++   {
++     "at": 1488.5,
++     "what": "rect corner x",
++     "width": 6,
++   },
++   {
++     "at": 576.5,
++     "what": "rect corner y",
++     "width": 6,
++   },
++   {
++     "at": 1200.5,
++     "what": "rect corner x",
++     "width": 6,
++   },
++   {
++     "at": 576.5,
++     "what": "rect corner y",
++     "width": 6,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[51/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, fractional pan, zoom 1.5: full overlay, at rest, west selected
+AssertionError: expected [ { at: -14.5, width: 6, …(1) }, …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -14.5,
++     "what": "vertical segment",
++     "width": 6,
++   },
++   {
++     "at": 1425.5,
++     "what": "vertical segment",
++     "width": 6,
++   },
++   {
++     "at": -33.5,
++     "what": "horizontal segment",
++     "width": 6,
++   },
++   {
++     "at": 1982.5,
++     "what": "horizontal segment",
++     "width": 6,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[52/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+AssertionError: expected [ { at: -14.5, width: 6, …(1) }, …(7) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": -14.5,
++     "what": "vertical segment",
++     "width": 6,
++   },
++   {
++     "at": 1425.5,
++     "what": "vertical segment",
++     "width": 6,
++   },
++   {
++     "at": -33.5,
++     "what": "horizontal segment",
++     "width": 6,
++   },
++   {
++     "at": 1982.5,
++     "what": "horizontal segment",
++     "width": 6,
++   },
++   {
++     "at": 1785.5,
++     "what": "vertical segment",
++     "width": 6,
++   },
++   {
++     "at": 2217.5,
++     "what": "vertical segment",
++     "width": 6,
++   },
++   {
++     "at": 398.5,
++     "what": "horizontal segment",
++     "width": 6,
++   },
++   {
++     "at": 830.5,
++     "what": "horizontal segment",
++     "width": 6,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:75:23
+     73|           expect(strokes.length).toBeGreaterThan(0);
+     74|           const bad = strokes.filter((s) => !edgesWhole(s.at, s.width)…
+     75|           expect(bad).toEqual([]);
+       |                       ^
+     76|         });
+     77|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[53/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts > row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+AssertionError: expected [ Array(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "at": 1785.5,
++     "what": "rect corner x",
++     "width": 6,
++   },
++   {
++     "at": 398.5,
++     "what": "rect corner y",
++     "width": 6,
++   },
++   {
++     "at": 2217.5,
++     "what": "rect corner x",
++     "width": 6,
++   },
++   {
++     "at": 398.5,
++     "what": "rect corner y",
++     "width": 6,
++   },
++   {
++     "at": 2217.5,
++     "what": "rect corner x",
++     "width": 6,
++   },
++   {
++     "at": 830.5000000000001,
++     "what": "rect corner y",
++     "width": 6,
++   },
++   {
++     "at": 1785.5,
++     "what": "rect corner x",
++     "width": 6,
++   },
++   {
++     "at": 830.5000000000001,
++     "what": "rect corner y",
++     "width": 6,
++   },
++ ]
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts:90:21
+     88|           && Math.abs(s.width - deviceStrokeWidth(REGION_OUTLINE_SELEC…
+     89|         const bad = strokes.filter((s) => !edgesWhole(s.at, s.width));
+     90|         expect(bad).toEqual([]);
+       |                     ^
+     91|       });
+     92|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[54/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-middrag.test.ts > row 208 control: with the tint ON the full overlay issues exactly master's calls, but for row 239's even-width strokes > at rest, west selected: same calls, same report
+AssertionError: expected [ …(588) ] to deeply equal [ …(588) ]
+
+- Expected
++ Received
+
+@@ -3455,11 +3455,11 @@
+      ],
+      "op": "beginPath",
+    },
+    {
+      "args": [
+-       0,
++       0.5,
+        0,
+      ],
+      "m": [
+        1,
+        0,
+@@ -3470,11 +3470,11 @@
+      ],
+      "op": "moveTo",
+    },
+    {
+      "args": [
+-       0,
++       0.5,
+        448,
+      ],
+      "m": [
+        1,
+        0,
+@@ -3485,11 +3485,11 @@
+      ],
+      "op": "lineTo",
+    },
+    {
+      "args": [
+-       320,
++       320.5,
+        0,
+      ],
+      "m": [
+        1,
+        0,
+@@ -3500,11 +3500,11 @@
+      ],
+      "op": "moveTo",
+    },
+    {
+      "args": [
+-       320,
++       320.5,
+        448,
+      ],
+      "m": [
+        1,
+        0,
+@@ -3515,12 +3515,12 @@
+      ],
+      "op": "lineTo",
+    },
+    {
+      "args": [
+-       0,
+        0,
++       0.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -3531,11 +3531,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        320,
+-       0,
++       0.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -3546,11 +3546,11 @@
+      "op": "lineTo",
+    },
+    {
+      "args": [
+        0,
+-       448,
++       448.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -3561,11 +3561,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        320,
+-       448,
++       448.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-middrag.test.ts:68:34
+     66|       const r = recordingContext();
+     67|       const rep = drawRegionOverlay(r.ctx, c.dpr, CASE_VP, c.input);
+     68|       expect(roundTrip(r.calls)).toEqual(golden.cases[c.name].calls);
+       |                                  ^
+     69|       expect(roundTrip({
+     70|         regions: rep.regions, selectedId: rep.selectedId, unassignedRe…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[55/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-middrag.test.ts > row 208 control: with the tint ON the full overlay issues exactly master's calls, but for row 239's even-width strokes > mid-drag with the tint ON: the preview pieces, west selected: same calls, same report
+AssertionError: expected [ …(648) ] to deeply equal [ …(648) ]
+
+- Expected
++ Received
+
+@@ -3952,11 +3952,11 @@
+      ],
+      "op": "beginPath",
+    },
+    {
+      "args": [
+-       0,
++       0.5,
+        0,
+      ],
+      "m": [
+        1,
+        0,
+@@ -3967,11 +3967,11 @@
+      ],
+      "op": "moveTo",
+    },
+    {
+      "args": [
+-       0,
++       0.5,
+        448,
+      ],
+      "m": [
+        1,
+        0,
+@@ -3982,11 +3982,11 @@
+      ],
+      "op": "lineTo",
+    },
+    {
+      "args": [
+-       320,
++       320.5,
+        0,
+      ],
+      "m": [
+        1,
+        0,
+@@ -3997,11 +3997,11 @@
+      ],
+      "op": "moveTo",
+    },
+    {
+      "args": [
+-       320,
++       320.5,
+        448,
+      ],
+      "m": [
+        1,
+        0,
+@@ -4012,12 +4012,12 @@
+      ],
+      "op": "lineTo",
+    },
+    {
+      "args": [
+-       0,
+        0,
++       0.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -4028,11 +4028,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        320,
+-       0,
++       0.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -4043,11 +4043,11 @@
+      "op": "lineTo",
+    },
+    {
+      "args": [
+        0,
+-       448,
++       448.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -4058,11 +4058,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        320,
+-       448,
++       448.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -4072,11 +4072,11 @@
+      ],
+      "op": "lineTo",
+    },
+    {
+      "args": [
+-       400,
++       400.5,
+        96,
+      ],
+      "m": [
+        1,
+        0,
+@@ -4087,11 +4087,11 @@
+      ],
+      "op": "moveTo",
+    },
+    {
+      "args": [
+-       400,
++       400.5,
+        192,
+      ],
+      "m": [
+        1,
+        0,
+@@ -4102,11 +4102,11 @@
+      ],
+      "op": "lineTo",
+    },
+    {
+      "args": [
+-       496,
++       496.5,
+        96,
+      ],
+      "m": [
+        1,
+        0,
+@@ -4117,11 +4117,11 @@
+      ],
+      "op": "moveTo",
+    },
+    {
+      "args": [
+-       496,
++       496.5,
+        192,
+      ],
+      "m": [
+        1,
+        0,
+@@ -4133,11 +4133,11 @@
+      "op": "lineTo",
+    },
+    {
+      "args": [
+        400,
+-       96,
++       96.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -4148,11 +4148,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        496,
+-       96,
++       96.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -4163,11 +4163,11 @@
+      "op": "lineTo",
+    },
+    {
+      "args": [
+        400,
+-       192,
++       192.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+@@ -4178,11 +4178,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        496,
+-       192,
++       192.5,
+      ],
+      "m": [
+        1,
+        0,
+        0,
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-middrag.test.ts:68:34
+     66|       const r = recordingContext();
+     67|       const rep = drawRegionOverlay(r.ctx, c.dpr, CASE_VP, c.input);
+     68|       expect(roundTrip(r.calls)).toEqual(golden.cases[c.name].calls);
+       |                                  ^
+     69|       expect(roundTrip({
+     70|         regions: rep.regions, selectedId: rep.selectedId, unassignedRe…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[56/95]⎯
+
+ FAIL  src/renderer/canvas/__tests__/region-overlay-middrag.test.ts > row 208 control: with the tint ON the full overlay issues exactly master's calls, but for row 239's even-width strokes > mid-drag with the tint ON, at dpr 1.35: same calls, same report
+AssertionError: expected [ …(648) ] to deeply equal [ …(648) ]
+
+- Expected
++ Received
+
+@@ -3952,11 +3952,11 @@
+      ],
+      "op": "beginPath",
+    },
+    {
+      "args": [
+-       0,
++       0.37037037037037035,
+        0,
+      ],
+      "m": [
+        1.35,
+        0,
+@@ -3967,11 +3967,11 @@
+      ],
+      "op": "moveTo",
+    },
+    {
+      "args": [
+-       0,
++       0.37037037037037035,
+        448,
+      ],
+      "m": [
+        1.35,
+        0,
+@@ -3982,11 +3982,11 @@
+      ],
+      "op": "lineTo",
+    },
+    {
+      "args": [
+-       320,
++       320.3703703703703,
+        0,
+      ],
+      "m": [
+        1.35,
+        0,
+@@ -3997,11 +3997,11 @@
+      ],
+      "op": "moveTo",
+    },
+    {
+      "args": [
+-       320,
++       320.3703703703703,
+        448,
+      ],
+      "m": [
+        1.35,
+        0,
+@@ -4012,12 +4012,12 @@
+      ],
+      "op": "lineTo",
+    },
+    {
+      "args": [
+-       0,
+        0,
++       0.37037037037037035,
+      ],
+      "m": [
+        1.35,
+        0,
+        0,
+@@ -4028,11 +4028,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        320,
+-       0,
++       0.37037037037037035,
+      ],
+      "m": [
+        1.35,
+        0,
+        0,
+@@ -4043,11 +4043,11 @@
+      "op": "lineTo",
+    },
+    {
+      "args": [
+        0,
+-       448.1481481481481,
++       448.5185185185185,
+      ],
+      "m": [
+        1.35,
+        0,
+        0,
+@@ -4058,11 +4058,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        320,
+-       448.1481481481481,
++       448.5185185185185,
+      ],
+      "m": [
+        1.35,
+        0,
+        0,
+@@ -4072,11 +4072,11 @@
+      ],
+      "op": "lineTo",
+    },
+    {
+      "args": [
+-       400,
++       400.3703703703703,
+        96,
+      ],
+      "m": [
+        1.35,
+        0,
+@@ -4087,11 +4087,11 @@
+      ],
+      "op": "moveTo",
+    },
+    {
+      "args": [
+-       400,
++       400.3703703703703,
+        192,
+      ],
+      "m": [
+        1.35,
+        0,
+@@ -4102,11 +4102,11 @@
+      ],
+      "op": "lineTo",
+    },
+    {
+      "args": [
+-       496.29629629629625,
++       496.66666666666663,
+        96,
+      ],
+      "m": [
+        1.35,
+        0,
+@@ -4117,11 +4117,11 @@
+      ],
+      "op": "moveTo",
+    },
+    {
+      "args": [
+-       496.29629629629625,
++       496.66666666666663,
+        192,
+      ],
+      "m": [
+        1.35,
+        0,
+@@ -4133,11 +4133,11 @@
+      "op": "lineTo",
+    },
+    {
+      "args": [
+        400,
+-       96.29629629629629,
++       96.66666666666666,
+      ],
+      "m": [
+        1.35,
+        0,
+        0,
+@@ -4148,11 +4148,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        496,
+-       96.29629629629629,
++       96.66666666666666,
+      ],
+      "m": [
+        1.35,
+        0,
+        0,
+@@ -4163,11 +4163,11 @@
+      "op": "lineTo",
+    },
+    {
+      "args": [
+        400,
+-       191.85185185185185,
++       192.2222222222222,
+      ],
+      "m": [
+        1.35,
+        0,
+        0,
+@@ -4178,11 +4178,11 @@
+      "op": "moveTo",
+    },
+    {
+      "args": [
+        496,
+-       191.85185185185185,
++       192.2222222222222,
+      ],
+      "m": [
+        1.35,
+        0,
+        0,
+
+ ❯ src/renderer/canvas/__tests__/region-overlay-middrag.test.ts:68:34
+     66|       const r = recordingContext();
+     67|       const rep = drawRegionOverlay(r.ctx, c.dpr, CASE_VP, c.input);
+     68|       expect(roundTrip(r.calls)).toEqual(golden.cases[c.name].calls);
+       |                                  ^
+     69|       expect(roundTrip({
+     70|         regions: rep.regions, selectedId: rep.selectedId, unassignedRe…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[57/95]⎯
+
+
+ Test Files  3 failed | 22 passed | 1 skipped (26)
+      Tests  95 failed | 594 passed | 1 skipped (690)
+   Start at  06:15:42
+   Duration  3.85s (transform 19.94s, setup 29.93s, import 13.18s, tests 2.35s, environment 2ms)
+
+
+skip-report: 1 SKIPPED test(s) in 1 file(s). A SKIP IS NOT A PASS:
+  each of these contributed zero to the totals above.
+
+  src/renderer/canvas/__tests__/compose-bench.test.ts
+    ↓ bench > composition throughput
+        [meta] AURORA_BENCH is not set: this row is an opt-in measurement harness that PRINTS rather than asserts, so it is off by default; see the file header to run it
+
+skip-report: OK. Every skip named its reason.
+
+failure-class: 95 failure record(s) in 3 file(s) (95 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION       95   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/canvas/__tests__/dpr-chrome.test.ts
+    [ASSERTION] at dpr 1 the chrome issues exactly the calls master issued, but for row 239's even-width strokes > guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+        AssertionError: expected [ …(77) ] to deeply equal [ …(77) ]
+        why this bucket: name is AssertionError
+    [ASSERTION] at dpr 1 the chrome issues exactly the calls master issued, but for row 239's even-width strokes > guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+        AssertionError: expected [ …(31) ] to deeply equal [ …(31) ]
+        why this bucket: name is AssertionError
+    [ASSERTION] at dpr 1 the chrome issues exactly the calls master issued, but for row 239's even-width strokes > frame: active, zoom 2.5, caption override
+        AssertionError: expected [ …(14) ] to deeply equal [ …(14) ]
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1: frame: active, zoom 2.5, caption override
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.25: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.25: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.25: frame: active, zoom 2.5, caption override
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.35: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.35: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.35: frame: active, zoom 2.5, caption override
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.5: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.5: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.5: frame: active, zoom 2.5, caption override
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.75: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.75: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 1.75: frame: active, zoom 2.5, caption override
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 2: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 2: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 2: frame: active, zoom 2.5, caption override
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 2.5: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 2.5: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 2.5: frame: active, zoom 2.5, caption override
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 3: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption)
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 3: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every stroke keeps the crispness the identity reset was for: both edges on whole device pixels > dpr 3: frame: active, zoom 2.5, caption override
+        AssertionError: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239: no renderer code snaps a stroke through snapStroke > no file outside the tests calls snapStroke(: every chrome stroke goes through snapStrokeEdges
+        AssertionError: expected [ 'canvas/effects-guides.ts', …(17) ] to deeply equal []
+        why this bucket: name is AssertionError
+
+  src/renderer/canvas/__tests__/region-overlay-device-grid.test.ts
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, integral view: full overlay, at rest, west selected
+        AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, integral view: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ { at: 400.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, fractional pan, zoom 1.5: full overlay, at rest, west selected
+        AssertionError: expected [ { at: -4.5, width: 2, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: -4.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: -4.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ { at: 595.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, integral view: full overlay, at rest, west selected
+        AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, integral view: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ { at: 500.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, fractional pan, zoom 1.5: full overlay, at rest, west selected
+        AssertionError: expected [ { at: -5.5, width: 2, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: -5.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: -5.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.25, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ { at: 744.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, integral view: full overlay, at rest, west selected
+        AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, integral view: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ { at: 540.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, fractional pan, zoom 1.5: full overlay, at rest, west selected
+        AssertionError: expected [ …(4) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ …(8) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ …(8) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.35, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ { at: 803.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, integral view: full overlay, at rest, west selected
+        AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: 0.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, integral view: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ { at: 600.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, fractional pan, zoom 1.5: full overlay, at rest, west selected
+        AssertionError: expected [ { at: -6.5, width: 2, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: -6.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: -6.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.5, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ { at: 893.5, width: 2, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, integral view: full overlay, at rest, west selected
+        AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, integral view: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ { at: 700.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, fractional pan, zoom 1.5: full overlay, at rest, west selected
+        AssertionError: expected [ { at: -8.5, width: 4, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: -8.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: -8.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 1.75, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ Array(8) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, integral view: full overlay, at rest, west selected
+        AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, integral view: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ { at: 800.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, fractional pan, zoom 1.5: full overlay, at rest, west selected
+        AssertionError: expected [ { at: -9.5, width: 4, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: -9.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: -9.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ Array(8) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, integral view: full overlay, at rest, west selected
+        AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: 0.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, integral view: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ Array(8) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, fractional pan, zoom 1.5: full overlay, at rest, west selected
+        AssertionError: expected [ { at: -11.5, width: 4, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: -11.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: -11.5, width: 4, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 2.5, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ Array(8) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, integral view: full overlay, at rest, west selected
+        AssertionError: expected [ { at: 0.5, width: 6, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, integral view: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: 0.5, width: 6, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, integral view: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: 0.5, width: 6, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, integral view: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ Array(8) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, fractional pan, zoom 1.5: full overlay, at rest, west selected
+        AssertionError: expected [ { at: -14.5, width: 6, …(1) }, …(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON: the preview pieces, west selected
+        AssertionError: expected [ { at: -14.5, width: 6, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, fractional pan, zoom 1.5: full overlay, mid-drag with the tint ON, at dpr 1.35
+        AssertionError: expected [ { at: -14.5, width: 6, …(1) }, …(7) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] row 239 (a): every region-overlay stroke has both edges on whole device pixels > dpr 3, fractional pan, zoom 1.5: the gesture draw (dragged rect and trimmed outline)
+        AssertionError: expected [ Array(8) ] to deeply equal []
+        why this bucket: name is AssertionError
+
+  src/renderer/canvas/__tests__/region-overlay-middrag.test.ts
+    [ASSERTION] row 208 control: with the tint ON the full overlay issues exactly master's calls, but for row 239's even-width strokes > at rest, west selected: same calls, same report
+        AssertionError: expected [ …(588) ] to deeply equal [ …(588) ]
+        why this bucket: name is AssertionError
+    [ASSERTION] row 208 control: with the tint ON the full overlay issues exactly master's calls, but for row 239's even-width strokes > mid-drag with the tint ON: the preview pieces, west selected: same calls, same report
+        AssertionError: expected [ …(648) ] to deeply equal [ …(648) ]
+        why this bucket: name is AssertionError
+    [ASSERTION] row 208 control: with the tint ON the full overlay issues exactly master's calls, but for row 239's even-width strokes > mid-drag with the tint ON, at dpr 1.35: same calls, same report
+        AssertionError: expected [ …(648) ] to deeply equal [ …(648) ]
+        why this bucket: name is AssertionError
+
+failure-class: 95 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 26 of 26 module(s) this run selected finished.

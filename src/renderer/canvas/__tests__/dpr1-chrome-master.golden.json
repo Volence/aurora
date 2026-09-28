@@ -1,5 +1,5 @@
 {
- "generatedFrom": "master 803e8a301895709142cad70cc15763bd33a40ae2, signatures without a dpr argument",
+ "generatedFrom": "row 239 (a) parcel/even-chrome-239 (base 9d8fcee9, the row 239 source change), ruled 2026-09-28: even-width strokes on whole-pixel centres; every other call as master 803e8a301895709142cad70cc15763bd33a40ae2 recorded",
  "cases": {
   "guides: act space, three layers, one disabled, fractional pan and zoom": [
    {
@@ -893,7 +893,7 @@
     "op": "moveTo",
     "args": [
      0,
-     200.5
+     200
     ],
     "m": [
      1,
@@ -908,7 +908,7 @@
     "op": "lineTo",
     "args": [
      912,
-     200.5
+     200
     ],
     "m": [
      1,
@@ -1078,7 +1078,7 @@
     "op": "moveTo",
     "args": [
      0,
-     221.5
+     221
     ],
     "m": [
      1,
@@ -1093,7 +1093,7 @@
     "op": "lineTo",
     "args": [
      912,
-     221.5
+     221
     ],
     "m": [
      1,
@@ -1813,7 +1813,7 @@
     "op": "moveTo",
     "args": [
      0,
-     31.5
+     31
     ],
     "m": [
      1,
@@ -1828,7 +1828,7 @@
     "op": "lineTo",
     "args": [
      1097.6,
-     31.5
+     31
     ],
     "m": [
      1,
@@ -3570,8 +3570,8 @@
    {
     "op": "strokeRect",
     "args": [
-     60.5,
-     80.5,
+     60,
+     80,
      800,
      560
     ],
