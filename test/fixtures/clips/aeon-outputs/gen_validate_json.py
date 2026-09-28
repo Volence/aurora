@@ -5,12 +5,13 @@
 # Every case is a REAL subprocess of aeon's CLI, invoked the way Aurora invokes it
 # (validate <path> --donor-root <root> --json). Nothing below edits aeon's output.
 # The mutations are aeon's own, from tools/test_clip_manifest_json.py at 1d9afb25, except
-# the three on s2_woven (ROADMAP row 232): each is the least edit of the real woven act
+# the ones on s2_woven (ROADMAP rows 232 and 233): each is the least edit of the real woven act
 # that trips ONE of the connector rules whose subject is not a clip or corridor (K8 names
 # the fill, K9 a shaft), so the shaft/fill subject shapes are aeon's, not typed by hand.
 import copy, json, os, subprocess, sys
 
 root = os.getcwd()
+sys.path.insert(0, os.path.join(root, "tools"))  # mut_k9_shaft_past_act reads aeon's SECTION_SIZE
 out = sys.argv[1]
 bundle_path = sys.argv[2]
 bundle = {}
@@ -62,6 +63,15 @@ def mut_k9_shaft_dup_clip_id(d):
     d["shafts"][0]["id"] = d["clips"][0]["id"]
 
 
+def mut_k9_shaft_past_act(d):
+    # K9 "runs past the act" (ROADMAP row 233): shafts[2] (wfz_to_cpz) moved WHOLLY past the
+    # act's east edge, x = the act's width (grid_w x aeon's own SECTION_SIZE), subject
+    # {kind: shaft}. The one real shaft refusal whose rectangle is not on the target pane.
+    import clip_manifest as CM
+    assert d["shafts"][2]["id"] == "wfz_to_cpz"
+    d["shafts"][2]["dst_rect"]["x"] = d["act"]["grid_w"] * CM.geometry_constants()["SECTION_SIZE"]
+
+
 # accept_s2_two_clip (ROADMAP row 219): the unmutated two-clip act, the one acceptance in
 # the set aeon answers with NO warning (measured at the pin: s2_ehz_cpz and every woven
 # act carry W3), so "accepted, nothing to say" is aeon's answer, not an empty list typed here.
@@ -71,7 +81,8 @@ plan = [("accept_s2_ehz_cpz", "s2_ehz_cpz", None), ("accept_s2_two_clip", "s2_tw
         ("accept_w3", "s2_two_clip", mut_w3), ("refuse_r12_after_w2", "s2_two_clip", mut_w2_r12),
         ("refuse_k8_fill_no_why", "s2_woven", mut_k8_fill_no_why),
         ("refuse_k9_shaft_ledge_pitch", "s2_woven", mut_k9_shaft_pitch),
-        ("refuse_k9_shaft_dup_clip_id", "s2_woven", mut_k9_shaft_dup_clip_id)]
+        ("refuse_k9_shaft_dup_clip_id", "s2_woven", mut_k9_shaft_dup_clip_id),
+        ("refuse_k9_shaft_past_act", "s2_woven", mut_k9_shaft_past_act)]
 os.makedirs(out, exist_ok=True)
 
 
