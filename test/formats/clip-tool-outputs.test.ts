@@ -38,7 +38,11 @@ const clipact = (name: string) => JSON.parse(readFileSync(resolve(DIR, `${name}.
 };
 const CASES = JSON.parse(readFileSync(resolve(DIR, 'validate-json.cases.json'), 'utf8')) as Record<string, { exit: number; stdout: string; stderr: string }>;
 interface Marker {
-  aeon: { revision: string; tool_path: string; tool_blob: string; re_measure: string; inputs?: { path: string; blob: string }[] };
+  aeon: {
+    revision: string; tool_path: string; tool_blob: string; re_measure: string; materialised_by: string;
+    inputs?: { path: string; blob: string }[]; closure_not_loaded?: string[];
+    data_not_opened?: string[]; inputs_excluded?: { path: string; why: string }[];
+  };
   fixture: { path: string; sha256: string; command: string };
   generator?: { path: string };
 }
@@ -237,6 +241,20 @@ describe('validate --json: accepted, refused and CRASHED are three answers', () 
       expect(v).toEqual({ kind: 'accepted', warnings: doc.warnings });
     });
   }
+
+  // ROADMAP row 219 (b): until then both acceptances carried W3, so "accepted with
+  // nothing to say" was never aeon's answer here. Which cases are warning-free is read
+  // from aeon's own stdout, never from a case name.
+  it('an acceptance aeon answers with NO warning reads as accepted with an empty warning list, not as a crash or a refusal', () => {
+    const quiet = acceptCases.filter((k) => (JSON.parse(CASES[k].stdout) as { warnings: unknown[] }).warnings.length === 0);
+    const noisy = acceptCases.filter((k) => !quiet.includes(k));
+    expect(quiet, 'the vendored set holds no warning-free acceptance').not.toEqual([]);
+    expect(noisy, 'the vendored set holds no acceptance WITH a warning, so this row would not tell the two apart').not.toEqual([]);
+    for (const k of quiet) {
+      expect(CASES[k].exit, k).toBe(0);
+      expect(readValidateJson(CASES[k].exit, CASES[k].stdout, CASES[k].stderr), k).toEqual({ kind: 'accepted', warnings: [] });
+    }
+  });
 
   for (const k of crashCases) {
     it(`${k}: exit 1 with NO JSON is a CRASH carrying aeon's traceback, never a refusal`, () => {
@@ -518,6 +536,105 @@ describe('CURRENCY: the INPUTS those tools read, at aeon origin/master', () => {
       const pinned = (m.aeon.inputs ?? []).map((i) => i.path);
       expect(named.filter((p) => !pinned.includes(p)), `${m.fixture.path}: read by the recorded run but NOT pinned`).toEqual([]);
       for (const i of m.aeon.inputs ?? []) expect(i.blob, `${i.path}`).toMatch(/^[0-9a-f]{40}$/);
+    });
+
+    // ROADMAP row 219 (c): the manifests are not all an output reads. The tool imports
+    // aeon modules, and the donor trees it reads are the donor conversion's output
+    // (gitignored in aeon), so that conversion and ITS modules are inputs too. The
+    // closure is derived HERE from aeon's own sources at the marker's revision (git
+    // objects), from tool_path and from the conversion tool the marker's
+    // materialised_by names; every module in it is pinned, or listed as measured
+    // not-loaded. Each pinned blob is also held to the marker's OWN revision, so a
+    // blob cannot have been typed or taken from some other tree.
+    it(`${m.fixture.path}: every aeon module and data file the tool and the donor conversion read is pinned, measured unread, or a declared exclusion, each at the marker's revision`, (ctx) => {
+      const conv = /python3 (tools\/[a-z0-9_]+\.py) convert --all-six/.exec(m.aeon.materialised_by);
+      expect(conv, `${m.fixture.path}: materialised_by names no donor conversion`).not.toBeNull();
+      const aeon = peerRepo('aeon');
+      if (aeon === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR); CANNOT MEASURE ${m.fixture.path}'s import closure`);
+        return;
+      }
+      const rev = resolveRev(aeon, m.aeon.revision);
+      if (rev === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: ${m.aeon.revision} does not resolve in ${aeon} (unfetched?); CANNOT MEASURE ${m.fixture.path}'s import closure`);
+        return;
+      }
+      const closure = new Set<string>();
+      /** Modules some module imports at COLUMN 0: loaded whenever that module is, so never "not loaded" beside a pinned importer. */
+      const topLevel = new Map<string, Set<string>>();
+      const todo = [m.aeon.tool_path, conv![1]];
+      while (todo.length > 0) {
+        const p = todo.pop()!;
+        if (closure.has(p)) continue;
+        const at = readAtRev(aeon, rev, p);
+        expect(at.ok, at.ok ? '' : at.why).toBe(true);
+        if (!at.ok) return;
+        closure.add(p);
+        const names = new Set<string>();
+        for (const x of at.text.matchAll(/^[ \t]*import[ \t]+([^\n#]+)/gm)) {
+          for (const part of x[1].split(',')) { const t = part.trim().split(/\s+/)[0]; if (t) names.add(t.split('.')[0]); }
+        }
+        for (const x of at.text.matchAll(/^[ \t]*from[ \t]+([A-Za-z_]\w*)[ \t]+import\b/gm)) names.add(x[1]);
+        const top = new Set<string>();
+        for (const x of at.text.matchAll(/^import[ \t]+([^\n#]+)/gm)) {
+          for (const part of x[1].split(',')) { const t = part.trim().split(/\s+/)[0]; if (t) top.add(`tools/${t.split('.')[0]}.py`); }
+        }
+        for (const x of at.text.matchAll(/^from[ \t]+([A-Za-z_]\w*)[ \t]+import\b/gm)) top.add(`tools/${x[1]}.py`);
+        topLevel.set(p, top);
+        // A name is an aeon module when tools/<name>.py exists at the revision; stdlib and numpy are not there.
+        for (const n of names) if (!closure.has(`tools/${n}.py`) && readAtRev(aeon, rev, `tools/${n}.py`).ok) todo.push(`tools/${n}.py`);
+      }
+      // Anti-vacuous: the conversion and the tool each pull in aeon modules of their own.
+      expect(closure.size, `${m.fixture.path}: closure found no module beyond its two roots`).toBeGreaterThan(2);
+      const pinned = new Set([m.aeon.tool_path, ...(m.aeon.inputs ?? []).map((i) => i.path)]);
+      const notLoaded = m.aeon.closure_not_loaded ?? [];
+      expect(notLoaded.filter((p) => pinned.has(p)), `${m.fixture.path}: listed as not loaded AND pinned`).toEqual([]);
+      expect([...closure].filter((p) => !pinned.has(p) && !notLoaded.includes(p)).sort(),
+        `${m.fixture.path}: imported by the tool or the donor conversion at ${m.aeon.revision}, but neither pinned in aeon.inputs nor measured not loaded`).toEqual([]);
+      // "Not loaded" is the trace's word and this row cannot re-trace; what it CAN refute is a
+      // module listed not-loaded that a pinned (so loaded) module imports at column 0.
+      const contradicted: string[] = [];
+      for (const [p, top] of topLevel) if (pinned.has(p)) for (const q of top) if (notLoaded.includes(q)) contradicted.push(`${q} (imported at top level by ${p})`);
+      expect(contradicted, `${m.fixture.path}: listed as not loaded, but a loaded module imports it unconditionally`).toEqual([]);
+
+      // DATA FILES. The loaded modules (tool_path and every pinned tools/*.py) name the
+      // committed files they read as os.path.join of string literals; derive those here,
+      // at the revision. Each must be pinned, measured not opened (data_not_opened), or
+      // a DECLARED exclusion (inputs_excluded: read, deliberately unpinned, with its why).
+      // An exclusion is its own category: dropping a pin without declaring it still reds.
+      const loaded = [...pinned].filter((p) => p.startsWith('tools/') && p.endsWith('.py'));
+      const named = new Set<string>();
+      for (const p of loaded) {
+        const at = readAtRev(aeon, rev, p);
+        if (!at.ok) continue;
+        for (const call of at.text.matchAll(/os\.path\.join\(([^()]*)\)/g)) {
+          const lits = [...call[1].matchAll(/["']([A-Za-z0-9_.-]+)["']/g)].map((x) => x[1]);
+          if (lits.length === 0 || !lits[lits.length - 1].includes('.')) continue;
+          for (let i = 0; i < lits.length; i++) {
+            const q = lits.slice(i).join('/');
+            if (!named.has(q) && readAtRev(aeon, rev, q).ok) named.add(q);
+          }
+        }
+      }
+      // Anti-vacuous: the clip tools read at least one committed data file this way.
+      expect(named.size, `${m.fixture.path}: derived no data file from the loaded modules`).toBeGreaterThan(0);
+      const notOpened = m.aeon.data_not_opened ?? [];
+      const excluded = m.aeon.inputs_excluded ?? [];
+      const excludedPaths = excluded.map((e) => e.path);
+      expect([...notOpened, ...excludedPaths].filter((p) => pinned.has(p)), `${m.fixture.path}: both pinned and not`).toEqual([]);
+      for (const e of excluded) {
+        expect(named.has(e.path), `${m.fixture.path}: excludes ${e.path}, which no loaded module names (an exclusion must be of something the tools read)`).toBe(true);
+        expect(e.why.length, `${m.fixture.path}: ${e.path} is excluded with no why`).toBeGreaterThan(0);
+      }
+      expect([...named].filter((p) => !pinned.has(p) && !notOpened.includes(p) && !excludedPaths.includes(p)).sort(),
+        `${m.fixture.path}: a data file a loaded module names at ${m.aeon.revision} is neither pinned, measured not opened, nor a declared exclusion`).toEqual([]);
+      const wrong: string[] = [];
+      for (const i of m.aeon.inputs ?? []) {
+        const at = readAtRev(aeon, rev, i.path);
+        if (!at.ok) wrong.push(`${i.path}: ${at.why}`);
+        else if (at.blob !== i.blob) wrong.push(`${i.path}: pinned ${i.blob}, but at the marker's own revision ${rev} it is ${at.blob}`);
+      }
+      expect(wrong, `${m.fixture.path}: a pinned blob is not the file at the revision the marker names`).toEqual([]);
     });
 
     it(`${m.fixture.path}: each pinned input at aeon origin/master is the blob it was captured from`, (ctx) => {

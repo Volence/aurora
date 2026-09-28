@@ -63,6 +63,19 @@
 //         canvas read back in the id label's band holds no warning pixel and
 //         the band below it does (found by eye in this parcel's first shot,
 //         where "C4" printed over "ehz_2x").
+//   ROW 219 (a), 2026-09-28: the REAL s2_ehz_cpz act (aeon's own clips.json in
+//   the copy, chosen by DP.9s's real click), not an act the harness built:
+//   DP.11a the act list names every clip act in the copy (read from its disk),
+//         and the facts line is that clips.json's grid, clip and corridor counts.
+//   DP.11b the target pane holds the whole act (both world corners in view) and
+//         drew it from aeon's bake: a section drew iff the harness's OWN bake of
+//         the file paints a cell there; the canvas, read back per section, is
+//         non-blank over every painted section and blank over every section no
+//         clip or corridor rectangle touches.
+//   DP.11c aeon's readout is the harness's own bake: the act line (pool tiles,
+//         pages, worst window, collision entries), the pool grid cell for cell
+//         over every clip and corridor, aeon's tile sum holding, and one
+//         collision line per clip. SHOT_DIR saves donor-page-real-s2_ehz_cpz.png.
 //
 // EXPECTATIONS COME FROM THE TREE: CONVERTER_COMMAND, marqueeRect, marqueeReadout,
 // clipsManifestPath and suggestDestination are bundled from the tree under test
@@ -389,9 +402,10 @@ async function rows(d, O, COPY, dpr) {
   const { c } = d;
   // SHOT_DIR=<dir> saves a PNG of the window at two points, for a person to
   // look at. Never read by a row: a picture is not a measurement here.
-  const shot = async (name) => {
+  // `clip` (client px, optional) shoots one region magnified by `clip.scale`.
+  const shot = async (name, clip = null) => {
     if (!process.env.SHOT_DIR) return;
-    const r = await c.send('Page.captureScreenshot', { format: 'png' });
+    const r = await c.send('Page.captureScreenshot', clip ? { format: 'png', clip } : { format: 'png' });
     const f = join(process.env.SHOT_DIR, `donor-page-${name}.png`);
     writeFileSync(f, Buffer.from(r.data, 'base64'));
     console.log(`    shot         : ${f}`);
@@ -725,6 +739,7 @@ async function rows(d, O, COPY, dpr) {
   const existPath = join(COPY, O.clipsManifestPath(EXIST));
   if (!existsSync(existPath)) {
     check('DP.9s', `the form names ${EXIST}'s EHZ song`, 'UNMEASURABLE', `${existPath} is not in the copy`);
+    check('DP.11', `the real ${EXIST} act on the page`, 'UNMEASURABLE', `${existPath} is not in the copy`);
   } else {
     const ehzSongs = [...new Set(JSON.parse(readFileSync(existPath, 'utf8')).clips.filter((k) => k.donor === 's2disasm' && k.zone === 'EHZ').map((k) => k.music ?? null))];
     const actBtn = await d.realClick(`document.querySelector('[data-donors-act="${EXIST}"]')`);
@@ -734,6 +749,127 @@ async function rows(d, O, COPY, dpr) {
     check('DP.9s', `a REAL click on ${EXIST}: the form names the song its s2disasm EHZ clips carry, read by the harness from that clips.json ON DISK`,
       !!(actBtn && actBtn.hitOk) && ehzSongs.length === 1 && typeof ehzSongs[0] === 'string' && song9 === `Song: ${ehzSongs[0]} (from s2disasm EHZ)`,
       `songs on disk ${J(ehzSongs)}; DOM ${J(song9)}; target ${J(s9.paste.target && s9.paste.target.actId)}`);
+    await bigAct(EXIST, existPath);
+  }
+
+  // ── DP.11 the REAL s2_ehz_cpz act, on the page (row 219 (a)) ────────────
+  // Every row before this builds its own one- or two-section act. This is the
+  // act aeon ships: its clips.json in the copy, as DP.9s just chose it with a
+  // real click. Every expectation is read from that file ON DISK and from the
+  // HARNESS's own bake of it (aeon's CLI, in the copy), never typed here.
+  async function bigAct(actId, manPath) {
+    const man = JSON.parse(readFileSync(manPath, 'utf8'));
+    const gw = man.act.grid_w; const gh = man.act.grid_h;
+    const corridors = man.corridors ?? [];
+    const outDir = mkdtempSync(join(os.tmpdir(), 'donor-page-big-'));
+    let own = null;
+    try {
+      const bk = aeonTool(COPY, ['tools/clip_act_bake.py', 'bake', manPath, '--out', outDir]);
+      if (bk.status === 0 && existsSync(join(outDir, 'clipact.json'))) {
+        const clipact = JSON.parse(readFileSync(join(outDir, 'clipact.json'), 'utf8'));
+        // Per section, from the bake's own files: cells a zone claims (key >= 0)
+        // whose tile is not aeon's blank (index 0, "the blank tile every act carries").
+        const painted = []; const cells = [];
+        for (let n = 0; n < gw * gh; n++) {
+          const t = join(outDir, `section_${n}.tiles.bin`); const k = join(outDir, `section_${n}.zonekey.bin`);
+          if (!existsSync(t) || !existsSync(k)) { painted.push(null); cells.push(null); continue; }
+          const tb = readFileSync(t); const kb = readFileSync(k); let p = 0;
+          for (let i = 0; i < kb.length; i++) if (kb.readInt8(i) >= 0 && (tb.readUInt16BE(i * 2) & 0x7ff) !== 0) p++;
+          painted.push(p); cells.push(kb.length);
+        }
+        own = { exit: bk.status, clipact, painted, cells };
+      } else own = { exit: bk.status, stderr: String(bk.stderr).slice(-400) };
+    } finally { rmSync(outDir, { recursive: true, force: true }); }
+    if (!own || own.exit !== 0 || !own.clipact) {
+      check('DP.11', `the real ${actId} act on the page`, 'UNMEASURABLE', `the harness's own bake of ${manPath} did not answer: ${J(own)}`);
+      return;
+    }
+    const pool = own.clipact.pool;
+    console.log(`    ${actId}      : on disk ${gw} x ${gh} sections, clips ${J(man.clips.map((k) => k.id))}, corridors ${J(corridors.map((k) => k.id))}; `
+      + `harness bake: pool ${pool.tiles} tiles / ${pool.pages} pages, painted cells per section ${J(own.painted)}`);
+
+    // DP.11a the act list names every clip act aeon holds in the copy.
+    const clipsRoot = join(COPY, dirname(dirname(O.clipsManifestPath(actId))));
+    const actsOnDisk = readdirSync(clipsRoot).filter((a) => existsSync(join(COPY, O.clipsManifestPath(a)))).sort();
+    const actsDom = await c.json('[...document.querySelectorAll("[data-donors-act]")].map((b) => b.getAttribute("data-donors-act")).sort()');
+    const facts = await c.evalExpr('(document.querySelector("[data-donors-target-facts]") || {}).textContent || null');
+    const wantFacts = `${O.clipsManifestPath(actId)}: ${gw} x ${gh} sections, ${man.clips.length} clip(s), ${corridors.length} corridor(s); on disk. Build it in aeon with S2CLIP=${actId} ./build.sh.`;
+    check('DP.11a', `the act list holds every clip act in the copy (read from its disk), and the chosen ${actId}'s facts are its clips.json's: grid, clip and corridor counts`,
+      J(actsDom) === J(actsOnDisk) && actsDom.includes(actId) && facts === wantFacts,
+      `on disk ${J(actsOnDisk)}; DOM ${J(actsDom)}; facts ${J(facts)}; want ${J(wantFacts)}`);
+
+    // DP.11b the pane holds the whole act and drew it from the bake: a section
+    // drew iff the harness's own bake gives it a painted cell, and on the canvas
+    // (read back) every painted section is non-blank and every section no clip
+    // or corridor rectangle touches is blank.
+    const s11 = await d.waitFor((s) => s.targetCompose && s.targetCompose.act === actId && s.targetPane && s.targetPane.bitmaps > 0, `${actId} composed`, 240, 250, { soft: true });
+    await sleep(600);
+    const T11 = await d.pane('target');
+    const comp = s11.targetCompose && s11.targetCompose.act === actId ? s11.targetCompose.sections : [];
+    const drewIff = own.painted.map((p, n) => ({ n, painted: p, drawn: (comp.find((x) => x.n === n) || { drawnPixels: null }).drawnPixels }));
+    const iffOk = drewIff.length === gw * gh && drewIff.every((x) => x.painted !== null && x.drawn !== null && (x.painted > 0) === (x.drawn > 0))
+      && drewIff.some((x) => x.painted > 0) && drewIff.some((x) => x.painted === 0);
+    const W = gw * 2048; const H = gh * 2048;
+    const tl = d.clientOf(T11, 0, 0); const br = d.clientOf(T11, W, H);
+    const inView = T11.worldW === W && T11.worldH === H && tl.x >= T11.rect.left - 1 && tl.y >= T11.rect.top - 1
+      && br.x <= T11.rect.left + T11.rect.width + 1 && br.y <= T11.rect.top + T11.rect.height + 1;
+    const rects = [...man.clips, ...corridors].map((k) => k.dst_rect);
+    const touched = (n) => { const sx = (n % gw) * 2048; const sy = Math.floor(n / gw) * 2048;
+      return rects.some((r) => r.x < sx + 2048 && r.x + r.w > sx && r.y < sy + 2048 && r.y + r.h > sy); };
+    const boxes = own.painted.map((_, n) => { const a = d.clientOf(T11, (n % gw) * 2048, Math.floor(n / gw) * 2048); const b2 = d.clientOf(T11, (n % gw + 1) * 2048, (Math.floor(n / gw) + 1) * 2048);
+      return { n, x0: a.x - T11.rect.left, y0: a.y - T11.rect.top, x1: b2.x - T11.rect.left, y1: b2.y - T11.rect.top }; });
+    const read = await c.json(String.raw`(() => { const cv = document.querySelector('[data-zone-pane-canvas="target"]'); if (!cv) return null;
+      const b = cv.getBoundingClientRect(); const k = cv.width / b.width; const ctx = cv.getContext('2d');
+      return ${J(boxes)}.map((q) => { const x0 = Math.ceil((q.x0 + 3) * k), y0 = Math.ceil((q.y0 + 3) * k), x1 = Math.floor((q.x1 - 3) * k), y1 = Math.floor((q.y1 - 3) * k);
+        if (x1 <= x0 || y1 <= y0) return { n: q.n, area: 0 };
+        const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data; let drawn = 0; let opaque = 0;
+        for (let i = 3; i < img.length; i += 4) { if (img[i] !== 0) drawn++; if (img[i] >= 250) opaque++; }
+        const a = (x1 - x0) * (y1 - y0);
+        return { n: q.n, area: a, share: +(drawn / a).toFixed(3), opaque: +(opaque / a).toFixed(3) }; }); })()`);
+    // ART IS OPAQUE, THE CLIP'S OWN FILL IS NOT: a clip rectangle is filled at
+    // alpha 0.06 (DONOR_MARK_FAINT_FILL), so "any alpha" over a section inside a
+    // clip reads non-blank with NO art drawn (found by a plant that dropped the
+    // bitmaps: 0.506 either way). So a painted section must show OPAQUE pixels
+    // over at least a quarter of the share its painted cells cover (cells hold
+    // transparent pixels too), and an untouched one no pixel at all.
+    const canvasOk = !!read && read.every((r) => r.area > 100)
+      && read.filter((r) => own.painted[r.n] > 0).every((r) => r.opaque > 0 && r.opaque >= 0.25 * (own.painted[r.n] / own.cells[r.n]))
+      && read.filter((r) => !touched(r.n)).every((r) => r.share === 0)
+      && read.some((r) => !touched(r.n));
+    check('DP.11b', `the target pane holds the whole ${gw} x ${gh}-section act (both world corners in the pane) and drew it from aeon's bake: each section drew iff the harness's own bake paints a cell there, and the canvas, read back, is non-blank over every painted section and blank over every section no clip or corridor touches`,
+      inView && iffOk && canvasOk,
+      `dpr ${dpr}; pane ${J({ rect: T11.rect, view: T11.view, worldW: T11.worldW, worldH: T11.worldH })}; corners ${J({ tl, br })}; per section ${J(drewIff)}; canvas ${J(read)}; untouched ${J(own.painted.map((_, n) => n).filter((n) => !touched(n)))}`);
+
+    // DP.11c aeon's readout for the act: the act line, the pool grid cell for
+    // cell, and one collision line per clip, all against the harness's bake.
+    const dom11 = await c.json(String.raw`(() => {
+      const cells = {}; for (const el of document.querySelectorAll('[data-donors-pool-cell]')) cells[el.getAttribute('data-donors-pool-cell')] = el.textContent;
+      const ids = [...document.querySelectorAll('[data-donors-pool-id]')].map((el) => el.getAttribute('data-donors-pool-id'));
+      const box = document.querySelector('[data-donors-pool-rows]');
+      return { act: (document.querySelector('[data-donors-readout-act]') || {}).textContent || null, state: box && box.getAttribute('data-donors-pool-rows'), cells, ids,
+        sum: (document.querySelector('[data-donors-pool-sum]') || { getAttribute: () => null }).getAttribute('data-donors-pool-sum'),
+        broken: !!document.querySelector('[data-donors-pool-broken]'), note: (document.querySelector('[data-donors-bake-note]') || {}).textContent || null,
+        clipLines: [...document.querySelectorAll('[data-donors-readout-clip]')].map((el) => el.getAttribute('data-donors-readout-clip')) }; })()`);
+    const fields = ['tiles', 'tiles_added', 'pages_touched', 'pages_exclusive'];
+    const wantCells = {};
+    for (const r of pool.per_clip) for (const f of fields) wantCells[`clip:${r.index}:${f}`] = String(r[f]);
+    for (const r of pool.per_corridor || []) for (const f of fields) wantCells[`corridor:${r.index}:${f}`] = String(r[f]);
+    const vp = own.clipact.verdict_at_placement; const col = own.clipact.collision;
+    const wantAct = `${pool.tiles} pool tiles in ${pool.pages} pages; worst camera window ${vp.worst} of ${vp.frames} frames (${vp.over} over budget); ${col.attr_entries} of ${col.cap} collision attr entries`;
+    const wantIds = [...pool.per_clip, ...(pool.per_corridor || [])].map((r) => r.id);
+    const wantClipLines = (col.per_clip || []).map((p) => p.clip);
+    check('DP.11c', `aeon's readout for ${actId} is the harness's own bake of it: the act line (pool tiles, pages, worst window, collision entries), the pool grid cell for cell over every clip and corridor, aeon's tile sum holding, and one collision line per clip`,
+      !dom11.note && !!dom11.act && dom11.act.replace(/\s+/g, ' ').includes(wantAct) && dom11.state === 'present'
+        && J(dom11.cells) === J(wantCells) && J(dom11.ids) === J(wantIds) && dom11.sum === 'holds' && !dom11.broken
+        && J(dom11.clipLines) === J(wantClipLines) && wantClipLines.length === man.clips.length,
+      `DOM ${J(dom11).slice(0, 900)}; want act ${J(wantAct)}; want ids ${J(wantIds)}; want collision lines ${J(wantClipLines)}`);
+    await shot(`real-${actId}`);
+    // For a person: the target pane magnified 2x, and aeon's readout scrolled into
+    // view (it sits below the fold of the side panel on this window).
+    await shot(`real-${actId}-pane`, { x: T11.rect.left, y: T11.rect.top, width: T11.rect.width, height: T11.rect.height, scale: 2 });
+    await c.evalExpr('(document.querySelector("[data-donors-readout]") || { scrollIntoView() {} }).scrollIntoView({ block: "start" })');
+    await sleep(300);
+    await shot(`real-${actId}-readout`);
   }
 
   // ── DP.10 a real bake refusal, on screen ────────────────────────────────

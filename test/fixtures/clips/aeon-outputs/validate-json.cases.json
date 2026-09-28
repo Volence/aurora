@@ -4,6 +4,11 @@
     "stderr": "",
     "stdout": "{\n  \"ok\": true,\n  \"refusals\": [],\n  \"schema\": 1,\n  \"warnings\": [\n    {\n      \"message\": \"W3 act section 5 holds 2 zones: 'ehz_act1' (s2disasm/EHZ), 'cpz_act1' (s2disasm/CPZ). One section carries ONE local tile map \\u2014 a single 11-bit space capped at 2047 entries (ojz_strip_gen.build_section_local_map) \\u2014 and a mixed section needs the sum of both zones' tiles in it. The bake prints the map size per section and refuses past the cap.\",\n      \"rule\": \"W3\",\n      \"subjects\": [\n        {\n          \"id\": \"ehz_act1\",\n          \"index\": 0,\n          \"kind\": \"clip\"\n        },\n        {\n          \"id\": \"cpz_act1\",\n          \"index\": 1,\n          \"kind\": \"clip\"\n        }\n      ]\n    }\n  ]\n}\n"
   },
+  "accept_s2_two_clip": {
+    "exit": 0,
+    "stderr": "",
+    "stdout": "{\n  \"ok\": true,\n  \"refusals\": [],\n  \"schema\": 1,\n  \"warnings\": []\n}\n"
+  },
   "accept_w3": {
     "exit": 0,
     "stderr": "",
