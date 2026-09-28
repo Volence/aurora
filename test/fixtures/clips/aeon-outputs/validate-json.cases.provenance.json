@@ -4,30 +4,30 @@
   "aeon": {
     "repo": "git@github.com:Volence/aeon.git",
     "branch_that_answers_currency": "origin/master",
-    "revision": "88bd34147b4616d52d6659960aa92dc45124ee2a",
-    "revision_is": "the ONE pin of ROADMAP row 227 (REVENDOR-AEON-WOVEN-MTZ-CPZ, branch row227-revendor-aeon): aeon origin/master 88bd34147b4616d52d6659960aa92dc45124ee2a read 2026-09-27T08:51:23Z after a fetch, taken as the pin itself. Since the previous capture (11238bb3): f6a71aeb moved tools/clip_act_bake.py (zone_separation's gap is measured between the two zones' NEAREST COLUMNS, not their outer spans, and columns holding both zones give minus their count; the woven act s2_mtz_cpz had read as a -496-cell overlap), and 210eef66/3feb206c moved tools/clip_manifest.py (zone_has_plane_b: a ONE-PATH zone, no plane-B solidity anywhere in its converted tree, Sonic 2's Metropolis, is pasted with plane A on BOTH planes in _clip_collision, so K6 reads both planes again; new _clip_at helper; K6 docstring). tools/collision_pipeline.py, tools/fg_page_order.py and the three clips.json inputs did not move. Blobs at the pin: clip_act_bake b8e97ebc, clip_manifest 03fa4314, collision_pipeline dbbe59de, fg_page_order 68e303fc, s2_ehz_cpz clips.json 64ab630c, s2_two_clip clips.json 2ff33b48, s2_ehz_boot clips.json 73ac4006.",
+    "revision": "cffdf7168fca5030c45b22b27c5e8c2916e1112c",
+    "revision_is": "the ONE pin of ROADMAP row 228 (REVENDOR-AEON-AFTER-OVERNIGHT, branch row228-revendor-aeon): aeon origin/master cffdf7168fca5030c45b22b27c5e8c2916e1112c read 2026-09-28T03:18:20Z after a fetch, taken as the pin itself (the tree every tool below ran in). Since the previous capture (88bd3414): tools/clip_act_bake.py moved at 8afa8015 and d796ad94 (the woven report's §C items 6 and 2: an act's optional neutral `fill` and its vertical connectors, `shafts`, get pool rows `pool.per_fill` / `pool.per_shaft` and top-level `fill` / `shafts` in clipact.json, and a reworded `per_clip_fields.tiles_added`, ALL written only when the act HAS a fill or shafts, so an act without either writes the clipact.json it always wrote); tools/clip_manifest.py moved at 8afa8015, d796ad94 and 6ba38be0 (the loader reads `fill` (K8) and `shafts` (K7, K9, K10 at bake) beside `clips`, refusal subjects of kind \"fill\" / \"shaft\"; and a zone is ONE-PATH iff its Sonic 2 act-1 object layout has no plane switcher that can select path B, `zone_path_b_switchers` read through tools/s2_layer_lines.py, replacing the plane-B-solidity test that row 227 recorded: a one-path zone is still pasted with plane A on both planes in `_clip_collision`, and at the pin only Wing Fortress changes class, having plane-B solidity and 0 B-selecting switchers). games/sonic4/data/clips/s2_ehz_cpz/clips.json moved (c993be2a at 621b7fce: `unpainted_remainder.y_from` / `y_why`, one `note` sentence) and s2_ehz_boot/clips.json moved (9e4104d0 at 91c7c48a: the same bottom-edge fields). tools/collision_pipeline.py, tools/fg_page_order.py and s2_two_clip/clips.json did not move. Blobs at the pin: clip_act_bake 958958b5, clip_manifest 080d8313, collision_pipeline dbbe59de, fg_page_order 68e303fc, s2_ehz_cpz clips.json c993be2a, s2_two_clip clips.json 2ff33b48, s2_ehz_boot clips.json 9e4104d0.",
     "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, or any inputs[].path's blob differs from its inputs[].blob, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob, inputs[].blob and revision here (and in the sibling markers of test/fixtures/clips/aeon-outputs/)",
-    "materialised_by": "git -C <aeon> archive 88bd3414 | tar -x into a scratch directory under $HOME/.cache (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
+    "materialised_by": "git -C <aeon> archive -o <tar> cffdf716, extracted into a scratch directory under $HOME/.cache (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
     "tool_path": "tools/clip_manifest.py",
-    "tool_blob": "03fa43143c6031ee463e17e7379a160ca6fbc4fd",
+    "tool_blob": "080d83131d49996463a3cb9b9cf24856939f0ff9",
     "inputs_are": "the manifests the generator reads (the bases of its `plan`; the currency row requires every one of them here). The tool itself is tool_blob above.",
     "inputs": [
       {
         "path": "games/sonic4/data/clips/s2_ehz_cpz/clips.json",
-        "blob": "64ab630ce376ba7e985ba540d943728d89e6d79b"
+        "blob": "c993be2a22ab8ec06a1757fffbba6de8535f5979"
       },
       {
         "path": "games/sonic4/data/clips/s2_two_clip/clips.json",
         "blob": "2ff33b48aff412945e1e57777ff01cac29008403"
       }
     ],
-    "what_changed_at_this_pin": "Re-captured at 88bd3414: 9/9 cases, exit codes and aeon's stdout unchanged; 7 cases byte-identical. The two crash tracebacks differ in copy path and line numbers only (clip_manifest.py +53 lines: 1620 -> 1673 etc.). Normalising both gives diff exit 0."
+    "what_changed_at_this_pin": "Re-captured at cffdf716: 9/9 cases, exit codes and aeon's stdout unchanged; 7 cases byte-identical. The two crash tracebacks differ in copy path and line numbers only (clip_manifest.py: <module> 1673 -> 2258, load 823/824 -> 988/989). Normalising paths and line numbers gives 0 differing cases. The zone_path_b_switchers change does not reach these EHZ/CPZ manifests."
   },
   "fixture": {
     "path": "test/fixtures/clips/aeon-outputs/validate-json.cases.json",
     "command": "EMPYREAN_SUITE_ROOT=<suite> python3 test/fixtures/clips/aeon-outputs/gen_validate_json.py <scratch>/vj2 <this file>, run from the materialised copy: nine real subprocesses of `python3 tools/clip_manifest.py validate <path> --donor-root <copy>/games/sonic4/data/donors --json`, each {exit, stdout, stderr} verbatim",
     "why_these": "an acceptance, an acceptance with a W3 naming two clips, R7 (one clip), R10 clip/clip and clip/corridor (pair rules), R12 after a W2 (a warning kept under a refusal), the untagged top-level refusal (rule null, no subjects), and the two CRASHES aeon documents (not JSON; a missing path): exit 1, empty stdout, a traceback",
-    "sha256": "8863a0e5ff5db083f4b9525b3b599e84399c347aaf668cbab41e89640143975b"
+    "sha256": "d0b4daea2af8759bbf617b89ef956a71131ec005f4e6eccf1ba71de027c5f5f9"
   },
   "generator": {
     "path": "test/fixtures/clips/aeon-outputs/gen_validate_json.py",
