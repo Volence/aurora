@@ -4,10 +4,10 @@
   "aeon": {
     "repo": "git@github.com:Volence/aeon.git",
     "branch_that_answers_currency": "origin/master",
-    "revision": "b85e60d2352242161607ea2cd25c2d9e799e86a7",
-    "revision_is": "the ONE pin of ROADMAP row 231 (REVENDOR-AEON-WOVEN-CROSSING-PATH, branch parcel/revendor-clips-77fc6fb6): aeon origin/master b85e60d2352242161607ea2cd25c2d9e799e86a7 read 2026-09-28T04:09:57Z after a fetch, taken as the pin itself (the tree every tool below ran in); b85e60d2 and cd6739e9 are lane-status/lane-log commits on top of 77fc6fb6, the merge of WOVEN-CROSSING-PATH. Since the previous capture (cffdf716): tools/clip_manifest.py moved at f8796a92 (K11: a corridor's optional `path_lines`, each exactly {mouth, donor_obj03, why}, one per mouth, shape-checked by the loader, and Corridor.as_json writes `path_lines` only when a corridor has some); games/sonic4/data/clips/s2_woven/clips.json moved at f8796a92 (the mtz_to_cpz corridor declares one path line at its east mouth, donor Obj03 at (6536, 1152)). tools/s2_layer_lines.py, tools/path_b_floor_witness.py and tools/test_s2_layer_lines.py moved too; no marker pins them. tools/clip_act_bake.py, tools/collision_pipeline.py, tools/fg_page_order.py and the s2_ehz_cpz, s2_two_clip and s2_ehz_boot clips.json did not move. Blobs at the pin: clip_act_bake 958958b5, clip_manifest d1cd32ad, collision_pipeline dbbe59de, fg_page_order 68e303fc, s2_ehz_cpz clips.json c993be2a, s2_two_clip clips.json 2ff33b48, s2_ehz_boot clips.json 9e4104d0, s2_woven clips.json 30e2fc14.",
+    "revision": "e47493aa2d443b5090380ce3eba9f6a22b4b3898",
+    "revision_is": "ROADMAP row 232 (CLIP-REFUSAL-SHAFT-FILL-SUBJECTS, branch parcel/clip-refusal-subjects-232): aeon origin/master e47493aa2d443b5090380ce3eba9f6a22b4b3898 read 2026-09-28T04:48:10Z after a fetch, taken as the pin (the tree every run below ran in). `git log b85e60d2..e47493aa -- tools/clip_manifest.py games/sonic4/data/clips` is EMPTY: the tool and every manifest are the blobs row 231 pinned at b85e60d2 (clip_manifest d1cd32ad, s2_ehz_cpz clips.json c993be2a, s2_two_clip clips.json 2ff33b48, s2_woven clips.json 30e2fc14). The previous pin (row 231) was b85e60d2352242161607ea2cd25c2d9e799e86a7; the sibling markers in this directory stay there, and nothing they pin moved.",
     "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, or any inputs[].path's blob differs from its inputs[].blob, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob, inputs[].blob and revision here (and in the sibling markers of test/fixtures/clips/aeon-outputs/)",
-    "materialised_by": "git -C <aeon> archive -o <tar> b85e60d2352242161607ea2cd25c2d9e799e86a7, extracted into $HOME/.cache/aurora-revendor-aeon/tree (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
+    "materialised_by": "git -C <aeon> archive -o <tar> e47493aa2d443b5090380ce3eba9f6a22b4b3898, extracted into $HOME/.cache/aurora-revendor-aeon/tree (the same path row 231 used, so the two crash tracebacks' absolute paths are unchanged; outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well, <scratch> = $HOME/.cache/aurora-revendor-aeon (so the manifests are ../vj2/*, as before).",
     "tool_path": "tools/clip_manifest.py",
     "tool_blob": "d1cd32ad93613814bc76a1feca41368e2bbdccd2",
     "inputs_are": "the manifests the generator reads (the bases of its `plan`; the currency row requires every one of them here). The tool itself is tool_blob above.",
@@ -19,19 +19,23 @@
       {
         "path": "games/sonic4/data/clips/s2_two_clip/clips.json",
         "blob": "2ff33b48aff412945e1e57777ff01cac29008403"
+      },
+      {
+        "path": "games/sonic4/data/clips/s2_woven/clips.json",
+        "blob": "30e2fc1432e1e609a75d35f0e2bdef77ed8ccc3e"
       }
     ],
-    "what_changed_at_this_pin": "Re-captured at b85e60d2: 9/9 cases, exit codes and aeon's stdout unchanged; 7 cases byte-identical. The two crash tracebacks differ in line numbers only (clip_manifest.py: <module> 2258 -> 2323, main 2254 -> 2319, _mode_validate 2214 -> 2279, validate_json 2188 -> 2253, load 988/989 -> 1051/1052). Normalising line numbers gives 0 differing cases."
+    "what_changed_at_this_pin": "Re-captured at e47493aa for row 232: the nine earlier cases are byte-identical to row 231's capture (compared case by case: exit, stdout, stderr), and THREE cases are new, each a least edit of the real s2_woven act (the generator's mut_k8_fill_no_why, mut_k9_shaft_pitch, mut_k9_shaft_dup_clip_id): refuse_k8_fill_no_why (K8, subjects [{kind: fill, index: 0, id: null}], with the woven act's 10 W3 warnings kept under it), refuse_k9_shaft_ledge_pitch (K9, subjects [{kind: shaft, index: 3, id: ehz_to_hpz}]), and refuse_k9_shaft_dup_clip_id (K9 pair, subjects [{kind: clip, index: 0, id: wfz_deck}, {kind: shaft, index: 0, id: wfz_deck}]). Their subject shapes are clip_manifest.py's subject() at the pin (lines 432-441, 1415-1422, 1497)."
   },
   "fixture": {
     "path": "test/fixtures/clips/aeon-outputs/validate-json.cases.json",
-    "command": "EMPYREAN_SUITE_ROOT=<suite> python3 test/fixtures/clips/aeon-outputs/gen_validate_json.py <scratch>/vj2 <this file>, run from the materialised copy: nine real subprocesses of `python3 tools/clip_manifest.py validate <path> --donor-root <copy>/games/sonic4/data/donors --json`, each {exit, stdout, stderr} verbatim",
-    "why_these": "an acceptance, an acceptance with a W3 naming two clips, R7 (one clip), R10 clip/clip and clip/corridor (pair rules), R12 after a W2 (a warning kept under a refusal), the untagged top-level refusal (rule null, no subjects), and the two CRASHES aeon documents (not JSON; a missing path): exit 1, empty stdout, a traceback",
-    "sha256": "c70d1cde6c36f3965696657dba2c1a4a76a7f3f62a274beb9a72ab7c9d14dbd9"
+    "command": "EMPYREAN_SUITE_ROOT=<suite> python3 test/fixtures/clips/aeon-outputs/gen_validate_json.py <scratch>/vj2 <this file>, run from the materialised copy: twelve real subprocesses of `python3 tools/clip_manifest.py validate <path> --donor-root <copy>/games/sonic4/data/donors --json`, each {exit, stdout, stderr} verbatim; the three s2_woven cases (row 232) also carry `manifest`, the mutated manifest the generator wrote and aeon judged",
+    "why_these": "an acceptance, an acceptance with a W3 naming two clips, R7 (one clip), R10 clip/clip and clip/corridor (pair rules), R12 after a W2 (a warning kept under a refusal), the untagged top-level refusal (rule null, no subjects), and the two CRASHES aeon documents (not JSON; a missing path): exit 1, empty stdout, a traceback; and (row 232) the two subject kinds that are neither clip nor corridor: K8 naming the FILL, K9 naming a SHAFT, and a K9 pair naming a clip AND a shaft in one refusal",
+    "sha256": "258519a33beca227527452fe2edf05f668acea0b0fe577bcf53bb602f4c945f5"
   },
   "generator": {
     "path": "test/fixtures/clips/aeon-outputs/gen_validate_json.py",
-    "what": "the generator fixture.command runs; the mutations are aeon's own from tools/test_clip_manifest_json.py at 1d9afb25",
-    "sha256": "879776f3f662b9b530e7683cb79b0a5272455d4749866a1fe7920b622753cc5b"
+    "what": "the generator fixture.command runs; the mutations are aeon's own from tools/test_clip_manifest_json.py at 1d9afb25, bar the three s2_woven ones (row 232), each commented in the generator with the rule it trips",
+    "sha256": "cfa483ac273cd0d54776be8786851f8c71cb449da7ac377e1cf50e96e81d84af"
   }
 }

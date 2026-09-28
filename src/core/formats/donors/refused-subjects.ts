@@ -16,6 +16,10 @@
 // outlined on the wrong rectangle. `id: null` (a clip with no id) is placed by
 // index alone.
 //
+// A `shaft` or `fill` subject (ROADMAP row 232) is never placed: the pane draws
+// neither, so each is named "not on this pane" (`subjectRect` says why). A K9
+// pair of a clip and a shaft outlines the clip and names the shaft.
+//
 // The look call (overseer, 2026-09-28, under the owner's 2026-09-18 permission):
 // a 2px dashed outline in the page's existing warning colour, labelled with the
 // rule tag; a pair rule outlines both; cleared with the refusal.
@@ -31,13 +35,28 @@ export function ruleTag(rule: string | null): string {
 /** The subject's rectangle in `doc`, or null when it is not on the pane. */
 export function subjectRect(doc: ClipManifestDoc | null, s: ClipSubject): ClipRect | null {
   if (!doc) return null;
-  // Only the two kinds the pane draws are placed. aeon also names `shaft` (K9)
-  // and `fill` (K8) subjects, which the reader does not pass yet (ROADMAP row
-  // 232) and the pane does not draw; read as a string so such a subject, if it
-  // ever arrives, is named "not on this pane" and never looked up in another
-  // kind's list.
-  const kind: string = s.kind;
-  const hit = kind === 'clip' ? doc.clips[s.index] : kind === 'corridor' ? doc.corridors[s.index] : undefined;
+  // Only the two kinds the pane draws are placed (target-outlines.ts draws the
+  // act's clips and corridors, nothing else). Since ROADMAP row 232 the reader
+  // also passes aeon's `shaft` (K7/K9, and either side of an R10 or K8 pair)
+  // and `fill` (K8) subjects. Neither is placed, each for its own reason:
+  //   * a shaft HAS a rectangle (its `dst_rect`), but the pane draws no shafts
+  //     and ClipManifestDoc has no shaft view; outlining one would be the first
+  //     shaft the pane ever shows, a look nobody has ruled (row 232's packet,
+  //     Open). Until then it is named "not on this pane", never looked up in
+  //     the clips or corridors list at the same index;
+  //   * the fill is the act's background rectangle, around every clip, corridor
+  //     and shaft (aeon's s2_woven fill is the whole act): an outline of it
+  //     would frame the pane, not point at anything. Named, never outlined.
+  let hit: { id: string; dst: ClipRect } | undefined;
+  switch (s.kind) {
+    case 'clip': hit = doc.clips[s.index]; break;
+    case 'corridor': hit = doc.corridors[s.index]; break;
+    case 'shaft': case 'fill': return null;
+    default: {
+      const never: never = s.kind;
+      return never;
+    }
+  }
   if (!hit) return null;
   if (s.id !== null && hit.id !== s.id) return null;
   return hit.dst;

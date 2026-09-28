@@ -15,6 +15,24 @@
 // clip or corridor: `{kind: 'clip'|'corridor', index, id|null}`, empty for an
 // act-level refusal, two for a pair rule (first claimant first).
 //
+// ═══ EVERY SUBJECT KIND AEON CAN EMIT (ROADMAP row 232) ═══════════════════
+//
+// Census of aeon `tools/clip_manifest.py` at e47493aa (blob d1cd32ad), where
+// every subject is built by ONE function, `subject(kind, index, ident)` (line
+// 432), always exactly `{kind, index, id}`; `clip_act_bake.py` builds its only
+// subject (C4) through that same function:
+//   * `clip`     — index into `clips` (literals at 1098/1100/1105, `_subject_of`);
+//   * `corridor` — index into `corridors` (1274/1276/1281, `_subject_of`);
+//   * `shaft`    — index into `shafts` (K9 at 1415/1417/1422; `_subject_of` for
+//                  K7, an R10 overlap and K8's "meets the fill" pair), id null
+//                  when the entry is not an object or has no string id;
+//   * `fill`     — the act's ONE neutral fill, always `{kind: 'fill', index: 0,
+//                  id: null}` (1497; the header states that exact dict at 280).
+// So a `shaft` or `fill` refusal is a verdict, not a malformed answer (before
+// row 232 this reader called both crashes). A kind outside these four is still
+// malformed and named in the crash; so is a fill that is not index 0 / id null,
+// because aeon says there is exactly one and it has no id.
+//
 // ═══ THE BAKE'S ANSWER: THE SAME SHAPE, THREE DIFFERENCES ═════════════════
 //
 // aeon `tools/clip_act_bake.py` header ("`bake --json`") at 71ae3433, research
@@ -65,7 +83,15 @@ const TOOL: Record<ClipJsonTool, { name: string; schema: number; judged: string 
   bake: { name: 'aeon\'s bake', schema: BAKE_JSON_SCHEMA, judged: 'the act was NOT judged' },
 };
 
-export interface ClipSubject { kind: 'clip' | 'corridor'; index: number; id: string | null }
+/** Every subject kind aeon's `subject()` can emit (census in the header). */
+export const CLIP_SUBJECT_KINDS = ['clip', 'corridor', 'shaft', 'fill'] as const;
+export type ClipSubjectKind = (typeof CLIP_SUBJECT_KINDS)[number];
+/**
+ * WHICH entry a refusal or warning is about: `index` is its position in the
+ * manifest's `clips` / `corridors` / `shafts` list; a `fill` is the act's one
+ * fill, always index 0 and id null.
+ */
+export interface ClipSubject { kind: ClipSubjectKind; index: number; id: string | null }
 export interface ClipNote { rule: string | null; subjects: ClipSubject[]; message: string }
 
 export type ClipJsonVerdict =
@@ -82,10 +108,15 @@ function isObj(x: unknown): x is Record<string, unknown> {
 function readSubject(x: unknown): ClipSubject | string {
   if (!isObj(x)) return 'a subject is not an object';
   const { kind, index, id } = x;
-  if (kind !== 'clip' && kind !== 'corridor') return `a subject's kind is ${JSON.stringify(kind)}, not clip or corridor`;
+  if (!(CLIP_SUBJECT_KINDS as readonly unknown[]).includes(kind)) {
+    return `a subject's kind is ${JSON.stringify(kind)}, not one of ${CLIP_SUBJECT_KINDS.join(', ')}`;
+  }
   if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) return `a subject's index is ${JSON.stringify(index)}`;
   if (id !== null && typeof id !== 'string') return `a subject's id is ${JSON.stringify(id)}, not a string or null`;
-  return { kind, index, id };
+  if (kind === 'fill' && (index !== 0 || id !== null)) {
+    return `a fill subject is index ${index}, id ${JSON.stringify(id)}; aeon names the act's one fill as index 0, id null`;
+  }
+  return { kind: kind as ClipSubjectKind, index, id };
 }
 
 function readNote(x: unknown, where: string): ClipNote | string {
@@ -163,8 +194,15 @@ export function readBakeJson(exitCode: number | null, stdout: string, stderr: st
   return readClipToolJson('bake', exitCode, stdout, stderr);
 }
 
-/** "clip 1 cpz_s2", "corridor 0 ehz_to_cpz", "clip 2 (no id)". */
+/** The words a person reads for the act's one fill (aeon's `fill` subject, K8). */
+export const FILL_SUBJECT_LABEL = 'the act\'s fill';
+
+/**
+ * "clip 1 cpz_s2", "corridor 0 ehz_to_cpz", "shaft 3 ehz_to_hpz", "clip 2 (no id)",
+ * and "the act's fill" for the one fill (its index 0 and null id say nothing).
+ */
 export function subjectLabel(s: ClipSubject): string {
+  if (s.kind === 'fill') return FILL_SUBJECT_LABEL;
   return `${s.kind} ${s.index} ${s.id === null ? '(no id)' : s.id}`;
 }
 

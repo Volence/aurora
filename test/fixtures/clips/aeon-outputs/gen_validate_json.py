@@ -4,7 +4,10 @@
 #   EMPYREAN_SUITE_ROOT=<suite> python3 <this file> <scratch dir> <bundle out path>
 # Every case is a REAL subprocess of aeon's CLI, invoked the way Aurora invokes it
 # (validate <path> --donor-root <root> --json). Nothing below edits aeon's output.
-# The mutations are aeon's own, from tools/test_clip_manifest_json.py at 1d9afb25.
+# The mutations are aeon's own, from tools/test_clip_manifest_json.py at 1d9afb25, except
+# the three on s2_woven (ROADMAP row 232): each is the least edit of the real woven act
+# that trips ONE of the connector rules whose subject is not a clip or corridor (K8 names
+# the fill, K9 a shaft), so the shaft/fill subject shapes are aeon's, not typed by hand.
 import copy, json, os, subprocess, sys
 
 root = os.getcwd()
@@ -42,9 +45,29 @@ def mut_w2_r12(d):
     d["clips"][1]["src_rect"]["x"] = 4096 + 8
 
 
+def mut_k8_fill_no_why(d):
+    # K8: "`fill` has no `why`" -- the fill's own refusal, subject {kind: fill}.
+    del d["fill"]["why"]
+
+
+def mut_k9_shaft_pitch(d):
+    # K9: shafts[3] (ehz_to_hpz, a stair shaft) with its ledges one block row further
+    # apart than the least standing-jump rise (80 px at the pin), subject {kind: shaft}.
+    assert d["shafts"][3]["id"] == "ehz_to_hpz"
+    d["shafts"][3]["ledges"]["pitch"] = 96
+
+
+def mut_k9_shaft_dup_clip_id(d):
+    # K9 pair: shafts[0] takes clips[0]'s id -- a clip and a shaft in ONE refusal.
+    d["shafts"][0]["id"] = d["clips"][0]["id"]
+
+
 plan = [("accept_s2_ehz_cpz", "s2_ehz_cpz", None), ("refuse_r7", "s2_two_clip", mut_r7),
         ("refuse_r10_pair", "s2_two_clip", mut_r10), ("refuse_r10_clip_corridor", "s2_ehz_cpz", mut_r10c),
-        ("accept_w3", "s2_two_clip", mut_w3), ("refuse_r12_after_w2", "s2_two_clip", mut_w2_r12)]
+        ("accept_w3", "s2_two_clip", mut_w3), ("refuse_r12_after_w2", "s2_two_clip", mut_w2_r12),
+        ("refuse_k8_fill_no_why", "s2_woven", mut_k8_fill_no_why),
+        ("refuse_k9_shaft_ledge_pitch", "s2_woven", mut_k9_shaft_pitch),
+        ("refuse_k9_shaft_dup_clip_id", "s2_woven", mut_k9_shaft_dup_clip_id)]
 os.makedirs(out, exist_ok=True)
 
 
@@ -63,6 +86,11 @@ for name, base, m in plan:
     p = f"{out}/{name}.clips.json"
     json.dump(d, open(p, "w"), indent=2)
     run(name, p)
+    if base == "s2_woven":
+        # Row 232: the woven cases also carry the manifest aeon judged (the mutated
+        # woven act, as written above), so the target pane's refused-subject rows
+        # place the subjects on THAT manifest rather than re-deriving the mutation.
+        bundle[name]["manifest"] = d
 open(f"{out}/notjson.clips.json", "w").write("{ this is not json")
 run("crash_not_json", f"{out}/notjson.clips.json")
 run("crash_missing_path", f"{out}/no_such_file.json")
