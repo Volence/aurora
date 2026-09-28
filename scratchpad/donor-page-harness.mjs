@@ -805,8 +805,10 @@ async function rows(d, O, COPY, dpr) {
   // rows 3..14, the tag band rows 17..28, both from 4 px in, 40 px wide.
   const idBand = await bandRead(rect10, { x0: 4, x1: 44, y0: 3, y1: 15 });
   const tagBand = await bandRead(rect10, { x0: 4, x1: 44, y0: 17, y1: 29 });
-  check('DP.10t', 'the rule tag is drawn UNDER the clip\'s id label, not over it: the id band holds the (accent) label and no warning pixel, the band below holds the warning tag',
-    !!idBand && !!tagBand && idBand.lit > 5 && idBand.warn === 0 && tagBand.warn > 5,
+  // (`lit` is printed, not judged: the art under the rectangle is bright, so it
+  // read 480/480 in both bands and could not tell a label from no label.)
+  check('DP.10t', 'the rule tag is drawn UNDER the clip\'s id label, not over it: the id band holds no warning pixel, the band below holds the warning tag',
+    !!idBand && !!tagBand && idBand.warn === 0 && tagBand.warn > 5,
     `id band ${J(idBand)}; tag band ${J(tagBand)}; rect ${J(rect10)}`);
 }
 
