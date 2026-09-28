@@ -116,7 +116,7 @@ export default function DonorTargetPane(): React.ReactElement {
     const m = useDonorStore.getState().marquee;
     if (!m) return;
     const d = useDonorDraft.getState();
-    d.setDst(snapDestination(p, m, d.mode));
+    d.setDst(snapDestination(p, m, d.mode), usePasteStore.getState().target?.actId ?? null);
   }, []);
 
   if (!target) {

@@ -268,14 +268,42 @@ export function serializeClipManifest(doc: ClipManifestDoc): string {
   return jsonFileText(text);
 }
 
-/** Every rectangle already placed in the act: clips and corridors. */
+/**
+ * Every rectangle already placed in the act, as aeon's R10 counts them: clips,
+ * corridors AND shafts (tools/clip_manifest.py, "R10 / K2 -- dst overlap, over
+ * clips, corridors AND shafts"). Shafts are read from the raw manifest (the
+ * document has no view of them, and the target pane does not draw them). Before
+ * ROADMAP row 235 (a) they were left out here, so a suggestion on a woven act
+ * could land on a shaft and be refused R10. A shaft entry without a readable
+ * `dst_rect` is skipped: aeon refuses that manifest by another rule first.
+ */
 export function placedRects(doc: ClipManifestDoc | null): ClipRect[] {
   if (!doc) return [];
-  return [...doc.clips.map((c) => c.dst), ...doc.corridors.map((c) => c.dst)];
+  const shafts: ClipRect[] = [];
+  for (const s of Array.isArray(doc.raw.shafts) ? doc.raw.shafts : []) {
+    if (!isObj(s)) continue;
+    try { shafts.push(rectOf(s.dst_rect, 'shaft')); } catch { /* aeon refuses it first */ }
+  }
+  return [...doc.clips.map((c) => c.dst), ...doc.corridors.map((c) => c.dst), ...shafts];
 }
 
+/** aeon's R10 overlap: the same four strict comparisons (tools/clip_manifest.py). */
 function overlaps(a: ClipRect, b: ClipRect): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+}
+
+/**
+ * Whether a paste at `rect` is FREE: it starts at or past the act's origin, ends
+ * inside the act (aeon's R8), and overlaps no clip, corridor or shaft already
+ * placed (aeon's R10). THE one predicate: `suggestDestination` and
+ * `placeDraftOnAct` both call it, so a suggestion and a kept placement cannot
+ * disagree about what free means. Aeon's loader still judges every paste.
+ */
+export function destinationFree(doc: ClipManifestDoc | null, gridW: number, gridH: number, rect: ClipRect): boolean {
+  const W = gridW * SECTION_PIXEL_SIZE;
+  const H = gridH * SECTION_PIXEL_SIZE;
+  if (rect.x < 0 || rect.y < 0 || rect.x + rect.w > W || rect.y + rect.h > H) return false;
+  return !placedRects(doc).some((p) => overlaps(p, rect));
 }
 
 /**
@@ -341,18 +369,51 @@ export function snapDestination(
 export function suggestDestination(
   doc: ClipManifestDoc | null, gridW: number, gridH: number, src: ClipRect,
 ): { x: number; y: number } | null {
-  if (src.x % COLLISION_QUANTUM_PX || src.y % COLLISION_QUANTUM_PX) return null;
-  if (src.x % MARQUEE_SNAP_PX || src.y % MARQUEE_SNAP_PX) return null;
-  const placed = placedRects(doc);
+  if (!onSectionPasteGrid(src)) return null;
   const W = gridW * SECTION_PIXEL_SIZE;
   const H = gridH * SECTION_PIXEL_SIZE;
   for (let y = 0; y + src.h <= H; y += SECTION_PIXEL_SIZE) {
     for (let x = 0; x + src.w <= W; x += SECTION_PIXEL_SIZE) {
-      const r = { x, y, w: src.w, h: src.h };
-      if (!placed.some((p) => overlaps(p, r))) return { x, y };
+      if (destinationFree(doc, gridW, gridH, { x, y, w: src.w, h: src.h })) return { x, y };
     }
   }
   return null;
+}
+
+/** Whether a section-aligned paste of `src` can pass R12 at all (its origin on the 16-px collision grid). */
+function onSectionPasteGrid(src: ClipRect): boolean {
+  return !(src.x % COLLISION_QUANTUM_PX || src.y % COLLISION_QUANTUM_PX || src.x % MARQUEE_SNAP_PX || src.y % MARQUEE_SNAP_PX);
+}
+
+/**
+ * Where the drafted paste goes when the page (re)places it on an act (ROADMAP
+ * row 235 (a)): whenever the draft is only a suggestion, and when an author's
+ * placement meets an act it was not made on (an act switch).
+ *
+ *   'kept'       the author's placement (`carried`) is FREE on this act: it
+ *                stays put. An author's choice is not undone when nothing is
+ *                wrong with it here.
+ *   'suggested'  otherwise, the first free section origin, row by row
+ *                (`suggestDestination`, the page's one rule for a new draft).
+ *   'none-free'  the source is on the grid but no section origin is free: no
+ *                destination, and the page says so (never an overlapping one).
+ *   'off-grid'   the source is off the 16-px collision grid, so no section-
+ *                aligned paste can pass R12: no destination; the page asks for
+ *                a placement by hand.
+ */
+export type DraftPlacement =
+  | { kind: 'kept' | 'suggested'; dst: { x: number; y: number } }
+  | { kind: 'none-free' | 'off-grid'; dst: null };
+
+export function placeDraftOnAct(
+  doc: ClipManifestDoc | null, gridW: number, gridH: number, src: ClipRect, carried: { x: number; y: number } | null,
+): DraftPlacement {
+  if (carried && destinationFree(doc, gridW, gridH, { x: carried.x, y: carried.y, w: src.w, h: src.h })) {
+    return { kind: 'kept', dst: { x: carried.x, y: carried.y } };
+  }
+  if (!onSectionPasteGrid(src)) return { kind: 'off-grid', dst: null };
+  const dst = suggestDestination(doc, gridW, gridH, src);
+  return dst ? { kind: 'suggested', dst } : { kind: 'none-free', dst: null };
 }
 
 /** The smallest section grid that holds `rect` placed at the origin. */

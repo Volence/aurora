@@ -76,6 +76,21 @@
 //         pages, worst window, collision entries), the pool grid cell for cell
 //         over every clip and corridor, aeon's tile sum holding, and one
 //         collision line per clip. SHOT_DIR saves donor-page-real-s2_ehz_cpz.png.
+//   ROW 235 (a), 2026-09-28: the drafted paste belongs to ONE act:
+//   DP.6n after the first paste fills the one-section act, no section origin
+//         is free for the marquee (the harness finds none, from the clips.json on
+//         disk): the draft has no destination, the pane draws no accent outline,
+//         Paste is disabled, and the form SAYS so (data-donors-no-free, naming
+//         the act and the rectangle's size).
+//   DP.11d the draft DP.7 placed by a click on hx_donor_act, carried into the
+//         real click on s2_ehz_cpz, where it would overlap a rectangle on disk
+//         (checked first; UNMEASURABLE if not): it is re-placed at the harness's
+//         OWN first free section origin, row by row, over every clip, corridor
+//         and shaft in that clips.json; the pane's accent outline and the Place
+//         at fields say the same spot; a REAL click on Paste is not refused and
+//         writes that dst_rect (read from disk); a real click on Undo puts the
+//         file back byte for byte. DP.11b's "untouched sections are blank"
+//         leaves out the sections the draft's own outline touches.
 //
 // EXPECTATIONS COME FROM THE TREE: CONVERTER_COMMAND, marqueeRect, marqueeReadout,
 // clipsManifestPath and suggestDestination are bundled from the tree under test
@@ -450,6 +465,20 @@ async function rows(d, O, COPY, dpr) {
       return { n: img.length / 4, warn, lit }; })()`);
   };
   const dashedOf = (P) => (P && Array.isArray(P.outlines) ? P.outlines.filter((o) => o.dashed) : null);
+  const accentOf = (P) => (P && Array.isArray(P.outlines) ? P.outlines.filter((o) => o.tone === 'accent') : null);
+  // ROW 235 (a): what "free" means, written HERE from aeon's R8 and R10 wording
+  // (inside the act; no overlap with any clip, corridor or shaft dst_rect in the
+  // clips.json ON DISK), not bundled from the tree, so a wrong app predicate
+  // disagrees with it. Section origins, row by row.
+  const rectsOnDisk = (man) => [...(man.clips ?? []), ...(man.corridors ?? []), ...(man.shafts ?? [])].map((k) => k.dst_rect);
+  const hits = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const freeOn = (man, r) => r.x >= 0 && r.y >= 0 && r.x + r.w <= man.act.grid_w * 2048 && r.y + r.h <= man.act.grid_h * 2048
+    && !rectsOnDisk(man).some((p) => hits(p, r));
+  const freeOrigins = (man, w, h) => {
+    const out = [];
+    for (let y = 0; y < man.act.grid_h * 2048; y += 2048) for (let x = 0; x < man.act.grid_w * 2048; x += 2048) if (freeOn(man, { x, y, w, h })) out.push({ x, y });
+    return out;
+  };
 
   // ── DP.0 ────────────────────────────────────────────────────────────────
   const opened = await c.evalExpr(`window.__dbg.aeon.open(${J(COPY)})`).catch((e) => `threw: ${e.message}`);
@@ -649,6 +678,26 @@ async function rows(d, O, COPY, dpr) {
       `harness bake pool ${pool.tiles} tiles / ${pool.pages} pages, per_clip ${J(pool.per_clip)}; DOM ${J(dom6e).slice(0, 700)}`);
   }
 
+  // ── DP.6n no free spot, said on the page (row 235 (a)) ──────────────────
+  {
+    const man6 = JSON.parse(readFileSync(path, 'utf8'));
+    const free6 = freeOrigins(man6, m.w, m.h);
+    if (free6.length > 0) {
+      check('DP.6n', 'with no free section origin left, the form says so', 'UNMEASURABLE', `the act on disk still has free origins for ${m.w} x ${m.h}: ${J(free6)}`);
+    } else {
+      const s6n = await d.waitFor((s) => s.draft.dst === null && s.draft.placement === 'none-free', 'the none-free placement', 40, 250, { soft: true });
+      await sleep(300);
+      const dom6n = await c.json(String.raw`(() => { const el = document.querySelector('[data-donors-no-free]');
+        const b = document.querySelector('[data-donors-paste-button]');
+        return { act: el ? el.getAttribute('data-donors-no-free') : null, text: el ? el.textContent : null, pasteDisabled: !!(b && b.disabled) }; })()`);
+      const acc6 = accentOf(s6n.targetPane);
+      check('DP.6n', `after the paste fills ${ACT}, no section origin is free for the ${m.w} x ${m.h} marquee (the harness finds none on disk): the draft has NO destination, the pane draws no accent outline, Paste is disabled, and the form says so, naming the act and the size`,
+        s6n.draft.dst === null && s6n.draft.placement === 'none-free' && dom6n.act === ACT && !!dom6n.text && dom6n.text.includes(`${m.w} x ${m.h}`)
+          && dom6n.text.includes(ACT) && J(acc6) === '[]' && dom6n.pasteDisabled,
+        `on disk ${J(rectsOnDisk(man6))} in ${man6.act.grid_w} x ${man6.act.grid_h}; draft ${J(s6n.draft)}; DOM ${J(dom6n)}; accent ${J(acc6)}`);
+    }
+  }
+
   await shot('pasted');
   // ── DP.7 a paste aeon refuses ───────────────────────────────────────────
   const shaBefore = sha(readFileSync(path));
@@ -742,6 +791,8 @@ async function rows(d, O, COPY, dpr) {
     check('DP.11', `the real ${EXIST} act on the page`, 'UNMEASURABLE', `${existPath} is not in the copy`);
   } else {
     const ehzSongs = [...new Set(JSON.parse(readFileSync(existPath, 'utf8')).clips.filter((k) => k.donor === 's2disasm' && k.zone === 'EHZ').map((k) => k.music ?? null))];
+    // Row 235 (a): the draft as it stands on the PREVIOUS act, just before the click.
+    const pre9 = await d.st();
     const actBtn = await d.realClick(`document.querySelector('[data-donors-act="${EXIST}"]')`);
     const s9 = await d.waitFor((s) => s.paste.target && s.paste.target.actId === EXIST && !s.paste.busy, `${EXIST} chosen`, 240);
     await sleep(300);
@@ -750,6 +801,58 @@ async function rows(d, O, COPY, dpr) {
       !!(actBtn && actBtn.hitOk) && ehzSongs.length === 1 && typeof ehzSongs[0] === 'string' && song9 === `Song: ${ehzSongs[0]} (from s2disasm EHZ)`,
       `songs on disk ${J(ehzSongs)}; DOM ${J(song9)}; target ${J(s9.paste.target && s9.paste.target.actId)}`);
     await bigAct(EXIST, existPath);
+    await carriedDraft(EXIST, existPath, pre9);
+  }
+
+  // ── DP.11d the draft carried from another act lands FREE (row 235 (a)) ───
+  // `pre` is the page's state just before DP.9s's real click on `actId`: the
+  // draft DP.7 placed by a click on the harness's own act. Every expectation
+  // is read from `actId`'s clips.json ON DISK by the harness's own R8/R10
+  // oracle (`freeOrigins`), never from the tree.
+  async function carriedDraft(actId, manPath, pre) {
+    const before = readFileSync(manPath);
+    const man = JSON.parse(before.toString('utf8'));
+    const rects = rectsOnDisk(man);
+    const carried = pre && pre.draft && pre.draft.dst ? { x: pre.draft.dst.x, y: pre.draft.dst.y, w: m.w, h: m.h } : null;
+    const fromAct = pre && pre.paste && pre.paste.target ? pre.paste.target.actId : null;
+    if (!carried || fromAct === actId || rects.every((r) => !hits(r, carried))) {
+      check('DP.11d', `a draft carried onto ${actId} lands free`, 'UNMEASURABLE',
+        `the premise is not there: before the click the draft was ${J(pre && pre.draft)} on ${J(fromAct)}; on ${actId} it overlaps ${J(carried ? rects.filter((r) => hits(r, carried)) : null)}`);
+      return;
+    }
+    const want = freeOrigins(man, m.w, m.h)[0] ?? null;
+    if (!want) {
+      check('DP.11d', `a draft carried onto ${actId} lands free`, 'UNMEASURABLE', `the harness finds no free section origin for ${m.w} x ${m.h} on ${actId}`);
+      return;
+    }
+    const s = await d.waitFor((q) => q.paste.target && q.paste.target.actId === actId && q.draft.dst !== null
+      && (accentOf(q.targetPane) ?? []).length === 1, `the draft on ${actId}`, 40, 250, { soft: true });
+    const dst = s.draft.dst;
+    const rect = dst ? { x: dst.x, y: dst.y, w: m.w, h: m.h } : null;
+    const overlapped = rect ? rects.filter((r) => hits(r, rect)) : null;
+    const acc = accentOf(s.targetPane);
+    const fields = await c.json(String.raw`(() => { const f = [...document.querySelectorAll('[data-donors-paste] input[type="number"]')];
+      return f.map((i) => i.value); })()`);
+    await shot(`carried-${actId}`);
+    const pasteBtn = await d.realClick('document.querySelector("[data-donors-paste-button]")');
+    const sp = await d.waitFor((q) => q.paste.outcome && !q.paste.busy, `the paste on ${actId}`, 480, 250, { soft: true });
+    const afterText = readFileSync(manPath, 'utf8');
+    const after = JSON.parse(afterText);
+    const added = after.clips.length === man.clips.length + 1 ? after.clips[after.clips.length - 1] : null;
+    const outcome = sp.paste.outcome;
+    let undone = null;
+    if (outcome && outcome.kind === 'pasted') {
+      await d.realClick('document.querySelector("[data-donors-undo]")');
+      await d.waitFor((q) => q.paste.outcome && q.paste.outcome.kind === 'undone' && !q.paste.busy, 'the undo', 160, 250, { soft: true });
+      undone = Buffer.compare(readFileSync(manPath), before) === 0;
+    }
+    check('DP.11d', `the draft DP.7 placed on ${fromAct}, carried into a REAL click on ${actId} where it overlapped ${rects.filter((r) => hits(r, carried)).length} rectangle(s) on disk, lands at the harness's own first free section origin (no clip, corridor or shaft on disk); the pane's accent outline and the Place at fields say that spot; a REAL Paste there is NOT refused and writes that dst_rect to disk; a REAL Undo puts the file back byte for byte`,
+      !!rect && J(dst) === J(want) && J(overlapped) === '[]' && freeOn(man, rect)
+        && J(acc) === J([{ rect, label: s.draft.clipId, tone: 'accent' }]) && J(fields) === J([String(want.x), String(want.y)])
+        && !!(pasteBtn && pasteBtn.hitOk) && !!outcome && outcome.kind === 'pasted' && !!added && J(added.dst_rect) === J(rect)
+        && undone === true,
+      `carried ${J(carried)} from ${fromAct}; want ${J(want)}; draft ${J(s.draft)}; overlaps on disk ${J(overlapped)}; accent ${J(acc)}; fields ${J(fields)}; `
+        + `outcome ${J(outcome).slice(0, 500)}; added ${J(added)}; undo restored bytes ${J(undone)}`);
   }
 
   // ── DP.11 the REAL s2_ehz_cpz act, on the page (row 219 (a)) ────────────
@@ -813,7 +916,13 @@ async function rows(d, O, COPY, dpr) {
     const tl = d.clientOf(T11, 0, 0); const br = d.clientOf(T11, W, H);
     const inView = T11.worldW === W && T11.worldH === H && tl.x >= T11.rect.left - 1 && tl.y >= T11.rect.top - 1
       && br.x <= T11.rect.left + T11.rect.width + 1 && br.y <= T11.rect.top + T11.rect.height + 1;
-    const rects = [...man.clips, ...corridors].map((k) => k.dst_rect);
+    // Row 235 (a): the drafted paste now lands on a FREE spot, i.e. in a section
+    // no clip or corridor touches, and its accent outline (a fill and a stroke)
+    // draws there. Those sections are left out of "blank", by the pane's own
+    // paint report of the accent outline; at least one untouched section must
+    // remain (checked below), so the clause cannot empty itself.
+    const draftRects = (accentOf(s11.targetPane) ?? []).map((o) => o.rect);
+    const rects = [...man.clips, ...corridors].map((k) => k.dst_rect).concat(draftRects);
     const touched = (n) => { const sx = (n % gw) * 2048; const sy = Math.floor(n / gw) * 2048;
       return rects.some((r) => r.x < sx + 2048 && r.x + r.w > sx && r.y < sy + 2048 && r.y + r.h > sy); };
     const boxes = own.painted.map((_, n) => { const a = d.clientOf(T11, (n % gw) * 2048, Math.floor(n / gw) * 2048); const b2 = d.clientOf(T11, (n % gw + 1) * 2048, (Math.floor(n / gw) + 1) * 2048);

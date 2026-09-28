@@ -1806,7 +1806,7 @@ interface DonorProbeState {
     busy: boolean; outcome: unknown; undo: number; redo: number; baked: boolean; bakeNote: string | null;
     bakeNoteKind: string | null;
   };
-  draft: { clipId: string; dst: unknown; mode: string; reason: string };
+  draft: { clipId: string; dst: unknown; mode: string; reason: string; actId: string | null; dstTouched: boolean; placement: string | null };
   focusedDocId: string | null;
 }
 
@@ -1836,7 +1836,7 @@ function donorProbeState(): DonorProbeState {
       busy: p.busy, outcome: p.outcome, undo: p.undoStack.length, redo: p.redoStack.length,
       baked: p.baked !== null, bakeNote: p.bakeNote, bakeNoteKind: p.bakeNoteKind,
     },
-    draft: { clipId: dr.clipId, dst: dr.dst, mode: dr.mode, reason: dr.reason },
+    draft: { clipId: dr.clipId, dst: dr.dst, mode: dr.mode, reason: dr.reason, actId: dr.actId, dstTouched: dr.dstTouched, placement: dr.placement },
     focusedDocId: focusedDocId(),
   };
 }
