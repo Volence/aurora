@@ -18,6 +18,7 @@
 import { useClassicProjectStore } from './state/classicProjectStore';
 import { useClassicLevelStore, type LayoutPlane } from './state/classicLevelStore';
 import { stampLayoutCell, type StampLayoutCellReport } from './debug-level-edit';
+import { layoutCellAt } from './components/classic/viewport-math';
 import { useClassicObjectArtStore } from './state/classicObjectArtStore';
 import { useProjectStore, getCurrentAct, getCurrentZone } from './state/projectStore';
 import { getActiveLevel } from './state/projectStore';
@@ -170,6 +171,26 @@ interface ClassicProbeApi {
    */
   docHash(): number | null;
   setSelectedChunk(id: number): void;
+  /**
+   * READ-ONLY: the armed stamp chunk (`classicLevelStore.selectedChunkId`, an
+   * ENGINE id, 0 = air). The half of `setSelectedChunk` a harness reads back after
+   * a REAL right-click eyedrop on the map, which is how
+   * `scratchpad/classic-canvas-dpr-harness.mjs` learns which layout cell a click
+   * resolved to without asking the viewport's own pointer math.
+   */
+  selectedChunk(): number;
+  /**
+   * READ-ONLY: the raw layout byte (bit 7 = S1's loop flag) at one layout cell of
+   * one plane, or null outside the grid. The document's answer, so a harness can
+   * choose a cell boundary whose two sides hold different chunks and so tell a
+   * one-cell miss from a hit.
+   */
+  layoutCell(col: number, row: number, plane?: LayoutPlane): number | null;
+  /** READ-ONLY: the open act's layout grid size in chunks, or null with no act. */
+  layoutSize(plane?: LayoutPlane): { width: number; height: number } | null;
+  /** READ-ONLY: the armed map tool (`editorStore.tool`), so a harness can see
+   *  that a REAL tool key (`k`, stamp-chunk) reached the store. */
+  tool(): string;
   setComposerBlock(id: number): void;
   /**
    * THE ONE WRITE DOOR ON THIS PROBE THAT CHANGES THE LEVEL DOCUMENT, and the
@@ -350,6 +371,22 @@ function installClassicProbe(): ClassicProbeApi {
       return h;
     },
     setSelectedChunk: (id) => state().setSelectedChunkId(id),
+    selectedChunk: () => state().selectedChunkId,
+    layoutCell: (col, row, plane) => {
+      const { doc } = state();
+      if (!doc) return null;
+      const grid = (plane ?? 'fg') === 'bg' ? doc.bg : doc.fg;
+      if (!Number.isInteger(col) || !Number.isInteger(row)) return null;
+      // The viewport's own reader, so a short grid reads as the viewport draws it.
+      return layoutCellAt(grid, col, row) ?? null;
+    },
+    layoutSize: (plane) => {
+      const { doc } = state();
+      if (!doc) return null;
+      const grid = (plane ?? 'fg') === 'bg' ? doc.bg : doc.fg;
+      return { width: grid.width, height: grid.height };
+    },
+    tool: () => useEditorStore.getState().tool,
     setComposerBlock: (id) => state().setComposerBlockId(id),
     // Straight through to the door module. Kept a one-line delegation on
     // purpose: the reasoning, and the rule it must not break, live in one place

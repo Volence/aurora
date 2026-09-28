@@ -1,0 +1,13 @@
+diff --git a/src/renderer/components/classic/classic-overlays.ts b/src/renderer/components/classic/classic-overlays.ts
+index 6878f3f0..d969c6bb 100644
+--- a/src/renderer/components/classic/classic-overlays.ts
++++ b/src/renderer/components/classic/classic-overlays.ts
+@@ -95,7 +95,7 @@ export function drawCollision(
+   // transform's `a` is zoom x dpr on the device-sized classic store (row 194), so
+   // the device scale comes back out: the gate and the widths stay in CSS px,
+   // which is what aeon's overlay states them in and what the constants mean.
+-  const zoomScale = ctx.getTransform().a / dpr;
++  const zoomScale = ctx.getTransform().a;
+   for (let i = 0; i < 256; i++) {
+     const cell = chunk.cells[i];
+     // Block 0 first, because that is the order the engine tests in: FindFloor

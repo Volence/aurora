@@ -1,0 +1,222 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ab34b6ed775224009
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts (32 tests | 32 failed) 6ms
+     × 640.5x480.25 at 1 2ms
+     × 640.5x480.25 at 1.25 0ms
+     × 640.5x480.25 at 1.35 0ms
+     × 640.5x480.25 at 1.5 0ms
+     × 640.5x480.25 at 2 0ms
+     × 640.5x480.25 at 3 0ms
+     × 856x742 at 1 0ms
+     × 856x742 at 1.25 0ms
+     × 856x742 at 1.35 0ms
+     × 856x742 at 1.5 0ms
+     × 856x742 at 2 0ms
+     × 856x742 at 3 0ms
+     × 576x542 at 1 0ms
+     × 576x542 at 1.25 0ms
+     × 576x542 at 1.35 0ms
+     × 576x542 at 1.5 0ms
+     × 576x542 at 2 0ms
+     × 576x542 at 3 0ms
+     × 1x1 at 1 0ms
+     × 1x1 at 1.25 0ms
+     × 1x1 at 1.35 0ms
+     × 1x1 at 1.5 0ms
+     × 1x1 at 2 0ms
+     × 1x1 at 3 0ms
+     × 333.33x99.9 at 1 0ms
+     × 333.33x99.9 at 1.25 0ms
+     × 333.33x99.9 at 1.35 0ms
+     × 333.33x99.9 at 1.5 0ms
+     × 333.33x99.9 at 2 0ms
+     × 333.33x99.9 at 3 0ms
+     × at a factor of 1 it is exactly the pre-fix floor(rect), so a 100% display is unchanged 0ms
+     × a zero or collapsed box still yields a one-pixel store, never zero 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 32 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1.25
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1.35
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1.5
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 2
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 3
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 1
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 1.25
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 1.35
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 1.5
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 2
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 3
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 1
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 1.25
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 1.35
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 1.5
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 2
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 3
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 1
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 1.25
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 1.35
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 1.5
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 2
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 3
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1.25
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1.35
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1.5
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 2
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 3
+TypeError: classicBackingStore is not a function
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:22:19
+     20|     for (const dpr of FACTORS) {
+     21|       it(`${rw}x${rh} at ${dpr}`, () => {
+     22|         const s = classicBackingStore(rw, rh, dpr);
+       |                   ^
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/32]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > at a factor of 1 it is exactly the pre-fix floor(rect), so a 100% display is unchanged
+TypeError: classicBackingStore is not a function
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:43:17
+     41|   it('at a factor of 1 it is exactly the pre-fix floor(rect), so a 100…
+     42|     for (const [rw, rh] of RECTS) {
+     43|       const s = classicBackingStore(rw, rh, 1);
+       |                 ^
+     44|       expect([s.deviceWidth, s.deviceHeight, s.cssWidth, s.cssHeight])
+     45|         .toEqual([Math.max(1, Math.floor(rw)), Math.max(1, Math.floor(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/32]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > a zero or collapsed box still yields a one-pixel store, never zero
+TypeError: classicBackingStore is not a function
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:51:15
+     49|
+     50|   it('a zero or collapsed box still yields a one-pixel store, never ze…
+     51|     const s = classicBackingStore(0, 0, 1.5);
+       |               ^
+     52|     expect([s.deviceWidth, s.deviceHeight]).toEqual([1, 1]);
+     53|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/32]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  32 failed (32)
+   Start at  04:02:43
+   Duration  527ms (transform 326ms, setup 415ms, import 15ms, tests 6ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 32 failure record(s) in 1 file(s) (32 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        0   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED    32   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/classic/__tests__/classic-backing-store.test.ts
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1.25
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1.35
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1.5
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 2
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 3
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 1
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 1.25
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 1.35
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 1.5
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 2
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 3
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 1
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 1.25
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 1.35
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 1.5
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 2
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 3
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 1
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 1.25
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 1.35
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 1.5
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 2
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 3
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1.25
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1.35
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1.5
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 2
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 3
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > at a factor of 1 it is exactly the pre-fix floor(rect), so a 100% display is unchanged
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] classicBackingStore: device-sized store, CSS box derived back from it > a zero or collapsed box still yields a one-pixel store, never zero
+        TypeError: classicBackingStore is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+
+run-completeness: COMPLETE, 1 of 1 module(s) this run selected finished.

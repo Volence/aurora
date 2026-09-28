@@ -1,0 +1,231 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ab34b6ed775224009
+
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts (175 tests | 1 failed) 45ms
+     ✓ the golden was recorded from master, and it and the scenarios name the same cases (anti-vacuous) 1ms
+     ✓ guides: act space, three layers, one disabled, fractional pan and zoom 1ms
+     ✓ guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 1ms
+     ✓ guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ surfaces: two remapped layers, one rule near the top edge 1ms
+     ✓ surfaces: zoom 2.5, one rule 0ms
+     ✓ frame: at rest, fractional pan, zoom 1.5 0ms
+     ✓ frame: active, zoom 2.5, caption override 0ms
+     ✓ frame: half off the top edge 0ms
+     ✓ camera: four bands, camera 320, fractional frame 1ms
+     ✓ camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+     ✓ lens label: anchored to coverage, fractional anchor 0ms
+     ✓ lens label: no coverage on screen: the corner 0ms
+     ✓ the comparison can fail: at 1.35 the same draws differ from master (anti-vacuous) 2ms
+     ✓ centre, width and length at dpr 1 are Math.round(v) + 0.5, w and Math.round(len) 1ms
+     ✓ a device width keeps the parity of its CSS width and is the nearest such integer 1ms
+     ✓ dpr 1: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.25: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1.25: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1.25: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.35: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1.35: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1.35: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.5: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1.5: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1.5: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.75: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1.75: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1.75: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 2: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 2: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 2: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 2.5: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 2.5: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 2.5: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 3: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 3: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 3: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1: zoom 2.5, one rule 0ms
+     ✓ dpr 1.25: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.25: zoom 2.5, one rule 0ms
+     ✓ dpr 1.35: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.35: zoom 2.5, one rule 0ms
+     ✓ dpr 1.5: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.5: zoom 2.5, one rule 0ms
+     ✓ dpr 1.75: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.75: zoom 2.5, one rule 0ms
+     ✓ dpr 2: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 2: zoom 2.5, one rule 0ms
+     ✓ dpr 2.5: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 2.5: zoom 2.5, one rule 0ms
+     ✓ dpr 3: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 3: zoom 2.5, one rule 0ms
+     ✓ dpr 1: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1: half off the top edge 0ms
+     ✓ dpr 1.25: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1.25: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.25: half off the top edge 0ms
+     ✓ dpr 1.35: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1.35: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.35: half off the top edge 0ms
+     ✓ dpr 1.5: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1.5: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.5: half off the top edge 0ms
+     ✓ dpr 1.75: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1.75: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.75: half off the top edge 0ms
+     ✓ dpr 2: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 2: active, zoom 2.5, caption override 0ms
+     ✓ dpr 2: half off the top edge 0ms
+     ✓ dpr 2.5: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 2.5: active, zoom 2.5, caption override 0ms
+     ✓ dpr 2.5: half off the top edge 0ms
+     ✓ dpr 3: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 3: active, zoom 2.5, caption override 0ms
+     ✓ dpr 3: half off the top edge 0ms
+     ✓ dpr 1: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 1: frame: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1: frame: half off the top edge 0ms
+     ✓ dpr 1.25: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1.25: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1.25: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.25: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.25: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 1.25: frame: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1.25: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.25: frame: half off the top edge 0ms
+     ✓ dpr 1.35: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1.35: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1.35: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.35: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.35: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 1.35: frame: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1.35: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.35: frame: half off the top edge 0ms
+     ✓ dpr 1.5: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1.5: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1.5: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.5: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.5: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 1.5: frame: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1.5: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.5: frame: half off the top edge 0ms
+     ✓ dpr 1.75: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 1.75: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 1.75: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 1.75: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 1.75: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 1.75: frame: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 1.75: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 1.75: frame: half off the top edge 0ms
+     ✓ dpr 2: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 2: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 2: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 2: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 2: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 2: frame: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 2: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 2: frame: half off the top edge 0ms
+     ✓ dpr 2.5: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 2.5: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 2.5: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 2.5: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 2.5: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 2.5: frame: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 2.5: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 2.5: frame: half off the top edge 0ms
+     ✓ dpr 3: guides: act space, three layers, one disabled, fractional pan and zoom 0ms
+     ✓ dpr 3: guides: screen space, hover on 1, a refusal notice on 2 (plate + caption) 0ms
+     ✓ dpr 3: guides: a drag in flight on 0, zoom 2.5, a guide near the top edge 0ms
+     ✓ dpr 3: surfaces: two remapped layers, one rule near the top edge 0ms
+     ✓ dpr 3: surfaces: zoom 2.5, one rule 0ms
+     ✓ dpr 3: frame: at rest, fractional pan, zoom 1.5 0ms
+     ✓ dpr 3: frame: active, zoom 2.5, caption override 0ms
+     ✓ dpr 3: frame: half off the top edge 0ms
+     ✓ dpr 1.25: camera: four bands, camera 320, fractional frame 1ms
+     ✓ dpr 1.25: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 1ms
+     ✓ dpr 1.25: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 1.25: lens label: no coverage on screen: the corner 0ms
+     ✓ dpr 1.35: camera: four bands, camera 320, fractional frame 1ms
+     ✓ dpr 1.35: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+     ✓ dpr 1.35: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 1.35: lens label: no coverage on screen: the corner 0ms
+     ✓ dpr 1.5: camera: four bands, camera 320, fractional frame 0ms
+     ✓ dpr 1.5: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 1ms
+     ✓ dpr 1.5: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 1.5: lens label: no coverage on screen: the corner 0ms
+     ✓ dpr 1.75: camera: four bands, camera 320, fractional frame 1ms
+     ✓ dpr 1.75: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 1ms
+     ✓ dpr 1.75: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 1.75: lens label: no coverage on screen: the corner 0ms
+     ✓ dpr 2: camera: four bands, camera 320, fractional frame 0ms
+     ✓ dpr 2: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+     ✓ dpr 2: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 2: lens label: no coverage on screen: the corner 0ms
+     ✓ dpr 2.5: camera: four bands, camera 320, fractional frame 0ms
+     ✓ dpr 2.5: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+     ✓ dpr 2.5: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 2.5: lens label: no coverage on screen: the corner 0ms
+     ✓ dpr 3: camera: four bands, camera 320, fractional frame 0ms
+     ✓ dpr 3: camera: four bands, camera 900 (wraps), zoom 2.5, no captions 0ms
+     ✓ dpr 3: lens label: anchored to coverage, fractional anchor 0ms
+     ✓ dpr 3: lens label: no coverage on screen: the corner 0ms
+     ✓ the census read the renderer tree (anti-vacuous) 0ms
+     × every identity reset left is on a canvas whose backing store is not dpr-scaled 4ms
+     ✓ and each of those sites still has one, so the list cannot outlive what it names 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/canvas/__tests__/dpr-chrome.test.ts > no identity reset is left in the renderer except on canvases that are not dpr-scaled > every identity reset left is on a canvas whose backing store is not dpr-scaled
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "components/classic/ClassicLevelViewport.tsx",
++ ]
+
+ ❯ src/renderer/canvas/__tests__/dpr-chrome.test.ts:290:50
+    288|
+    289|   it('every identity reset left is on a canvas whose backing store is …
+    290|     expect(hits.filter((h) => !(h in UNSCALED))).toEqual([]);
+       |                                                  ^
+    291|   });
+    292|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 174 passed (175)
+   Start at  04:12:17
+   Duration  683ms (transform 417ms, setup 412ms, import 150ms, tests 45ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 1 failure record(s) in 1 file(s) (1 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        1   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/canvas/__tests__/dpr-chrome.test.ts
+    [ASSERTION] no identity reset is left in the renderer except on canvases that are not dpr-scaled > every identity reset left is on a canvas whose backing store is not dpr-scaled
+        AssertionError: expected [ Array(1) ] to deeply equal []
+        why this bucket: name is AssertionError
+
+failure-class: 1 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 1 of 1 module(s) this run selected finished.

@@ -1,0 +1,267 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ab34b6ed775224009
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts (19 tests | 8 failed) 192ms
+     × at 1 the store is floor(CSS box x 1) device px, and the CSS box is that over 1 166ms
+     × at 1.25 the store is floor(CSS box x 1.25) device px, and the CSS box is that over 1.25 2ms
+     × at 1.35 the store is floor(CSS box x 1.35) device px, and the CSS box is that over 1.35 2ms
+     × at 1.5 the store is floor(CSS box x 1.5) device px, and the CSS box is that over 1.5 2ms
+     × at 2 the store is floor(CSS box x 2) device px, and the CSS box is that over 2 2ms
+     × at 3 the store is floor(CSS box x 3) device px, and the CSS box is that over 3 1ms
+     ✓ a device ratio of undefined sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of 0 sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of -2 sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of NaN sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of Infinity sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of 2 sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of null sizes the store at one device px per CSS px 1ms
+     ✓ at 1 every draw starts from the device transform with smoothing off 1ms
+     × at 1.5 every draw starts from the device transform with smoothing off 1ms
+     × at 2 every draw starts from the device transform with smoothing off 2ms
+     ✓ at 1 a right-click either side of x=256 eyedrops the chunk under it 2ms
+     ✓ at 1.5 a right-click either side of x=256 eyedrops the chunk under it 1ms
+     ✓ at 2 a right-click either side of x=256 eyedrops the chunk under it 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1 the store is floor(CSS box x 1) device px, and the CSS box is that over 1
+AssertionError: expected { width: undefined, height: undefined } to deeply equal { width: '640px', height: '480px' }
+
+- Expected
++ Received
+
+  {
+-   "height": "480px",
+-   "width": "640px",
++   "height": undefined,
++   "width": undefined,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:190:10
+    188|       // sized store with no style would lay out `dpr` times too big.
+    189|       expect({ width: el(s).style.width, height: el(s).style.height })
+    190|         .toEqual({ width: `${w / dpr}px`, height: `${h / dpr}px` });
+       |          ^
+    191|     });
+    192|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.25 the store is floor(CSS box x 1.25) device px, and the CSS box is that over 1.25
+AssertionError: expected { width: 640, height: 480 } to deeply equal { width: 800, height: 600 }
+
+- Expected
++ Received
+
+  {
+-   "height": 600,
+-   "width": 800,
++   "height": 480,
++   "width": 640,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:185:60
+    183|       const w = Math.floor(VIEWPORT.width * dpr);
+    184|       const h = Math.floor(VIEWPORT.height * dpr);
+    185|       expect({ width: el(s).width, height: el(s).height }).toEqual({ w…
+       |                                                            ^
+    186|       // The CSS box is set EXPLICITLY, to exactly the store over the …
+    187|       // canvas with no CSS width takes its attribute as its CSS size,…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.35 the store is floor(CSS box x 1.35) device px, and the CSS box is that over 1.35
+AssertionError: expected { width: 640, height: 480 } to deeply equal { width: 864, height: 648 }
+
+- Expected
++ Received
+
+  {
+-   "height": 648,
+-   "width": 864,
++   "height": 480,
++   "width": 640,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:185:60
+    183|       const w = Math.floor(VIEWPORT.width * dpr);
+    184|       const h = Math.floor(VIEWPORT.height * dpr);
+    185|       expect({ width: el(s).width, height: el(s).height }).toEqual({ w…
+       |                                                            ^
+    186|       // The CSS box is set EXPLICITLY, to exactly the store over the …
+    187|       // canvas with no CSS width takes its attribute as its CSS size,…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.5 the store is floor(CSS box x 1.5) device px, and the CSS box is that over 1.5
+AssertionError: expected { width: 640, height: 480 } to deeply equal { width: 960, height: 720 }
+
+- Expected
++ Received
+
+  {
+-   "height": 720,
+-   "width": 960,
++   "height": 480,
++   "width": 640,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:185:60
+    183|       const w = Math.floor(VIEWPORT.width * dpr);
+    184|       const h = Math.floor(VIEWPORT.height * dpr);
+    185|       expect({ width: el(s).width, height: el(s).height }).toEqual({ w…
+       |                                                            ^
+    186|       // The CSS box is set EXPLICITLY, to exactly the store over the …
+    187|       // canvas with no CSS width takes its attribute as its CSS size,…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 2 the store is floor(CSS box x 2) device px, and the CSS box is that over 2
+AssertionError: expected { width: 640, height: 480 } to deeply equal { width: 1281, height: 960 }
+
+- Expected
++ Received
+
+  {
+-   "height": 960,
+-   "width": 1281,
++   "height": 480,
++   "width": 640,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:185:60
+    183|       const w = Math.floor(VIEWPORT.width * dpr);
+    184|       const h = Math.floor(VIEWPORT.height * dpr);
+    185|       expect({ width: el(s).width, height: el(s).height }).toEqual({ w…
+       |                                                            ^
+    186|       // The CSS box is set EXPLICITLY, to exactly the store over the …
+    187|       // canvas with no CSS width takes its attribute as its CSS size,…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 3 the store is floor(CSS box x 3) device px, and the CSS box is that over 3
+AssertionError: expected { width: 640, height: 480 } to deeply equal { width: 1921, height: 1440 }
+
+- Expected
++ Received
+
+  {
+-   "height": 1440,
+-   "width": 1921,
++   "height": 480,
++   "width": 640,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:185:60
+    183|       const w = Math.floor(VIEWPORT.width * dpr);
+    184|       const h = Math.floor(VIEWPORT.height * dpr);
+    185|       expect({ width: el(s).width, height: el(s).height }).toEqual({ w…
+       |                                                            ^
+    186|       // The CSS box is set EXPLICITLY, to exactly the store over the …
+    187|       // canvas with no CSS width takes its attribute as its CSS size,…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.5 every draw starts from the device transform with smoothing off
+AssertionError: expected [ 1, +0, +0, 1, +0, +0 ] to deeply equal [ 1.5, +0, +0, 1.5, +0, +0 ]
+
+- Expected
++ Received
+
+  [
+-   1.5,
++   1,
+    0,
+    0,
+-   1.5,
++   1,
+    0,
+    0,
+  ]
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:208:50
+    206|       const transforms = s.calls.filter((c) => c.op === 'setTransform'…
+    207|       expect(transforms.length, 'the draw pass never set a base transf…
+    208|       for (const t of transforms) expect(t.args).toEqual([dpr, 0, 0, d…
+       |                                                  ^
+    209|       const blits = s.calls.filter((c) => c.op === 'drawImage');
+    210|       expect(blits.length, 'no chunk was blitted: this row measured an…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 2 every draw starts from the device transform with smoothing off
+AssertionError: expected [ 1, +0, +0, 1, +0, +0 ] to deeply equal [ 2, +0, +0, 2, +0, +0 ]
+
+- Expected
++ Received
+
+  [
+-   2,
++   1,
+    0,
+    0,
+-   2,
++   1,
+    0,
+    0,
+  ]
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:208:50
+    206|       const transforms = s.calls.filter((c) => c.op === 'setTransform'…
+    207|       expect(transforms.length, 'the draw pass never set a base transf…
+    208|       for (const t of transforms) expect(t.args).toEqual([dpr, 0, 0, d…
+       |                                                  ^
+    209|       const blits = s.calls.filter((c) => c.op === 'drawImage');
+    210|       expect(blits.length, 'no chunk was blitted: this row measured an…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 11 passed (19)
+   Start at  04:02:26
+   Duration  697ms (transform 459ms, setup 423ms, import 16ms, tests 192ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 8 failure record(s) in 1 file(s) (8 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        8   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/classic/__tests__/classic-device-scale.test.ts
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1 the store is floor(CSS box x 1) device px, and the CSS box is that over 1
+        AssertionError: expected { width: undefined, height: undefined } to deeply equal { width: '640px', height: '480px' }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.25 the store is floor(CSS box x 1.25) device px, and the CSS box is that over 1.25
+        AssertionError: expected { width: 640, height: 480 } to deeply equal { width: 800, height: 600 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.35 the store is floor(CSS box x 1.35) device px, and the CSS box is that over 1.35
+        AssertionError: expected { width: 640, height: 480 } to deeply equal { width: 864, height: 648 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.5 the store is floor(CSS box x 1.5) device px, and the CSS box is that over 1.5
+        AssertionError: expected { width: 640, height: 480 } to deeply equal { width: 960, height: 720 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 2 the store is floor(CSS box x 2) device px, and the CSS box is that over 2
+        AssertionError: expected { width: 640, height: 480 } to deeply equal { width: 1281, height: 960 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 3 the store is floor(CSS box x 3) device px, and the CSS box is that over 3
+        AssertionError: expected { width: 640, height: 480 } to deeply equal { width: 1921, height: 1440 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.5 every draw starts from the device transform with smoothing off
+        AssertionError: expected [ 1, +0, +0, 1, +0, +0 ] to deeply equal [ 1.5, +0, +0, 1.5, +0, +0 ]
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 2 every draw starts from the device transform with smoothing off
+        AssertionError: expected [ 1, +0, +0, 1, +0, +0 ] to deeply equal [ 2, +0, +0, 2, +0, +0 ]
+        why this bucket: name is AssertionError
+
+failure-class: 8 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 1 of 1 module(s) this run selected finished.

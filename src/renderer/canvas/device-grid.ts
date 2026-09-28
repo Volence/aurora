@@ -80,3 +80,30 @@ export function snapStroke(cssAt: number, cssWidth: number, dpr: number): Snappe
 export function snapLength(cssLength: number, dpr: number): number {
   return Math.round(cssLength * dpr) / dpr;
 }
+
+/**
+ * How many DEVICE pixels this display puts inside one CSS pixel, right now.
+ *
+ * ONE READING FOR BOTH MAP SURFACES. It was a private function of `MapViewport` (aeon's
+ * map) until row 194 gave the Sonic 1 level canvas (`ClassicLevelViewport`) the same
+ * device-sized backing store; it moved here rather than being copied, so the two
+ * surfaces cannot disagree about what an unusable reading means.
+ *
+ * ⚠ DERIVED ON EVERY CALL AND NEVER CACHED, because it MOVES: dragging the window
+ * to a display with a different scale factor changes it with no resize of the CSS
+ * box, and on the virtual display this repo's harnesses run on it has been
+ * observed at both 1 and 1.35 inside a single session. Any surface that pins
+ * today's value is wrong on the next display, and a test that asserts a
+ * particular number is measuring the machine rather than the code.
+ *
+ * ONE IS THE ANSWER FOR EVERY UNUSABLE READING, and the list is deliberate rather
+ * than a `?? 1`: no window at all (both map components' bodies run in the node test
+ * suite), a non-number, a NaN from a host that computed one, an Infinity, and
+ * zero or negative -- each of which would otherwise produce a zero-sized or
+ * inverted backing store, which paints nothing and looks exactly like a broken
+ * renderer.
+ */
+export function deviceScale(): number {
+  const dpr = typeof window === 'undefined' ? undefined : window.devicePixelRatio;
+  return typeof dpr === 'number' && Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+}

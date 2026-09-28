@@ -1,0 +1,77 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ab34b6ed775224009
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts (19 tests | 2 failed) 247ms
+     ✓ at 1 the store is floor(CSS box x 1) device px, and the CSS box is that over 1 198ms
+     ✓ at 1.25 the store is floor(CSS box x 1.25) device px, and the CSS box is that over 1.25 4ms
+     ✓ at 1.35 the store is floor(CSS box x 1.35) device px, and the CSS box is that over 1.35 2ms
+     ✓ at 1.5 the store is floor(CSS box x 1.5) device px, and the CSS box is that over 1.5 2ms
+     ✓ at 2 the store is floor(CSS box x 2) device px, and the CSS box is that over 2 2ms
+     ✓ at 3 the store is floor(CSS box x 3) device px, and the CSS box is that over 3 2ms
+     ✓ a device ratio of undefined sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of 0 sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of -2 sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of NaN sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of Infinity sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of 2 sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of null sizes the store at one device px per CSS px 2ms
+     ✓ at 1 every draw starts from the device transform with smoothing off 2ms
+     ✓ at 1.5 every draw starts from the device transform with smoothing off 2ms
+     ✓ at 2 every draw starts from the device transform with smoothing off 2ms
+     ✓ at 1 a right-click either side of x=256 eyedrops the chunk under it 3ms
+     × at 1.5 a right-click either side of x=256 eyedrops the chunk under it 11ms
+     × at 2 a right-click either side of x=256 eyedrops the chunk under it 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the pointer still maps in CSS pixels > at 1.5 a right-click either side of x=256 eyedrops the chunk under it
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the pointer still maps in CSS pixels > at 2 a right-click either side of x=256 eyedrops the chunk under it
+AssertionError: x=255 is chunk 1 at zoom 1: expected 2 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:234:93
+    232|       });
+    233|       click(255);
+    234|       expect(useClassicLevelStore.getState().selectedChunkId, 'x=255 i…
+       |                                                                                             ^
+    235|       click(257);
+    236|       expect(useClassicLevelStore.getState().selectedChunkId, 'x=257 i…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 17 passed (19)
+   Start at  04:06:30
+   Duration  798ms (transform 507ms, setup 454ms, import 17ms, tests 247ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 2 failure record(s) in 1 file(s) (2 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        2   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/classic/__tests__/classic-device-scale.test.ts
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the pointer still maps in CSS pixels > at 1.5 a right-click either side of x=256 eyedrops the chunk under it
+        AssertionError: x=255 is chunk 1 at zoom 1: expected 2 to be 1 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the pointer still maps in CSS pixels > at 2 a right-click either side of x=256 eyedrops the chunk under it
+        AssertionError: x=255 is chunk 1 at zoom 1: expected 2 to be 1 // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 2 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 1 of 1 module(s) this run selected finished.

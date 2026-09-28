@@ -275,7 +275,10 @@ describe('no identity reset is left in the renderer except on canvases that are 
   /** The sites whose identity reset is RIGHT, and why (the packet's per-site table). */
   const UNSCALED: Record<string, string> = {
     'canvas/raster-timeline.ts': 'RasterTimelineStrip gives this canvas a FIXED intrinsic size (RASTER_TIMELINE_W x H); its pointer maps client px to strip px through the rect, so identity is strip px',
-    'components/classic/ClassicLevelViewport.tsx': 'the classic canvas backing store is floor(CSS rect), never multiplied by dpr, and its pointer reads CSS px, so identity is CSS px',
+    // ClassicLevelViewport LEFT this list at row 194: its store is now device-sized and
+    // its draw starts from setTransform(dpr, ...), so an identity reset there is the
+    // defect again, and the row above now reds on one
+    // (docs/reviews/2026-09-28-classic-canvas-dpr-194.md).
   };
 
   it('the census read the renderer tree (anti-vacuous)', () => {
