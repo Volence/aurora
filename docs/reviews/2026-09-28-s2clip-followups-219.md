@@ -57,12 +57,12 @@ donor conversion in the copy with a `sys.addaudithook` `open` hook in every Pyth
 - the scratch outputs.
 
 Every file kept is committed in aeon, and has the same blob at `b85e60d2`, `e47493aa` and `origin/master`
-`28880431`. Per marker, 17 to 24 inputs, in four kinds:
+`28880431`. Per marker, 16 to 23 inputs, in four kinds:
 - the manifests;
 - every aeon module the run loaded, including the lazily imported `layer_lines` and `s2_layer_lines` that the bake
   loads;
 - `tools/s2_zone_convert.py` and `tools/import_s2_collision.py` from the conversion;
-- the data files the modules opened: `engine/system/constants.emp` and `project.json` everywhere, and wherever
+- the data files the modules opened: `project.json` everywhere, and wherever
   opened `art/palettes/SonicAndTails.bin`, `games/sonic4/player/knuckles.emp` and
   `games/sonic4/data/collision/base_s2/{angles,heightmaps}.bin`.
 
@@ -101,19 +101,46 @@ have been typed or taken from another tree. The row skips loudly without an aeon
 - anything opened below Python, such as a C extension's `fopen`, which the audit hook cannot see. I checked that the
   traced modules use no `np.fromfile`, `memmap` or `ctypes`.
 
-**⚠ FOR THE OVERSEER: the currency row will go red more often.** `git log --since=2026-08-28 origin/master` over
-aeon gives these counts:
+**The currency red rate, and the overseer's ruling.** `git log --since=2026-08-28 origin/master` over aeon, counting
+every pinned path across the six markers (tool paths included):
 
 | pins | paths pinned | commits that moved one | days with such a commit |
 |---|---|---|---|
-| old | 8 | 58 | 9 |
-| new | 27 | 143 | 19 |
+| before row 219 | 8 | 58 | 9 |
+| full pin (as first built, `338950f6`) | 27 | 143 | 19 |
+| **now: full pin minus `constants.emp`** | 26 | 115 | **16** |
+| (for reference) also minus `ojz_strip_gen.py` | 25 | 96 | 14 |
 
-`engine/system/constants.emp` accounts for most of the rise (37 commits, 36 of them moving no old pin), then
-`ojz_strip_gen.py` (21) and `vram_map.py` (13). The rows ARE the dependency: a change there can move the output, and
-a whole-file blob cannot tell which constants the tools read. If that red rate is too high, one fix is to pin the
-named constants the tools read in place of the whole of `constants.emp`. That is a new mechanism, so I did not build
-it. Dropping the file from the pin would also work, and would make `inputs_are` say so again.
+Per path over the same 30 days, the highest are `engine/system/constants.emp` 37, `tools/ojz_strip_gen.py` 27,
+`tools/clip_manifest.py` 23, `tools/clip_act_bake.py` 16, the `s2_ehz_cpz` manifest 14 and `tools/vram_map.py` 13.
+
+The overseer ruled to drop `constants.emp` from the pin and declare it. Every marker now carries
+`aeon.inputs_excluded: [{path: "engine/system/constants.emp", why}]`. The `why` says the file IS read (by
+`clip_manifest.py`, `fg_page_order.py`, `fg_working_set.py` and `layer_lines.py`, and the trace saw every run open
+it) and is deliberately NOT pinned. It gives the measurement (37 commits in 30 days; red-days 9 -> 19 under the full
+pin, 16 without it) and says the finer pin is tracked as ROADMAP row 234. Each marker's `inputs_are` says the same.
+So a change to a constant the tools read can move an output with every currency row green, until row 234 lands.
+
+The ruling said to treat any comparable-churn input the same. The next one is `tools/ojz_strip_gen.py` (27). I named
+it and **kept it pinned**: it is executed code, not a file the tools read a few named values from, so row 234's finer
+pin does not apply to it. Dropping it too would take red-days to 14. That is the overseer's call if wanted.
+
+**The check still refuses an undeclared omission.** The closure row now also derives the committed DATA files the
+loaded modules (tool_path and every pinned `tools/*.py`) name, as an `os.path.join` of string literals, at the
+marker's revision. Each must be:
+- pinned;
+- in `data_not_opened` (named by a loaded module, but the audit trace saw no process open it: for example
+  `engine/level/camera.emp` and the OJZ act descriptor); or
+- a declared exclusion. An exclusion must be of a file a loaded module names, and it must carry a `why`.
+
+A declared exclusion is a category of its own, separate from "measured not loaded/opened". Red/green, each mutation
+on `s2_ehz_cpz.clipact.provenance.json` on disk, restored from the committed `124bac12`:
+1. `tools/vram_map.py` dropped from `inputs`: **RED**, 1 failed / 85, naming `tools/vram_map.py`.
+2. `project.json` dropped from `inputs`, undeclared: **RED**, 1 failed / 85, naming `project.json`.
+3. The `inputs_excluded` declaration of `constants.emp` removed, which leaves it an undeclared omission: **RED**,
+   1 failed / 85, naming `engine/system/constants.emp`. At `338950f6` this omission would have passed, because the
+   closure row saw modules only and the currency row sees only what is listed.
+4. Restored (the declared exclusion in place): **GREEN**, 86/86.
 
 ## 4. (a) The real `s2_ehz_cpz` act on the donor page
 
@@ -203,12 +230,15 @@ Run on the docs commit on top of `82a4f5ab`, from the worktree, `VITEST_MAX_WORK
 - `338950f6` (c) the extended pin and the closure row;
 - `931de770` (a) DP.11a to DP.11c;
 - `82a4f5ab` (a) the opaque-pixel fix;
-- the ROADMAP row and this packet, then these closing figures.
+- the ROADMAP row and this packet, then the closing figures;
+- `124bac12` (c) the overseer ruling: `constants.emp` a declared exclusion, and the data-file clause;
+- ROADMAP row 234, and this packet and row 219 updated to match.
 
 ## 7. Open
 
-- The currency red rate (section 3, the overseer's call): keep `constants.emp` as a whole-file pin, pin named
-  constants instead (new mechanism), or drop it and say so.
+- `constants.emp` is a declared exclusion by overseer ruling. The finer pin (the constants the clip tools read, by
+  name and value) is ROADMAP row 234. Whether `ojz_strip_gen.py` (27 commits in 30 days, kept pinned) should follow
+  is the overseer's call.
 - The look items in section 4: the pane size on a big act, label collisions, the carried draft destination, the
   truncated pool ids, and CPZ's appearance.
 - The donor sources outside aeon (`s2disasm`, `s2-simonwai-disasm`) are recorded, not pinned. Checking them would
