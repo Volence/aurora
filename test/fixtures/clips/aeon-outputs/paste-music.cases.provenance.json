@@ -6,11 +6,11 @@
     "branch_that_answers_currency": "origin/master",
     "revision": "b85e60d2352242161607ea2cd25c2d9e799e86a7",
     "revision_is": "the ONE pin of ROADMAP row 231 (REVENDOR-AEON-WOVEN-CROSSING-PATH, branch parcel/revendor-clips-77fc6fb6): aeon origin/master b85e60d2352242161607ea2cd25c2d9e799e86a7 read 2026-09-28T04:09:57Z after a fetch, taken as the pin itself (the tree every tool below ran in); b85e60d2 and cd6739e9 are lane-status/lane-log commits on top of 77fc6fb6, the merge of WOVEN-CROSSING-PATH. Since the previous capture (cffdf716): tools/clip_manifest.py moved at f8796a92 (K11: a corridor's optional `path_lines`, each exactly {mouth, donor_obj03, why}, one per mouth, shape-checked by the loader, and Corridor.as_json writes `path_lines` only when a corridor has some); games/sonic4/data/clips/s2_woven/clips.json moved at f8796a92 (the mtz_to_cpz corridor declares one path line at its east mouth, donor Obj03 at (6536, 1152)). tools/s2_layer_lines.py, tools/path_b_floor_witness.py and tools/test_s2_layer_lines.py moved too; no marker pins them. tools/clip_act_bake.py, tools/collision_pipeline.py, tools/fg_page_order.py and the s2_ehz_cpz, s2_two_clip and s2_ehz_boot clips.json did not move. Blobs at the pin: clip_act_bake 958958b5, clip_manifest d1cd32ad, collision_pipeline dbbe59de, fg_page_order 68e303fc, s2_ehz_cpz clips.json c993be2a, s2_two_clip clips.json 2ff33b48, s2_ehz_boot clips.json 9e4104d0, s2_woven clips.json 30e2fc14.",
-    "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, or any inputs[].path's blob differs from its inputs[].blob, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob, inputs[].blob and revision here; then re-run test/formats/paste-music-r3.test.ts, which holds withClip's output to the manifests the fixture records",
+    "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, or any inputs[].path's blob differs from its inputs[].blob, or any inputs_by_value constant's value differs from its pinned value, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob, inputs[].blob, the inputs_by_value values and revision here; then re-run test/formats/paste-music-r3.test.ts, which holds withClip's output to the manifests the fixture records",
     "materialised_by": "git -C <aeon> archive -o <tar> b85e60d2352242161607ea2cd25c2d9e799e86a7, extracted into $HOME/.cache/aurora-revendor-aeon/tree (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
     "tool_path": "tools/clip_manifest.py",
     "tool_blob": "d1cd32ad93613814bc76a1feca41368e2bbdccd2",
-    "inputs_are": "Every aeon-COMMITTED file the recorded run reads, pinned by blob at `revision` (ROADMAP row 219, measured, not typed): (1) the clip manifests the recorded run names (derived by the completeness row from fixture.command and the generator's `plan`); (2) every aeon module the run LOADED, i.e. the import closure of tool_path as executed; (3) the donor conversion (tools/s2_zone_convert.py, named in materialised_by) and every module it loaded, because the donor trees the tools read (games/sonic4/data/donors/, gitignored in aeon) are that conversion's output, not committed files; (4) the data files those modules opened (project.json, and whichever of art/palettes/SonicAndTails.bin, games/sonic4/player/knuckles.emp and games/sonic4/data/collision/base_s2/*.bin this run opens). HOW MEASURED: the recorded command and the conversion were re-run in the materialised copy at e47493aa with a sys.addaudithook `open` hook in every Python process (sitecustomize on PYTHONPATH), and every opened path inside the copy was kept bar the donor trees and the scratch outputs; every file kept has the same blob at b85e60d2, e47493aa and origin/master 28880431. The completeness row re-derives the static import closure of tool_path and the conversion tool at `revision` (git objects) and requires every module in it to be pinned here or listed in closure_not_loaded, and derives the committed data files those loaded modules name in an os.path.join of string literals, each of which must be pinned, listed in data_not_opened, or declared in inputs_excluded. NOT PINNED, stated: (0) engine/system/constants.emp, a DECLARED exclusion, see inputs_excluded (read by the tools, deliberately unpinned; finer pin tracked as ROADMAP row 234); (a) closure_not_loaded, modules the tools import only inside functions this run never called (measured by the same trace); (b) the donor SOURCES, outside aeon: the conversion reads the suite's s2disasm (art, collision, level, mappings, s2.asm, s2.constants.asm) and s2-simonwai-disasm (HPZ), and the bake reads s2disasm level/objects/*_1.bin and s2.asm directly; those are other repositories' working trees, read by path, which the currency row (aeon origin/master) cannot see; observed at capture clean at s2disasm HEAD e45ebf332f39987424ca3102e50c717628f71269 and s2-simonwai-disasm HEAD 0113ca4775115689edc87d4115ed9cb51f220e02; (c) anything opened below Python (a C extension's fopen), which the audit hook cannot see; the modules traced read their files through Python's open (checked: no np.fromfile/memmap in them).",
+    "inputs_are": "Every aeon-COMMITTED file the recorded run reads, pinned by blob at `revision` (ROADMAP row 219, measured, not typed): (1) the clip manifests the recorded run names (derived by the completeness row from fixture.command and the generator's `plan`); (2) every aeon module the run LOADED, i.e. the import closure of tool_path as executed; (3) the donor conversion (tools/s2_zone_convert.py, named in materialised_by) and every module it loaded, because the donor trees the tools read (games/sonic4/data/donors/, gitignored in aeon) are that conversion's output, not committed files; (4) the data files those modules opened (project.json, and whichever of art/palettes/SonicAndTails.bin, games/sonic4/player/knuckles.emp and games/sonic4/data/collision/base_s2/*.bin this run opens). HOW MEASURED: the recorded command and the conversion were re-run in the materialised copy at e47493aa with a sys.addaudithook `open` hook in every Python process (sitecustomize on PYTHONPATH), and every opened path inside the copy was kept bar the donor trees and the scratch outputs; every file kept has the same blob at b85e60d2, e47493aa and origin/master 28880431. The completeness row re-derives the static import closure of tool_path and the conversion tool at `revision` (git objects) and requires every module in it to be pinned here or listed in closure_not_loaded, and derives the committed data files those loaded modules name in an os.path.join of string literals, each of which must be pinned by blob, pinned by value (inputs_by_value), listed in data_not_opened, or declared in inputs_excluded. NOT PINNED, stated: (0) engine/system/constants.emp as a FILE: it is pinned by the values of the constants the tools read (inputs_by_value, ROADMAP row 234), so an edit to a constant no recorded run reads moves nothing here; (a) closure_not_loaded, modules the tools import only inside functions this run never called (measured by the same trace); (b) the donor SOURCES, outside aeon: the conversion reads the suite's s2disasm (art, collision, level, mappings, s2.asm, s2.constants.asm) and s2-simonwai-disasm (HPZ), and the bake reads s2disasm level/objects/*_1.bin and s2.asm directly; those are other repositories' working trees, read by path, which the currency row (aeon origin/master) cannot see; observed at capture clean at s2disasm HEAD e45ebf332f39987424ca3102e50c717628f71269 and s2-simonwai-disasm HEAD 0113ca4775115689edc87d4115ed9cb51f220e02; (c) anything opened below Python (a C extension's fopen), which the audit hook cannot see; the modules traced read their files through Python's open (checked: no np.fromfile/memmap in them).",
     "closure_not_loaded": [
       "tools/fg_page_order.py",
       "tools/gen_collision_data.py",
@@ -31,10 +31,65 @@
       "games/sonic4/player/knuckles.emp"
     ],
     "data_not_opened_is": "committed files a loaded module names (an os.path.join of string literals) that the audit trace saw no process of the recorded run or the conversion open. Not pinned: the output cannot depend on a file nothing opened.",
-    "inputs_excluded": [
+    "inputs_by_value": [
       {
         "path": "engine/system/constants.emp",
-        "why": "READ by the tools (engine/system/constants.emp: clip_manifest.py, fg_page_order.py, fg_working_set.py and layer_lines.py parse named constants out of it; the audit trace saw every recorded run open it) and DELIBERATELY NOT PINNED (overseer ruling at row 219's landing, 2026-09-28): it is the highest-churn input, 37 aeon commits in the 30 days to 2026-09-28, and pinning it whole took the days with a currency red over those 30 days from 9 (the pre-219 pins) to 19; without it, 16. A change to a constant the tools read can therefore move this output with the currency rows green. The finer pin (only the constants the clip tools read, by name and value at the pin) is tracked as ROADMAP row 234."
+        "why": "READ by the tools (the audit trace saw every recorded run open it) and pinned by the VALUES of the constants they read, not by its blob (ROADMAP row 234, replacing row 219's declared exclusion): a blob pin reds on every unrelated constants edit (37 aeon commits in the 30 days to 2026-09-28; days with a currency red over those 30 days: 9 before row 219, 19 under the whole-file pin, 16 with the file excluded, 16 (only 2 of the 37 commits moved a pinned value, 77cf6a71 and 2a727b29, and each also moved a file pinned by blob) under this pin). Read here by: clip_manifest.py (geometry_constants: SECTION_SIZE, MAX_ACT_SECTIONS; player_clearance_px: PLAYER_Y_RADIUS; _const: PLAYER_X_RADIUS); ojz_strip_gen.py (module level: ART_POOL_PAGE_TILES). NOT READ WHOLESALE: fg_working_set.ConstantSource scans every `const` line but resolves only the names asked for, each by evaluating its right-hand side over the names it mentions, FIRST DEFINITION WINNING; layer_lines takes the first `^pub const NAME = literal`. So each output depends on the file only through the resolved values below, and a value moves whenever its own line, a line it depends on, or an earlier definition of the name moves. The values are aeon's own parsers' answers at `revision` (ConstantSource.get, layer_lines.engine_constants); the provenance row recomputes them with test/support/emp-constants.ts's transcription of those parsers, and the currency row recomputes them at aeon origin/master. names_not_read: constants a loaded module names that this run never reads.",
+        "readers": [
+          {
+            "parse": "ConstantSource",
+            "loads": [
+              "engine/system/constants.emp"
+            ],
+            "values": {
+              "ART_POOL_PAGE_TILES": 64,
+              "MAX_ACT_SECTIONS": 48,
+              "PLAYER_X_RADIUS": 9,
+              "PLAYER_Y_RADIUS": 19,
+              "SECTION_SIZE": 2048
+            }
+          }
+        ],
+        "names_not_read": [
+          {
+            "names": [
+              "PHYS_GRAVITY",
+              "PHYS_JUMP_FORCE"
+            ],
+            "because_not_opened": "games/sonic4/player/knuckles.emp",
+            "why": "read only by clip_manifest.jump_reach_px (K9, a stair's ledge pitch), which loads games/sonic4/player/knuckles.emp beside constants.emp; the audit trace saw no process of this run open knuckles.emp (data_not_opened), so jump_reach_px never ran."
+          },
+          {
+            "names": [
+              "ART_POOL_PAGE_BYTES",
+              "BLOCKS_PER_SECTION_AXIS",
+              "BLOCK_INDEX_ENTRIES",
+              "BLOCK_NT_SIZE",
+              "BLOCK_TILE_SIZE",
+              "CAM_MAX_Y_STEP",
+              "DMA_BUDGET_NTSC",
+              "NT_TILE_MASK",
+              "PAGE_FRAMES",
+              "PAGE_FRAMES_MAX",
+              "PAGE_FRAME_TILE_SHIFT",
+              "PAGE_PREFETCH_MAX",
+              "POOL_TILE_CEILING",
+              "SCREEN_HEIGHT",
+              "SCREEN_LAST_COL_MAX",
+              "SCREEN_LAST_ROW_MAX",
+              "SCREEN_WIDTH",
+              "SECTION_H_REACH_COLS_MAX",
+              "SECTION_SIZE_SHIFT",
+              "SECTION_V_REACH_ROWS_MAX",
+              "TILE_CACHE_COLS",
+              "TILE_CACHE_MARGIN_H",
+              "TILE_CACHE_MARGIN_V",
+              "TILE_CACHE_ROWS"
+            ],
+            "because_not_opened": "engine/level/camera.emp",
+            "why": "named only by fg_working_set.Model (its NEEDED list) and its report (DMA_BUDGET_NTSC, ART_POOL_PAGE_BYTES); Model() loads engine/level/camera.emp beside constants.emp, and the audit trace saw no process of this run open camera.emp (data_not_opened), so no Model was built. In this run fg_page_order is closure_not_loaded, so the budget names (PAGE_FRAMES, TILE_CACHE_*, SCREEN_*, ...) are named here only by fg_working_set's Model list and by ojz_strip_gen's reads of the budget dict fg_page_order.load_budget_constants builds, which never ran."
+          }
+        ]
       }
     ],
     "inputs": [

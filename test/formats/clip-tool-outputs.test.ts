@@ -30,6 +30,7 @@ import {
   BAKE_JSON_SCHEMA, FILL_SUBJECT_LABEL, readBakeJson, readValidateJson, subjectsLabel, VALIDATE_JSON_SCHEMA,
 } from '../../src/core/formats/donors/clip-validate-json';
 import { peerRepo, resolveRev, readAtRev } from '../support/peer-repo';
+import { ConstantSource, definingLine, EMP_PARSES, EmpParseError, PARSER_SOURCE_LINES, readerValues, type EmpReader } from '../support/emp-constants';
 
 const DIR = resolve(__dirname, '../fixtures/clips/aeon-outputs');
 const clipact = (name: string) => JSON.parse(readFileSync(resolve(DIR, `${name}.clipact.json`), 'utf8')) as {
@@ -37,11 +38,23 @@ const clipact = (name: string) => JSON.parse(readFileSync(resolve(DIR, `${name}.
   clips: { id: string }[]; corridors: { id: string }[];
 };
 const CASES = JSON.parse(readFileSync(resolve(DIR, 'validate-json.cases.json'), 'utf8')) as Record<string, { exit: number; stdout: string; stderr: string }>;
+/**
+ * ROADMAP row 234: a data input pinned by the VALUES the tools read out of it, not by its
+ * blob (constants.emp: a blob pin reds on every unrelated constant). `readers` are the
+ * reader contexts (the parse, the files it loads in order, name -> value at `revision`);
+ * `names_not_read` are constants a loaded module names that no recorded run reads, each
+ * group resting on a data file `data_not_opened` records no run opening.
+ */
+interface ByValue {
+  path: string; why: string; readers: EmpReader[];
+  names_not_read: { names: string[]; because_not_opened: string; why: string }[];
+}
 interface Marker {
   aeon: {
     revision: string; tool_path: string; tool_blob: string; re_measure: string; materialised_by: string;
     inputs?: { path: string; blob: string }[]; closure_not_loaded?: string[];
     data_not_opened?: string[]; inputs_excluded?: { path: string; why: string }[];
+    inputs_by_value?: ByValue[];
   };
   fixture: { path: string; sha256: string; command: string };
   generator?: { path: string };
@@ -621,13 +634,18 @@ describe('CURRENCY: the INPUTS those tools read, at aeon origin/master', () => {
       const notOpened = m.aeon.data_not_opened ?? [];
       const excluded = m.aeon.inputs_excluded ?? [];
       const excludedPaths = excluded.map((e) => e.path);
-      expect([...notOpened, ...excludedPaths].filter((p) => pinned.has(p)), `${m.fixture.path}: both pinned and not`).toEqual([]);
+      // ROADMAP row 234: a file pinned by the VALUES read out of it (inputs_by_value) is
+      // covered too; the row below holds those values. It is one category, not two.
+      const byValuePaths = (m.aeon.inputs_by_value ?? []).map((b) => b.path);
+      const categories = [...pinned, ...notOpened, ...excludedPaths, ...byValuePaths];
+      expect(categories.filter((p, i) => categories.indexOf(p) !== i), `${m.fixture.path}: in two categories at once (pinned by blob, by value, not opened, excluded)`).toEqual([]);
       for (const e of excluded) {
         expect(named.has(e.path), `${m.fixture.path}: excludes ${e.path}, which no loaded module names (an exclusion must be of something the tools read)`).toBe(true);
         expect(e.why.length, `${m.fixture.path}: ${e.path} is excluded with no why`).toBeGreaterThan(0);
       }
-      expect([...named].filter((p) => !pinned.has(p) && !notOpened.includes(p) && !excludedPaths.includes(p)).sort(),
-        `${m.fixture.path}: a data file a loaded module names at ${m.aeon.revision} is neither pinned, measured not opened, nor a declared exclusion`).toEqual([]);
+      for (const p of byValuePaths) expect(named.has(p), `${m.fixture.path}: pins ${p} by value, which no loaded module names`).toBe(true);
+      expect([...named].filter((p) => !pinned.has(p) && !notOpened.includes(p) && !excludedPaths.includes(p) && !byValuePaths.includes(p)).sort(),
+        `${m.fixture.path}: a data file a loaded module names at ${m.aeon.revision} is neither pinned (by blob or by value), measured not opened, nor a declared exclusion`).toEqual([]);
       const wrong: string[] = [];
       for (const i of m.aeon.inputs ?? []) {
         const at = readAtRev(aeon, rev, i.path);
@@ -635,6 +653,199 @@ describe('CURRENCY: the INPUTS those tools read, at aeon origin/master', () => {
         else if (at.blob !== i.blob) wrong.push(`${i.path}: pinned ${i.blob}, but at the marker's own revision ${rev} it is ${at.blob}`);
       }
       expect(wrong, `${m.fixture.path}: a pinned blob is not the file at the revision the marker names`).toEqual([]);
+    });
+
+    // ROADMAP row 234. constants.emp is pinned by the VALUES the tools read, and this row
+    // holds that pin to aeon's own source at the marker's revision (git objects):
+    //   * the parse is aeon's: every source line test/support/emp-constants.ts transcribes
+    //     is still in the parser's file, so the transcription is of THIS revision's parser;
+    //   * the names are complete: every constant a loaded module names as a whole string
+    //     literal ("NAME" or 'NAME': a get("NAME"), a name list, a dict key) is pinned, or
+    //     listed not-read on the strength of a data file the trace saw no run open;
+    //   * the values are not typed: each is the parse's answer at the marker's revision.
+    it(`${m.fixture.path}: the constants pinned by value are every one its loaded modules name, valued by the tools' own parse at the marker's revision`, (ctx) => {
+      const byValue = m.aeon.inputs_by_value ?? [];
+      expect(byValue.length, `${m.fixture.path}: no aeon.inputs_by_value (constants.emp is read by every run; row 234 pins it by value)`).toBeGreaterThan(0);
+      const aeon = peerRepo('aeon');
+      if (aeon === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR); CANNOT MEASURE ${m.fixture.path}'s value pin`);
+        return;
+      }
+      const rev = resolveRev(aeon, m.aeon.revision);
+      if (rev === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: ${m.aeon.revision} does not resolve in ${aeon} (unfetched?); CANNOT MEASURE ${m.fixture.path}'s value pin`);
+        return;
+      }
+      const text = (p: string) => {
+        const at = readAtRev(aeon, rev, p);
+        if (!at.ok) throw new Error(`${m.fixture.path}: ${at.why}`);
+        return at.text;
+      };
+      const blobPinned = new Set([m.aeon.tool_path, ...(m.aeon.inputs ?? []).map((i) => i.path)]);
+      const loaded = [...blobPinned].filter((p) => p.startsWith('tools/') && p.endsWith('.py'));
+      const notOpened = m.aeon.data_not_opened ?? [];
+      for (const b of byValue) {
+        expect(b.why.length, `${b.path}: pinned by value with no why`).toBeGreaterThan(0);
+        // The parse: known, its transcribed source lines present at the revision.
+        const parserFile: Record<string, string> = { ConstantSource: 'tools/fg_working_set.py', 'layer_lines.engine_constants': 'tools/layer_lines.py' };
+        for (const r of b.readers) {
+          expect(EMP_PARSES, `${b.path}: parse ${r.parse} is none this suite transcribes`).toContain(r.parse);
+          expect(r.loads[0], `${b.path}: a reader's first load must be the file pinned by value`).toBe(b.path);
+          // Any other file a reader loads is an input in its own right: pinned by blob.
+          for (const p of r.loads.slice(1)) expect(blobPinned.has(p), `${b.path}: reader ${r.parse} also loads ${p}, which is not pinned by blob`).toBe(true);
+          const pf = parserFile[r.parse];
+          expect(loaded, `${b.path}: parse ${r.parse} is ${pf}'s, which no loaded module is`).toContain(pf);
+          const src = text(pf).split('\n').map((l) => l.trim());
+          expect(PARSER_SOURCE_LINES[pf].filter((l) => !src.includes(l)),
+            `${pf} at ${rev} no longer carries the lines test/support/emp-constants.ts transcribes; the value parse is UNVERIFIED against this revision, re-transcribe it`).toEqual([]);
+        }
+        // The names: every whole-string-literal constant name in a loaded module.
+        const defs = new ConstantSource();
+        defs.loadText(text(b.path), b.path);
+        const derived = new Set<string>();
+        for (const p of loaded) for (const x of text(p).matchAll(/(["'])([A-Za-z_][A-Za-z0-9_]*)\1/g)) if (defs.defines(x[2])) derived.add(x[2]);
+        // Anti-vacuous: the clip tools name constants of this file.
+        expect(derived.size, `${m.fixture.path}: derived no constant name of ${b.path} from its loaded modules`).toBeGreaterThan(0);
+        const pinnedNames = new Set(b.readers.flatMap((r) => Object.keys(r.values)));
+        const notRead = b.names_not_read.flatMap((g) => g.names);
+        for (const g of b.names_not_read) {
+          expect(g.why.length, `${b.path}: a names_not_read group with no why`).toBeGreaterThan(0);
+          expect(notOpened, `${b.path}: ${g.names.join(', ')} are "not read" because no run opened ${g.because_not_opened}, which data_not_opened does not record`).toContain(g.because_not_opened);
+        }
+        expect(notRead.filter((n) => pinnedNames.has(n)), `${b.path}: both pinned by value and listed not read`).toEqual([]);
+        expect(notRead.filter((n) => !derived.has(n)), `${b.path}: listed not read, but no loaded module names it at ${rev}`).toEqual([]);
+        expect([...derived].filter((n) => !pinnedNames.has(n) && !notRead.includes(n)).sort(),
+          `${m.fixture.path}: a constant of ${b.path} a loaded module names at ${rev} is neither pinned by value nor listed not read`).toEqual([]);
+        // The values: the parse's answer at the marker's own revision, never typed.
+        for (const r of b.readers) {
+          expect(Object.keys(r.values).length, `${b.path}: an empty ${r.parse} reader`).toBeGreaterThan(0);
+          expect(readerValues(r, text), `${b.path}: a pinned value is not ${r.parse}'s answer at the marker's own revision ${rev}`).toEqual(r.values);
+        }
+      }
+    });
+
+    // ROADMAP row 234's whole point, as a census rather than one plant: over constants.emp
+    // at the marker's revision, an edit to ANY constant no reader resolves leaves every
+    // pinned value where it was (the file's blob moves, the pin does not), and an edit to
+    // any pinned constant's winning line, or an earlier definition of it, moves it.
+    it(`${m.fixture.path}: GREEN on every unread constant's edit, RED on every pinned constant's edit or shadowing (census at the marker's revision)`, (ctx) => {
+      const byValue = m.aeon.inputs_by_value ?? [];
+      expect(byValue.length, `${m.fixture.path}: no aeon.inputs_by_value`).toBeGreaterThan(0);
+      const aeon = peerRepo('aeon');
+      if (aeon === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR); CANNOT MEASURE ${m.fixture.path}'s value-pin census`);
+        return;
+      }
+      const rev = resolveRev(aeon, m.aeon.revision);
+      if (rev === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: ${m.aeon.revision} does not resolve in ${aeon} (unfetched?); CANNOT MEASURE ${m.fixture.path}'s value-pin census`);
+        return;
+      }
+      const cache = new Map<string, string>();
+      const atRev = (p: string) => {
+        if (!cache.has(p)) {
+          const at = readAtRev(aeon, rev, p);
+          if (!at.ok) throw new Error(`${m.fixture.path}: ${at.why}`);
+          cache.set(p, at.text);
+        }
+        return cache.get(p)!;
+      };
+      for (const b of byValue) {
+        const base = atRev(b.path);
+        const withText = (t: string) => (p: string) => (p === b.path ? t : atRev(p));
+        const all = () => b.readers.map((r) => readerValues(r, withText(current)));
+        let current = base;
+        const lines = base.split('\n');
+        const edit = (i: number, line: string) => [...lines.slice(0, i), line, ...lines.slice(i + 1)].join('\n');
+        // What the readers resolve: the pinned names and everything their expressions reach.
+        const closure = new Set<string>();
+        for (const r of b.readers) {
+          if (r.parse === 'ConstantSource') {
+            const s = new ConstantSource();
+            for (const p of r.loads) s.loadText(atRev(p), p);
+            for (const n of Object.keys(r.values)) s.get(n);
+            for (const n of s.resolved()) closure.add(n);
+          } else for (const n of Object.keys(r.values)) closure.add(n);
+        }
+        const defs = new ConstantSource();
+        defs.loadText(base, b.path);
+        const unread = defs.definitions().map((d) => d.name).filter((n) => !closure.has(n));
+        // Anti-vacuous: the file defines far more than the tools read.
+        expect(unread.length, `${b.path}: no constant outside the readers' closure to edit`).toBeGreaterThan(0);
+        const moved: string[] = [];
+        for (const n of unread) {
+          const i = definingLine(base, n);
+          const expr = /=\s*(.+?)\s*$/.exec(lines[i].split('//')[0])![1];
+          current = edit(i, `pub const ${n} = (${expr}) + 1`);
+          expect(current, `${n}: the edit changed nothing`).not.toBe(base);
+          const got = all();
+          b.readers.forEach((r, k) => { for (const [name, v] of Object.entries(r.values)) if (got[k][name] !== v) moved.push(`editing unread ${n} moved ${name}: ${v} -> ${got[k][name]}`); });
+        }
+        expect(moved, `${b.path}: an edit to a constant no reader resolves moved a pinned value (the pin would red on an unrelated edit)`).toEqual([]);
+        const still: string[] = [];
+        let planted = 0;
+        b.readers.forEach((r, k) => {
+          for (const [name, v] of Object.entries(r.values)) {
+            // (1) its winning line, by the parse's own notion of "winning line".
+            const i = r.parse === 'ConstantSource' ? definingLine(base, name)
+              : lines.findIndex((l) => new RegExp(`^pub const ${name}\\s*=\\s*(\\$[0-9A-Fa-f]+|\\d+)\\b`).test(l));
+            const plants: [string, string][] = [];
+            if (i >= 0) plants.push([`edit ${name}'s line`, edit(i, `pub const ${name} = ${v + 1}`)]);
+            // (2) an EARLIER definition: first definition wins, in both parses.
+            plants.push([`shadow ${name} above its definition`, `pub const ${name} = ${v + 1}\n${base}`]);
+            for (const [what, t] of plants) {
+              planted++;
+              current = t;
+              const got = all()[k][name];
+              if (got === v) still.push(`${what}: ${r.parse} still reads ${v}`);
+            }
+          }
+        });
+        current = base;
+        expect(planted, `${b.path}: no pinned constant was planted`).toBeGreaterThan(0);
+        expect(still, `${b.path}: an edit to a pinned constant did NOT move its value (the pin would stay green on a real change)`).toEqual([]);
+        process.stdout.write(`clip-tool-outputs value-pin census: ${m.fixture.path}: ${unread.length} unread constants edited, 0 pins moved; ${planted} plants on pinned constants, each moved (at ${rev})\n`);
+      }
+    });
+
+    it(`${m.fixture.path}: each constant pinned by value at aeon origin/master is the value it was captured with`, (ctx) => {
+      const byValue = m.aeon.inputs_by_value ?? [];
+      expect(byValue.length, `${m.fixture.path}: no aeon.inputs_by_value`).toBeGreaterThan(0);
+      const aeon = peerRepo('aeon');
+      if (aeon === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR); CANNOT MEASURE the currency of ${m.fixture.path}'s constants`);
+        return;
+      }
+      const tip = resolveRev(aeon, 'origin/master');
+      if (tip === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: origin/master does not resolve in ${aeon}; CANNOT MEASURE ${m.fixture.path}'s constants`);
+        return;
+      }
+      const moved: string[] = [];
+      let n = 0;
+      for (const b of byValue) {
+        for (const r of b.readers) {
+          let now: Record<string, number | string>;
+          try {
+            now = readerValues(r, (p) => {
+              const at = readAtRev(aeon, tip, p);
+              if (!at.ok) throw new EmpParseError(at.why);
+              return at.text;
+            });
+          } catch (e) {
+            if (!(e instanceof EmpParseError)) throw e;
+            moved.push(`${b.path} (${r.parse}): ${e.message}`);
+            continue;
+          }
+          for (const [name, v] of Object.entries(r.values)) {
+            n++;
+            if (now[name] !== v) moved.push(`${name} (${r.parse} over ${r.loads.join(' + ')}): pinned ${v}, origin/master ${tip} has ${now[name]}`);
+          }
+        }
+      }
+      process.stdout.write(`clip-tool-outputs currency: ${m.fixture.path}: ${n} constants pinned by value compared at aeon origin/master ${tip}; ${moved.length} moved\n`);
+      expect(moved, 'NOT AN AURORA REGRESSION: a constant this output was captured with moved in aeon.\n'
+        + `  compared at aeon origin/master ${tip}, pinned at ${m.aeon.revision}\n  Re-measure: ${m.aeon.re_measure}`).toEqual([]);
     });
 
     it(`${m.fixture.path}: each pinned input at aeon origin/master is the blob it was captured from`, (ctx) => {
