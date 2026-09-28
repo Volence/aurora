@@ -1,0 +1,224 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b
+
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts (15 tests | 4 failed) 10ms
+     ✓ arms exactly one listener, on the query naming the scale the display has now 1ms
+     × a move off that scale calls back with the NEW scale, and re-arms on the new scale's query 4ms
+     × THE RE-ARM: a second, third and fourth move are each heard once, with their own scale 1ms
+     ✓ unsubscribe before any move removes the listener, and a move then calls nothing 0ms
+     × unsubscribe AFTER re-arms removes the CURRENT listener, not only the first one armed 1ms
+     ✓ unsubscribe is safe to call twice 0ms
+     × two subscribers are independent: unsubscribing one leaves the other hearing 0ms
+     ✓ a device ratio of undefined arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ a device ratio of 0 arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ a device ratio of -2 arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ a device ratio of NaN arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ a device ratio of Infinity arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ a device ratio of 2 arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ a device ratio of null arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ no display at all (no window, or a window with no matchMedia) is a no-op that still unsubscribes 1ms
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts (21 tests | 1 failed) 340ms
+     ✓ at 1 the store is floor(CSS box x 1) device px, and the CSS box is that over 1 298ms
+     ✓ at 1.25 the store is floor(CSS box x 1.25) device px, and the CSS box is that over 1.25 2ms
+     ✓ at 1.35 the store is floor(CSS box x 1.35) device px, and the CSS box is that over 1.35 2ms
+     ✓ at 1.5 the store is floor(CSS box x 1.5) device px, and the CSS box is that over 1.5 2ms
+     ✓ at 2 the store is floor(CSS box x 2) device px, and the CSS box is that over 2 2ms
+     ✓ at 3 the store is floor(CSS box x 3) device px, and the CSS box is that over 3 2ms
+     ✓ a device ratio of undefined sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of 0 sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of -2 sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of NaN sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of Infinity sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of 2 sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of null sizes the store at one device px per CSS px 2ms
+     ✓ at 1 every draw starts from the device transform with smoothing off 2ms
+     ✓ at 1.5 every draw starts from the device transform with smoothing off 2ms
+     ✓ at 2 every draw starts from the device transform with smoothing off 2ms
+     × each move re-sizes the store to floor(CSS box x the new scale) and redraws at that scale 5ms
+     ✓ holds one listener while mounted and none after unmount 2ms
+     ✓ at 1 a right-click either side of x=256 eyedrops the chunk under it 2ms
+     ✓ at 1.5 a right-click either side of x=256 eyedrops the chunk under it 2ms
+     ✓ at 2 a right-click either side of x=256 eyedrops the chunk under it 2ms
+ ❯ src/renderer/components/__tests__/map-device-scale.test.ts (19 tests | 1 failed) 464ms
+     ✓ at a scale factor of 1 the store is the CSS box times the factor  439ms
+     ✓ at a scale factor of 1.25 the store is the CSS box times the factor 2ms
+     ✓ at a scale factor of 1.35 the store is the CSS box times the factor 2ms
+     ✓ at a scale factor of 2 the store is the CSS box times the factor 1ms
+     ✓ at a scale factor of 3 the store is the CSS box times the factor 1ms
+     ✓ a scale factor that changes between draws is picked up on the next draw 1ms
+     × a scale change with NO resize and NO repaint re-sizes both canvases (row 237) 4ms
+     ✓ unmounting the map removes its scale listener (row 237) 1ms
+     ✓ a device ratio of undefined falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of 0 falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of -2 falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of NaN falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of Infinity falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of 2 falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of null falls back to one CSS pixel per device pixel 1ms
+     ✓ CANNOT MEASURE the drawing transform, and says so rather than implying it 1ms
+     ✓ F7 with no cursor ever seen issues no warp and says why 2ms
+     ✓ F7 after a real hover warps to that point 2ms
+     ✓ a hover AT the corner warps, because the corner is a position and not an absence 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > a move off that scale calls back with the NEW scale, and re-arms on the new scale's query
+AssertionError: expected [] to deeply equal [ { …(2) } ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "count": 1,
+-     "media": "(resolution: 1.5dppx)",
+-   },
+- ]
++ []
+
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:46:30
+     44|     expect(heard).toEqual([1.5]);
+     45|     // The old list holds nothing; the one live listener is on the new…
+     46|     expect(fake.listeners()).toEqual([{ media: '(resolution: 1.5dppx)'…
+       |                              ^
+     47|   });
+     48|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > THE RE-ARM: a second, third and fourth move are each heard once, with their own scale
+AssertionError: expected [ 1.5 ] to deeply equal [ 1.5, 2, 1, 1.35 ]
+
+- Expected
++ Received
+
+  [
+    1.5,
+-   2,
+-   1,
+-   1.35,
+  ]
+
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:54:19
+     52|     onDeviceScaleChange((d) => heard.push(d), host);
+     53|     for (const d of [1.5, 2, 1, 1.35]) fake.setScale(d);
+     54|     expect(heard).toEqual([1.5, 2, 1, 1.35]);
+       |                   ^
+     55|     expect(fake.totalListeners(), 'a re-arm left the previous listener…
+     56|     expect(fake.queries()).toEqual([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > unsubscribe AFTER re-arms removes the CURRENT listener, not only the first one armed
+AssertionError: expected [ 1.5 ] to deeply equal [ 1.5, 2 ]
+
+- Expected
++ Received
+
+  [
+    1.5,
+-   2,
+  ]
+
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:77:19
+     75|     fake.setScale(1.5);
+     76|     fake.setScale(2);
+     77|     expect(heard).toEqual([1.5, 2]);
+       |                   ^
+     78|     off();
+     79|     expect(fake.totalListeners(), 'the re-armed listener survived unsu…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > two subscribers are independent: unsubscribing one leaves the other hearing
+AssertionError: expected [ 1.5 ] to deeply equal [ 1.5, 2 ]
+
+- Expected
++ Received
+
+  [
+    1.5,
+-   2,
+  ]
+
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:103:15
+    101|     fake.setScale(2);
+    102|     expect(a).toEqual([1.5]);
+    103|     expect(b).toEqual([1.5, 2]);
+       |               ^
+    104|   });
+    105|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  src/renderer/components/__tests__/map-device-scale.test.ts > VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a scale change with NO resize and NO repaint re-sizes both canvases (row 237)
+AssertionError: the move to 2 reached no listener: expected 0 to be greater than 0
+ ❯ src/renderer/components/__tests__/map-device-scale.test.ts:288:78
+    286|     const resizes = win!.observers().length;
+    287|     for (const d of [1.5, 2, 1.25]) {
+    288|       expect(s.display!.setScale(d), `the move to ${d} reached no list…
+       |                                                                              ^
+    289|       const want = { width: Math.round(VIEWPORT.width * d), height: Ma…
+    290|       expect(size(map), `map canvas after the move to ${d}`).toEqual(w…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > row 237 (a): a scale change with no resize re-sizes the store > each move re-sizes the store to floor(CSS box x the new scale) and redraws at that scale
+AssertionError: the move to 2 reached no listener: expected 0 to be greater than 0
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:240:78
+    238|     for (const d of [1.5, 2, 1.25]) {
+    239|       s.calls.length = 0;
+    240|       expect(s.display!.setScale(d), `the move to ${d} reached no list…
+       |                                                                              ^
+    241|       s.paint();
+    242|       const w = Math.floor(VIEWPORT.width * d);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  6 failed | 49 passed (55)
+   Start at  04:27:34
+   Duration  1.21s (transform 2.02s, setup 1.77s, import 116ms, tests 814ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (3 module(s) reported).
+
+failure-class: 6 failure record(s) in 3 file(s) (6 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        6   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/canvas/__tests__/device-scale-change.test.ts
+    [ASSERTION] onDeviceScaleChange: one listener, re-armed for each new scale > a move off that scale calls back with the NEW scale, and re-arms on the new scale's query
+        AssertionError: expected [] to deeply equal [ { …(2) } ]
+        why this bucket: name is AssertionError
+    [ASSERTION] onDeviceScaleChange: one listener, re-armed for each new scale > THE RE-ARM: a second, third and fourth move are each heard once, with their own scale
+        AssertionError: expected [ 1.5 ] to deeply equal [ 1.5, 2, 1, 1.35 ]
+        why this bucket: name is AssertionError
+    [ASSERTION] onDeviceScaleChange: one listener, re-armed for each new scale > unsubscribe AFTER re-arms removes the CURRENT listener, not only the first one armed
+        AssertionError: expected [ 1.5 ] to deeply equal [ 1.5, 2 ]
+        why this bucket: name is AssertionError
+    [ASSERTION] onDeviceScaleChange: one listener, re-armed for each new scale > two subscribers are independent: unsubscribing one leaves the other hearing
+        AssertionError: expected [ 1.5 ] to deeply equal [ 1.5, 2 ]
+        why this bucket: name is AssertionError
+
+  src/renderer/components/__tests__/map-device-scale.test.ts
+    [ASSERTION] VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a scale change with NO resize and NO repaint re-sizes both canvases (row 237)
+        AssertionError: the move to 2 reached no listener: expected 0 to be greater than 0
+        why this bucket: name is AssertionError
+
+  src/renderer/components/classic/__tests__/classic-device-scale.test.ts
+    [ASSERTION] row 237 (a): a scale change with no resize re-sizes the store > each move re-sizes the store to floor(CSS box x the new scale) and redraws at that scale
+        AssertionError: the move to 2 reached no listener: expected 0 to be greater than 0
+        why this bucket: name is AssertionError
+
+failure-class: 6 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 3 of 3 module(s) this run selected finished.

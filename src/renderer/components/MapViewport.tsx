@@ -1810,12 +1810,12 @@ export default function MapViewport() {
   // monitor with another scale factor keeps its CSS box, so the observer above never
   // fires, and both dpr-sized stores (this map and the ghost layer over it) kept the
   // old factor until something else repainted: in place, but soft. The shared
-  // listener (canvas/device-grid.ts) calls back on each move, and each of the two
-  // draws re-reads `deviceScale()` and re-sizes its own store first thing.
-  useEffect(() => onDeviceScaleChange(() => {
-    redraw();
-    drawCollisionPreview();
-  }), [redraw, drawCollisionPreview]);
+  // listener (canvas/device-grid.ts) calls the SAME `redraw` the observer does: it
+  // re-reads `deviceScale()` and re-sizes the map store first thing, and ends in
+  // `drawCollisionPreview`, which does the same for the ghost layer. (A second,
+  // explicit `drawCollisionPreview()` here was planted out and nothing reddened:
+  // docs/reviews/2026-09-28-canvas-dpr-237.md, Ma3.)
+  useEffect(() => onDeviceScaleChange(() => redraw()), [redraw]);
 
   // ---- THE MARQUEE SNAP MODIFIER (owner: "if you hold control it behaves like
   //      it did where it forces to draw collision size") ---------------------

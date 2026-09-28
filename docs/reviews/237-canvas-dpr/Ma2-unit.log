@@ -1,0 +1,96 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b
+
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts (15 tests | 2 failed) 10ms
+     ✓ arms exactly one listener, on the query naming the scale the display has now 2ms
+     ✓ a move off that scale calls back with the NEW scale, and re-arms on the new scale's query 0ms
+     ✓ THE RE-ARM: a second, third and fourth move are each heard once, with their own scale 0ms
+     ✓ unsubscribe before any move removes the listener, and a move then calls nothing 0ms
+     × unsubscribe AFTER re-arms removes the CURRENT listener, not only the first one armed 4ms
+     ✓ unsubscribe is safe to call twice 0ms
+     × two subscribers are independent: unsubscribing one leaves the other hearing 1ms
+     ✓ a device ratio of undefined arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ a device ratio of 0 arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ a device ratio of -2 arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ a device ratio of NaN arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ a device ratio of Infinity arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ a device ratio of 2 arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ a device ratio of null arms on the 1dppx query (deviceScale's fallback) 0ms
+     ✓ no display at all (no window, or a window with no matchMedia) is a no-op that still unsubscribes 1ms
+ ✓ src/renderer/components/classic/__tests__/classic-device-scale.test.ts (21 tests) 309ms
+ ✓ src/renderer/components/__tests__/map-device-scale.test.ts (19 tests) 436ms
+     ✓ at a scale factor of 1 the store is the CSS box times the factor  419ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > unsubscribe AFTER re-arms removes the CURRENT listener, not only the first one armed
+AssertionError: the re-armed listener survived unsubscribe: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:79:81
+     77|     expect(heard).toEqual([1.5, 2]);
+     78|     off();
+     79|     expect(fake.totalListeners(), 'the re-armed listener survived unsu…
+       |                                                                                 ^
+     80|     fake.setScale(3);
+     81|     fake.setScale(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/renderer/canvas/__tests__/device-scale-change.test.ts > onDeviceScaleChange: one listener, re-armed for each new scale > two subscribers are independent: unsubscribing one leaves the other hearing
+AssertionError: expected [ 1.5, 2 ] to deeply equal [ 1.5 ]
+
+- Expected
++ Received
+
+  [
+    1.5,
++   2,
+  ]
+
+ ❯ src/renderer/canvas/__tests__/device-scale-change.test.ts:102:15
+    100|     offA();
+    101|     fake.setScale(2);
+    102|     expect(a).toEqual([1.5]);
+       |               ^
+    103|     expect(b).toEqual([1.5, 2]);
+    104|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 53 passed (55)
+   Start at  04:27:44
+   Duration  1.03s (transform 1.66s, setup 1.44s, import 77ms, tests 755ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (3 module(s) reported).
+
+failure-class: 2 failure record(s) in 1 file(s) (2 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        2   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/canvas/__tests__/device-scale-change.test.ts
+    [ASSERTION] onDeviceScaleChange: one listener, re-armed for each new scale > unsubscribe AFTER re-arms removes the CURRENT listener, not only the first one armed
+        AssertionError: the re-armed listener survived unsubscribe: expected 1 to be +0 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] onDeviceScaleChange: one listener, re-armed for each new scale > two subscribers are independent: unsubscribing one leaves the other hearing
+        AssertionError: expected [ 1.5, 2 ] to deeply equal [ 1.5 ]
+        why this bucket: name is AssertionError
+
+failure-class: 2 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 3 of 3 module(s) this run selected finished.
