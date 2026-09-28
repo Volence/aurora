@@ -89,8 +89,11 @@ describe('the donor pool grid on a woven act (rendered from aeon\'s real clipact
   it('every id cell prints its id whole: the text holds the id and nothing in its style cuts it (s2_ehz_cpz)', () => {
     const raw = load('s2_ehz_cpz');
     const cellsById = [...render(raw).matchAll(/data-donors-pool-id="([^"]+)"[^>]*style="([^"]*)"[^>]*>([^<]*)</g)]
-      .map((m) => ({ id: m[1], cut: /text-overflow:\s*ellipsis|overflow:\s*hidden|white-space:\s*nowrap/.test(m[2]), whole: m[3].includes(m[1]) }));
-    expect(cellsById).toEqual([...raw.pool.per_clip, ...raw.pool.per_corridor].map((r) => ({ id: r.id, cut: false, whole: true })));
+      .map((m) => ({ id: m[1], cut: /text-overflow:\s*ellipsis|overflow:\s*hidden|white-space:\s*nowrap/.test(m[2]), whole: m[3].includes(m[1]),
+        // Overseer ruling: the id comes FIRST (the cell's leading text), so a wrap
+        // drops the muted kind tag, never the id, below the row's numbers.
+        first: m[3].trimStart().startsWith(m[1]) }));
+    expect(cellsById).toEqual([...raw.pool.per_clip, ...raw.pool.per_corridor].map((r) => ({ id: r.id, cut: false, whole: true, first: true })));
   });
 
   it('a file without shafts or a fill (s2_ehz_cpz) renders no shaft or fill section', () => {
