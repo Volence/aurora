@@ -1,0 +1,28 @@
+diff --git a/src/renderer/components/CollisionLegend.tsx b/src/renderer/components/CollisionLegend.tsx
+index 870fdff2..4aeebc45 100644
+--- a/src/renderer/components/CollisionLegend.tsx
++++ b/src/renderer/components/CollisionLegend.tsx
+@@ -80,7 +80,8 @@ export function AngleSwatch({ cellScreenPx }: { cellScreenPx: number }) {
+       });
+     };
+     paint();
+-    return onDeviceScaleChange(paint);
++    void onDeviceScaleChange;
++    return undefined;
+   }, [cellScreenPx]);
+   return <canvas ref={ref} style={{ width: SWATCH, height: SWATCH, flex: '0 0 auto' }} />;
+ }
+diff --git a/src/renderer/components/effects/AnchorSweepPreview.tsx b/src/renderer/components/effects/AnchorSweepPreview.tsx
+index e49d01df..086c7c7c 100644
+--- a/src/renderer/components/effects/AnchorSweepPreview.tsx
++++ b/src/renderer/components/effects/AnchorSweepPreview.tsx
+@@ -134,7 +134,8 @@ export function AnchorSweepPreview({ sweep, channel }: {
+       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+     };
+     size();
+-    const stopScale = onDeviceScaleChange(size);
++    void onDeviceScaleChange;
++    const stopScale = (): void => undefined;
+ 
+     let raf = 0;
+     let stopped = false;

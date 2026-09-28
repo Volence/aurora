@@ -1,0 +1,14 @@
+diff --git a/src/renderer/components/MapViewport.tsx b/src/renderer/components/MapViewport.tsx
+index 60ea4632..eaf0e41a 100644
+--- a/src/renderer/components/MapViewport.tsx
++++ b/src/renderer/components/MapViewport.tsx
+@@ -858,7 +858,8 @@ export default function MapViewport() {
+           ctx.strokeStyle = SELECTION_MARQUEE;
+           // On the device grid, as the marquee above is (row 238 (a)); the same
+           // even-width caveat applies.
+-          strokeRectOnDeviceGrid(ctx, sx, sy, sw, sh, 2, dpr);
++          ctx.lineWidth = 2 / sZoom;
++          ctx.strokeRect(sx, sy, sw, sh);
+           ctx.restore();
+         }
+       }

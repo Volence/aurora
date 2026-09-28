@@ -1,0 +1,110 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ae14a22e230463e67
+
+ ❯ src/renderer/components/__tests__/legend-anchor-device-scale.test.ts (4 tests | 4 failed) 245ms
+     × each move re-sizes the store to round(18 x d) and paints the mark again under [d,0,0,d,0,0] 27ms
+     × one listener while mounted, none after unmount 2ms
+     × each move re-sizes the store to round(rect x d) and sets [d,0,0,d,0,0] for the next frame 214ms
+     × one listener while playing, none after unmount 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/__tests__/legend-anchor-device-scale.test.ts > CollisionLegend AngleSwatch: the store follows a scale change with no resize (row 238 (b)) > each move re-sizes the store to round(18 x d) and paints the mark again under [d,0,0,d,0,0]
+AssertionError: the move to 1.5 reached no listener: expected 0 to be greater than 0
+ ❯ src/renderer/components/__tests__/legend-anchor-device-scale.test.ts:84:73
+     82|       rec.calls.length = 0;
+     83|       rec.strokes.length = 0;
+     84|       expect(d.setScale(dpr), `the move to ${dpr} reached no listener`…
+       |                                                                         ^
+     85|       expect(sizeOf(canvas), `swatch store after the move to ${dpr}`)
+     86|         .toEqual({ width: Math.round(SWATCH * dpr), height: Math.round…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/renderer/components/__tests__/legend-anchor-device-scale.test.ts > CollisionLegend AngleSwatch: the store follows a scale change with no resize (row 238 (b)) > one listener while mounted, none after unmount
+AssertionError: the swatch never armed a scale listener: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/renderer/components/__tests__/legend-anchor-device-scale.test.ts:96:75
+     94|   it('one listener while mounted, none after unmount', async () => {
+     95|     const { d } = await mountSwatch(1);
+     96|     expect(d.totalListeners(), 'the swatch never armed a scale listene…
+       |                                                                           ^
+     97|     d.setScale(1.5);
+     98|     expect(d.totalListeners(), 'the re-arm left more than one listener…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/renderer/components/__tests__/legend-anchor-device-scale.test.ts > AnchorSweepPreview: the store follows a scale change with no resize (row 238 (b)) > each move re-sizes the store to round(rect x d) and sets [d,0,0,d,0,0] for the next frame
+AssertionError: the move to 1.5 reached no listener: expected 0 to be greater than 0
+ ❯ src/renderer/components/__tests__/legend-anchor-device-scale.test.ts:141:73
+    139|     for (const dpr of [1.5, 2, 1.25]) {
+    140|       rec.calls.length = 0;
+    141|       expect(d.setScale(dpr), `the move to ${dpr} reached no listener`…
+       |                                                                         ^
+    142|       expect(sizeOf(canvas), `preview store after the move to ${dpr}`)
+    143|         .toEqual({ width: Math.round(W * dpr), height: Math.round(H * …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/renderer/components/__tests__/legend-anchor-device-scale.test.ts > AnchorSweepPreview: the store follows a scale change with no resize (row 238 (b)) > one listener while playing, none after unmount
+AssertionError: the preview never armed a scale listener: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/renderer/components/__tests__/legend-anchor-device-scale.test.ts:151:76
+    149|   it('one listener while playing, none after unmount', async () => {
+    150|     const { d } = await mountPreview(1);
+    151|     expect(d.totalListeners(), 'the preview never armed a scale listen…
+       |                                                                            ^
+    152|     d.setScale(2);
+    153|     expect(d.totalListeners(), 'the re-arm left more than one listener…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed (4)
+   Start at  04:59:19
+   Duration  978ms (transform 701ms, setup 586ms, import 61ms, tests 245ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 4 failure record(s) in 1 file(s) (4 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        4   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/__tests__/legend-anchor-device-scale.test.ts
+    [ASSERTION] CollisionLegend AngleSwatch: the store follows a scale change with no resize (row 238 (b)) > each move re-sizes the store to round(18 x d) and paints the mark again under [d,0,0,d,0,0]
+        AssertionError: the move to 1.5 reached no listener: expected 0 to be greater than 0
+        why this bucket: name is AssertionError
+    [ASSERTION] CollisionLegend AngleSwatch: the store follows a scale change with no resize (row 238 (b)) > one listener while mounted, none after unmount
+        AssertionError: the swatch never armed a scale listener: expected +0 to be 1 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] AnchorSweepPreview: the store follows a scale change with no resize (row 238 (b)) > each move re-sizes the store to round(rect x d) and sets [d,0,0,d,0,0] for the next frame
+        AssertionError: the move to 1.5 reached no listener: expected 0 to be greater than 0
+        why this bucket: name is AssertionError
+    [ASSERTION] AnchorSweepPreview: the store follows a scale change with no resize (row 238 (b)) > one listener while playing, none after unmount
+        AssertionError: the preview never armed a scale listener: expected +0 to be 1 // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 4 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 1 of 1 module(s) this run selected finished.
