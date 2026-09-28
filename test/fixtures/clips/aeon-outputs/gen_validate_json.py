@@ -62,7 +62,11 @@ def mut_k9_shaft_dup_clip_id(d):
     d["shafts"][0]["id"] = d["clips"][0]["id"]
 
 
-plan = [("accept_s2_ehz_cpz", "s2_ehz_cpz", None), ("refuse_r7", "s2_two_clip", mut_r7),
+# accept_s2_two_clip (ROADMAP row 219): the unmutated two-clip act, the one acceptance in
+# the set aeon answers with NO warning (measured at the pin: s2_ehz_cpz and every woven
+# act carry W3), so "accepted, nothing to say" is aeon's answer, not an empty list typed here.
+plan = [("accept_s2_ehz_cpz", "s2_ehz_cpz", None), ("accept_s2_two_clip", "s2_two_clip", None),
+        ("refuse_r7", "s2_two_clip", mut_r7),
         ("refuse_r10_pair", "s2_two_clip", mut_r10), ("refuse_r10_clip_corridor", "s2_ehz_cpz", mut_r10c),
         ("accept_w3", "s2_two_clip", mut_w3), ("refuse_r12_after_w2", "s2_two_clip", mut_w2_r12),
         ("refuse_k8_fill_no_why", "s2_woven", mut_k8_fill_no_why),

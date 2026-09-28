@@ -238,6 +238,20 @@ describe('validate --json: accepted, refused and CRASHED are three answers', () 
     });
   }
 
+  // ROADMAP row 219 (b): until then both acceptances carried W3, so "accepted with
+  // nothing to say" was never aeon's answer here. Which cases are warning-free is read
+  // from aeon's own stdout, never from a case name.
+  it('an acceptance aeon answers with NO warning reads as accepted with an empty warning list, not as a crash or a refusal', () => {
+    const quiet = acceptCases.filter((k) => (JSON.parse(CASES[k].stdout) as { warnings: unknown[] }).warnings.length === 0);
+    const noisy = acceptCases.filter((k) => !quiet.includes(k));
+    expect(quiet, 'the vendored set holds no warning-free acceptance').not.toEqual([]);
+    expect(noisy, 'the vendored set holds no acceptance WITH a warning, so this row would not tell the two apart').not.toEqual([]);
+    for (const k of quiet) {
+      expect(CASES[k].exit, k).toBe(0);
+      expect(readValidateJson(CASES[k].exit, CASES[k].stdout, CASES[k].stderr), k).toEqual({ kind: 'accepted', warnings: [] });
+    }
+  });
+
   for (const k of crashCases) {
     it(`${k}: exit 1 with NO JSON is a CRASH carrying aeon's traceback, never a refusal`, () => {
       const c = CASES[k];
