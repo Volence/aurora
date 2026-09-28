@@ -81,6 +81,7 @@ describe('the song line a paste shows (row 222)', () => {
       for (const donor of ['s2disasm', 'other']) for (const zone of ['EHZ', 'CPZ', 'OOZ']) lines.push(zoneSongLine(zoneSong(doc, donor, zone)));
     }
     expect(lines.length).toBe(texts.length * 6);
-    expect(lines.filter((l) => l.includes('—'))).toEqual([]);
+    const EM_DASH = String.fromCharCode(0x2014);
+    expect(lines.filter((l) => l.includes(EM_DASH))).toEqual([]);
   });
 });

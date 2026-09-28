@@ -23,6 +23,22 @@ export interface PaneBitmap { x: number; y: number; size: number; bitmap: ImageB
 
 export interface PaneView { scale: number; ox: number; oy: number }
 
+/**
+ * One outlined rectangle. `dashed` draws a 2px DASHED edge with no fill, and
+ * `tag` a second, smaller label under `label`: the target pane's refused-subject
+ * outline (row 213 (b)), tone 'warning', tag = the refusal's rule.
+ */
+export interface PaneOutline {
+  rect: PxRect;
+  label?: string;
+  tone?: 'accent' | 'warning' | 'faint';
+  dashed?: boolean;
+  tag?: string;
+}
+
+/** The dash of a refused-subject outline, in screen pixels. */
+export const OUTLINE_DASH: readonly number[] = [6, 4];
+
 export interface ZonePaneReport {
   pane: string;
   view: PaneView;
@@ -32,6 +48,8 @@ export interface ZonePaneReport {
   worldW: number;
   worldH: number;
   paints: number;
+  /** The outlines this paint drew, in world pixels, as the pane was given them. */
+  outlines: PaneOutline[];
 }
 
 const reports = new Map<string, ZonePaneReport>();
@@ -51,8 +69,8 @@ export interface ZonePaneProps {
   bitmaps: readonly PaneBitmap[];
   /** Rectangle whose OUTSIDE is dimmed (the donor crop). */
   crop?: PxRect | null;
-  /** Rectangles outlined in the accent colour (marquee, pasted clips). */
-  outlines?: ReadonlyArray<{ rect: PxRect; label?: string; tone?: 'accent' | 'warning' | 'faint' }>;
+  /** Rectangles outlined in the accent colour (marquee, pasted clips), or dashed in warning (a refused subject). */
+  outlines?: ReadonlyArray<PaneOutline>;
   /** The rectangle a view should fit on first show; defaults to the whole world. */
   fitTo?: PxRect | null;
   onDrag?: (a: { x: number; y: number }, b: { x: number; y: number }, done: boolean) => void;
@@ -113,21 +131,32 @@ export default function ZonePane(props: ZonePaneProps): React.ReactElement {
       const col = o.tone === 'warning' ? DONOR_MARK_WARN : o.tone === 'faint' ? DONOR_MARK_FAINT : DONOR_MARK;
       const x = sx(o.rect.x); const y = sy(o.rect.y);
       const rw = o.rect.w * view.scale; const rh = o.rect.h * view.scale;
-      ctx.fillStyle = o.tone === 'faint' ? DONOR_MARK_FAINT_FILL : DONOR_MARK_FILL;
-      ctx.fillRect(x, y, rw, rh);
+      if (!o.dashed) {
+        ctx.fillStyle = o.tone === 'faint' ? DONOR_MARK_FAINT_FILL : DONOR_MARK_FILL;
+        ctx.fillRect(x, y, rw, rh);
+      }
       ctx.strokeStyle = col;
       ctx.lineWidth = 2;
+      ctx.setLineDash(o.dashed ? [...OUTLINE_DASH] : []);
       ctx.strokeRect(x + 1, y + 1, Math.max(0, rw - 2), Math.max(0, rh - 2));
+      ctx.setLineDash([]);
       if (o.label) {
         ctx.font = '11px sans-serif';
         ctx.fillStyle = col;
         ctx.fillText(o.label, x + 4, y + 13);
+      }
+      if (o.tag) {
+        // Under the clip's own id label, so a refused clip reads "ehz_1" then "R3".
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillStyle = col;
+        ctx.fillText(o.tag, x + 4, y + (o.label ? 26 : 13));
       }
     }
     paintsRef.current += 1;
     const r = canvas.getBoundingClientRect();
     reports.set(pane, {
       pane, view: { ...view }, dpr, bitmaps: bitmaps.length, worldW, worldH, paints: paintsRef.current,
+      outlines: (outlines ?? []).map((o) => ({ ...o, rect: { ...o.rect } })),
       rect: { left: r.left, top: r.top, width: r.width, height: r.height },
     });
   }, [bitmaps, crop, outlines, pane, worldW, worldH]);

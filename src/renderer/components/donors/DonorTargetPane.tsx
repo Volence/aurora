@@ -28,6 +28,7 @@ import { parseTiles } from '../../../core/formats/tiles';
 import { snapDestination } from '../../../core/formats/donors/clip-manifest-doc';
 import { SECTION_PIXEL_SIZE, SECTION_TILES_WIDE } from '../../../core/model/s4-types';
 import type { FileAccess } from '../../../core/project/adapter';
+import { targetPaneOutlines } from './target-outlines';
 
 /** What the last target composition drew, per section, for the debug hooks. */
 export interface TargetComposeReport { act: string; sections: Array<{ n: number; drawnPixels: number }> }
@@ -104,13 +105,12 @@ export default function DonorTargetPane(): React.ReactElement {
     return () => { live = false; };
   }, [root, baked, target, line0]);
 
-  const outlines = React.useMemo(() => {
-    const o: Array<{ rect: { x: number; y: number; w: number; h: number }; label?: string; tone?: 'accent' | 'warning' | 'faint' }> = [];
-    for (const c of target?.doc.clips ?? []) o.push({ rect: c.dst, label: c.id, tone: 'faint' });
-    for (const c of target?.doc.corridors ?? []) o.push({ rect: c.dst, label: c.id, tone: 'faint' });
-    if (marquee && draft.dst) o.push({ rect: { x: draft.dst.x, y: draft.dst.y, w: marquee.w, h: marquee.h }, label: draft.clipId || undefined, tone: 'accent' });
-    return o;
-  }, [target, marquee, draft.dst, draft.clipId]);
+  const outcome = usePasteStore((s) => s.outcome);
+  const bakeRefused = usePasteStore((s) => s.bakeRefused);
+  const outlines = React.useMemo(
+    () => targetPaneOutlines({ doc: target?.doc ?? null, marquee, draft: { dst: draft.dst, clipId: draft.clipId }, outcome, bakeRefused }),
+    [target, marquee, draft.dst, draft.clipId, outcome, bakeRefused],
+  );
 
   const onClickWorld = React.useCallback((p: { x: number; y: number }) => {
     const m = useDonorStore.getState().marquee;

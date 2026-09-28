@@ -42,6 +42,7 @@ import { useProjectStore } from '../../state/projectStore';
 import { useDonorStore } from '../../state/donorStore';
 import { usePasteStore, type PasteOutcome } from '../../state/donor-paste';
 import { subjectsLabel, type ClipNote } from '../../../core/formats/donors/clip-validate-json';
+import { subjectsLabelOnPane } from '../../../core/formats/donors/refused-subjects';
 import { readPoolRows, type PoolRow, type PoolRowField } from '../../../core/formats/donors/clipact-pool';
 import { useDonorDraft } from '../../state/donor-draft';
 import {
@@ -142,14 +143,18 @@ const TAG: React.CSSProperties = {
   padding: `0 ${T.s1}`, marginRight: T.s1, color: T.textHi,
 };
 
-/** One refusal or warning as aeon's --json names it: the rule, who it is about, aeon's sentence. */
-function NoteHead({ note, kind }: { note: ClipNote; kind: 'refusal' | 'warning' }): React.ReactElement {
+/**
+ * One refusal or warning as aeon's --json names it: the rule, who it is about, aeon's sentence.
+ * For a refusal, `judged` is the manifest aeon judged: a subject the target pane cannot place
+ * on it is named "not on this pane" (row 213 (b)), never dropped.
+ */
+function NoteHead({ note, kind, judged }: { note: ClipNote; kind: 'refusal' | 'warning'; judged?: ClipManifestDoc }): React.ReactElement {
   return (
     <div style={{ ...(kind === 'refusal' ? WARN : NOTE), marginBottom: T.s1 }}>
       <span data-donors-note-rule style={{ ...TAG, borderColor: kind === 'refusal' ? T.warning : T.border }}>
         {note.rule ?? 'untagged'}
       </span>
-      <span data-donors-note-subjects>{subjectsLabel(note.subjects)}</span>
+      <span data-donors-note-subjects>{judged ? subjectsLabelOnPane(note.subjects, judged) : subjectsLabel(note.subjects)}</span>
     </div>
   );
 }
@@ -199,7 +204,7 @@ export function outcomeView(o: PasteOutcome): React.ReactElement {
           </div>
           {o.refusals.map((r, i) => (
             <div key={i} data-donors-refusal-note={r.rule ?? ''}>
-              <NoteHead note={r} kind="refusal" />
+              <NoteHead note={r} kind="refusal" judged={o.judged} />
               <pre data-donors-refusal style={PRE}>{r.message}</pre>
             </div>
           ))}
