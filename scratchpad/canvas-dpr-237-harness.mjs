@@ -63,8 +63,11 @@
 //              boundary: nothing bleeds past it).
 //        m.s.2 column C-1 at full strength on every sampled row.
 //        m.s.3 column C at full strength on every sampled row.
-//        m.s.4 column C+1 NEVER at full strength (the inner edge is the C|C+1 boundary;
-//              C+1 is the ghost's art, so "untouched" cannot be asked of it).
+//        m.s.4 column C+1 UNCHANGED by the hover (the inner edge is the C|C+1 boundary),
+//              with the premise that C+2 and C+3 are unchanged too (the picked chunk's
+//              art leaves the map as it was there), else UNMEASURABLE. ROW 239 (b): it
+//              used to ask "C+1 never at full strength", which the half-covered C+1 of
+//              row 237's centring also satisfied, so it passed on every build.
 //        m.s.5-8 the same four for the top edge (rows R-2, R-1, R, R+1).
 //        m.s1.9 (dpr 1, only with EDGE_BASELINE): the left and top edge windows are
 //              PIXEL-IDENTICAL to the baseline build's (master's crisp world-unit
@@ -72,8 +75,11 @@
 //   b.s  (ROW 238) also the classic STAMP-DRAG PREVIEW (2 CSS px): a real left press on
 //        cell A shows it, a real Escape cancels the gesture before the real release (so
 //        nothing is stamped; b.s.5 proves cell A is unchanged). Against the hover-on shot:
-//        b.s.6 X-2 unchanged, b.s.7 X-1 and X at full strength, b.s.8 X+1 never at full
-//        strength, and b.s.9-11 the same on the top edge. RED on row 237's helper: its
+//        b.s.6 X-2 unchanged, b.s.7 X-1 and X at full strength, b.s.8 X+1 exactly the
+//        preview fill (STAMP_PREVIEW_FILL, read from source) over its hover-on pixel, with
+//        X+2 as the control that the prediction holds where no stroke reaches, and
+//        b.s.9-11 the same on the top edge. ROW 239 (b): .8/.11 used to ask "never at full
+//        strength", which a half-covered X+1 also satisfied, so they passed on every build. RED on row 237's helper: its
 //        half-pixel centre put X-1 and X+1 at half coverage. b.s1.12 (dpr 1, EDGE_BASELINE)
 //        pixel identity with the baseline build's world-unit preview.
 //        EDGE_OUT=<file> writes this build's dpr-1 windows for use as a baseline.
@@ -290,9 +296,22 @@ async function strokeColour() {
   return { rgb: [Number(m[1]), Number(m[2]), Number(m[3])], a: Number(m[4]) };
 }
 
+/**
+ * STAMP_PREVIEW_FILL, read from source: the drag preview's translucent fill over the cell.
+ * Row 239 (b): b.s.8/.11 predict X+1 / Y+1 from it (fill over the hover-on pixel).
+ */
+async function fillColour() {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(`${ROOT}/src/renderer/canvas/canvas-colors.ts`, 'utf8');
+  const m = /export const STAMP_PREVIEW_FILL = 'rgba\((\d+),(\d+),(\d+),([\d.]+)\)'/.exec(src);
+  if (!m) throw new Error('STAMP_PREVIEW_FILL is not an rgba() literal any more: the fill-only prediction cannot be derived, UNMEASURABLE');
+  return { rgb: [Number(m[1]), Number(m[2]), Number(m[3])], a: Number(m[4]) };
+}
+
 async function partStrokes(scale) {
   const P = `b.s${scale}`;
   const stroke = await strokeColour();
+  const fill = await fillColour();
   // A pixel the stroke covers WHOLLY is a*stroke + (1-a)*under for some under in [0,255].
   const inBand = (px) => px.every((v, i) => v >= stroke.a * stroke.rgb[i] - 1 && v <= stroke.a * stroke.rgb[i] + (1 - stroke.a) * 255 + 1);
   await session(`${P}: classic stamp-ghost outline at --force-device-scale-factor=${scale}`, async (c) => {
@@ -445,14 +464,33 @@ async function partStrokes(scale) {
       shotIsDevice && dc[1].changed === 0 && dc[3].full === SPAN, `X-2 changed ${dc[1].changed}/${SPAN}; anti-vacuous X full ${dc[3].full}/${SPAN}`);
     check(`${P}.7`, 'drag preview, left edge: X-1 and X are the stroke at full strength on every sampled row (BOTH edges on whole device px)',
       shotIsDevice && dc[2].full === SPAN && dc[3].full === SPAN, `X-1 full ${dc[2].full}/${SPAN}, X full ${dc[3].full}/${SPAN}`);
-    check(`${P}.8`, 'drag preview, left edge: X+1 is never at full strength (the inner edge is the X|X+1 boundary)',
-      shotIsDevice && dc[4].full === 0, `X+1 full ${dc[4].full}/${SPAN}`);
+    // ROW 239 (b): .8 and .11 used to ask "X+1 / Y+1 never at full strength", which a
+    // HALF-covered column also satisfies, so they passed on row 237's half-pixel centring
+    // too (docs/reviews/2026-09-28-device-grid-238.md, Open). They now predict the
+    // column exactly: the press draws STAMP_PREVIEW_FILL over the whole cell and the 2 px
+    // stroke on its edge, so a pixel the stroke does NOT reach is the fill composited
+    // over its hover-on value, fa * fill + (1 - fa) * on (+-2 per channel for 8-bit
+    // rounding). A half-covered X+1 is that blended again with the stroke, far outside.
+    // X+2 / Y+2, which no placement of a 2 px stroke on this edge reaches, must meet the
+    // same prediction, or the prediction itself is wrong here and the row is UNMEASURABLE.
+    const fillOnly = (pOn, pPress) => pPress.every((v, i) => Math.abs(v - (fill.a * fill.rgb[i] + (1 - fill.a) * pOn[i])) <= 2);
+    const fillCol = (k) => { let n = 0; for (let y = 0; y < winV.h; y++) { const i = y * winV.w + k; if (fillOnly(vOn.px[i], vP.px[i])) n++; } return n; };
+    const fillRow = (k) => { let n = 0; for (let x = 0; x < winH.w; x++) { const i = k * winH.w + x; if (fillOnly(hOn.px[i], hP.px[i])) n++; } return n; };
+    const fcX1 = fillCol(4), fcX2 = fillCol(5), frY1 = fillRow(4), frY2 = fillRow(5);
+    check(`${P}.8`, fcX2 === SPAN
+      ? 'drag preview, left edge: X+1 is exactly the preview fill over the hover-on pixel on every sampled row: the stroke reaches none of it (the inner edge is the X|X+1 boundary)'
+      : 'drag preview, left edge: UNMEASURABLE, the fill-only prediction does not hold even at X+2, which no stroke reaches',
+    shotIsDevice && fcX2 === SPAN && fcX1 === SPAN,
+    `X+1 fill-only ${fcX1}/${SPAN}; control X+2 fill-only ${fcX2}/${SPAN}; STAMP_PREVIEW_FILL ${J(fill)}`);
     check(`${P}.9`, 'drag preview, top edge: Y-2 is unchanged by the press on every sampled column',
       shotIsDevice && dr[1].changed === 0 && dr[3].full === SPAN, `Y-2 changed ${dr[1].changed}/${SPAN}; anti-vacuous Y full ${dr[3].full}/${SPAN}`);
     check(`${P}.10`, 'drag preview, top edge: Y-1 and Y at full strength on every sampled column',
       shotIsDevice && dr[2].full === SPAN && dr[3].full === SPAN, `Y-1 full ${dr[2].full}/${SPAN}, Y full ${dr[3].full}/${SPAN}`);
-    check(`${P}.11`, 'drag preview, top edge: Y+1 never at full strength',
-      shotIsDevice && dr[4].full === 0, `Y+1 full ${dr[4].full}/${SPAN}`);
+    check(`${P}.11`, frY2 === SPAN
+      ? 'drag preview, top edge: Y+1 is exactly the preview fill over the hover-on pixel on every sampled column (the stroke reaches none of it)'
+      : 'drag preview, top edge: UNMEASURABLE, the fill-only prediction does not hold even at Y+2, which no stroke reaches',
+    shotIsDevice && frY2 === SPAN && frY1 === SPAN,
+    `Y+1 fill-only ${frY1}/${SPAN}; control Y+2 fill-only ${frY2}/${SPAN}`);
     if (scale === 1) identityRow(`${P}.12`, 'dpr 1: the drag preview\'s edge windows are PIXEL-IDENTICAL to the baseline build\'s', 'bs-drag', { v: vP.px, h: hP.px });
   }, { electronArgs: [`--force-device-scale-factor=${scale}`] });
 }
@@ -591,8 +629,19 @@ async function partMapStrokes(scale) {
       shotIsDevice && cols[2].full === SPAN, `C-1 full ${cols[2].full}/${SPAN}`);
     check(`${P}.3`, 'left edge: device column C is the stroke at full strength on every sampled row',
       shotIsDevice && cols[3].full === SPAN, `C full on ${cols[3].full}/${SPAN}`);
-    check(`${P}.4`, 'left edge: device column C+1 is never at full strength (the inner edge is the C|C+1 boundary)',
-      shotIsDevice && cols[4].full === 0, `C+1 full ${cols[4].full}/${SPAN}`);
+    // ROW 239 (b): .4 and .8 used to ask "C+1 / R+1 never at full strength", which a
+    // HALF-covered column also satisfies, so they passed on row 237's half-pixel centring
+    // too. They now ask that C+1 is UNCHANGED by the hover, like the outer C-2: the ghost
+    // art is drawn there too, so this holds only where the picked chunk's art leaves the
+    // map as it was, and the premise checks exactly that at C+2 and C+3, which no
+    // placement of a 2 px stroke on this edge reaches. If either changed, the row is
+    // UNMEASURABLE (red), never a pass.
+    const artClearV = cols[5].changed === 0 && cols[6].changed === 0;
+    check(`${P}.4`, artClearV
+      ? 'left edge: device column C+1 is unchanged by the hover on every sampled row (the inner edge is the C|C+1 boundary)'
+      : 'left edge: UNMEASURABLE, the ghost art changes C+2/C+3 here, so an unchanged C+1 cannot be asked of it',
+    shotIsDevice && artClearV && cols[4].changed === 0,
+    `C+1 changed ${cols[4].changed}/${SPAN}; premise: C+2 changed ${cols[5].changed}/${SPAN}, C+3 changed ${cols[6].changed}/${SPAN}`);
     check(`${P}.5`, 'top edge: device row R-2 is untouched by the hover on every sampled column',
       shotIsDevice && rws[1].changed === 0 && rws[3].full === SPAN,
       `R-2 changed on ${rws[1].changed}/${SPAN}; anti-vacuous: R full on ${rws[3].full}/${SPAN}`);
@@ -600,8 +649,12 @@ async function partMapStrokes(scale) {
       shotIsDevice && rws[2].full === SPAN, `R-1 full ${rws[2].full}/${SPAN}`);
     check(`${P}.7`, 'top edge: device row R is the stroke at full strength on every sampled column',
       shotIsDevice && rws[3].full === SPAN, `R full on ${rws[3].full}/${SPAN}`);
-    check(`${P}.8`, 'top edge: device row R+1 is never at full strength',
-      shotIsDevice && rws[4].full === 0, `R+1 full ${rws[4].full}/${SPAN}`);
+    const artClearH = rws[5].changed === 0 && rws[6].changed === 0;
+    check(`${P}.8`, artClearH
+      ? 'top edge: device row R+1 is unchanged by the hover on every sampled column'
+      : 'top edge: UNMEASURABLE, the ghost art changes R+2/R+3 here, so an unchanged R+1 cannot be asked of it',
+    shotIsDevice && artClearH && rws[4].changed === 0,
+    `R+1 changed ${rws[4].changed}/${SPAN}; premise: R+2 changed ${rws[5].changed}/${SPAN}, R+3 changed ${rws[6].changed}/${SPAN}`);
     if (scale === 1) identityRow(`${P}.9`, 'dpr 1: the ghost outline\'s edge windows are PIXEL-IDENTICAL to the baseline build\'s', 'ms', { v: vOn.px, h: hOn.px });
     await mouseEv(c, 'mouseMoved', 4, 4);
   }, { electronArgs: [`--force-device-scale-factor=${scale}`] });
