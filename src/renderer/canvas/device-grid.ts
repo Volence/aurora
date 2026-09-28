@@ -67,15 +67,51 @@ export interface SnappedStroke {
 }
 
 /**
+ * How close, in device px (and in CSS px for the parity), a width must be to a tie to BE
+ * the tie. See `deviceStrokeWidth`.
+ */
+export const STROKE_TIE_EPS = 1e-9;
+
+/**
  * The whole number of DEVICE pixels a `cssWidth` stroke is drawn at on a `dpr` canvas.
  *
  * The integer nearest `cssWidth * dpr` with the same parity as `cssWidth` (rounded),
  * never less than that parity's smallest width, ties going thinner. See the file
  * docblock for why parity and not plain rounding.
+ *
+ * ═══ TIES ARE DETECTED, NOT LEFT TO THE FLOAT (ROADMAP row 240 (b)) ═══
+ *
+ * Two roundings in here have ties, and both used to be decided by floating-point noise
+ * in the caller's arithmetic rather than by a rule:
+ *
+ *   - the WIDTH: when `cssWidth * dpr` is a whole number of the other parity, it sits
+ *     exactly halfway between two same-parity widths. The angle mark's stem core (2 CSS
+ *     px) is 3 device px at dpr 1.5 and arrives as `((1.25 / zoom) * 1.6 * zoom * dpr) /
+ *     dpr`, which is 2.0000000000000004 at some zooms and 2 at others: 4 device px at zoom
+ *     1.5, 2 at zoom 2 (docs/reviews/2026-09-28-stragglers-239d.md section 6).
+ *   - the PARITY: a CSS width of k + 0.5 (1.5 through `(1.5 / zoom) * zoom`) arrives as
+ *     1.4999999999999998 at some zooms, so `Math.round` called it odd at those and even
+ *     at the rest: 1 device px or 2 at dpr 1.
+ *
+ * Each is now a tie when it is within `STROKE_TIE_EPS` of one, and each tie takes ONE
+ * rule:
+ *
+ *   - a width tie goes THINNER, the rule this function always stated. It is the answer
+ *     every EXACT tie already got (a 1 px line at dpr 2 is 1 device px, not 3; a 2 px
+ *     line at dpr 1.5 is 2, not 4), so the fix moves only the noisy cases onto it, and a
+ *     mark or line that is thinner never covers art the thicker one would not. The
+ *     parity's smallest width still floors it, so a tie never thins a stroke to 0 (0.4
+ *     CSS px at dpr 2.5 is a tie between 0 and 2, and is 2).
+ *   - a parity tie goes UP, which is `Math.round`'s own half-up: 0.5 is odd (the object
+ *     box's 0.5 CSS floor relies on that) and 1.5 even.
+ *
+ * Nothing that is not within `STROKE_TIE_EPS` of a tie changes.
  */
 export function deviceStrokeWidth(cssWidth: number, dpr: number): number {
-  const parity = Math.abs(Math.round(cssWidth)) % 2;
-  const k = parity + 2 * Math.ceil((cssWidth * dpr - parity) / 2 - 0.5);
+  const parity = Math.abs(Math.floor(cssWidth + 0.5 + STROKE_TIE_EPS)) % 2;
+  // The width is `parity + 2 * n`: n is the nearest whole step to `half`, a tie going down.
+  const half = (cssWidth * dpr - parity) / 2;
+  const k = parity + 2 * Math.ceil(half - 0.5 - STROKE_TIE_EPS / 2);
   return Math.max(parity === 1 ? 1 : 2, k);
 }
 

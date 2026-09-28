@@ -122,27 +122,17 @@ function renderAt(dpr: number, v: View, opts: Partial<OverlayOptions>): Recordin
 const dev = (w: number, cam: number, v: View, dpr: number): number => (w - cam) * v.zoom * dpr;
 
 /**
- * The device width a `cssWidth` stroke may be drawn at: `deviceStrokeWidth`'s answer, OR,
- * when `cssWidth * dpr` is an exact TIE between two same-parity integers, either of them.
+ * The device width a `cssWidth` stroke must be drawn at: `deviceStrokeWidth`'s answer,
+ * exactly, INCLUDING at a tie.
  *
- * ⚠ MEASURED, NOT ASSUMED (row 239 (d)): the angle mark's stem core is 2 CSS px (3.0
- * device px at dpr 1.5) and its casing 4.8 (6.0 at dpr 1.25), both exact ties, and
- * `deviceStrokeWidth`'s "ties go thinner" is decided there by floating-point noise in
- * the width's arithmetic path (`(k / zoom) * 1.6 * zoom * dpr / dpr`). Measured through
- * that path: the core at dpr 1.5 is 4 device px at zooms 1.5 and 3.625 but 2 at zooms 1
- * and 2; the casing at dpr 1.25 is 5 at zooms 1.5 and 3.625 but 7 at 1 and 2. That is
- * the helper's, not this parcel's, and is reported, not fixed.
+ * Row 239 (d) accepted either same-parity neighbour here, because the angle mark's stem
+ * core (2 CSS px, 3.0 device px at dpr 1.5) and casing (4.8, 6.0 at dpr 1.25) are exact
+ * ties that floating-point noise in the width's path decided (the core was 4 device px at
+ * zoom 1.5 and 2 at zoom 2). ROADMAP row 240 (b) made `deviceStrokeWidth` detect a tie
+ * with a tolerance and send it thinner, so the lenience is gone: a noisy tie is a red row.
  */
 function expectWidth(s: DeviceStroke, cssWidth: number, dpr: number): void {
-  const want = deviceStrokeWidth(cssWidth, dpr);
-  const x = cssWidth * dpr;
-  const tie = Math.abs(Math.abs(x - want) - 1) < 1e-9;
-  if (tie) {
-    expect(isWhole(s.width) && Math.round(s.width) % 2 === want % 2 && Math.abs(s.width - x) < 1 + 1e-9,
-      `width ${s.width} at a tie (${x} device px) is neither neighbour`).toBe(true);
-  } else {
-    expect(s.width, 'width').toBeCloseTo(want, 9);
-  }
+  expect(s.width, 'width').toBeCloseTo(deviceStrokeWidth(cssWidth, dpr), 9);
 }
 
 /** Each segment of `s` is axis-aligned with both edges whole, ends whole, width derived. */
