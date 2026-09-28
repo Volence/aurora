@@ -1,0 +1,221 @@
+root: /home/volence/.cache/aurora-master-239d  BORROWED — this script lives in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a89182949c0610033, which has no built app, so the app under test is /home/volence/.cache/aurora-master-239d's build
+      pinned: AURORA_BUILT_TREE=/home/volence/.cache/aurora-master-239d
+
+=== session: s1: row 239 (d) stragglers at --force-device-scale-factor=1 (port 9364 verified free) ===
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /tmp/aurora-harness-profiles/stragglers-239d-harness-1240730-0145ba1b — see HAZARD 6
+      provenance  app entry /home/volence/.cache/aurora-master-239d/dist/main/index.mjs; aeon COPY /home/volence/.cache/aeon-copy-239d (the root:/pinned: lines above name the tree)
+      s1  aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  s1.0  PREMISE: dpr 1 took and the map canvas sits on whole device px
+        dpr 1; canvas rect {"left":284,"top":74,"width":876,"height":721}; device origin (284, 74)
+PASS  s1.p.0  PREMISE: a real marquee drag and Ctrl+C filled a 4x4 block-aligned clipboard, Ctrl+V armed paste, and the real hover put the ghost at tile (26, 14)
+        clipboard {"widthTiles":4,"heightTiles":4,"artOnly":false,"collisionALen":4,"collisionBLen":4,"nonzeroTiles":8}; ghost {"pasting":true,"hover":{"sectionIndex":0,"baseCol":26,"baseRow":14},"paints":1}; hover client (578,176); shots master-scale1-paste-{off,on}.png
+      s1.p.top  paste ghost outline, top edge (horizontal, dashed, 2 CSS px): 18 sampled columns, E = device row 170; alternative "width 2": E-3: 0/18 mismatch; E-2: 0/18 mismatch; E-1: 0/18 mismatch; E+0: 0/18 mismatch
+      s1.p.top  one line across it, E-3..E+0, off: 000000 000000 000000 000000
+      s1.p.top  one line across it, E-3..E+0, on : 000000 000000 94e2d5 94e2d5
+PASS  s1.p.top.out  paste ghost outline, top edge (horizontal, dashed, 2 CSS px): the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)
+        E-3,E-2 mismatched []; screenshot in device px: true (1400x872); 18 sampled (at least 12 required)
+PASS  s1.p.top.stroke  paste ghost outline, top edge (horizontal, dashed, 2 CSS px): the stroke's own columns are the whole-pixel composite (both edges whole)
+        E-1,E+0 mismatched []; screenshot in device px: true (1400x872); 18 sampled (at least 12 required)
+NOT MEASURED  s1.p.top.id  paste ghost outline, top edge (horizontal, dashed, 2 CSS px): the on-shot cross-section is byte-identical to the baseline build
+        no EDGE_BASELINE given
+PASS  s1.c.0  PREMISE: the 'c' key armed paint-collision with the eraser (word 0)
+        state tool paint-collision; armed {"plane":"a","bothPlanes":false,"word":0}; hover (524,154); shots master-scale1-paint-{off,on}.png
+      s1.c.left  collision-paint cell, left edge (inset scope 1 + primary 2 device px over the erase fill): 24 sampled rows, E = device column 508; alternative "scope 1, primary 2": E-2: 0/24 mismatch; E-1: 0/24 mismatch; E+0: 0/24 mismatch; E+1: 24/24 mismatch; E+2: 0/24 mismatch; E+3: 0/24 mismatch
+      s1.c.left  one line across it, E-2..E+3, off: 000000 000000 000000 000000 000000 000000
+      s1.c.left  one line across it, E-2..E+3, on : 000000 000000 7bbbf9 6e6c8b 662424 662424
+PASS  s1.c.left.out  collision-paint cell, left edge (inset scope 1 + primary 2 device px over the erase fill): the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)
+        E-2,E-1 mismatched []; screenshot in device px: true (1400x872); 24 sampled (at least 12 required)
+FAIL  s1.c.left.stroke  collision-paint cell, left edge (inset scope 1 + primary 2 device px over the erase fill): the stroke's own columns are the whole-pixel composite (both edges whole)
+        E+0,E+1 mismatched [{"o":1,"m":24}]; screenshot in device px: true (1400x872); 24 sampled (at least 12 required)
+PASS  s1.c.left.in  collision-paint cell, left edge (inset scope 1 + primary 2 device px over the erase fill): the columns INSIDE the stroke are the fill-only composite (nothing past the inner edge)
+        E+2,E+3 mismatched []; screenshot in device px: true (1400x872); 24 sampled (at least 12 required)
+      s1.m  real axis-aligned marks in section 0: none over 49 cameras (491 marks reported, every one slanted)
+      s1.m  authored fixture: shape 243 (angle byte 0x0), word 0x30f3, poked into air cell {"cc":48,"cr":38} of plane A
+PASS  s1.m.0  PREMISE: an axis-aligned (vertical) stem is drawn at the compact tier (stem only) at zoom 2
+        camera (512,512); mark {"ax":775.5,"ay":610,"bar1x":771,"bar1y":610,"bar2x":780,"bar2y":610,"tipx":775.5,"tipy":603.5,"angle":0,"tangentDrawn":false,"normalKnown":true}; report {"active":true,"suppressed":false,"tier":"compact","drawn":40}; searched 49 cameras; shots master-scale1-mark-{off,on}.png
+      s1.m.stem  angle mark stem (vertical; casing 4.800000000000001 CSS px, core 2): 11 sampled rows, E = device column 811; alternative "casing 5, core 2": E-4: 0/11 mismatch; E-3: 11/11 mismatch; E-2: 0/11 mismatch; E-1: 0/11 mismatch; E+0: 0/11 mismatch; E+1: 0/11 mismatch; E+2: 11/11 mismatch; E+3: 0/11 mismatch; E+4: 0/11 mismatch
+      s1.m.stem  one line across it, E-4..E+4, off: b66d24 924924 924924 924924 924924 b66d24 b66d24 b66d24 b66d24
+      s1.m.stem  one line across it, E-4..E+4, on : b66d24 5f311c 151010 ff5a46 ff5a46 191410 76481c b66d24 b66d24
+FAIL  s1.m.stem.out  angle mark stem (vertical; casing 4.800000000000001 CSS px, core 2): the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)
+        E-4,E-3,E+3,E+4 mismatched [{"o":-3,"m":11}]; screenshot in device px: true (1400x872); 11 sampled (at least 8 required)
+FAIL  s1.m.stem.stroke  angle mark stem (vertical; casing 4.800000000000001 CSS px, core 2): the stroke's own columns are the whole-pixel composite (both edges whole)
+        E-2,E-1,E+0,E+1,E+2 mismatched [{"o":2,"m":11}]; screenshot in device px: true (1400x872); 11 sampled (at least 8 required)
+PASS  s1.b.0  PREMISE: an object the app draws as a no-preview box is found by its own stroke colour
+        object {"x":808,"y":210,"typeId":"solid"} at camera (744,146); of 8 in section 0
+      s1.b.left  object box, left edge (world width 2 CSS px): 14 sampled rows, E = device column 396; alternative "width 2": E-3: 0/14 mismatch; E-2: 0/14 mismatch; E-1: 0/14 mismatch; E+0: 0/14 mismatch; E+1: 0/14 mismatch; E+2: 0/14 mismatch
+      s1.b.left  one line across it, E-3..E+2, off: 000000 000000 000000 000000 000000 000000
+      s1.b.left  one line across it, E-3..E+2, on : 000000 000000 ff4444 ff4444 b34646 b34646
+PASS  s1.b.left.out  object box, left edge (world width 2 CSS px): the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)
+        E-3,E-2 mismatched []; screenshot in device px: true (1400x872); 14 sampled (at least 12 required)
+PASS  s1.b.left.stroke  object box, left edge (world width 2 CSS px): the stroke's own columns are the whole-pixel composite (both edges whole)
+        E-1,E+0 mismatched []; screenshot in device px: true (1400x872); 14 sampled (at least 12 required)
+PASS  s1.b.left.in  object box, left edge (world width 2 CSS px): the columns INSIDE the stroke are the fill-only composite (nothing past the inner edge)
+        E+1,E+2 mismatched []; screenshot in device px: true (1400x872); 14 sampled (at least 12 required)
+NOT MEASURED  s1.b.left.id  object box, left edge (world width 2 CSS px): the on-shot cross-section is byte-identical to the baseline build
+        no EDGE_BASELINE given
+PASS  s1.l.0  PREMISE: the priority lens drew (veils and segments in view)
+        tile {"col":112,"row":32}; camera (832,192); report {"active":true,"reason":null,"sections":9,"veils":109,"segments":353,"paints":92}; shots master-scale1-priority-{off,on}.png
+      s1.l.left  priority lens, a region's left boundary (1 CSS px over the veil): 12 sampled rows, E = device column 412; alternative "width 1": E-2: 0/12 mismatch; E-1: 12/12 mismatch; E+0: 12/12 mismatch; E+1: 0/12 mismatch; E+2: 0/12 mismatch
+      s1.l.left  one line across it, E-2..E+2, off: 000000 003219 1b3219 240000 492424
+      s1.l.left  one line across it, E-2..E+2, on : 000000 6e7c80 a585b5 68266b 7e3a7f
+FAIL  s1.l.left.out  priority lens, a region's left boundary (1 CSS px over the veil): the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)
+        E-2,E-1 mismatched [{"o":-1,"m":12}]; screenshot in device px: true (1400x872); 12 sampled (at least 12 required)
+FAIL  s1.l.left.stroke  priority lens, a region's left boundary (1 CSS px over the veil): the stroke's own columns are the whole-pixel composite (both edges whole)
+        E+0 mismatched [{"o":0,"m":12}]; screenshot in device px: true (1400x872); 12 sampled (at least 12 required)
+PASS  s1.l.left.in  priority lens, a region's left boundary (1 CSS px over the veil): the columns INSIDE the stroke are the fill-only composite (nothing past the inner edge)
+        E+1,E+2 mismatched []; screenshot in device px: true (1400x872); 12 sampled (at least 12 required)
+PASS  s1.bp.0  PREMISE: after the in-memory poke of plane B, the both-planes lens drew
+        cell {"cc":65,"cr":24,"word":12543}; camera (976,320); report {"active":true,"reason":null,"sections":9,"sectionsWithPlaneB":9,"veils":22,"segments":136,"paints":100}; shots master-scale1-bothplanes-{off,on}.png
+      s1.bp.left  both-planes lens, a cell's left boundary (1 CSS px over the veil): 28 sampled rows, E = device column 412; alternative "width 1": E-2: 0/28 mismatch; E-1: 28/28 mismatch; E+0: 28/28 mismatch; E+1: 0/28 mismatch; E+2: 0/28 mismatch
+      s1.bp.left  one line across it, E-2..E+2, off: b6ff6d b6ff6d b6ff6d b6ff6d b6ff6d
+      s1.bp.left  one line across it, E-2..E+2, on : b6ff6d b9fcac 9af2c2 7cec95 7cec95
+FAIL  s1.bp.left.out  both-planes lens, a cell's left boundary (1 CSS px over the veil): the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)
+        E-2,E-1 mismatched [{"o":-1,"m":28}]; screenshot in device px: true (1400x872); 28 sampled (at least 12 required)
+FAIL  s1.bp.left.stroke  both-planes lens, a cell's left boundary (1 CSS px over the veil): the stroke's own columns are the whole-pixel composite (both edges whole)
+        E+0 mismatched [{"o":0,"m":28}]; screenshot in device px: true (1400x872); 28 sampled (at least 12 required)
+PASS  s1.bp.left.in  both-planes lens, a cell's left boundary (1 CSS px over the veil): the columns INSIDE the stroke are the fill-only composite (nothing past the inner edge)
+        E+1,E+2 mismatched []; screenshot in device px: true (1400x872); 28 sampled (at least 12 required)
+PASS  s1.lg.0  PREMISE: the legend's angle swatch is on screen, its store sized to the display
+        swatch {"left":301,"top":180,"width":18,"height":18,"store":[18,18]}
+      s1.lg  swatch pixels: 18x18 device px at (301,180); 21 distinct colours
+NOT MEASURED  s1.lg.id  the legend swatch (its $20 mark is all diagonal, so the routing must change no pixel) is byte-identical to the baseline build
+        no EDGE_BASELINE given
+   flush check armed: profile /tmp/aurora-harness-profiles/stragglers-239d-harness-1240730-0145ba1b/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session ABSENT under this project key (session A opens the project mid-body), unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 100ms
+cleanup: tree under pid 1240797 (1 process(es)):
+           1240797 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (203B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (203B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+
+=== session: s1.5: row 239 (d) stragglers at --force-device-scale-factor=1.5 (port 9364 verified free) ===
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+      provenance  app entry /home/volence/.cache/aurora-master-239d/dist/main/index.mjs; aeon COPY /home/volence/.cache/aeon-copy-239d (the root:/pinned: lines above name the tree)
+      s1.5  aeon open threw: Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+PASS  s1.5.0  PREMISE: dpr 1.5 took and the map canvas sits on whole device px
+        dpr 1.5; canvas rect {"left":284,"top":74,"width":596,"height":522}; device origin (426, 111)
+PASS  s1.5.p.0  PREMISE: a real marquee drag and Ctrl+C filled a 4x4 block-aligned clipboard, Ctrl+V armed paste, and the real hover put the ghost at tile (26, 14)
+        clipboard {"widthTiles":4,"heightTiles":4,"artOnly":false,"collisionALen":4,"collisionBLen":4,"nonzeroTiles":8}; ghost {"pasting":true,"hover":{"sectionIndex":0,"baseCol":26,"baseRow":14},"paints":1}; hover client (578,176); shots master-scale1.5-paste-{off,on}.png
+      s1.5.p.top  paste ghost outline, top edge (horizontal, dashed, 2 CSS px): 18 sampled columns, E = device row 255; alternative "width 2": E-3: 0/18 mismatch; E-2: 18/18 mismatch; E-1: 0/18 mismatch; E+0: 0/18 mismatch
+      s1.5.p.top  one line across it, E-3..E+0, off: 000000 000000 000000 000000
+      s1.5.p.top  one line across it, E-3..E+0, on : 000000 4a716b 94e2d5 94e2d5
+FAIL  s1.5.p.top.out  paste ghost outline, top edge (horizontal, dashed, 2 CSS px): the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)
+        E-3,E-2 mismatched [{"o":-2,"m":18}]; screenshot in device px: true (1680x1008); 18 sampled (at least 12 required)
+PASS  s1.5.p.top.stroke  paste ghost outline, top edge (horizontal, dashed, 2 CSS px): the stroke's own columns are the whole-pixel composite (both edges whole)
+        E-1,E+0 mismatched []; screenshot in device px: true (1680x1008); 18 sampled (at least 12 required)
+PASS  s1.5.c.0  PREMISE: the 'c' key armed paint-collision with the eraser (word 0)
+        state tool paint-collision; armed {"plane":"a","bothPlanes":false,"word":0}; hover (524,154); shots master-scale1.5-paint-{off,on}.png
+      s1.5.c.left  collision-paint cell, left edge (inset scope 1 + primary 2 device px over the erase fill): 36 sampled rows, E = device column 762; alternative "scope 1, primary 2": E-2: 0/36 mismatch; E-1: 0/36 mismatch; E+0: 0/36 mismatch; E+1: 0/36 mismatch; E+2: 36/36 mismatch; E+3: 0/36 mismatch
+      s1.5.c.left  one line across it, E-2..E+3, off: 000000 000000 000000 000000 000000 000000
+      s1.5.c.left  one line across it, E-2..E+3, on : 000000 000000 7bbbf9 79b8f6 694858 662424
+PASS  s1.5.c.left.out  collision-paint cell, left edge (inset scope 1 + primary 2 device px over the erase fill): the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)
+        E-2,E-1 mismatched []; screenshot in device px: true (1680x1008); 36 sampled (at least 12 required)
+PASS  s1.5.c.left.stroke  collision-paint cell, left edge (inset scope 1 + primary 2 device px over the erase fill): the stroke's own columns are the whole-pixel composite (both edges whole)
+        E+0,E+1 mismatched []; screenshot in device px: true (1680x1008); 36 sampled (at least 12 required)
+FAIL  s1.5.c.left.in  collision-paint cell, left edge (inset scope 1 + primary 2 device px over the erase fill): the columns INSIDE the stroke are the fill-only composite (nothing past the inner edge)
+        E+2,E+3 mismatched [{"o":2,"m":36}]; screenshot in device px: true (1680x1008); 36 sampled (at least 12 required)
+      s1.5.m  real axis-aligned marks in section 0: none over 49 cameras (207 marks reported, every one slanted)
+      s1.5.m  authored fixture: shape 243 (angle byte 0x0), word 0x30f3, poked into air cell {"cc":43,"cr":37} of plane A
+PASS  s1.5.m.0  PREMISE: an axis-aligned (vertical) stem is drawn at the compact tier (stem only) at zoom 2
+        camera (512,512); mark {"ax":695.5,"ay":594,"bar1x":691,"bar1y":594,"bar2x":700,"bar2y":594,"tipx":695.5,"tipy":587.5,"angle":0,"tangentDrawn":false,"normalKnown":true}; report {"active":true,"suppressed":false,"tier":"compact","drawn":12}; searched 49 cameras; shots master-scale1.5-mark-{off,on}.png
+      s1.5.m.stem  angle mark stem (vertical; casing 4.800000000000001 CSS px, core 2): 16 sampled rows, E = device column 977; alternative "casing 7, core 2" (of casing 7, core 2 | casing 7, core 4): E-5: 16/16 mismatch; E-4: 16/16 mismatch; E-3: 0/16 mismatch; E-2: 16/16 mismatch; E-1: 0/16 mismatch; E+0: 0/16 mismatch; E+1: 0/16 mismatch; E+2: 0/16 mismatch; E+3: 16/16 mismatch; E+4: 0/16 mismatch; E+5: 0/16 mismatch
+      s1.5.m.stem  one line across it, E-5..E+5, off: 492424 492424 492424 492424 492424 492424 240000 240000 240000 492424 492424
+      s1.5.m.stem  one line across it, E-5..E+5, on : 422021 0e0c10 0e0c10 ff5a46 ff5a46 ff5a46 0a090d 0a090d 200001 492424 492424
+FAIL  s1.5.m.stem.out  angle mark stem (vertical; casing 4.800000000000001 CSS px, core 2): the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)
+        E-5,E-4,E+4,E+5 mismatched [{"o":-5,"m":16},{"o":-4,"m":16}]; screenshot in device px: true (1680x1008); 16 sampled (at least 8 required)
+FAIL  s1.5.m.stem.stroke  angle mark stem (vertical; casing 4.800000000000001 CSS px, core 2): the stroke's own columns are the whole-pixel composite (both edges whole)
+        E-3,E-2,E-1,E+0,E+1,E+2,E+3 mismatched [{"o":-2,"m":16},{"o":3,"m":16}]; screenshot in device px: true (1680x1008); 16 sampled (at least 8 required)
+PASS  s1.5.b.0  PREMISE: an object the app draws as a no-preview box is found by its own stroke colour
+        object {"x":808,"y":210,"typeId":"solid"} at camera (744,146); of 8 in section 0
+      s1.5.b.left  object box, left edge (world width 2 CSS px): 20 sampled rows, E = device column 594; alternative "width 2": E-3: 0/20 mismatch; E-2: 20/20 mismatch; E-1: 0/20 mismatch; E+0: 0/20 mismatch; E+1: 20/20 mismatch; E+2: 0/20 mismatch
+      s1.5.b.left  one line across it, E-3..E+2, off: 000000 000000 000000 000000 000000 000000
+      s1.5.b.left  one line across it, E-3..E+2, on : 000000 802222 ff4444 ff4444 d94545 b34646
+FAIL  s1.5.b.left.out  object box, left edge (world width 2 CSS px): the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)
+        E-3,E-2 mismatched [{"o":-2,"m":20}]; screenshot in device px: true (1680x1008); 20 sampled (at least 12 required)
+PASS  s1.5.b.left.stroke  object box, left edge (world width 2 CSS px): the stroke's own columns are the whole-pixel composite (both edges whole)
+        E-1,E+0 mismatched []; screenshot in device px: true (1680x1008); 20 sampled (at least 12 required)
+FAIL  s1.5.b.left.in  object box, left edge (world width 2 CSS px): the columns INSIDE the stroke are the fill-only composite (nothing past the inner edge)
+        E+1,E+2 mismatched [{"o":1,"m":20}]; screenshot in device px: true (1680x1008); 20 sampled (at least 12 required)
+PASS  s1.5.l.0  PREMISE: the priority lens drew (veils and segments in view)
+        tile {"col":112,"row":32}; camera (832,192); report {"active":true,"reason":null,"sections":9,"veils":57,"segments":174,"paints":92}; shots master-scale1.5-priority-{off,on}.png
+      s1.5.l.left  priority lens, a region's left boundary (1 CSS px over the veil): 18 sampled rows, E = device column 618; alternative "width 1": E-2: 0/18 mismatch; E-1: 18/18 mismatch; E+0: 18/18 mismatch; E+1: 0/18 mismatch; E+2: 0/18 mismatch
+      s1.5.l.left  one line across it, E-2..E+2, off: 00190c 003219 1b3219 1f190c 240000
+      s1.5.l.left  one line across it, E-2..E+2, on : 00190c a6a2b5 c6a7d4 663471 68266b
+FAIL  s1.5.l.left.out  priority lens, a region's left boundary (1 CSS px over the veil): the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)
+        E-2,E-1 mismatched [{"o":-1,"m":18}]; screenshot in device px: true (1680x1008); 18 sampled (at least 12 required)
+FAIL  s1.5.l.left.stroke  priority lens, a region's left boundary (1 CSS px over the veil): the stroke's own columns are the whole-pixel composite (both edges whole)
+        E+0 mismatched [{"o":0,"m":18}]; screenshot in device px: true (1680x1008); 18 sampled (at least 12 required)
+PASS  s1.5.l.left.in  priority lens, a region's left boundary (1 CSS px over the veil): the columns INSIDE the stroke are the fill-only composite (nothing past the inner edge)
+        E+1,E+2 mismatched []; screenshot in device px: true (1680x1008); 18 sampled (at least 12 required)
+PASS  s1.5.bp.0  PREMISE: after the in-memory poke of plane B, the both-planes lens drew
+        cell {"cc":65,"cr":24,"word":12543}; camera (976,320); report {"active":true,"reason":null,"sections":9,"sectionsWithPlaneB":9,"veils":22,"segments":118,"paints":100}; shots master-scale1.5-bothplanes-{off,on}.png
+      s1.5.bp.left  both-planes lens, a cell's left boundary (1 CSS px over the veil): 42 sampled rows, E = device column 618; alternative "width 1": E-2: 0/42 mismatch; E-1: 42/42 mismatch; E+0: 42/42 mismatch; E+1: 0/42 mismatch; E+2: 0/42 mismatch
+      s1.5.bp.left  one line across it, E-2..E+2, off: b6ff6d b6ff6d b6ff6d b6ff6d b6ff6d
+      s1.5.bp.left  one line across it, E-2..E+2, on : b6ff6d bbfbcb a8f5d8 7cec95 7cec95
+FAIL  s1.5.bp.left.out  both-planes lens, a cell's left boundary (1 CSS px over the veil): the columns OUTSIDE the stroke are unchanged (nothing past the outer edge)
+        E-2,E-1 mismatched [{"o":-1,"m":42}]; screenshot in device px: true (1680x1008); 42 sampled (at least 12 required)
+FAIL  s1.5.bp.left.stroke  both-planes lens, a cell's left boundary (1 CSS px over the veil): the stroke's own columns are the whole-pixel composite (both edges whole)
+        E+0 mismatched [{"o":0,"m":42}]; screenshot in device px: true (1680x1008); 42 sampled (at least 12 required)
+PASS  s1.5.bp.left.in  both-planes lens, a cell's left boundary (1 CSS px over the veil): the columns INSIDE the stroke are the fill-only composite (nothing past the inner edge)
+        E+1,E+2 mismatched []; screenshot in device px: true (1680x1008); 42 sampled (at least 12 required)
+PASS  s1.5.lg.0  PREMISE: the legend's angle swatch is on screen, its store sized to the display
+        swatch {"left":300.66668701171875,"top":180.33334350585938,"width":18,"height":18,"store":[27,27]}
+      s1.5.lg  swatch pixels: 27x27 device px at (451,271); 26 distinct colours
+NOT MEASURED  s1.5.lg.id  the legend swatch (its $20 mark is all diagonal, so the routing must change no pixel) is byte-identical to the baseline build
+        no EDGE_BASELINE given
+   flush check armed: profile /tmp/aurora-harness-profiles/stragglers-239d-harness-1240730-0145ba1b/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session ABSENT under this project key (session A opens the project mid-body), unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 101ms
+cleanup: tree under pid 1350043 (1 process(es)):
+           1350043 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (203B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (203B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+wrote docs/reviews/239d-stragglers/edge-baseline-master-2c7921b6.json
+
+31/48 checks passed
+FAILED: s1.c.left.stroke, s1.m.stem.out, s1.m.stem.stroke, s1.l.left.out, s1.l.left.stroke, s1.bp.left.out, s1.bp.left.stroke, s1.5.p.top.out, s1.5.c.left.in, s1.5.m.stem.out, s1.5.m.stem.stroke, s1.5.b.left.out, s1.5.b.left.in, s1.5.l.left.out, s1.5.l.left.stroke, s1.5.bp.left.out, s1.5.bp.left.stroke

@@ -1,0 +1,16 @@
+differing px 878 in 7 connected groups
+  group bbox (799,201)-(815,218) size 17x18, 110 px, of which fix #ff4444: 47
+  group bbox (421,469)-(438,486) size 18x18, 128 px, of which fix #ff4444: 64
+  group bbox (511,527)-(528,544) size 18x18, 128 px, of which fix #ff4444: 64
+  group bbox (103,575)-(120,592) size 18x18, 128 px, of which fix #ff4444: 64
+  group bbox (151,575)-(168,592) size 18x18, 128 px, of which fix #ff4444: 64
+  group bbox (351,575)-(368,592) size 18x18, 128 px, of which fix #ff4444: 64
+  group bbox (431,575)-(448,592) size 18x18, 128 px, of which fix #ff4444: 64
+differing px 878 in 7 connected groups
+  group bbox (799,201)-(815,218) size 17x18, 110 px, of which fix #ff4444: 47
+  group bbox (421,469)-(438,486) size 18x18, 128 px, of which fix #ff4444: 64
+  group bbox (511,527)-(528,544) size 18x18, 128 px, of which fix #ff4444: 64
+  group bbox (103,575)-(120,592) size 18x18, 128 px, of which fix #ff4444: 64
+  group bbox (151,575)-(168,592) size 18x18, 128 px, of which fix #ff4444: 64
+  group bbox (351,575)-(368,592) size 18x18, 128 px, of which fix #ff4444: 64
+  group bbox (431,575)-(448,592) size 18x18, 128 px, of which fix #ff4444: 64

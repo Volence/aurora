@@ -1,0 +1,13 @@
+diff --git a/src/renderer/components/CollisionLegend.tsx b/src/renderer/components/CollisionLegend.tsx
+index bce1b6c8..def99670 100644
+--- a/src/renderer/components/CollisionLegend.tsx
++++ b/src/renderer/components/CollisionLegend.tsx
+@@ -78,7 +78,7 @@ export function AngleSwatch({ cellScreenPx }: { cellScreenPx: number }) {
+       // DIAGONAL and the adapter draws them where they were, at their CSS width (the
+       // rule is about device rows and columns). The legend's pixels are therefore
+       // unchanged by the routing, and that is disclosed rather than claimed as a snap.
+-      drawAngleMark(segmentsOnDeviceGrid(ctx, dpr) as unknown as MarkDrawCtx, 0, 0, SWATCH, mark, {
++      drawAngleMark(ctx as unknown as MarkDrawCtx, 0, 0, SWATCH, mark, {
+         color: COLLISION_ANGLE_TICK,
+         casing: COLLISION_ANGLE_CASING,
+         coreWidth: 1.25,

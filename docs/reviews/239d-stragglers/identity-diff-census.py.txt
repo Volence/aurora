@@ -1,0 +1,32 @@
+"""Classify every differing pixel between two identity captures.
+
+A pixel is 'box-border' when, in either build, it is the object box stroke (#ff4444)
+or a partial of it over the box fill or the map (red channel dominant, G == B - 0..2
+within the 0x44/0x46 family). Prints the census and any pixel that is not.
+"""
+import sys
+from PIL import Image
+a = Image.open(sys.argv[1]).convert('RGB'); b = Image.open(sys.argv[2]).convert('RGB')
+pa, pb = a.load(), b.load()
+W, H = a.size
+diff = [(x, y) for y in range(H) for x in range(W) if pa[x, y] != pb[x, y]]
+# Group differing pixels into connected boxes by flood fill on the diff mask.
+mask = set(diff)
+seen = set()
+boxes = []
+for p in diff:
+    if p in seen:
+        continue
+    stack = [p]; seen.add(p); comp = []
+    while stack:
+        x, y = stack.pop(); comp.append((x, y))
+        for q in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1), (x + 1, y + 1), (x - 1, y - 1), (x + 1, y - 1), (x - 1, y + 1)):
+            if q in mask and q not in seen:
+                seen.add(q); stack.append(q)
+    xs = [c[0] for c in comp]; ys = [c[1] for c in comp]
+    boxes.append((min(xs), min(ys), max(xs), max(ys), len(comp)))
+print('differing px', len(diff), 'in', len(boxes), 'connected groups')
+for bx in boxes:
+    x0, y0, x1, y1, n = bx
+    fix_red = sum(1 for (x, y) in diff if x0 <= x <= x1 and y0 <= y <= y1 and pb[x, y] == (255, 68, 68))
+    print(f'  group bbox ({x0},{y0})-({x1},{y1}) size {x1 - x0 + 1}x{y1 - y0 + 1}, {n} px, of which fix #ff4444: {fix_red}')

@@ -1,0 +1,16 @@
+diff --git a/src/renderer/canvas/OverlayRenderer.ts b/src/renderer/canvas/OverlayRenderer.ts
+index 5cf2ec1a..57dcfdef 100644
+--- a/src/renderer/canvas/OverlayRenderer.ts
++++ b/src/renderer/canvas/OverlayRenderer.ts
+@@ -470,9 +470,8 @@ export class OverlayRenderer {
+       // heaviest. Half a CSS px rounds to 1, an ODD width, so the border stays the
+       // smallest whole stroke the display has (1 device px up to dpr 2.x).
+       // The rect is mapped to CSS px from the camera, as the marks' mapping is.
+-      strokeCssRectOnDeviceGrid(ctx as CanvasRenderingContext2D,
+-        (wx - half - vpX) * zoom, (wy - half - vpY) * zoom, OBJECT_BOX_SIZE * zoom, OBJECT_BOX_SIZE * zoom,
+-        Math.max(OBJECT_BOX_STROKE_WIDTH * zoom, 0.5), dpr);
++      ctx.lineWidth = OBJECT_BOX_STROKE_WIDTH;
++      ctx.strokeRect(wx - half, wy - half, OBJECT_BOX_SIZE, OBJECT_BOX_SIZE);
+ 
+       // The label is sized in SCREEN pixels — `8 * invZoom` world px — which is
+       // the convention `classic-overlays.drawObjects` has always used. Under the

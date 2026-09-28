@@ -1,0 +1,335 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a89182949c0610033
+
+ ✓ src/renderer/canvas/__tests__/overlay-stragglers-device-grid.test.ts (120 tests) 56ms
+ ✓ src/renderer/components/__tests__/legend-anchor-device-scale.test.ts (4 tests) 240ms
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts (49 tests | 24 failed) 487ms
+     ✓ dpr 1, zoom 1.5, camera 0,0  420ms
+     ✓ dpr 1, zoom 1.5, camera 10.25,3.5 2ms
+     ✓ dpr 1, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 1, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 1.25, zoom 1.5, camera 0,0 1ms
+     ✓ dpr 1.25, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 1.25, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 1.25, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 1.35, zoom 1.5, camera 0,0 2ms
+     ✓ dpr 1.35, zoom 1.5, camera 10.25,3.5 2ms
+     ✓ dpr 1.35, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 1.35, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 1.5, zoom 1.5, camera 0,0 1ms
+     ✓ dpr 1.5, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 1.5, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 1.5, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 2, zoom 1.5, camera 0,0 1ms
+     ✓ dpr 2, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 2, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 2, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 3, zoom 1.5, camera 0,0 1ms
+     ✓ dpr 3, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 3, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 3, zoom 3.3, camera 250.4,99.9 1ms
+     × dpr 1, zoom 1.5, camera 0,0 4ms
+     × dpr 1, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 1, zoom 0.5, camera 13,7 1ms
+     × dpr 1, zoom 3.3, camera 250.4,99.9 1ms
+     × dpr 1.25, zoom 1.5, camera 0,0 1ms
+     × dpr 1.25, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 1.25, zoom 0.5, camera 13,7 1ms
+     × dpr 1.25, zoom 3.3, camera 250.4,99.9 1ms
+     × dpr 1.35, zoom 1.5, camera 0,0 1ms
+     × dpr 1.35, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 1.35, zoom 0.5, camera 13,7 1ms
+     × dpr 1.35, zoom 3.3, camera 250.4,99.9 1ms
+     × dpr 1.5, zoom 1.5, camera 0,0 1ms
+     × dpr 1.5, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 1.5, zoom 0.5, camera 13,7 1ms
+     × dpr 1.5, zoom 3.3, camera 250.4,99.9 1ms
+     × dpr 2, zoom 1.5, camera 0,0 1ms
+     × dpr 2, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 2, zoom 0.5, camera 13,7 6ms
+     × dpr 2, zoom 3.3, camera 250.4,99.9 2ms
+     × dpr 3, zoom 1.5, camera 0,0 1ms
+     × dpr 3, zoom 1.5, camera 10.25,3.5 1ms
+     × dpr 3, zoom 0.5, camera 13,7 1ms
+     × dpr 3, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ at dpr 1 on integer edges the scope outline covers the column the world-unit stroke did 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 24 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1, zoom 1.5, camera 0,0
+AssertionError: width: expected 1.5 to be close to 2, received difference is 0.5, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:183:30
+    181|     expect(s.kind).toBe('rect');
+    182|     const w = deviceStrokeWidth(cssWidth, dpr);
+    183|     expect(s.width, 'width').toBeCloseTo(w, 9);
+       |                              ^
+    184|     const L = Math.round((cellX - v.x) * v.zoom * dpr), T = Math.round…
+    185|     const R = Math.round((cellX + 16 - v.x) * v.zoom * dpr), B = Math.…
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:215:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/24]⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1, zoom 1.5, camera 10.25,3.5
+AssertionError: left outer edge: expected 80.625 to be close to 81, received difference is 0.375, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:189:44
+    187|     // Each side's centre is half the width in from its outer edge, so…
+    188|     // and the stroke is inside [L, R] x [T, B].
+    189|     expect(b.l - w / 2, 'left outer edge').toBeCloseTo(L, 9);
+       |                                            ^
+    190|     expect(b.t - w / 2, 'top outer edge').toBeCloseTo(T, 9);
+    191|     expect(b.r + w / 2, 'right outer edge').toBeCloseTo(R, 9);
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:214:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/24]⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1, zoom 0.5, camera 13,7
+AssertionError: left outer edge: expected 25.5 to be close to 26, received difference is 0.5, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:189:44
+    187|     // Each side's centre is half the width in from its outer edge, so…
+    188|     // and the stroke is inside [L, R] x [T, B].
+    189|     expect(b.l - w / 2, 'left outer edge').toBeCloseTo(L, 9);
+       |                                            ^
+    190|     expect(b.t - w / 2, 'top outer edge').toBeCloseTo(T, 9);
+    191|     expect(b.r + w / 2, 'right outer edge').toBeCloseTo(R, 9);
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:214:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/24]⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1, zoom 3.3, camera 250.4,99.9
+AssertionError: left outer edge: expected -615.1199999999999 to be close to -615, received difference is 0.11999999999989086, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:189:44
+    187|     // Each side's centre is half the width in from its outer edge, so…
+    188|     // and the stroke is inside [L, R] x [T, B].
+    189|     expect(b.l - w / 2, 'left outer edge').toBeCloseTo(L, 9);
+       |                                            ^
+    190|     expect(b.t - w / 2, 'top outer edge').toBeCloseTo(T, 9);
+    191|     expect(b.r + w / 2, 'right outer edge').toBeCloseTo(R, 9);
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:214:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/24]⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.25, zoom 1.5, camera 0,0
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.25, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.25, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.25, zoom 3.3, camera 250.4,99.9
+AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:183:30
+    181|     expect(s.kind).toBe('rect');
+    182|     const w = deviceStrokeWidth(cssWidth, dpr);
+    183|     expect(s.width, 'width').toBeCloseTo(w, 9);
+       |                              ^
+    184|     const L = Math.round((cellX - v.x) * v.zoom * dpr), T = Math.round…
+    185|     const R = Math.round((cellX + 16 - v.x) * v.zoom * dpr), B = Math.…
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:214:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/24]⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.35, zoom 1.5, camera 0,0
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.35, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.35, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.35, zoom 3.3, camera 250.4,99.9
+AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:183:30
+    181|     expect(s.kind).toBe('rect');
+    182|     const w = deviceStrokeWidth(cssWidth, dpr);
+    183|     expect(s.width, 'width').toBeCloseTo(w, 9);
+       |                              ^
+    184|     const L = Math.round((cellX - v.x) * v.zoom * dpr), T = Math.round…
+    185|     const R = Math.round((cellX + 16 - v.x) * v.zoom * dpr), B = Math.…
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:214:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/24]⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.5, zoom 1.5, camera 0,0
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.5, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.5, zoom 0.5, camera 13,7
+AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:183:30
+    181|     expect(s.kind).toBe('rect');
+    182|     const w = deviceStrokeWidth(cssWidth, dpr);
+    183|     expect(s.width, 'width').toBeCloseTo(w, 9);
+       |                              ^
+    184|     const L = Math.round((cellX - v.x) * v.zoom * dpr), T = Math.round…
+    185|     const R = Math.round((cellX + 16 - v.x) * v.zoom * dpr), B = Math.…
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:214:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/24]⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.5, zoom 3.3, camera 250.4,99.9
+AssertionError: width: expected 1.4999999999999998 to be close to 1, received difference is 0.4999999999999998, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:183:30
+    181|     expect(s.kind).toBe('rect');
+    182|     const w = deviceStrokeWidth(cssWidth, dpr);
+    183|     expect(s.width, 'width').toBeCloseTo(w, 9);
+       |                              ^
+    184|     const L = Math.round((cellX - v.x) * v.zoom * dpr), T = Math.round…
+    185|     const R = Math.round((cellX + 16 - v.x) * v.zoom * dpr), B = Math.…
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:214:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/24]⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 2, zoom 1.5, camera 0,0
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 2, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 2, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 2, zoom 3.3, camera 250.4,99.9
+AssertionError: width: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:183:30
+    181|     expect(s.kind).toBe('rect');
+    182|     const w = deviceStrokeWidth(cssWidth, dpr);
+    183|     expect(s.width, 'width').toBeCloseTo(w, 9);
+       |                              ^
+    184|     const L = Math.round((cellX - v.x) * v.zoom * dpr), T = Math.round…
+    185|     const R = Math.round((cellX + 16 - v.x) * v.zoom * dpr), B = Math.…
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:214:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/24]⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 3, zoom 1.5, camera 0,0
+AssertionError: width: expected 4.5 to be close to 4, received difference is 0.5, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:183:30
+    181|     expect(s.kind).toBe('rect');
+    182|     const w = deviceStrokeWidth(cssWidth, dpr);
+    183|     expect(s.width, 'width').toBeCloseTo(w, 9);
+       |                              ^
+    184|     const L = Math.round((cellX - v.x) * v.zoom * dpr), T = Math.round…
+    185|     const R = Math.round((cellX + 16 - v.x) * v.zoom * dpr), B = Math.…
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:215:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/24]⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 3, zoom 1.5, camera 10.25,3.5
+AssertionError: left outer edge: expected 241.875 to be close to 242, received difference is 0.125, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:189:44
+    187|     // Each side's centre is half the width in from its outer edge, so…
+    188|     // and the stroke is inside [L, R] x [T, B].
+    189|     expect(b.l - w / 2, 'left outer edge').toBeCloseTo(L, 9);
+       |                                            ^
+    190|     expect(b.t - w / 2, 'top outer edge').toBeCloseTo(T, 9);
+    191|     expect(b.r + w / 2, 'right outer edge').toBeCloseTo(R, 9);
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:214:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/24]⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 3, zoom 0.5, camera 13,7
+AssertionError: left outer edge: expected 76.5 to be close to 77, received difference is 0.5, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:189:44
+    187|     // Each side's centre is half the width in from its outer edge, so…
+    188|     // and the stroke is inside [L, R] x [T, B].
+    189|     expect(b.l - w / 2, 'left outer edge').toBeCloseTo(L, 9);
+       |                                            ^
+    190|     expect(b.t - w / 2, 'top outer edge').toBeCloseTo(T, 9);
+    191|     expect(b.r + w / 2, 'right outer edge').toBeCloseTo(R, 9);
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:214:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/24]⎯
+
+ FAIL  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts > site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 3, zoom 3.3, camera 250.4,99.9
+AssertionError: left outer edge: expected -1845.3599999999997 to be close to -1845, received difference is 0.3599999999996726, but expected 5e-10
+ ❯ expectInset src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:189:44
+    187|     // Each side's centre is half the width in from its outer edge, so…
+    188|     // and the stroke is inside [L, R] x [T, B].
+    189|     expect(b.l - w / 2, 'left outer edge').toBeCloseTo(L, 9);
+       |                                            ^
+    190|     expect(b.t - w / 2, 'top outer edge').toBeCloseTo(T, 9);
+    191|     expect(b.r + w / 2, 'right outer edge').toBeCloseTo(R, 9);
+ ❯ src/renderer/components/__tests__/map-stragglers-device-grid.test.ts:214:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/24]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  24 failed | 149 passed (173)
+   Start at  06:53:04
+   Duration  1.17s (transform 2.00s, setup 1.64s, import 347ms, tests 783ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (3 module(s) reported).
+
+failure-class: 24 failure record(s) in 1 file(s) (24 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION       24   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/__tests__/map-stragglers-device-grid.test.ts
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1, zoom 1.5, camera 0,0
+        AssertionError: width: expected 1.5 to be close to 2, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1, zoom 1.5, camera 10.25,3.5
+        AssertionError: left outer edge: expected 80.625 to be close to 81, received difference is 0.375, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1, zoom 0.5, camera 13,7
+        AssertionError: left outer edge: expected 25.5 to be close to 26, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1, zoom 3.3, camera 250.4,99.9
+        AssertionError: left outer edge: expected -615.1199999999999 to be close to -615, received difference is 0.11999999999989086, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.25, zoom 1.5, camera 0,0
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.25, zoom 1.5, camera 10.25,3.5
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.25, zoom 0.5, camera 13,7
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.25, zoom 3.3, camera 250.4,99.9
+        AssertionError: width: expected 1.25 to be close to 1, received difference is 0.25, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.35, zoom 1.5, camera 0,0
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.35, zoom 1.5, camera 10.25,3.5
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.35, zoom 0.5, camera 13,7
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.35, zoom 3.3, camera 250.4,99.9
+        AssertionError: width: expected 1.35 to be close to 1, received difference is 0.3500000000000001, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.5, zoom 1.5, camera 0,0
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.5, zoom 1.5, camera 10.25,3.5
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.5, zoom 0.5, camera 13,7
+        AssertionError: width: expected 1.5 to be close to 1, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 1.5, zoom 3.3, camera 250.4,99.9
+        AssertionError: width: expected 1.4999999999999998 to be close to 1, received difference is 0.4999999999999998, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 2, zoom 1.5, camera 0,0
+        AssertionError: width: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 2, zoom 1.5, camera 10.25,3.5
+        AssertionError: width: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 2, zoom 0.5, camera 13,7
+        AssertionError: width: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 2, zoom 3.3, camera 250.4,99.9
+        AssertionError: width: expected 2 to be close to 1, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 3, zoom 1.5, camera 0,0
+        AssertionError: width: expected 4.5 to be close to 4, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 3, zoom 1.5, camera 10.25,3.5
+        AssertionError: left outer edge: expected 241.875 to be close to 242, received difference is 0.125, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 3, zoom 0.5, camera 13,7
+        AssertionError: left outer edge: expected 76.5 to be close to 77, received difference is 0.5, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] site 2: the collision-paint block outlines are inset on the device grid (row 239 (d)) > dpr 3, zoom 3.3, camera 250.4,99.9
+        AssertionError: left outer edge: expected -1845.3599999999997 to be close to -1845, received difference is 0.3599999999996726, but expected 5e-10
+        why this bucket: name is AssertionError
+
+failure-class: 24 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 3 of 3 module(s) this run selected finished.

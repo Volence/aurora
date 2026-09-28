@@ -1,0 +1,12 @@
+diff --git a/src/renderer/canvas/composer-priority-lens.ts b/src/renderer/canvas/composer-priority-lens.ts
+index 16a712fa..3e714f09 100644
+--- a/src/renderer/canvas/composer-priority-lens.ts
++++ b/src/renderer/canvas/composer-priority-lens.ts
+@@ -89,7 +89,6 @@ export function drawComposerPriority(ctx: Ctx, doc: ComposerDoc, zoom: number):
+     // centred the 1 px line ON the tile boundary, half-covering the pixel on each
+     // side; on this grid it covers one whole pixel. What the browser's upscale then
+     // does at a fractional dpr is not a stroke's to decide.
+-    dpr: 1,
+   });
+ }
+ 
