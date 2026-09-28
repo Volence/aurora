@@ -18,7 +18,9 @@ import { angleMark, drawAngleMark, markTier, MIN_CELL_PX_FOR_MARK, BAR_HALF, NOR
 import type { MarkDrawCtx } from '../../core/collision/collision-angle-mark';
 import { resolveCell, resolvePlaneWords, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
 import { publishCollisionMarkReport, ROW_CAP } from './collision-mark-report';
-import { cameraDeviceMapping, segmentsOnDeviceGrid, strokeCssRectOnDeviceGrid } from './device-grid';
+import {
+  cameraDeviceMapping, segmentsOnDeviceGrid, strokeCssRectOnDeviceGrid, strokeCssRectInsetOnDeviceGrid,
+} from './device-grid';
 import type { CollisionMarkRow } from './collision-mark-report';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -41,6 +43,23 @@ export const OBJECT_BOX_STROKE_WIDTH = 1;
 export const OBJECT_LABEL_FONT_PX = 8;
 /** Baseline drop from the box centre, in screen px (the pre-existing `+3`). */
 export const OBJECT_LABEL_BASELINE_PX = 3;
+
+/** The map grids' stroke widths, in WORLD px: each grid thickens with zoom. */
+export const TILE_GRID_WORLD_WIDTH = 0.5;
+export const BLOCK_GRID_WORLD_WIDTH = 1;
+export const SECTION_GRID_WORLD_WIDTH = 2;
+/**
+ * A map grid whose lines would be closer than this on screen (`step * zoom`, CSS px) is
+ * NOT DRAWN (overseer ruling, 2026-09-28, ROADMAP row 240). Before row 240 the grids drew
+ * world-unit lines, sub-pixel and antialiased, so at that density they were faint to
+ * invisible. On the device grid a line is never under half a CSS px (1 device px), so a
+ * dense grid would instead become a solid wash (the tile grid at zoom 0.125: a line every
+ * CSS px) or a 50% stripe (every 2 CSS px). Below this spacing the grid says nothing an
+ * author can read, and hiding it keeps the look the old faint lines had.
+ */
+export const MIN_GRID_SPACING_CSS_PX = 4;
+
+type GridViewport = { x: number; y: number; width: number; height: number; zoom: number };
 
 function solidityFill(s: Solidity): string {
   switch (s) {
@@ -92,7 +111,9 @@ export class OverlayRenderer {
      * base `setTransform(dpr)` was built from). REQUIRED, for the reason classic's
      * `drawCollision` gave at row 194: a default of 1 would be silently wrong on every
      * other display. The angle marks, the object boxes and the two lenses' edges are
-     * stroked on the device grid with it (ROADMAP row 239 (d)).
+     * stroked on the device grid with it (ROADMAP row 239 (d)), and so are the surface
+     * line, the A/B diff outline and the three grids (row 240 (a)). The ring circles
+     * are not: an arc has no device row or column to land on.
      */
     dpr: number,
     objectSprites?: Map<string, ObjectPreview>,
@@ -112,9 +133,9 @@ export class OverlayRenderer {
     ctx.scale(zoom, zoom);
     ctx.translate(-vpX, -vpY);
 
-    if (options.showTileGrid) this.drawTileGrid(ctx, viewport);
-    if (options.showBlockGrid) this.drawBlockGrid(ctx, viewport);
-    if (options.showChunkGrid) this.drawSectionGrid(ctx, viewport);
+    if (options.showTileGrid) this.drawTileGrid(ctx, viewport, dpr);
+    if (options.showBlockGrid) this.drawBlockGrid(ctx, viewport, dpr);
+    if (options.showChunkGrid) this.drawSectionGrid(ctx, viewport, dpr);
 
     for (const info of sections) {
       if (options.showCollision || options.showCollisionPathB) {
@@ -207,81 +228,66 @@ export class OverlayRenderer {
   /** True count for the same pass, uncapped. */
   private markDrawn = 0;
 
-  drawTileGrid(ctx: Ctx, viewport: { x: number; y: number; width: number; height: number; zoom: number }): void {
-    const { x: vpX, y: vpY, width, height, zoom } = viewport;
-    const vpWidth = width / zoom;
-    const vpHeight = height / zoom;
-
-    ctx.strokeStyle = GRID_TILE;
-    ctx.lineWidth = 0.5;
-
-    const startX = Math.floor(vpX / 8) * 8;
-    const startY = Math.floor(vpY / 8) * 8;
-
-    for (let x = startX; x < vpX + vpWidth; x += 8) {
-      ctx.beginPath();
-      ctx.moveTo(x, vpY);
-      ctx.lineTo(x, vpY + vpHeight);
-      ctx.stroke();
-    }
-
-    for (let y = startY; y < vpY + vpHeight; y += 8) {
-      ctx.beginPath();
-      ctx.moveTo(vpX, y);
-      ctx.lineTo(vpX + vpWidth, y);
-      ctx.stroke();
-    }
+  drawTileGrid(ctx: Ctx, viewport: GridViewport, dpr: number): void {
+    this.drawGridLines(ctx, viewport, dpr, 8, TILE_GRID_WORLD_WIDTH, GRID_TILE);
   }
 
-  drawBlockGrid(ctx: Ctx, viewport: { x: number; y: number; width: number; height: number; zoom: number }): void {
-    const { x: vpX, y: vpY, width, height, zoom } = viewport;
-    const vpWidth = width / zoom;
-    const vpHeight = height / zoom;
-
-    ctx.strokeStyle = GRID_BLOCK;
-    ctx.lineWidth = 1;
-
-    const startX = Math.floor(vpX / 128) * 128;
-    const startY = Math.floor(vpY / 128) * 128;
-
-    for (let x = startX; x < vpX + vpWidth; x += 128) {
-      ctx.beginPath();
-      ctx.moveTo(x, vpY);
-      ctx.lineTo(x, vpY + vpHeight);
-      ctx.stroke();
-    }
-
-    for (let y = startY; y < vpY + vpHeight; y += 128) {
-      ctx.beginPath();
-      ctx.moveTo(vpX, y);
-      ctx.lineTo(vpX + vpWidth, y);
-      ctx.stroke();
-    }
+  drawBlockGrid(ctx: Ctx, viewport: GridViewport, dpr: number): void {
+    this.drawGridLines(ctx, viewport, dpr, 128, BLOCK_GRID_WORLD_WIDTH, GRID_BLOCK);
   }
 
-  private drawSectionGrid(ctx: Ctx, viewport: { x: number; y: number; width: number; height: number; zoom: number }): void {
+  private drawSectionGrid(ctx: Ctx, viewport: GridViewport, dpr: number): void {
+    this.drawGridLines(ctx, viewport, dpr, SECTION_PIXEL_SIZE, SECTION_GRID_WORLD_WIDTH, GRID_SECTION);
+  }
+
+  /**
+   * One grid: a line every `step` world px across the view, `worldWidth` WORLD px wide (so
+   * it thickens with zoom, as the three grids always have).
+   *
+   * ON THE DEVICE GRID (ROADMAP row 240 (a)), through the adapter the angle marks use: each
+   * line is vertical or horizontal, so both of its edges land on whole device pixels, its
+   * ends on `snapLength`, and its width is `deviceStrokeWidth` of its CSS width. They
+   * were stroked in world units, so a line whose world x was not on a device boundary
+   * half-covered the columns either side.
+   *
+   * ⚠ NEVER LESS THAN HALF A CSS PX, the object box's floor and for its reason: below it the
+   * parity rule reads the width as EVEN, whose smallest width is 2 device px, so zooming
+   * OUT would make the grid heavier. Half a CSS px is an odd width, 1 device px up to dpr
+   * 2.x.
+   *
+   * ⚠ AND NOT DRAWN AT ALL WHEN ITS LINES ARE UNDER `MIN_GRID_SPACING_CSS_PX` APART (ruled
+   * 2026-09-28 at row 240), for the reason that constant gives: at zoom 0.125 the floor
+   * would make the tile grid a 1 device px line every CSS px, a solid wash over the view.
+   *
+   * One stroke per line, as before, so the crossings of a translucent grid are painted
+   * twice exactly as they were.
+   */
+  private drawGridLines(
+    ctx: Ctx, viewport: GridViewport, dpr: number, step: number, worldWidth: number, style: string,
+  ): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
+    if (step * zoom < MIN_GRID_SPACING_CSS_PX) return;
     const vpWidth = width / zoom;
     const vpHeight = height / zoom;
+    const path = segmentsOnDeviceGrid(ctx, dpr, cameraDeviceMapping(vpX, vpY, zoom, dpr));
+    path.strokeStyle = style;
+    path.lineWidth = Math.max(worldWidth * zoom, 0.5) / zoom;
 
-    ctx.strokeStyle = GRID_SECTION;
-    ctx.lineWidth = 2;
+    const startX = Math.floor(vpX / step) * step;
+    const startY = Math.floor(vpY / step) * step;
 
-    const startX = Math.floor(vpX / SECTION_PIXEL_SIZE) * SECTION_PIXEL_SIZE;
-    const startY = Math.floor(vpY / SECTION_PIXEL_SIZE) * SECTION_PIXEL_SIZE;
-
-    for (let x = startX; x < vpX + vpWidth; x += SECTION_PIXEL_SIZE) {
-      ctx.beginPath();
-      ctx.moveTo(x, vpY);
-      ctx.lineTo(x, vpY + vpHeight);
-      ctx.stroke();
+    for (let x = startX; x < vpX + vpWidth; x += step) {
+      path.beginPath();
+      path.moveTo(x, vpY);
+      path.lineTo(x, vpY + vpHeight);
+      path.stroke();
     }
 
-    for (let y = startY; y < vpY + vpHeight; y += SECTION_PIXEL_SIZE) {
-      ctx.beginPath();
-      ctx.moveTo(vpX, y);
-      ctx.lineTo(vpX + vpWidth, y);
-      ctx.stroke();
+    for (let y = startY; y < vpY + vpHeight; y += step) {
+      path.beginPath();
+      path.moveTo(vpX, y);
+      path.lineTo(vpX + vpWidth, y);
+      path.stroke();
     }
   }
 
@@ -348,18 +354,27 @@ export class OverlayRenderer {
             }
             // Crisp line along the collidable surface — top of a floor (h>0) or
             // the underside of a hanging ceiling (h<0).
-            ctx.strokeStyle = COLLISION_SURFACE_LINE;
-            ctx.lineWidth = 1 / zoom;
+            //
+            // ON THE DEVICE GRID (ROADMAP row 240 (a)), through the marks' adapter, as
+            // classic's surface line has been since row 237 (b): each column's segment is
+            // horizontal, so its row goes on the device half-pixel nearest the surface (1
+            // CSS px is an odd width) and its ends on whole device px, so the 16 segments
+            // of a cell tile with no gap. Stroked at `1 / zoom` in world units, it sat
+            // centred ON a device row boundary whenever the surface did and half-covered
+            // the row either side. One path per cell: the segments never overlap, so this
+            // paints what one stroke per column painted.
+            markPath.strokeStyle = COLLISION_SURFACE_LINE;
+            markPath.lineWidth = 1 / zoom;
+            markPath.beginPath();
             for (let c = 0; c < 16; c++) {
               const h = p.heights[c];
               const run = columnSolidRun(h);
               if (!run) continue;
               const surfaceY = h >= 0 ? run.y : run.y + run.h;
-              ctx.beginPath();
-              ctx.moveTo(cx + c, cy + surfaceY);
-              ctx.lineTo(cx + c + 1, cy + surfaceY);
-              ctx.stroke();
+              markPath.moveTo(cx + c, cy + surfaceY);
+              markPath.lineTo(cx + c + 1, cy + surfaceY);
             }
+            markPath.stroke();
             // The angle mark. THIS BLOCK USED TO BE THE BUG: it drew a centred,
             // symmetric segment at `(cos a, -sin a)` — vertically MIRRORED
             // against both classic's overlay and the picker's thumbnails, so on
@@ -407,11 +422,18 @@ export class OverlayRenderer {
         }
 
         // Outline cells where the two planes disagree (dual-layer regions).
+        //
+        // AN INSET STROKE ON THE DEVICE GRID (ROADMAP row 240 (a)), MapViewport's
+        // collision-paint primary outline's treatment (row 239 (d)): it was `1.5 / zoom`
+        // inset by `0.75 / zoom` in world units, just inside the cell with whatever edge
+        // the camera gave it. `strokeCssRectInsetOnDeviceGrid` keeps it inside the cell,
+        // its outer edge on the cell's edge rounded to a whole device pixel and its inner
+        // edge `deviceStrokeWidth(1.5, dpr)` device px in from that. The cell is mapped to
+        // CSS px from the camera, as the object box is.
         if (differs) {
-          const inset = 0.75 / zoom;
           ctx.strokeStyle = COLLISION_DIFF;
-          ctx.lineWidth = 1.5 / zoom;
-          ctx.strokeRect(cx + inset, cy + inset, 16 - 2 * inset, 16 - 2 * inset);
+          strokeCssRectInsetOnDeviceGrid(ctx as CanvasRenderingContext2D,
+            (cx - vpX) * zoom, (cy - vpY) * zoom, 16 * zoom, 16 * zoom, 1.5, dpr);
         }
       }
     }

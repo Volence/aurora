@@ -5,6 +5,9 @@ import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import type { Color } from '../../../core/model/s4-types';
 import { T } from '../ui';
 import { CANVAS_VOID, OVERLAY_OUTLINE, SELECTION_MARQUEE, PREVIEW_STROKE } from '../../canvas/canvas-colors';
+import {
+  drawGridLines, drawPreview, drawSelection, strokeDocRect, strokeDocRectInset, type ChromeFrame,
+} from './pixel-viewport-chrome';
 
 export type GridKind = 'pixel' | 'cell8' | 'tile' | 'block';
 export interface ViewportOverlay {
@@ -158,11 +161,12 @@ export default function PixelViewport({
     ctx.save();
     ctx.translate(originX, originY);
 
-    const gridLines = (stepPx: number, alpha: number) => {
-      ctx.strokeStyle = `rgba(255,255,255,${alpha})`; ctx.lineWidth = 1;
-      for (let gx = 0; gx <= width; gx += stepPx) { ctx.beginPath(); ctx.moveTo(gx * zoom + 0.5, 0); ctx.lineTo(gx * zoom + 0.5, height * zoom); ctx.stroke(); }
-      for (let gy = 0; gy <= height; gy += stepPx) { ctx.beginPath(); ctx.moveTo(0, gy * zoom + 0.5); ctx.lineTo(width * zoom, gy * zoom + 0.5); ctx.stroke(); }
-    };
+    // THE CHROME IS STROKED ON THIS CANVAS'S PIXEL GRID (ROADMAP row 240 (a)); see
+    // pixel-viewport-chrome.ts for the frame and for what changed (only the preview, at
+    // the integer zooms the hosts give).
+    const frame: ChromeFrame = { ctx, originX, originY, zoom };
+    const gridLines = (stepPx: number, alpha: number) =>
+      drawGridLines(frame, width, height, stepPx, `rgba(255,255,255,${alpha})`);
     for (const gk of layers?.grids ?? []) {
       if (gk === 'pixel' && zoom >= 8) gridLines(1, 0.06);
       else if (gk === 'cell8') gridLines(8, 0.12);
@@ -172,29 +176,15 @@ export default function PixelViewport({
     drawUnderlay?.(ctx, zoom);
     for (const o of overlays ?? []) {
       ctx.strokeStyle = o.color ?? OVERLAY_OUTLINE;
-      if (o.kind === 'marquee') { ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.strokeRect(o.x * zoom + 0.5, o.y * zoom + 0.5, o.w * zoom, o.h * zoom); ctx.setLineDash([]); }
-      else { ctx.lineWidth = 2; ctx.strokeRect(o.x * zoom + 1, o.y * zoom + 1, o.w * zoom - 2, o.h * zoom - 2); }
+      if (o.kind === 'marquee') { ctx.setLineDash([4, 3]); strokeDocRect(frame, o.x, o.y, o.w, o.h, 1); ctx.setLineDash([]); }
+      else strokeDocRectInset(frame, o.x, o.y, o.w, o.h, 2);
     }
     if (selection) {
-      ctx.strokeStyle = SELECTION_MARQUEE; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
-      ctx.strokeRect(selection.x * zoom + 0.5, selection.y * zoom + 0.5, selection.w * zoom, selection.h * zoom);
-      ctx.setLineDash([]);
+      ctx.strokeStyle = SELECTION_MARQUEE;
+      drawSelection(frame, selection);
     }
-    const pv = controller.preview();
-    if (pv.kind !== 'none') {
-      ctx.strokeStyle = PREVIEW_STROKE; ctx.lineWidth = 1.5;
-      if (pv.kind === 'line') { ctx.beginPath(); ctx.moveTo((pv.x0 + 0.5) * zoom, (pv.y0 + 0.5) * zoom); ctx.lineTo((pv.x1 + 0.5) * zoom, (pv.y1 + 0.5) * zoom); ctx.stroke(); }
-      else if (pv.kind === 'rect' || pv.kind === 'marquee') {
-        const nx = Math.min(pv.x0, pv.x1), ny = Math.min(pv.y0, pv.y1), nw = Math.abs(pv.x1 - pv.x0) + 1, nh = Math.abs(pv.y1 - pv.y0) + 1;
-        if (pv.kind === 'marquee') ctx.setLineDash([4, 3]);
-        ctx.strokeRect(nx * zoom + 0.5, ny * zoom + 0.5, nw * zoom, nh * zoom);
-        ctx.setLineDash([]);
-      } else if (pv.kind === 'move') {
-        ctx.setLineDash([4, 3]);
-        ctx.strokeRect((pv.sel.x + pv.dx) * zoom + 0.5, (pv.sel.y + pv.dy) * zoom + 0.5, pv.sel.w * zoom, pv.sel.h * zoom);
-        ctx.setLineDash([]);
-      }
-    }
+    ctx.strokeStyle = PREVIEW_STROKE;
+    drawPreview(frame, controller.preview());
     drawOverlay?.(ctx, zoom);
     ctx.restore();
   });
