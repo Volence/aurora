@@ -5,20 +5,21 @@
     "repo": "git@github.com:Volence/aeon.git",
     "path": "games/sonic4/data/clips/s2_ehz_cpz/clips.json",
     "branch_that_answers_currency": "origin/master",
-    "revision": "afc23f5bb09cf2b143a71a86ae57d49a61a63a85",
-    "blob": "64ab630ce376ba7e985ba540d943728d89e6d79b",
-    "revision_is": "the LAST commit that touched the path (git log -1 <pin> -- <path>) at the ONE pin of ROADMAP rows 223+224 (LINES-EVERYWHERE, branch parcel/lines-everywhere-223-224): aeon origin/master d3b98868a9bca7573957b84092b4acd3c72c4ee6, read 2026-09-26T22:06Z after a fetch. Previous pin: 67f7787d (see pin_history_current_last).",
-    "what_changed_at_this_pin": "Three commits since 67f7787d: a974bc2e (LINES-EVERYWHERE) rewrites `floorless_columns.why` (plane B is REACHABLE now that the act carries Sonic 2's lines) and adds `floorless_columns.planes.B` {columns 64, x_runs [[1344,1408],[4672,4864],[8192,8256],[9472,9664]]}; 119e9455 and afc23f5b rewrite that `why` prose again (the x 1344..1407 hole is reachable, caused by the missing Obj11 bridge). No clip, corridor, grid, rectangle or `music` moved; still no final newline. Aurora's reader (src/core/formats/donors/clip-manifest-doc.ts) keeps the RAW object and does not read `floorless_columns`, so the new plane-B block survives a paste untouched."
+    "revision": "621b7fce6fedc63a5630fc00250684f2d3b4d19e",
+    "blob": "c993be2a22ab8ec06a1757fffbba6de8535f5979",
+    "revision_is": "the LAST commit that touched the path (git log -1 <pin> -- <path>) at the ONE pin of ROADMAP row 228 (REVENDOR-AEON-AFTER-OVERNIGHT, branch row228-revendor-aeon): aeon origin/master cffdf7168fca5030c45b22b27c5e8c2916e1112c, read 2026-09-28T03:18:20Z after a fetch. Previous pin: afc23f5b (see pin_history_current_last).",
+    "what_changed_at_this_pin": "Three commits since afc23f5b: 91c7c48a (clip_reachability checks the painted world's bottom edge) adds `unpainted_remainder.y_from` = 2048 and `unpainted_remainder.y_why` (Chemical Plant, the taller clip, paints rows 0..2047; every row from y 2048 to the act's bottom 6144 carries no art); e11e5f2b / 621b7fce rewrite one sentence of `note` (the SHORT-TUNNEL-VSCROLL-RATCHET slide is now CLOSED: 6 glitch ticks before, 0 after). No clip, corridor, grid, rectangle or `music` moved. Aurora's reader (src/core/formats/donors/clip-manifest-doc.ts) keeps the RAW object and reads neither `note` nor `unpainted_remainder`, so both survive a paste untouched."
   },
   "fixture": {
     "path": "test/fixtures/clips/s2_ehz_cpz.clips.json",
-    "bytes": 15128,
-    "sha256": "f5e6d925832629aaca162396d568922f43ce918a3e0c9081c4fdc84f0e9c9c0f",
-    "git_blob": "64ab630ce376ba7e985ba540d943728d89e6d79b"
+    "bytes": 15555,
+    "sha256": "d30ee88697122e9e2601a09caead073f886f1a59383c8f5ce42b4af34d17ba65",
+    "git_blob": "c993be2a22ab8ec06a1757fffbba6de8535f5979"
   },
   "re_vendor": "node scripts/revendor.mjs test/fixtures/clips/s2_ehz_cpz.clips.json test/fixtures/clips/s2_ehz_cpz.clips.provenance.json <AEON_DIR> games/sonic4/data/clips/s2_ehz_cpz/clips.json <the commit git log names>",
   "pin_history_current_last": [
     "a9ca3ecf9fe730277d6bd3df50bea7d3459ec507, 67f7787d656e5ce7896649bfb1d138987c997875, anchor_overlay + per-clip music (row 221)",
-    "64ab630c, afc23f5b, floorless_columns plane B (rows 223+224, pin d3b98868)"
+    "64ab630c, afc23f5b, floorless_columns plane B (rows 223+224, pin d3b98868)",
+    "c993be2a, 621b7fce, unpainted_remainder.y_from/y_why + note (row 228, pin cffdf716)"
   ]
 }

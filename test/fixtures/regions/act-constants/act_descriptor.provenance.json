@@ -6,30 +6,31 @@
     "repo": "git@github.com:Volence/aeon.git",
     "path": "games/sonic4/data/levels/ojz/act1/act_descriptor.emp",
     "branch_that_answers_currency": "origin/master",
-    "revision": "69cb17aa80eddd33db86d6c0fd496cf880a8200e",
-    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log -1 88bd34147b4616d52d6659960aa92dc45124ee2a -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` names 69cb17aa at the ONE pin of ROADMAP row 227 (REVENDOR-AEON-WOVEN-MTZ-CPZ, branch row227-revendor-aeon): aeon origin/master 88bd34147b4616d52d6659960aa92dc45124ee2a, read 2026-09-27T08:51Z after a fetch.",
-    "blob": "81b96036d7b50f5ec1e2da3a358432622d9e4d2c",
-    "last_changed_by": "69cb17aa A clip act can own its start: the named clip's Sonic 2 start, through four descriptor choosers (woven item 7). The only commit on the path since the previous pin 6b444e45.",
-    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> /home/volence/sonic_hacks/aeon <path> 69cb17aa80eddd33db86d6c0fd496cf880a8200e - bytes from `git show <rev>:<path>`, re-hashed on this side and compared to aeon's blob before the sidecar was written. Never the sibling working tree.",
-    "revision_published": "69cb17aa is reachable from aeon origin/master (88bd34147b4616d52d6659960aa92dc45124ee2a); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run.",
-    "what_changed_at_this_pin": "The act START POINT became clip-ownable (+628 B). A new `use games.sonic4.ojz_clip_act_act1.{ojz_clip_act_start_sec_x, ojz_clip_act_start_local_x, ojz_clip_act_start_sec_y, ojz_clip_act_start_local_y}` with a comment block, and the Act literal's four start fields now bind through those choosers with the old literals as their `hand:` values (`start_local_x: ojz_clip_act_start_local_x(hand: $0100)`, the same for local_y $0100, sec_x 0, sec_y 0). The neutral clip module hands back each `hand:` byte for byte; a clip act that names a `start` returns its own (aeon tools/clip_rom_bake.py act_start). No struct field, offset or size moved. None of the five rule-4 constants (REGION_MIN_SPAN, CENTRE_X_MIN/MAX, CENTRE_Y_MIN/MAX) or their derivations changed. engine_constants.emp stays at cc0921e6, still the last commit touching engine/system/constants.emp at the pin, so the pair agrees."
+    "revision": "adb700d18fb06ac68f61f0c21b7b6e10259c83e2",
+    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log -1 cffdf7168fca5030c45b22b27c5e8c2916e1112c -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` names adb700d1 at the ONE pin of ROADMAP row 228 (REVENDOR-AEON-AFTER-OVERNIGHT, branch row228-revendor-aeon): aeon origin/master cffdf7168fca5030c45b22b27c5e8c2916e1112c, read 2026-09-28T03:18:20Z after a fetch.",
+    "blob": "50c4ae700941c332873ddc21926513337d6a747c",
+    "last_changed_by": "adb700d1 Scene registry's act-span pin: a clip act may be taller than the registry's act. Since the previous pin 69cb17aa, two commits: 60005128 (region document held to the act it was authored for; OJZ_WIDE_FILL_ROWS deleted) and adb700d1.",
+    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> /home/volence/sonic_hacks/aeon <path> adb700d18fb06ac68f61f0c21b7b6e10259c83e2 - bytes from `git show <rev>:<path>`, re-hashed on this side and compared to aeon's blob before the sidecar was written. Never the sibling working tree.",
+    "revision_published": "adb700d1 is reachable from aeon origin/master (cffdf7168fca5030c45b22b27c5e8c2916e1112c); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run.",
+    "what_changed_at_this_pin": "The region table is held to the act its document was AUTHORED for, not to the grid (+1911 B). 60005128: new OJZ_AUTHORED_ACT_H (region_max_y1 of the generated rows, beside the existing OJZ_AUTHORED_ACT_W); the OJZ_WIDE_FILL_ROWS padding row (and OJZ_WIDE_FILL_ROWS_LEN) is DELETED, so OJZ_ACT1_REGION_ROW_COUNT and OJZ_Act1_Regions's length drop that term; the whole-table coverage ensure now sums to OJZ_AUTHORED_ACT_W * OJZ_AUTHORED_ACT_H, plus an extent ensure (final rows reach exactly the authored rectangle) and a binding ensure (OJZ_CLIP_ACT == 1 || authored == ACT_W x ACT_H); the DEBUG tall-BG row's y1 is OJZ_AUTHORED_ACT_H - 1 instead of ACT_H - 1. adb700d1: the SCENE_ACT_SPAN_Y ensure also admits a clip act TALLER than the registry's act (OJZ_CLIP_ACT == 1 && SCENE_ACT_SPAN_Y <= GRID_H << SECTION_SIZE_SHIFT). The five per-row rule-4 ensures inside ojz_region() and the derivations of REGION_MIN_SPAN (2 * CAM_MAX_Y_STEP = 32), CENTRE_X_MIN (160), CENTRE_X_MAX (ACT_W - SCREEN_WIDTH + CAM_SCREEN_HALF_W = 5984), CENTRE_Y_MIN (112) and CENTRE_Y_MAX (ACT_H - SCREEN_HEIGHT + CAM_SCREEN_HALF_H = 6032) did NOT move: resolved over the old and the new pair by src/core/formats/regions/act-constants.ts, all five equal. No Aurora source names OJZ_WIDE_FILL_ROWS, OJZ_AUTHORED_ACT_* or SCENE_ACT_SPAN_Y (grep of src, test, scripts). engine_constants.emp is re-vendored at 3d369bc7, the last commit touching engine/system/constants.emp at the pin, so the pair agrees."
   },
   "fixture": {
     "path": "test/fixtures/regions/act-constants/act_descriptor.emp",
-    "bytes": 88736,
-    "sha256": "62f5fefc257d0e2f76296d063a5bb1233a005bb6ef57a25df196a60c156bf481",
-    "git_blob": "81b96036d7b50f5ec1e2da3a358432622d9e4d2c",
+    "bytes": 90647,
+    "sha256": "409c3c4977a0ca297bd0aa4138dd67779d31a3a37b80e59b121af76a256b03d1",
+    "git_blob": "50c4ae700941c332873ddc21926513337d6a747c",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
   },
   "paired_with": {
     "fixture": "test/fixtures/regions/act-constants/engine_constants.emp",
-    "why": "The chain LEAVES this file. CENTRE_X_MAX is written here as `ACT_W - SCREEN_WIDTH + CAM_SCREEN_HALF_W`, and SCREEN_WIDTH and CAM_SCREEN_HALF_W are not declared here at all: line 127 of this file (it was line 121 at the previous pin, not 96: the citation had gone stale before this pin) is `use engine.constants.{SCREEN_WIDTH, SCREEN_HEIGHT, CAM_SCREEN_HALF_W, CAM_SCREEN_HALF_H, CAM_MAX_Y_STEP}`. A test that vendored only this half could not resolve a single one of the five rule-4 constants, so the pair is vendored together and re-vendored together.",
+    "why": "The chain LEAVES this file. CENTRE_X_MAX is written here as `ACT_W - SCREEN_WIDTH + CAM_SCREEN_HALF_W`, and SCREEN_WIDTH and CAM_SCREEN_HALF_W are not declared here at all: line 127 of this file (still line 127 at row 228's pin; it was line 121 two pins back, never 96) is `use engine.constants.{SCREEN_WIDTH, SCREEN_HEIGHT, CAM_SCREEN_HALF_W, CAM_SCREEN_HALF_H, CAM_MAX_Y_STEP}`. A test that vendored only this half could not resolve a single one of the five rule-4 constants, so the pair is vendored together and re-vendored together.",
     "what_a_mismatched_pair_would_certify": "Nothing. A derivation read from one aeon commit evaluated over leaves read from another is a number no build ever computed."
   },
   "re_vendor": "node scripts/revendor.mjs test/fixtures/regions/act-constants/act_descriptor.emp test/fixtures/regions/act-constants/act_descriptor.provenance.json <AEON_DIR> games/sonic4/data/levels/ojz/act1/act_descriptor.emp <the commit that last touched the path, from `git log origin/master -- <path>`> — then update `last_changed_by` and `revision_is` here, re-vendor engine_constants.emp at a revision that agrees, and re-run the full suite. ⚠ In zsh, brace the revision variable (`${REV}:<path>`) or the `:c` parameter modifier eats a character AND the `>` redirect has already truncated the fixture.",
   "pin_history_current_last": [
     "cb954af34a3fb58717a286cf362fecd9cad6fca7, 5c4633c98032306941bed42e72c9f5104b035a5a, Region 26 -> 28 B (row 221)",
     "6c6aaa89, 6b444e45, act_nt_physical + act_layer_lines (rows 223+224, pin d3b98868)",
-    "81b96036, 69cb17aa, clip-ownable act start (row 227, pin 88bd3414)"
+    "81b96036, 69cb17aa, clip-ownable act start (row 227, pin 88bd3414)",
+    "50c4ae70, adb700d1, OJZ_WIDE_FILL_ROWS deleted, table held to the authored act (row 228, pin cffdf716)"
   ]
 }
