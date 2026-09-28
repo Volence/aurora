@@ -46,7 +46,7 @@ import { subjectsLabelOnPane } from '../../../core/formats/donors/refused-subjec
 import { readPoolRows, type PoolRow, type PoolRowField } from '../../../core/formats/donors/clipact-pool';
 import { useDonorDraft } from '../../state/donor-draft';
 import {
-  clipIdProblem, gridToHold, REGION_ID_RE, suggestClipId, suggestDestination, zoneSong, zoneSongLine,
+  clipIdProblem, gridToHold, REGION_ID_RE, suggestClipId, zoneSong, zoneSongLine,
   type ClipManifestDoc,
 } from '../../../core/formats/donors/clip-manifest-doc';
 import { COLLISION_QUANTUM_PX } from '../../../core/formats/donors/donor-marquee';
@@ -255,20 +255,28 @@ function PasteForm(): React.ReactElement {
   const redoN = usePasteStore((s) => s.redoStack.length);
   const draft = useDonorDraft();
 
-  // Suggestions follow the marquee and the target until the author overrides them.
+  // Suggestions follow the marquee and the target until the author overrides
+  // them; an author's placement is re-placed only on an act it was not made on
+  // (ROADMAP row 235 (a), state/donor-draft.ts).
   React.useEffect(() => {
     if (!zone || !marquee || !target) return;
     useDonorDraft.getState().suggest({
-      clipId: suggestClipId(target.doc, zone.manifest.zone),
-      dst: suggestDestination(target.doc, target.doc.gridW, target.doc.gridH, marquee),
+      clipId: suggestClipId(target.doc, zone.manifest.zone), actId: target.actId, doc: target.doc, src: marquee,
     });
   }, [zone, marquee, target]);
 
   const idProblem = target && draft.clipId ? clipIdProblem(target.doc, draft.clipId) : null;
+  // ROADMAP row 235 (a): when no section origin on the act is free for this
+  // rectangle, the page says so instead of leaving a draft on an occupied spot.
+  const noFree = draft.placement === 'none-free' && target && marquee
+    ? `No section origin on ${target.actId} is free for this ${marquee.w} x ${marquee.h} px rectangle: at each one it would`
+      + ' overlap a clip, corridor or shaft (aeon R10) or run past the act\'s edge (R8). Type a place, or choose another act.'
+    : null;
   const unaligned = draft.dst !== null && (draft.dst.x % SECTION_PIXEL_SIZE !== 0 || draft.dst.y % SECTION_PIXEL_SIZE !== 0);
   const missing = !zone ? 'Open a donor zone.' : !marquee ? 'Mark a rectangle on the donor zone.'
     : !target ? 'Choose or start a clip act.' : !draft.clipId ? 'Give the clip an id.'
-      : idProblem ? idProblem : !draft.dst ? 'Click the act below to place the clip, or type where.'
+      : idProblem ? idProblem : !draft.dst && noFree ? noFree
+        : !draft.dst ? 'Click the act below to place the clip, or type where.'
         : unaligned && draft.reason.trim() === '' ? 'Off the section grid: say why (aeon R11 needs the reason in the file).'
           : null;
 
@@ -288,10 +296,7 @@ function PasteForm(): React.ReactElement {
       const m = useDonorStore.getState().marquee;
       useDonorDraft.getState().reset();
       if (t && z && m) {
-        useDonorDraft.getState().suggest({
-          clipId: suggestClipId(t.doc, z.manifest.zone),
-          dst: suggestDestination(t.doc, t.doc.gridW, t.doc.gridH, m),
-        });
+        useDonorDraft.getState().suggest({ clipId: suggestClipId(t.doc, z.manifest.zone), actId: t.actId, doc: t.doc, src: m });
       }
     });
   };
@@ -304,9 +309,9 @@ function PasteForm(): React.ReactElement {
       </Field>
       <Field label="Place at">
         <NumberField value={draft.dst?.x ?? 0} step={8} width={60}
-                     onChange={(v) => useDonorDraft.getState().setDst({ x: Math.floor(v), y: draft.dst?.y ?? 0 })} />
+                     onChange={(v) => useDonorDraft.getState().setDst({ x: Math.floor(v), y: draft.dst?.y ?? 0 }, target?.actId ?? null)} />
         <NumberField value={draft.dst?.y ?? 0} step={8} width={60}
-                     onChange={(v) => useDonorDraft.getState().setDst({ x: draft.dst?.x ?? 0, y: Math.floor(v) })} />
+                     onChange={(v) => useDonorDraft.getState().setDst({ x: draft.dst?.x ?? 0, y: Math.floor(v) }, target?.actId ?? null)} />
         <span style={NOTE}>px</span>
       </Field>
       <Field label="Snap">
@@ -340,7 +345,10 @@ function PasteForm(): React.ReactElement {
         <button type="button" data-donors-redo style={BUTTON} disabled={busy || redoN === 0}
                 onClick={() => void usePasteStore.getState().redo()}>Redo</button>
       </div>
-      {missing && <div data-donors-missing style={NOTE}>{missing}</div>}
+      {missing && (
+        <div data-donors-missing data-donors-no-free={missing === noFree ? target?.actId : undefined}
+             style={missing === noFree ? WARN : NOTE}>{missing}</div>
+      )}
       {outcome && outcomeView(outcome)}
     </div>
   );
