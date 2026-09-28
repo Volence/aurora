@@ -658,7 +658,11 @@ async function partScale(scale) {
         const px = await c.evalExpr(`${SHOT_PIXELS}(${J(lgOn)}, ${J(pts)})`);
         const hexes = px.px.map(hex);
         note(id, 'swatch pixels', `${n}x${n} device px at (${x0},${y0}); ${new Set(hexes).size} distinct colours`);
-        identity(`${id}.id`, 'the legend swatch (its $20 mark is all diagonal, so the routing must change no pixel)', hexes);
+        // ⚠ ROADMAP row 240 (c) MOVED THIS SWATCH ON PURPOSE: its stem's casing is the core
+        // plus the bar's margin (3.75 CSS px) where it was 3 x ARROW_WIDTH_SCALE (4.8), and
+        // being diagonal it is drawn at that CSS width. So against a baseline built BEFORE
+        // 240 (c) this row is red by design; the claim holds against a baseline built after.
+        identity(`${id}.id`, 'the legend swatch (its $20 mark is all diagonal, so the routing must change no pixel; a pre-240 (c) baseline differs by design)', hexes);
       }
       await c.evalExpr('window.__dbg.setOverlay("showCollisionAngles", false)');
       await c.evalExpr('window.__dbg.setOverlay("showCollision", false)');
