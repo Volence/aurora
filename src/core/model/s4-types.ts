@@ -7,6 +7,7 @@ import type { BgOverrideState } from '../formats/bg-override/bg-override-io';
 import type { BgLibraryUnresolvedEntry } from '../formats/bg-library';
 import type { ActRegionsState } from '../formats/regions/act-regions';
 import type { RegionRuleResolution } from '../formats/regions/act-constants';
+import type { ChunkMarksAtLoad } from '../collision/chunk-library-reserved';
 
 export const SECTION_TILES_WIDE = 256;
 export const SECTION_TILES_HIGH = 256;
@@ -643,6 +644,18 @@ export interface S4Project {
   zones: Zone[];
   objectLibrary: ObjectDef[];
   chunkLibrary: ChunkDef[];
+  /**
+   * The library chunks whose collision already carried reserved bits 15:14 in
+   * chunks.json when the project was opened, as the load read them, by id
+   * (collision/chunk-library-reserved.ts). The save refuses a library mark NOT
+   * in this record; one that is in it is written back unchanged (RULED
+   * 2026-09-28 by the overseer, ROADMAP row 225). Ordinarily empty.
+   *
+   * OPTIONAL ON PURPOSE, and absent is the STRICT reading: no record means no
+   * mark counts as already on disk, so every library mark is refused. A second
+   * constructor that forgets it refuses more, never erases or waves through.
+   */
+  chunkLibraryMarksAtLoad?: ReadonlyMap<string, ChunkMarksAtLoad>;
   bgLibrary: BgLibraryEntry[];
   /**
    * The BG-library entries the zone's MANIFEST names and this checkout cannot
