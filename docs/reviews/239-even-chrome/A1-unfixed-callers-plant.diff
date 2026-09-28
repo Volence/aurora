@@ -1,0 +1,218 @@
+diff --git a/src/renderer/canvas/effects-guides.ts b/src/renderer/canvas/effects-guides.ts
+index 70055c5c..a7130502 100644
+--- a/src/renderer/canvas/effects-guides.ts
++++ b/src/renderer/canvas/effects-guides.ts
+@@ -43,7 +43,7 @@ import {
+   EFFECTS_SURFACE_LINE, EFFECTS_SURFACE_CASING,
+   EFFECTS_SURFACE_LABEL_BG, EFFECTS_SURFACE_LABEL_TEXT,
+ } from './canvas-colors';
+-import { snapStrokeEdges, snapLength } from './device-grid';
++import { snapStroke, snapLength } from './device-grid';
+ 
+ /** The map viewport, in the shape the draw pass already has one. */
+ export interface GuideViewport {
+@@ -393,7 +393,7 @@ export function drawSurfaceMarks(
+     if (!row.onScreen) continue;
+     // On a device half-pixel, same reason as the guides: a 1px line on an integer
+     // device coordinate straddles two device rows and smears (canvas/device-grid.ts).
+-    const y = snapStrokeEdges(row.canvasY, 1, dpr).at;
++    const y = snapStroke(row.canvasY, 1, dpr).at;
+ 
+     // The casing first, unbroken, so the dashes read on white art as well as on
+     // black. A dashed white line alone vanishes over OJZ's bright water tiles,
+@@ -401,14 +401,14 @@ export function drawSurfaceMarks(
+     ctx.beginPath();
+     ctx.moveTo(0, y);
+     ctx.lineTo(vp.width, y);
+-    ctx.lineWidth = snapStrokeEdges(row.canvasY, 3, dpr).width;
++    ctx.lineWidth = snapStroke(row.canvasY, 3, dpr).width;
+     ctx.strokeStyle = EFFECTS_SURFACE_CASING;
+     ctx.stroke();
+ 
+     ctx.beginPath();
+     ctx.moveTo(0, y);
+     ctx.lineTo(vp.width, y);
+-    ctx.lineWidth = snapStrokeEdges(row.canvasY, 1, dpr).width;
++    ctx.lineWidth = snapStroke(row.canvasY, 1, dpr).width;
+     ctx.strokeStyle = EFFECTS_SURFACE_LINE;
+     // A long dash, not the guides' short one: the two dash patterns are what
+     // separate a referent from a division at a glance, before either label is
+@@ -546,17 +546,11 @@ export function drawLayerGuides(
+   for (const row of rows) {
+     if (!row.onScreen) continue;
+     const active = opts.dragIndex === row.index || opts.hoverIndex === row.index;
+-    // BOTH edges on whole device pixels, width in whole device pixels
+-    // (canvas/device-grid.ts `snapStrokeEdges`): a 1 px line centres on a device
+-    // half-pixel (on an integer device coordinate it would straddle two rows and
+-    // smear), and the 2 px hovered, dragged or refused line on a WHOLE pixel, where
+-    // `snapStroke` had half-covered a row at each edge (ROADMAP row 239 (a), ruled
+-    // 2026-09-28).
+-    const stroke = snapStrokeEdges(row.canvasY, active || row.notice !== null ? 2 : 1, dpr);
++    // Centre on a device half-pixel, width in whole device pixels: a 1px line on
++    // an integer device coordinate straddles two device rows and renders as a 2px
++    // smear (canvas/device-grid.ts).
++    const stroke = snapStroke(row.canvasY, active || row.notice !== null ? 2 : 1, dpr);
+     const y = stroke.at;
+-    // The label is ANCHORED ON THE 1 px LINE'S ROW whatever the width, so hovering
+-    // a guide does not move its label by half a device pixel.
+-    const labelY = snapStrokeEdges(row.canvasY, 1, dpr).at;
+ 
+     ctx.beginPath();
+     ctx.moveTo(0, y);
+@@ -578,7 +572,7 @@ export function drawLayerGuides(
+     const w = ctx.measureText(text).width;
+     // Below the line when the line is near the top edge, above it otherwise, so
+     // a guide at world 0 does not print its label off-canvas.
+-    const boxY = row.canvasY < 16 ? labelY + 2 : labelY - 15;
++    const boxY = row.canvasY < 16 ? y + 2 : y - 15;
+     ctx.fillStyle = row.notice !== null ? EFFECTS_GUIDE_REFUSED_BG : EFFECTS_GUIDE_LABEL_BG;
+     ctx.fillRect(4, boxY, w + 8, 13);
+     ctx.fillStyle = row.notice !== null ? EFFECTS_GUIDE_REFUSED
+diff --git a/src/renderer/canvas/region-overlay.ts b/src/renderer/canvas/region-overlay.ts
+index b3c3fe42..44dfaaf5 100644
+--- a/src/renderer/canvas/region-overlay.ts
++++ b/src/renderer/canvas/region-overlay.ts
+@@ -59,11 +59,7 @@
+ // CSS transform (`setTransform(dpr, ...)`) and snaps in device space, never
+ // resetting to identity: that reset is the defect
+ // `docs/reviews/2026-09-12-dpr-guides-offset.md` is about and
+-// `canvas/device-grid.ts` is the fix. Every stroke goes through
+-// `snapStrokeEdges`, so BOTH edges of the selected region's 2 px outline and of
+-// the dragged rect sit on whole device pixels at every dpr (ROADMAP row 239 (a),
+-// ruled 2026-09-28; `snapStroke` had centred them on a half-pixel and half-covered
+-// a device column at each edge).
++// `canvas/device-grid.ts` is the fix.
+ //
+ // ═══ TWO DRAWS: THE FULL OVERLAY, AND THE GESTURE ONLY ═══
+ //
+@@ -84,7 +80,7 @@ import {
+   REGION_UNASSIGNED_FILL, REGION_UNASSIGNED_LABEL_BG, REGION_UNASSIGNED_LABEL_TEXT,
+ } from './canvas-colors';
+ import { worldYToCanvasY } from './effects-guides';
+-import { snapLength, snapStrokeEdges } from './device-grid';
++import { snapLength, snapStroke } from './device-grid';
+ import { REGION_GRAB_PX } from '../../core/editing/region-marquee';
+ import {
+   coverage, isEmptyRect, rectArea, sortRects,
+@@ -317,7 +313,7 @@ export function drawRegionOverlay(
+   const holes = cover.unassigned;
+   if (holes.length > 0) {
+     ctx.strokeStyle = REGION_UNASSIGNED_FILL;
+-    ctx.lineWidth = snapStrokeEdges(0, REGION_OUTLINE_PX, dpr).width;
++    ctx.lineWidth = snapStroke(0, REGION_OUTLINE_PX, dpr).width;
+     for (const hole of holes) {
+       const c = toCanvas(hole, vp);
+       if (!intersects(c, canvasBox)) continue;
+@@ -331,7 +327,7 @@ export function drawRegionOverlay(
+       hatch(ctx, box, -1, REGION_HATCH_PX);
+       ctx.restore();
+       ctx.strokeRect(
+-        snapStrokeEdges(c.x, REGION_OUTLINE_PX, dpr).at, snapStrokeEdges(c.y, REGION_OUTLINE_PX, dpr).at,
++        snapStroke(c.x, REGION_OUTLINE_PX, dpr).at, snapStroke(c.y, REGION_OUTLINE_PX, dpr).at,
+         snapLength(c.w, dpr), snapLength(c.h, dpr),
+       );
+     }
+@@ -362,20 +358,20 @@ export function drawRegionOverlay(
+     ctx.clip();
+     ctx.strokeStyle = hue;
+     ctx.globalAlpha = REGION_HATCH_ALPHA;
+-    ctx.lineWidth = snapStrokeEdges(0, REGION_OUTLINE_PX, dpr).width;
++    ctx.lineWidth = snapStroke(0, REGION_OUTLINE_PX, dpr).width;
+     hatch(ctx, clampToCanvas(box, canvasBox), regionHatchSlope(i), REGION_HATCH_PX);
+     counts.hatches += 1;
+     ctx.restore();
+ 
+     const lw = selected ? REGION_OUTLINE_SELECTED_PX : REGION_OUTLINE_PX;
+     ctx.strokeStyle = hue;
+-    ctx.lineWidth = snapStrokeEdges(0, lw, dpr).width;
++    ctx.lineWidth = snapStroke(0, lw, dpr).width;
+     ctx.beginPath();
+     for (const s of regionOutlineSegments(rects)) {
+       const a = toCanvas({ x: s.x1, y: s.y1, w: 0, h: 0 }, vp);
+       const b = toCanvas({ x: s.x2, y: s.y2, w: 0, h: 0 }, vp);
+       const vertical = s.x1 === s.x2;
+-      const at = snapStrokeEdges(vertical ? a.x : a.y, lw, dpr).at;
++      const at = snapStroke(vertical ? a.x : a.y, lw, dpr).at;
+       ctx.moveTo(vertical ? at : a.x, vertical ? a.y : at);
+       ctx.lineTo(vertical ? at : b.x, vertical ? b.y : at);
+     }
+@@ -468,13 +464,13 @@ export function drawRegionGesture(
+     const bounds = unionBounds(rects);
+     if (bounds === null || !intersects(toCanvas(bounds, vp), canvasBox)) continue;
+     ctx.strokeStyle = hueOf(id);
+-    ctx.lineWidth = snapStrokeEdges(0, REGION_OUTLINE_PX, dpr).width;
++    ctx.lineWidth = snapStroke(0, REGION_OUTLINE_PX, dpr).width;
+     ctx.beginPath();
+     for (const s of regionOutlineSegments(rects)) {
+       const a = toCanvas({ x: s.x1, y: s.y1, w: 0, h: 0 }, vp);
+       const b = toCanvas({ x: s.x2, y: s.y2, w: 0, h: 0 }, vp);
+       const vertical = s.x1 === s.x2;
+-      const at = snapStrokeEdges(vertical ? a.x : a.y, REGION_OUTLINE_PX, dpr).at;
++      const at = snapStroke(vertical ? a.x : a.y, REGION_OUTLINE_PX, dpr).at;
+       ctx.moveTo(vertical ? at : a.x, vertical ? a.y : at);
+       ctx.lineTo(vertical ? at : b.x, vertical ? b.y : at);
+     }
+@@ -488,9 +484,9 @@ export function drawRegionGesture(
+     if (intersects(c, canvasBox)) {
+       const lw = REGION_OUTLINE_SELECTED_PX;
+       ctx.strokeStyle = hueOf(input.dragged.id);
+-      ctx.lineWidth = snapStrokeEdges(0, lw, dpr).width;
++      ctx.lineWidth = snapStroke(0, lw, dpr).width;
+       ctx.strokeRect(
+-        snapStrokeEdges(c.x, lw, dpr).at, snapStrokeEdges(c.y, lw, dpr).at,
++        snapStroke(c.x, lw, dpr).at, snapStroke(c.y, lw, dpr).at,
+         snapLength(c.w, dpr), snapLength(c.h, dpr),
+       );
+       gestureOutlines += 1;
+diff --git a/src/renderer/canvas/screen-frame.ts b/src/renderer/canvas/screen-frame.ts
+index 4fc52389..9feecbeb 100644
+--- a/src/renderer/canvas/screen-frame.ts
++++ b/src/renderer/canvas/screen-frame.ts
+@@ -43,7 +43,7 @@
+ 
+ import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../../core/model/screen';
+ import { worldYToCanvasY } from './effects-guides';
+-import { snapStrokeEdges, snapLength } from './device-grid';
++import { snapStroke, snapLength } from './device-grid';
+ import {
+   SCREEN_FRAME_LINE, SCREEN_FRAME_ACTIVE, SCREEN_FRAME_LABEL_BG, SCREEN_FRAME_LABEL_TEXT,
+ } from './canvas-colors';
+@@ -143,17 +143,14 @@ export function drawScreenFrame(
+   ctx.save();
+   // The map canvas's own CSS transform, restated absolutely.
+   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+-  // BOTH edges of the stroke on whole device pixels and a size in whole device
+-  // pixels (canvas/device-grid.ts `snapStrokeEdges`): the 1 px frame sits on one
+-  // device row, and the 2 px ACTIVE frame on two whole rows, where `snapStroke` had
+-  // centred it on a half-pixel and half-covered a row at each edge (ROADMAP row 239
+-  // (a), ruled 2026-09-28).
++  // Edges on device half-pixels and a size in whole device pixels, so the 1px
++  // stroke sits on one device row, not two (canvas/device-grid.ts).
+   const lw = opts.active ? 2 : 1;
+-  const x = snapStrokeEdges(r.x, lw, dpr).at;
+-  const y = snapStrokeEdges(r.y, lw, dpr).at;
++  const x = snapStroke(r.x, lw, dpr).at;
++  const y = snapStroke(r.y, lw, dpr).at;
+   const w = snapLength(r.w, dpr);
+   const h = snapLength(r.h, dpr);
+-  ctx.lineWidth = snapStrokeEdges(r.x, lw, dpr).width;
++  ctx.lineWidth = snapStroke(r.x, lw, dpr).width;
+   ctx.strokeStyle = opts.active ? SCREEN_FRAME_ACTIVE : SCREEN_FRAME_LINE;
+   ctx.setLineDash([]);
+   ctx.strokeRect(x, y, w, h);
+@@ -166,13 +163,8 @@ export function drawScreenFrame(
+   const tw = ctx.measureText(text).width;
+   // Inside the top-left corner; if the top edge is off-canvas, pin the label
+   // to the canvas's top so it stays readable while the frame is half-scrolled.
+-  // ANCHORED ON THE 1 px FRAME'S LINE WHATEVER THE WIDTH (row 239): the active
+-  // stroke centres half a device pixel off it, and a label that followed would
+-  // jump half a pixel on every hover.
+-  const ax = snapStrokeEdges(r.x, 1, dpr).at;
+-  const ay = snapStrokeEdges(r.y, 1, dpr).at;
+-  const boxX = Math.max(2, ax + 2);
+-  const boxY = Math.max(2, ay + 2);
++  const boxX = Math.max(2, x + 2);
++  const boxY = Math.max(2, y + 2);
+   ctx.fillStyle = SCREEN_FRAME_LABEL_BG;
+   ctx.fillRect(boxX, boxY, tw + 8, 13);
+   ctx.fillStyle = opts.active ? SCREEN_FRAME_ACTIVE : SCREEN_FRAME_LABEL_TEXT;
