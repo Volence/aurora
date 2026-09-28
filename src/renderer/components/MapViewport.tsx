@@ -4830,6 +4830,13 @@ const styles: Record<string, React.CSSProperties> = {
     borderTop: `1px solid ${T.border}`,
     fontSize: T.tXs, fontFamily: T.fontMono, color: T.textBase,
     gap: 6, alignItems: 'center',
+    // The collision arm's sparkline (▇▆▅▄…) is one run with no break
+    // opportunity; at a narrow window it is wider than the bar and was cut by
+    // the container's overflow: hidden. 'anywhere' lets only such a run break
+    // (ordinary spaces still wrap first) and, unlike 'break-word', also lowers
+    // the flex item's min-content width so it can shrink to the bar
+    // (ROADMAP row 244; harness:mapviewport-foreground HBW.a at 700 px).
+    overflowWrap: 'anywhere',
     pointerEvents: 'none',
   },
   ctxMenu: {
