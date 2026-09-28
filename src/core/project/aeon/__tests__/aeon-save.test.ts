@@ -1181,3 +1181,92 @@ describe('row 225(c): a mark copied by paste or chunk stamp is still audited and
     await expect(plan(x)).resolves.toBeDefined();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ROADMAP row 225, the side finding of (c): THE CHUNK LIBRARY. `chunks.json`
+// (collisionA/collisionB, one word per 16px chunk cell) was written with no
+// reserved-bits check, so a marked chunk was refused only once it was stamped
+// into a section. A mark that ENTERS the library this session (save_chunk, the
+// composer's save, a paste into a composer document) is now refused by the save
+// the same way a section cell is: before anything is planned, naming the chunk
+// and the cell, ending "Nothing was written.".
+//
+// A mark that was ALREADY in chunks.json when the project was opened is the
+// undecided case (whether it should block an unrelated save is an open question
+// for a ruling, since no gesture clears a library chunk's bits 15:14 today). Its
+// row below pins TODAY'S behaviour, written back unchanged, so a ruling either
+// way turns exactly one row red.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('row 225 side finding: a mark in the chunk LIBRARY is refused by the save', () => {
+  const LIB = 'data/ojz/chunks.json';
+  const MARK = 1;
+  const SHAPED = packCollisionCell({ shape: 0x33, xFlip: false, yFlip: false, solidity: 'all' });
+  const MARKED = (SHAPED | (MARK << PLANE_RESERVED_SHIFT)) & 0xFFFF;
+  /** A 4x4-tile chunk is 2x2 cells; cell (col 1, row 0) is flat index 1. */
+  const CELL = { col: 1, row: 0, index: 1 };
+
+  function libFixture(onDisk: Array<{ id: string; name: string; a: number[] }>): Map<string, Uint8Array> {
+    const files = fixtureFiles();
+    files.set('project.json', new TextEncoder().encode(JSON.stringify({ ...PROJECT_JSON, chunkLibrary: LIB })));
+    files.set(LIB, new TextEncoder().encode(JSON.stringify(onDisk.map((c) => ({
+      id: c.id, name: c.name, widthTiles: 4, heightTiles: 4,
+      nametable: new Array(16).fill(0), collisionA: c.a, collisionB: [0, 0, 0, 0],
+    })))));
+    return files;
+  }
+  async function loaded(files: Map<string, Uint8Array>) {
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    return { fa, r };
+  }
+  const plan = (x: Awaited<ReturnType<typeof loaded>>) => buildAeonSavePlan(
+    x.fa, x.r.config, x.r.project, 'ojz', 'act1', { legacyAtlasMerged: x.r.legacyAtlasMerged });
+  const libWritten = async (x: Awaited<ReturnType<typeof loaded>>) => {
+    const f = (await plan(x)).files.find((p) => p.path === LIB);
+    return f ? JSON.parse(new TextDecoder().decode(f.bytes)) as Array<{ id: string; collisionA: number[] }> : null;
+  };
+  const namesCell = (name: string, id: string, plane: string, col: number, row: number) => new RegExp(
+    `refusing to save ojz/act1: .*chunk library entry "${name}" \\(id ${id}\\).*`
+    + `plane ${plane} cell \\(col ${col}, row ${row}\\).*Nothing was written`);
+
+  it('ADDED THIS SESSION: a new library chunk carrying a mark is refused, naming the chunk and the cell', async () => {
+    const x = await loaded(libFixture([{ id: 'clean', name: 'Clean', a: [SHAPED, 0, 0, 0] }]));
+    const chunk = createChunkDef('marked', 'Marked', 4, 4);
+    chunk.collisionA[CELL.index] = MARKED;
+    x.r.project.chunkLibrary.push(chunk);
+    await expect(plan(x)).rejects.toThrow(namesCell('Marked', 'marked', 'A', CELL.col, CELL.row));
+  });
+
+  it('plane B is scanned too, and the cell is placed by the chunk\'s own width', async () => {
+    const x = await loaded(libFixture([]));
+    const chunk = createChunkDef('wide', 'Wide', 8, 4);   // 4 cells wide, 2 high
+    chunk.collisionB[6] = MARKED;                          // cell (col 2, row 1)
+    x.r.project.chunkLibrary.push(chunk);
+    await expect(plan(x)).rejects.toThrow(namesCell('Wide', 'wide', 'B', 2, 1));
+  });
+
+  it('control: the same chunk with bits 15:14 clear is written to chunks.json', async () => {
+    const x = await loaded(libFixture([{ id: 'clean', name: 'Clean', a: [SHAPED, 0, 0, 0] }]));
+    const chunk = createChunkDef('marked', 'Marked', 4, 4);
+    chunk.collisionA[CELL.index] = SHAPED;
+    x.r.project.chunkLibrary.push(chunk);
+    const lib = await libWritten(x);
+    expect(lib?.map((c) => c.id)).toEqual(['clean', 'marked']);
+    expect(lib?.[1]!.collisionA[CELL.index]).toBe(SHAPED);
+  });
+
+  it('a NEW mark on a chunk that already carried one on disk is refused, naming only the new cell', async () => {
+    const x = await loaded(libFixture([{ id: 'old', name: 'Old', a: [MARKED, 0, 0, 0] }]));
+    const chunk = x.r.project.chunkLibrary.find((c) => c.id === 'old')!;
+    chunk.collisionA[3] = MARKED;                          // cell (col 1, row 1)
+    const err = await plan(x).then(() => null, (e: Error) => e.message);
+    expect(err).toMatch(namesCell('Old', 'old', 'A', 1, 1));
+    expect(err).not.toMatch(/cell \(col 0, row 0\)/);
+  });
+
+  it('UNDECIDED, TODAY\'S BEHAVIOUR PINNED: a mark already in chunks.json at load is written back unchanged, not refused', async () => {
+    const x = await loaded(libFixture([{ id: 'old', name: 'Old', a: [MARKED, 0, 0, 0] }]));
+    const lib = await libWritten(x);
+    expect(lib?.[0]!.collisionA[0]).toBe(MARKED);
+  });
+});

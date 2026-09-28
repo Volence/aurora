@@ -388,6 +388,34 @@ describe('saveAeonProject', () => {
     expect(useToastStore.getState().toasts.at(-1)!.message).toBe('Save failed');
   });
 
+  /**
+   * ROADMAP row 225, the side finding of (c): a mark in the chunk LIBRARY takes
+   * the same refusal path as a section cell, with the same guarantee: the
+   * refused save writes NOTHING (not chunks.json, not the act's section files),
+   * and the author is told which chunk and which cell. Before the fix the library
+   * was written with no check at all.
+   */
+  it('row 225 library: a chunk-library entry carrying a mark refuses the save and nothing is written', async () => {
+    dirtyAct('ojz', 'act1');
+    const s = useProjectStore.getState();
+    s.config!.chunkLibraryPath = 'data/ojz/chunks.json';
+    const { createChunkDef } = await import('../../../core/model/s4-types');
+    const chunk = createChunkDef('agent-marked', 'Marked', 2, 2);
+    chunk.collisionA[0] = (0x0033 | (2 << 14)) & 0xFFFF;
+    s.addChunks([chunk]);
+    // An edit the act would otherwise write, so "nothing written" is a measurement.
+    const proj = useProjectStore.getState().project!;
+    proj.zones[0]!.acts.find((a) => a.id === 'act1')!.sections[0]!.tileGrid.nametable[5] = (2 << 13) | 1;
+
+    const result = await saveAeonProject();
+
+    expect(result.kind).toBe('error');
+    expect(written).toEqual([]);
+    expect(files.has('data/ojz/chunks.json')).toBe(false);
+    const shown = useProjectStore.getState().error ?? '';
+    expect(shown).toMatch(/refusing to save ojz\/act1: .*chunk library entry "Marked" \(id agent-marked\).*plane A cell \(col 0, row 0\).*Nothing was written/);
+  });
+
   describe('a write the main process refuses', () => {
     let tmp: string;
     let outside: string;
