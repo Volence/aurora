@@ -91,6 +91,18 @@
 //                          that really failed here; row 4c must go red
 //   PLANT=rot-swatch     … rot the colour-swatch finder (section 7's every row
 //                          reads that list); row 7b must catch it and ABORT
+//   PLANT=<kind>:<site>  … ROW 220: make ONE clicked control unreachable, or
+//                          reachable but dead, IN THE RUNNING APP through CDP
+//                          (no source edit), and prove that site's row goes red.
+//                          <site>: facet (1d), subtab (1e), section (4c), new (4a),
+//                          swatch (7f). <kind>:
+//                            pe-none  `pointer-events: none` on the target
+//                            cover    a transparent fixed div over its rect
+//                            inert    a native click listener on the target
+//                                     that stops propagation, so the hit test
+//                                     passes and React's handler never runs
+//                          Each prints what it did, the target's computed
+//                          `pointer-events` and the element at the hit point.
 
 import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
@@ -101,6 +113,7 @@ import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { readAeonShippedPreset } from './lib/aeon-shipped-preset.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
+import { realClick, loadEffectsFacet } from './lib/real-click.mjs';
 import { build as esbuildBuild } from 'esbuild';
 
 const PORT = Number(process.env.PORT ?? 9431);
@@ -123,6 +136,16 @@ const SHOTS = `${ROOT}/scratchpad/shots-band-preset`;
 mkdirSync(SHOTS, { recursive: true });
 
 const PLANT = process.env.PLANT ?? '';
+// ROW 220's click plants. An unknown PLANT is refused: a typo would otherwise
+// run the unmutated app and its green would read as "the plant stayed green".
+const CLICK_SITES = ['facet', 'subtab', 'section', 'new', 'swatch'];
+const CLICK_PLANTS = ['pe-none', 'cover', 'inert'];
+const [PLANT_KIND, PLANT_SITE] = PLANT.includes(':') ? PLANT.split(':') : ['', ''];
+if (PLANT !== '' && !['rot-selector', 'rot-section', 'rot-swatch'].includes(PLANT)
+  && !(CLICK_PLANTS.includes(PLANT_KIND) && CLICK_SITES.includes(PLANT_SITE))) {
+  throw new Error(`unknown PLANT=${PLANT}: want rot-selector | rot-section | rot-swatch | `
+    + `<${CLICK_PLANTS.join('|')}>:<${CLICK_SITES.join('|')}>`);
+}
 /** THIS run's preset — created through the panel's own `New`, authored here.
  *  ⚠ `aurora_local_` IS NOT DECORATION. `New` writes into the same id namespace
  *  aeon commits into, and a collision there does not fail: it silently selects
@@ -180,6 +203,8 @@ const MINE = `${AEONDIR}/games/sonic4/data/editor/effects/presets/${PRESET_ID}.j
 // harness now calls `assertFreshBuild`: a dist/ older than src/ would make the
 // row red for a reason that is not the panel's.
 assertFreshBuild(RUN);
+/** Row 1d's target, from the source `FacetBar` renders (row 215's shape). */
+const EFFECTS_FACET = await loadEffectsFacet(ROOT, '1d');
 const PRESET_PROVIDER_SRC = `${ROOT}/src/renderer/providers/effects-preset.ts`;
 const PROVIDER = await (async () => {
   const out = await esbuildBuild({
@@ -287,15 +312,104 @@ function check(id, name, ok, detail) {
   if (!ok) fails.push(`[${id}] ${name}`);
 }
 
-const clickByText = (re, tag = 'button') => String.raw`
+// ═══════════════════════════════════════════════════════════════════════════
+// EVERY CLICK IS A REAL ONE — ROADMAP row 220
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠ UNTIL ROW 220 FIVE CLICKS HERE WERE `el.click()`: the Effects facet
+// (`clickByText`), the sub-tab (`SUBTAB`), the section header (`OPEN_SECTION`),
+// the preset `New` button and the 7f swatch. A synthetic click fires the handler
+// whether or not a person could reach the target: no hit test, no overlap, no
+// visibility, no `pointer-events`. Each now goes through `AIM_AT` + `clickSite`:
+// find the ONE target, scroll it into view, take its `Math.round` centre, hit-
+// test that pixel, and send lib/real-click.mjs `realClick` there. The row then
+// needs BOTH the hit test to land on the target AND a read-back of the state the
+// click should change, so a click that lands and does nothing is a FAIL too.
+//
+// The click is sent even when the hit test misses. The browser routes it to
+// whatever IS at that pixel, exactly as a person's click would be, so the
+// read-back half fails on its own and the row does not rest on the pre-check.
+
+/**
+ * Page-side: resolve `finder` to ONE element and aim at it. `finder` is an
+ * expression yielding an Element, or a string saying why there is none.
+ * Applies this run's click plant when `site` is the planted one.
+ */
+const AIM_AT = (site, finder) => String.raw`
 (() => {
-  const el = [...document.querySelectorAll(${JSON.stringify(tag)})]
-    .find((e) => ${re}.test(((e.textContent || '') + ' ' + (e.getAttribute('aria-label') || '')).trim()));
-  if (!el) return false;
-  if (el.disabled) return 'disabled';
-  el.click();
-  return true;
+  const el = (${finder});
+  if (typeof el === 'string') return { found: false, why: el };
+  if (!el || typeof el.getBoundingClientRect !== 'function') {
+    return { found: false, why: 'finder matched nothing' };
+  }
+  el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  const plant = ${JSON.stringify(PLANT_SITE === site ? PLANT_KIND : '')};
+  let planted = null;
+  if (plant === 'pe-none') {
+    window.__plant220 = { el, pe: el.style.pointerEvents };
+    el.style.pointerEvents = 'none';
+    planted = 'pointer-events:none set on the target';
+  }
+  const r = el.getBoundingClientRect();
+  const x = Math.round(r.left + r.width / 2), y = Math.round(r.top + r.height / 2);
+  if (plant === 'cover') {
+    const d = document.createElement('div');
+    d.setAttribute('data-plant-220', '');
+    Object.assign(d.style, { position: 'fixed', left: r.left + 'px', top: r.top + 'px',
+      width: r.width + 'px', height: r.height + 'px', zIndex: '2147483647', background: 'transparent' });
+    document.body.appendChild(d);
+    planted = 'transparent fixed div over the target rect';
+  }
+  if (plant === 'inert') {
+    const stop = (e) => e.stopPropagation();
+    el.addEventListener('click', stop);
+    window.__plant220 = { el, stop };
+    planted = 'click listener on the target stops propagation (React never sees it)';
+  }
+  const hit = document.elementFromPoint(x, y);
+  const name = (n) => n ? n.tagName.toLowerCase()
+    + (n.hasAttribute('data-plant-220') ? '[data-plant-220]' : '')
+    + ':' + (n.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 30) : null;
+  return {
+    found: true, dpr: window.devicePixelRatio,
+    rect: { left: +r.left.toFixed(2), top: +r.top.toFixed(2), w: +r.width.toFixed(2), h: +r.height.toFixed(2) },
+    aim: { x, y },
+    hitIsTarget: !!(hit && (hit === el || el.contains(hit))),
+    hit: name(hit), target: name(el),
+    pointerEvents: getComputedStyle(el).pointerEvents,
+    disabled: !!el.disabled,
+    planted,
+  };
 })()`;
+
+/** Page-side: undo this run's click plant, so later rows measure the real app. */
+const UNPLANT = String.raw`
+(() => {
+  document.querySelectorAll('[data-plant-220]').forEach((n) => n.remove());
+  const p = window.__plant220;
+  if (p && p.stop) p.el.removeEventListener('click', p.stop);
+  if (p && 'pe' in p) p.el.style.pointerEvents = p.pe;
+  delete window.__plant220;
+  return 'ok';
+})()`;
+
+/**
+ * Aim at `finder` and send a REAL click at the aim. Returns the aim record
+ * (found, rect, aim, hitIsTarget, hit, pointerEvents, planted), which the
+ * caller prints beside its row. Nothing is clicked when nothing was found.
+ * A plant is undone right after its click, so only the planted row can go red
+ * for it (and whatever needs that row's effect, which is named in the packet).
+ */
+async function clickSite(c, site, finder) {
+  const a = await c.json(AIM_AT(site, finder));
+  if (a.found) await realClick(c, a.aim.x, a.aim.y);
+  if (a.planted) {
+    console.log(`        PLANT ${PLANT} applied at ${site}: ${a.planted}; computed pointer-events `
+      + `${JSON.stringify(a.pointerEvents)}; hit at ${JSON.stringify(a.aim)} = ${JSON.stringify(a.hit)}`);
+    await c.evalExpr(UNPLANT);
+  }
+  return a;
+}
 
 const SET_INPUT = (selector, value) => String.raw`
 (() => {
@@ -322,29 +436,36 @@ const SET_INPUT = (selector, value) => String.raw`
 // did cost two runs of this harness.
 const SECTION_RE = String.raw`/^Raster band presets\b/`;
 
-/** Open a CollapsibleSection by its header text, and report what happened. */
-const OPEN_SECTION = (re, proofSelector) => String.raw`
+/** A CollapsibleSection's header div, by its text; or why there is none. */
+const SECTION_HEADER = (re) => String.raw`
 (() => {
-  const open = () => !!(${proofSelector});
-  if (open()) return 'already-open';
   const hdr = [...document.querySelectorAll('div')]
     .filter((d) => d.style && d.style.cursor === 'pointer' && ${re}.test((d.textContent || '').trim()))
     .pop();
-  if (!hdr) {
-    // NAME WHAT WAS THERE INSTEAD. "no-header" alone sent one run chasing a
-    // product bug that was a selector bug; the candidates make the difference
-    // visible in the log rather than in the next run.
-    const seen = [...document.querySelectorAll('div')]
-      .filter((d) => d.style && d.style.cursor === 'pointer')
-      .map((d) => (d.textContent || '').trim().slice(0, 48));
-    return 'no-header: ' + JSON.stringify(seen);
-  }
-  hdr.click();
-  // NOT the open() probe HERE. React has not re-rendered yet, so it reports
-  // 'clicked-shut' for a click that worked — measured, and it cost a run. The
-  // caller re-checks after a settle; this only reports that a header was hit.
-  return 'clicked';
+  if (hdr) return hdr;
+  // NAME WHAT WAS THERE INSTEAD. "no-header" alone sent one run chasing a
+  // product bug that was a selector bug; the candidates make the difference
+  // visible in the log rather than in the next run.
+  const seen = [...document.querySelectorAll('div')]
+    .filter((d) => d.style && d.style.cursor === 'pointer')
+    .map((d) => (d.textContent || '').trim().slice(0, 48));
+  return 'no-header: ' + JSON.stringify(seen);
 })()`;
+
+/**
+ * Open a CollapsibleSection by its header text with a REAL click (row 220),
+ * and report what happened: `{ state: 'already-open' }`, or `{ state:
+ * 'clicked' | 'no-header', aim }`. The header binds `onClick` on its div.
+ *
+ * NOT an open() probe right after the click. React has not re-rendered yet, so
+ * it reports shut for a click that worked (measured, and it cost a run). The
+ * caller re-checks `SECTION_IS_OPEN` after a settle; that is the read-back.
+ */
+async function openSection(c, re, proofSelector) {
+  if (await c.evalExpr(`!!(${proofSelector})`)) return { state: 'already-open' };
+  const aim = await clickSite(c, 'section', SECTION_HEADER(re));
+  return { state: aim.found ? 'clicked' : 'no-header', aim };
+}
 
 /** Did the section really open? Re-checked after a settle, never synchronously. */
 const SECTION_IS_OPEN = (proofSelector) => `!!(${proofSelector})`;
@@ -432,12 +553,7 @@ const LIMIT_BLOCK = String.raw`
  * than throwing, so the row below reports "not found" instead of a stack.
  */
 const SUBTAB = (id) => String.raw`
-(() => {
-  const t = document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]');
-  if (!t) return 'no-sub-tab';
-  t.click();
-  return 'ok';
-})()`;
+(document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]') || 'no-sub-tab')`;
 
 async function main() {
   const t0 = Date.now();
@@ -530,15 +646,48 @@ async function main() {
       !loaded.some((p) => p.id === PRESET_ID),
       `presets at open: ${JSON.stringify(loaded.map((p) => p.id))}`);
 
-    const clicked = await c.evalExpr(clickByText('/^Effects$/'));
-    check('1d', 'the Effects facet mounts', clicked === true, `click → ${clicked}`);
+    // ⚠ ROW 1d WAS `clickByText('/^Effects$/')` UNTIL ROW 220, a synthetic
+    // `el.click()` that passed on "a button whose text matched was found":
+    // effects-guide 1b's exact shape before row 215. Now the pill FacetBar
+    // renders for the source's Effects descriptor (exactly one, inside the
+    // Facets group) takes a REAL click, and the facet the workspace store holds
+    // for the active tab is read back: not `parallax` before, `parallax` after.
+    const FACET_NOW = 'window.__dbg.parallaxPreview().facet';
+    const facetBefore = await c.evalExpr(FACET_NOW);
+    const pill = await clickSite(c, 'facet', String.raw`(() => {
+      const want = ${JSON.stringify(EFFECTS_FACET.label)};
+      const bar = document.querySelector('[role="group"][aria-label="Facets"]');
+      if (!bar) return 'no Facets group';
+      const all = [...bar.querySelectorAll('button')].filter((b) => (b.textContent || '').trim() === want);
+      return all.length === 1 ? all[0] : all.length + ' pills labelled ' + want;
+    })()`);
     await sleep(1200);
-    await c.evalExpr(SUBTAB('colour'));
+    const facetAfter = await c.evalExpr(FACET_NOW);
+    check('1d', `a REAL click on the "${EFFECTS_FACET.label}" pill mounts the \`${EFFECTS_FACET.id}\` facet`,
+      pill.found === true && pill.hitIsTarget === true
+      && facetBefore !== EFFECTS_FACET.id && facetAfter === EFFECTS_FACET.id,
+      `pill ${JSON.stringify(pill)}; facet before ${JSON.stringify(facetBefore)}, `
+      + `after ${JSON.stringify(facetAfter)} (want ${JSON.stringify(EFFECTS_FACET.id)})`);
+
+    // ROW 1e (new at row 220). The sub-tab click used to be `t.click()` with no
+    // row at all: a sub-tab that failed to switch surfaced sections later as a
+    // missing panel. Now a REAL click on the `colour` tab, and the store's
+    // `effectsSubTab` read back: not `colour` before (the default is
+    // `parallax`), `colour` after. `TabButton` binds `onClick` on a <button>.
+    const SUBTAB_NOW = 'window.__dbg.parallaxPreview().subTab';
+    const subBefore = await c.evalExpr(SUBTAB_NOW);
+    const sub = await clickSite(c, 'subtab', SUBTAB('colour'));
     await sleep(1000);
+    const subAfter = await c.evalExpr(SUBTAB_NOW);
+    check('1e', 'a REAL click on the `colour` sub-tab shows that job',
+      sub.found === true && sub.hitIsTarget === true
+      && subBefore !== 'colour' && subAfter === 'colour',
+      `tab ${JSON.stringify(sub)}; subTab before ${JSON.stringify(subBefore)}, `
+      + `after ${JSON.stringify(subAfter)}`);
 
     // ---- 2. The panel is on screen. --------------------------------------
     const PRESET_PROOF = `document.querySelector('input[placeholder="new_preset_id"]')`;
-    const opened = await c.evalExpr(OPEN_SECTION(SECTION_RE, PRESET_PROOF));
+    const opened = await openSection(c, SECTION_RE, PRESET_PROOF);
     await sleep(900);
     const isOpen = await c.evalExpr(SECTION_IS_OPEN(PRESET_PROOF));
     const panelText = await c.evalExpr(String.raw`
@@ -550,9 +699,14 @@ async function main() {
     // asserted BEFORE anything reads a substring off it. Without this a rotted
     // selector makes every substring test below false for the wrong reason —
     // or, worse, a `.not.toMatch` row true for the wrong reason.
+    // Row 220: `opened !== 'no-header'` was always true (the helper returned
+    // `'no-header: [...]'`). The section is expanded by default, so this is
+    // normally `already-open` and nothing is clicked; when it did need a click,
+    // that click must have hit the header.
     check('2a', 'the preset section is OPEN, its controls on screen',
-      isOpen === true && opened !== 'no-header',
-      `section → ${opened}, open after settle = ${isOpen}`);
+      isOpen === true
+      && (opened.state === 'already-open' || (opened.state === 'clicked' && opened.aim.hitIsTarget === true)),
+      `section → ${JSON.stringify(opened)}, open after settle = ${isOpen}`);
     check('2b', 'the limit block holds body text, not an empty shell',
       panelText.length > 400,
       panelText.length === 0
@@ -845,24 +999,27 @@ async function main() {
     // reported the preset feature broken. Two paths, one observable: exactly
     // the trap the standing invariants name. The button is found from the id
     // INPUT's own row, which is unique.
-    const pressedNew = await c.evalExpr(String.raw`
+    // Row 220: a REAL click (it was `btn.click()`), hit-tested at the button's
+    // centre; the read-back is the model's preset list (row 1c2 showed the id
+    // absent before). A `disabled` button is reported, not skipped: a real
+    // click on it does nothing and the read-back says so.
+    await sleep(300);
+    const pressedNew = await clickSite(c, 'new', String.raw`
       (() => {
         const input = document.querySelector('input[placeholder="new_preset_id"]');
         if (!input) return 'no-input';
         const row = input.parentElement;
-        const btn = [...row.querySelectorAll('button')].find((b) => /^New$/.test((b.textContent || '').trim()));
-        if (!btn) return 'no-button';
-        if (btn.disabled) return 'disabled';
-        btn.click();
-        return true;
+        const all = [...row.querySelectorAll('button')].filter((b) => /^New$/.test((b.textContent || '').trim()));
+        return all.length === 1 ? all[0] : all.length + ' New buttons in the id row';
       })()`);
     await sleep(900);
     const after = await c.json('window.__dbg.aeon.presets()');
-    check('4a', 'clicking New created the preset in the MODEL, not just on screen',
-      typed === 'ok' && pressedNew === true && after.some((p) => p.id === PRESET_ID),
+    check('4a', 'a REAL click on New created the preset in the MODEL, not just on screen',
+      typed === 'ok' && pressedNew.found === true && pressedNew.hitIsTarget === true
+      && pressedNew.disabled === false && after.some((p) => p.id === PRESET_ID),
       // Anti-vacuous: aeon's pre-existing preset is listed too, so a green here
       // is the NEW document appearing rather than the model being empty.
-      `typed=${typed} new=${pressedNew}; ${after.length} presets: `
+      `typed=${typed} new=${JSON.stringify(pressedNew)}; ${after.length} presets: `
       + JSON.stringify(after.map((p) => p.id)));
 
     const docs = JSON.parse(await c.evalExpr('window.__dbg.aeon.presetsJson()'));
@@ -929,12 +1086,16 @@ async function main() {
       `SHUT HEIGHT = ${shutBox && shutBox.height}px, children=${shutBox && shutBox.children} `
       + `(a CollapsibleSection renders no children while shut, so 1 = header alone)`);
 
-    const openedBands = await c.evalExpr(OPEN_SECTION(BANDS_RE, BANDS_PROOF));
+    // Row 220: a REAL click on the header (it was `hdr.click()`). Row 4b0 just
+    // measured this section SHUT, so the click is required (`clicked`, not
+    // `already-open`), must hit the header, and the read-back is the band
+    // editor's own id input appearing after a settle.
+    const openedBands = await openSection(c, BANDS_RE, BANDS_PROOF);
     await sleep(900);
     const bandsOpen = await c.evalExpr(SECTION_IS_OPEN(BANDS_PROOF));
-    check('4c', 'the band editor section opens',
-      bandsOpen === true && openedBands !== 'no-header',
-      `bands section → ${openedBands}, open after settle = ${bandsOpen}`);
+    check('4c', 'a REAL click on its header opens the band editor section',
+      bandsOpen === true && openedBands.state === 'clicked' && openedBands.aim.hitIsTarget === true,
+      `bands section → ${JSON.stringify(openedBands)}, open after settle = ${bandsOpen}`);
 
     // ---- 4c2. THE SECTION'S OPEN HEIGHT, ON A FRESH PRESET. --------------
     //
@@ -1131,18 +1292,22 @@ async function main() {
 
     // ---- 7f/7g. THE PICKER ACTUALLY WRITES. ------------------------------
     //
-    // A real click on the swatch (not `.click()` on something nothing listens
-    // to — this IS a <button> and React does listen), then the shared R/G/B
-    // sliders. `pointerup` is what `GenesisColorSliders` commits on.
+    // A REAL click on the swatch. Until row 220 the comment here said "a real
+    // click" and the code was `${SWATCHES}[0].click()`, a synthetic one. Now it
+    // is hit-tested at the swatch's centre (a <button> binding `onClick`), and
+    // the read-back is the shared R/G/B sliders appearing under the strip.
+    // `pointerup` is what `GenesisColorSliders` commits on (row 7g).
     const slidersBefore = await c.evalExpr(
       `document.querySelectorAll('input[type=range]').length`);
-    await c.evalExpr(String.raw`(() => { ${SWATCHES}[0].click(); return 'ok'; })()`);
+    const swatchAim = await clickSite(c, 'swatch', `(${SWATCHES}[0] || 'no swatch')`);
     await sleep(600);
     const slidersAfter = await c.evalExpr(
       `document.querySelectorAll('input[type=range]').length`);
-    check('7f', 'clicking a swatch opens the app\'s own R/G/B sliders under the strip',
-      slidersAfter - slidersBefore === 3,
-      `range inputs ${slidersBefore} -> ${slidersAfter} (GenesisColorSliders draws three)`);
+    check('7f', 'a REAL click on a swatch opens the app\'s own R/G/B sliders under the strip',
+      swatchAim.found === true && swatchAim.hitIsTarget === true
+      && slidersAfter - slidersBefore === 3,
+      `swatch ${JSON.stringify(swatchAim)}; range inputs ${slidersBefore} -> ${slidersAfter} `
+      + '(GenesisColorSliders draws three)');
 
     const beforeColours = cram0.colours.slice();
     const drove = await c.evalExpr(String.raw`

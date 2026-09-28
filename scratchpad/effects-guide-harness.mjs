@@ -74,7 +74,7 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
-import { build as esbuildBuild } from 'esbuild';
+import { realClick, loadEffectsFacet } from './lib/real-click.mjs';
 
 const PORT = Number(process.env.PORT ?? 9451);
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 95);
@@ -88,29 +88,11 @@ assertFreshBuild(RUN);
  * THE EFFECTS FACET, AS THE APP DEFINES IT (ROADMAP row 215). Row 1b used to
  * find the pill by a typed `/^Effects$/` and call `el.click()`, then pass on
  * "an element was found". Now the descriptor comes from the source the bar
- * renders (`FacetBar` paints `f.label` and calls `switchFacet(tabId, f.id)`
- * from `onClick`): its label is what the row aims at and its id is what the
- * row reads back through `__dbg.parallaxPreview().facet`, which is the
- * workspace store's `facetFor(activeId)`, the value the bar highlights.
- * Keyed by the id `parallax`, the Effects lens's capability id: that is the
- * value the workspace store holds, and the label is presentation that follows
- * it. esbuild bundles `src/core/shell/facets.ts` into memory, as
- * band-preset-harness does for its provider.
+ * renders; lib/real-click.mjs `loadEffectsFacet` (shared with
+ * band-preset-harness since row 220) bundles `src/core/shell/facets.ts` and
+ * refuses if the `parallax` descriptor is missing.
  */
-const FACETS_SRC = `${ROOT}/src/core/shell/facets.ts`;
-const EFFECTS_FACET = await (async () => {
-  const out = await esbuildBuild({
-    entryPoints: [FACETS_SRC], bundle: true, format: 'esm', platform: 'node',
-    write: false, logLevel: 'error',
-  });
-  const m = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
-  m.registerBuiltinFacets();
-  return m.facetRegistry.get('parallax');
-})();
-if (!EFFECTS_FACET || typeof EFFECTS_FACET.label !== 'string' || EFFECTS_FACET.label.length < 3) {
-  throw new Error(`CANNOT MEASURE: ${FACETS_SRC} registers no \`parallax\` facet with a label `
-    + `(got ${JSON.stringify(EFFECTS_FACET)}) — row 1b would have nothing to aim at.`);
-}
+const EFFECTS_FACET = await loadEffectsFacet(ROOT, '1b');
 const ELECTRON = RUN.electron;
 const MAIN = RUN.main;
 const AEONDIR = checkoutOverride('aeon')?.value;
@@ -200,29 +182,8 @@ function check(id, name, ok, detail) {
 }
 
 
-/**
- * A REAL CLICK: CDP `Input.dispatchMouseEvent` moved / pressed / released at an
- * INTEGER client pixel (ROADMAP row 214; row 1b's facet switch too since row
- * 215). Until 2026-09-25 rows 1b, 3 and 4 used
- * `el.click()`, a synthetic `click` with no pointerdown/mousedown/mouseup, no
- * hit test and no coordinates — so it reached a handler that a covering
- * element, a pointer-events rule or a mousedown-driven control would have kept
- * a person from reaching. The browser now routes this one through its own hit
- * test, the way a person's does. The caller computes the pixel from the
- * element's rect (and prints dpr, rect and aim beside the row): Xvfb's scale
- * factor varies between runs here, and a fractional aim is delivered to the
- * neighbouring device pixel (docs/OVERSEER-REFERENCE.md "Instruments").
- */
-async function realClick(c, x, y) {
-  if (!Number.isInteger(x) || !Number.isInteger(y)) {
-    throw new Error(`realClick aimed at a non-integer client pixel (${x}, ${y})`);
-  }
-  await c.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'none', buttons: 0 });
-  await c.send('Input.dispatchMouseEvent',
-    { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
-  await c.send('Input.dispatchMouseEvent',
-    { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
-}
+// `realClick` lives in lib/real-click.mjs since ROADMAP row 220 (one copy,
+// shared with band-preset-harness.mjs).
 
 /**
  * THE COLD READER'S OWN SEARCH, verbatim from §a1 of the walkthrough: any
