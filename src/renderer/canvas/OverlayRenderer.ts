@@ -48,6 +48,16 @@ export const OBJECT_LABEL_BASELINE_PX = 3;
 export const TILE_GRID_WORLD_WIDTH = 0.5;
 export const BLOCK_GRID_WORLD_WIDTH = 1;
 export const SECTION_GRID_WORLD_WIDTH = 2;
+/**
+ * A map grid whose lines would be closer than this on screen (`step * zoom`, CSS px) is
+ * NOT DRAWN (overseer ruling, 2026-09-28, ROADMAP row 240). Before row 240 the grids drew
+ * world-unit lines, sub-pixel and antialiased, so at that density they were faint to
+ * invisible. On the device grid a line is never under half a CSS px (1 device px), so a
+ * dense grid would instead become a solid wash (the tile grid at zoom 0.125: a line every
+ * CSS px) or a 50% stripe (every 2 CSS px). Below this spacing the grid says nothing an
+ * author can read, and hiding it keeps the look the old faint lines had.
+ */
+export const MIN_GRID_SPACING_CSS_PX = 4;
 
 type GridViewport = { x: number; y: number; width: number; height: number; zoom: number };
 
@@ -243,9 +253,11 @@ export class OverlayRenderer {
    * ⚠ NEVER LESS THAN HALF A CSS PX, the object box's floor and for its reason: below it the
    * parity rule reads the width as EVEN, whose smallest width is 2 device px, so zooming
    * OUT would make the grid heavier. Half a CSS px is an odd width, 1 device px up to dpr
-   * 2.x. What that costs, disclosed: at zoom 0.125 the tile grid is a 1 device px line
-   * every CSS px where it used to be an antialiased sixteenth of one, so its 6% white wash
-   * covers the view.
+   * 2.x.
+   *
+   * ⚠ AND NOT DRAWN AT ALL WHEN ITS LINES ARE UNDER `MIN_GRID_SPACING_CSS_PX` APART (ruled
+   * 2026-09-28 at row 240), for the reason that constant gives: at zoom 0.125 the floor
+   * would make the tile grid a 1 device px line every CSS px, a solid wash over the view.
    *
    * One stroke per line, as before, so the crossings of a translucent grid are painted
    * twice exactly as they were.
@@ -254,6 +266,7 @@ export class OverlayRenderer {
     ctx: Ctx, viewport: GridViewport, dpr: number, step: number, worldWidth: number, style: string,
   ): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
+    if (step * zoom < MIN_GRID_SPACING_CSS_PX) return;
     const vpWidth = width / zoom;
     const vpHeight = height / zoom;
     const path = segmentsOnDeviceGrid(ctx, dpr, cameraDeviceMapping(vpX, vpY, zoom, dpr));

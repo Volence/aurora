@@ -22,7 +22,7 @@ import { recordingContext, type Recording, type DeviceStroke } from './chrome-re
 import { deviceStrokeWidth } from '../device-grid';
 import { expectedCentre, edgesWhole } from './grid-edges';
 import {
-  OverlayRenderer, TILE_GRID_WORLD_WIDTH, BLOCK_GRID_WORLD_WIDTH, SECTION_GRID_WORLD_WIDTH,
+  OverlayRenderer, TILE_GRID_WORLD_WIDTH, BLOCK_GRID_WORLD_WIDTH, SECTION_GRID_WORLD_WIDTH, MIN_GRID_SPACING_CSS_PX,
 } from '../OverlayRenderer';
 import { COLLISION_SURFACE_LINE, COLLISION_DIFF, GRID_TILE, GRID_BLOCK, GRID_SECTION } from '../canvas-colors';
 import { packCollisionCell } from '../../../core/collision/collision-cell-word';
@@ -186,7 +186,10 @@ describe('the tile, block and section grids are on the device grid (row 240 (a))
           const xs: number[] = [], ys: number[] = [];
           for (let x = Math.floor(v.x / g.step) * g.step; x < v.x + vw; x += g.step) xs.push(x);
           for (let y = Math.floor(v.y / g.step) * g.step; y < v.y + vh; y += g.step) ys.push(y);
-          expect(lines.length, 'one stroke per grid line').toBe(xs.length + ys.length);
+          // A grid under MIN_GRID_SPACING_CSS_PX apart on screen is not drawn at all (its
+          // own describe below holds that edge); these rows then hold only that nothing leaks.
+          const drawn = g.step * v.zoom >= MIN_GRID_SPACING_CSS_PX;
+          expect(lines.length, 'one stroke per grid line').toBe(drawn ? xs.length + ys.length : 0);
           const cssWidth = Math.max(g.world * v.zoom, 0.5);
           const want = deviceStrokeWidth(cssWidth, dpr);
           lines.forEach((s, i) => {
@@ -210,11 +213,46 @@ describe('the tile, block and section grids are on the device grid (row 240 (a))
   }
 
   it('below half a CSS px a grid line is ONE device px at dpr 1, not the parity rule\'s even minimum of 2', () => {
-    const r = renderAt(1, { zoom: 0.25, x: 0, y: 0 }, { showTileGrid: true });
-    const lines = r.strokes.filter((s) => s.style === GRID_TILE);
+    // The block grid at zoom 0.25: a quarter CSS px wide, 32 CSS px apart, so drawn.
+    const zoom = 0.25;
+    expect(128 * zoom >= MIN_GRID_SPACING_CSS_PX, 'the case must be a drawn grid').toBe(true);
+    const r = renderAt(1, { zoom, x: 0, y: 0 }, { showBlockGrid: true });
+    const lines = r.strokes.filter((s) => s.style === GRID_BLOCK);
     expect(lines.length).toBeGreaterThan(0);
     for (const s of lines) expect(s.width).toBeCloseTo(1, 9);
-    // The rule the floor exists to avoid, stated: an eighth of a CSS px reads as EVEN.
-    expect(deviceStrokeWidth(TILE_GRID_WORLD_WIDTH * 0.25, 1)).toBe(2);
+    // The rule the floor exists to avoid, stated: a quarter CSS px reads as EVEN.
+    expect(deviceStrokeWidth(BLOCK_GRID_WORLD_WIDTH * zoom, 1)).toBe(2);
+  });
+});
+
+// ═══ the spacing threshold (overseer ruling 2026-09-28, row 240) ════════════════════════
+describe('a map grid closer than MIN_GRID_SPACING_CSS_PX on screen is not drawn', () => {
+  // Zooms DERIVED from the constant and each grid's step: exactly at the threshold, and
+  // just under it. Both sides at every dpr for the tile grid; one block-grid case.
+  const JUST_UNDER = 1 - 1e-3;
+  const tileAt = MIN_GRID_SPACING_CSS_PX / 8;
+  for (const dpr of DPRS) {
+    it(`tile grid, spacing just under the threshold: nothing drawn, dpr ${dpr}`, () => {
+      const zoom = tileAt * JUST_UNDER;
+      expect(8 * zoom).toBeLessThan(MIN_GRID_SPACING_CSS_PX);
+      const r = renderAt(dpr, { zoom, x: 0, y: 0 }, { showTileGrid: true });
+      expect(r.strokes.filter((s) => s.style === GRID_TILE).length).toBe(0);
+    });
+    it(`tile grid, spacing exactly at the threshold: drawn, dpr ${dpr}`, () => {
+      expect(8 * tileAt).toBe(MIN_GRID_SPACING_CSS_PX);
+      const r = renderAt(dpr, { zoom: tileAt, x: 0, y: 0 }, { showTileGrid: true });
+      expect(r.strokes.filter((s) => s.style === GRID_TILE).length).toBeGreaterThan(0);
+    });
+    it(`tile grid, spacing above the threshold: drawn, dpr ${dpr}`, () => {
+      const zoom = tileAt * 1.5;
+      const r = renderAt(dpr, { zoom, x: 0, y: 0 }, { showTileGrid: true });
+      expect(r.strokes.filter((s) => s.style === GRID_TILE).length).toBeGreaterThan(0);
+    });
+  }
+  it('block grid, spacing just under the threshold: nothing drawn', () => {
+    const zoom = (MIN_GRID_SPACING_CSS_PX / 128) * JUST_UNDER;
+    expect(128 * zoom).toBeLessThan(MIN_GRID_SPACING_CSS_PX);
+    const r = renderAt(1, { zoom, x: 0, y: 0 }, { showBlockGrid: true });
+    expect(r.strokes.filter((s) => s.style === GRID_BLOCK).length).toBe(0);
   });
 });
