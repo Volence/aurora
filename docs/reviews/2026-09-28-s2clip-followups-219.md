@@ -189,18 +189,21 @@ view). This is for the overseer's look call; I changed nothing on the page:
 
 ## 5. Suite
 
-- `npx tsc --noEmit`: exit 0.
-- Full `npm test` (the pre-checks, typecheck and vitest, `VITEST_MAX_WORKERS=4`, `TMPDIR` under `$HOME`): see the
-  row's closing figures in section 6.
+Run on the docs commit on top of `82a4f5ab`, from the worktree, `VITEST_MAX_WORKERS=4`, `TMPDIR` under `$HOME`:
+- `npm test` (every pre-check, `tsc --noEmit`, then vitest): exit 0. **Test Files 674 passed | 3 skipped (677); Tests
+  10525 passed | 20 skipped (10545)**; `run-completeness: COMPLETE, 677 of 677`; `failure-class: no failures`;
+  `skip-report: OK` (the skips name their reasons: no s4_engine tree, and sibling-root step 3, which is unmeasurable
+  from a linked worktree).
+- `npx tsc --noEmit`: exit 0. `npm run check:doc-citations`: OK.
+- `npm run harness:donor-page`: 26/26 PASS, 0 UNMEASURABLE (section 4).
 
-## 6. Commits and closing figures
+## 6. Commits
 
-See the report for the tip SHA and the final suite totals. The branch commits are, in order:
-- (b) the quiet acceptance;
-- (c) the extended pin and the closure row;
-- (a) DP.11a to DP.11c;
-- (a) the opaque-pixel fix;
-- this packet and the ROADMAP row.
+- `fe54a054` (b) the quiet acceptance;
+- `338950f6` (c) the extended pin and the closure row;
+- `931de770` (a) DP.11a to DP.11c;
+- `82a4f5ab` (a) the opaque-pixel fix;
+- the ROADMAP row and this packet, then these closing figures.
 
 ## 7. Open
 
