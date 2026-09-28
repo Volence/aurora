@@ -68,8 +68,9 @@ export interface TileLensSpec {
   /**
    * The canvas's device scale, when the caller wants the boundary strokes ON THE DEVICE
    * GRID (ROADMAP row 238 (c), the Sonic 1 priority lens): they then go through
-   * `segmentsOnDeviceGrid` (canvas/device-grid.ts), each edge on the device half-pixel
-   * `snapStroke` picks and its ends on whole device px. Absent, the strokes are drawn in
+   * `segmentsOnDeviceGrid` (canvas/device-grid.ts), each stroke centred where
+   * `snapStrokeEdges` puts it (both of its edges on whole device px) and its ends on
+   * whole device px. Absent, the strokes are drawn in
    * world units exactly as before; aeon's lenses pass nothing, so their picture is
    * unchanged by row 238.
    */

@@ -28,28 +28,37 @@
 // straddles two device rows"). That reason survives; the way of getting it changes. The
 // chrome now draws under the canvas's own CSS transform and SNAPS in device space:
 //
-//   - a stroke's CENTRE goes on a device half-pixel: `(round(v * dpr) + 0.5) / dpr`;
+//   - an odd-width stroke's CENTRE goes on a device half-pixel, `(round(v * dpr) + 0.5)
+//     / dpr`, and an even-width one's on a whole device pixel (below);
 //   - its WIDTH is a whole number of device pixels: the one nearest `w * dpr` with the
 //     same parity as `w`, ties going thinner. So a 1 px line stays an ODD device width
 //     and covers whole device rows, as it always did at dpr 1.
 //
 // ⚠ `snapStroke` CENTRES EVERY WIDTH ON A HALF-PIXEL, which gives an EVEN device width
-// (every 2 px line, at every dpr) a half-covered row or column at each edge. That was
-// true of the chrome this file was written for at dpr 1 too, because that chrome drew at
-// `Math.round(v) + 0.5` before it came here, and it is what dpr-chrome.test.ts's golden
-// holds. It is NOT "the look every 2 px line always had": an outline stroked at `2 / zoom`
-// in world units on an integer device edge covers two WHOLE columns, which is how
-// MapViewport's stamp ghost and marquee and classic's stamp-drag preview drew before rows
-// 237 and 238 (measured, docs/reviews/2026-09-28-device-grid-238.md). The pre-existing
-// chrome callers are left on `snapStroke` (a separate row; the packet counts which of
-// them draw an even width). Rows 237/238's helpers below go through `snapStrokeEdges`
-// instead, which puts BOTH edges of every width on whole device pixels.
+// (every 2 px line, at every dpr) a half-covered row or column at each edge. The chrome
+// this file was written for drew that way at dpr 1 too, because it drew at
+// `Math.round(v) + 0.5` before it came here. It is NOT "the look every 2 px line always
+// had": an outline stroked at `2 / zoom` in world units on an integer device edge covers
+// two WHOLE columns, which is how MapViewport's stamp ghost and marquee and classic's
+// stamp-drag preview drew before rows 237 and 238 (measured,
+// docs/reviews/2026-09-28-device-grid-238.md).
 //
-// AT dpr 1 BOTH REDUCE TO MASTER'S ARITHMETIC EXACTLY (`Math.round(v) + 0.5`, width
-// `w`, `Math.round(len)`), so a dpr-1 display does not change by one pixel. That is
-// asserted two ways: canvas/__tests__/dpr-chrome.test.ts compares every call against a
-// golden recorded from master, and scratchpad/dpr-guides-offset-harness.mjs hashes the
-// map's backing store against a master build.
+// SO EVERY STROKE NOW GOES THROUGH `snapStrokeEdges`, which puts BOTH edges of every
+// width on whole device pixels: rows 237/238's helpers below, and since ROADMAP row 239
+// (a) (ruled 2026-09-28) the older chrome too (the screen frame, the layer guides and
+// `plane_y` rules, the regions overlay). For an ODD width the answer is `snapStroke`'s,
+// so the 1 px and 3 px chrome did not move; the 2 px chrome (the active frame, the
+// hovered, dragged or refused guide, the selected region and the dragged region rect)
+// moved half a device pixel onto two whole rows or columns
+// (docs/reviews/2026-09-28-even-chrome-239.md). `snapStroke` stays for the tests that
+// state the half-pixel rule; dpr-chrome.test.ts holds that no renderer code calls it.
+//
+// AT dpr 1 THE ODD WIDTHS REDUCE TO MASTER'S ARITHMETIC EXACTLY (`Math.round(v) + 0.5`,
+// width `w`, `Math.round(len)`), and an even width to `Math.round(v)`, so a dpr-1 display
+// changed only where a 2 px line is drawn. canvas/__tests__/dpr-chrome.test.ts compares
+// every call against a dpr-1 golden (re-recorded for row 239, with the reason beside it),
+// and scratchpad/dpr-guides-offset-harness.mjs hashes the map's backing store against a
+// baseline build.
 
 /** A crisp stroke's centre and width, both in CSS px, for a canvas at `dpr`. */
 export interface SnappedStroke {
@@ -74,6 +83,10 @@ export function deviceStrokeWidth(cssWidth: number, dpr: number): number {
  * Where a crisp stroke of `cssWidth` nearest the CSS coordinate `cssAt` goes: its centre
  * on a device half-pixel and its width a whole number of device pixels, both expressed
  * back in CSS px for the canvas's CSS transform.
+ *
+ * ⚠ NO RENDERER CODE CALLS THIS (ROADMAP row 239 (a); dpr-chrome.test.ts's census):
+ * for an EVEN width the half-pixel centre half-covers a device row at each edge. Draw
+ * through `snapStrokeEdges`, which gives this same answer for every odd width.
  */
 export function snapStroke(cssAt: number, cssWidth: number, dpr: number): SnappedStroke {
   return {
@@ -93,8 +106,9 @@ export function snapStroke(cssAt: number, cssWidth: number, dpr: number): Snappe
  * At dpr 1 a 2 px stroke on an integer edge E therefore covers columns E-1 and E, which
  * is exactly what the world-unit `2 / zoom` outlines drew before rows 237/238 snapped
  * them. Used by `strokeRectOnDeviceGrid`, `strokeCssRectOnDeviceGrid`,
- * `segmentsOnDeviceGrid` and classic's surface line; NOT by the older chrome, which stays
- * on `snapStroke` under its golden (see the file docblock).
+ * `segmentsOnDeviceGrid` and classic's surface line, and since ROADMAP row 239 (a) by the
+ * older chrome too: the screen frame, the layer guides and `plane_y` rules, and the
+ * regions overlay (see the file docblock).
  */
 export function snapStrokeEdges(cssAt: number, cssWidth: number, dpr: number): SnappedStroke {
   const w = deviceStrokeWidth(cssWidth, dpr);

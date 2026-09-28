@@ -43,7 +43,7 @@
 
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../../core/model/screen';
 import { worldYToCanvasY } from './effects-guides';
-import { snapStroke, snapLength } from './device-grid';
+import { snapStrokeEdges, snapLength } from './device-grid';
 import {
   SCREEN_FRAME_LINE, SCREEN_FRAME_ACTIVE, SCREEN_FRAME_LABEL_BG, SCREEN_FRAME_LABEL_TEXT,
 } from './canvas-colors';
@@ -143,14 +143,17 @@ export function drawScreenFrame(
   ctx.save();
   // The map canvas's own CSS transform, restated absolutely.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // Edges on device half-pixels and a size in whole device pixels, so the 1px
-  // stroke sits on one device row, not two (canvas/device-grid.ts).
+  // BOTH edges of the stroke on whole device pixels and a size in whole device
+  // pixels (canvas/device-grid.ts `snapStrokeEdges`): the 1 px frame sits on one
+  // device row, and the 2 px ACTIVE frame on two whole rows, where `snapStroke` had
+  // centred it on a half-pixel and half-covered a row at each edge (ROADMAP row 239
+  // (a), ruled 2026-09-28).
   const lw = opts.active ? 2 : 1;
-  const x = snapStroke(r.x, lw, dpr).at;
-  const y = snapStroke(r.y, lw, dpr).at;
+  const x = snapStrokeEdges(r.x, lw, dpr).at;
+  const y = snapStrokeEdges(r.y, lw, dpr).at;
   const w = snapLength(r.w, dpr);
   const h = snapLength(r.h, dpr);
-  ctx.lineWidth = snapStroke(r.x, lw, dpr).width;
+  ctx.lineWidth = snapStrokeEdges(r.x, lw, dpr).width;
   ctx.strokeStyle = opts.active ? SCREEN_FRAME_ACTIVE : SCREEN_FRAME_LINE;
   ctx.setLineDash([]);
   ctx.strokeRect(x, y, w, h);
@@ -163,8 +166,13 @@ export function drawScreenFrame(
   const tw = ctx.measureText(text).width;
   // Inside the top-left corner; if the top edge is off-canvas, pin the label
   // to the canvas's top so it stays readable while the frame is half-scrolled.
-  const boxX = Math.max(2, x + 2);
-  const boxY = Math.max(2, y + 2);
+  // ANCHORED ON THE 1 px FRAME'S LINE WHATEVER THE WIDTH (row 239): the active
+  // stroke centres half a device pixel off it, and a label that followed would
+  // jump half a pixel on every hover.
+  const ax = snapStrokeEdges(r.x, 1, dpr).at;
+  const ay = snapStrokeEdges(r.y, 1, dpr).at;
+  const boxX = Math.max(2, ax + 2);
+  const boxY = Math.max(2, ay + 2);
   ctx.fillStyle = SCREEN_FRAME_LABEL_BG;
   ctx.fillRect(boxX, boxY, tw + 8, 13);
   ctx.fillStyle = opts.active ? SCREEN_FRAME_ACTIVE : SCREEN_FRAME_LABEL_TEXT;

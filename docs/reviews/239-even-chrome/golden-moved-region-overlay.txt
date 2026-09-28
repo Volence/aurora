@@ -1,0 +1,55 @@
+old: master 6072f9df0fa3f45afd750025110397eda7169974, drawRegionOverlay before row 208
+new: row 239 (a) parcel/even-chrome-239 (base 9d8fcee9, the row 239 source change), ruled 2026-09-28: even-width strokes on whole-pixel centres; every other call as master 6072f9df0fa3f45afd750025110397eda7169974 recorded (drawRegionOverlay before row 208)
+
+== at rest, nothing selected: 588 calls, 0 moved
+
+== at rest, west selected: 588 calls, 8 moved
+  #232 moveTo [0.5, 0] -> [0, 0]  (device lineWidth 2, EVEN)
+  #233 lineTo [0.5, 448] -> [0, 448]  (device lineWidth 2, EVEN)
+  #234 moveTo [320.5, 0] -> [320, 0]  (device lineWidth 2, EVEN)
+  #235 lineTo [320.5, 448] -> [320, 448]  (device lineWidth 2, EVEN)
+  #236 moveTo [0, 0.5] -> [0, 0]  (device lineWidth 2, EVEN)
+  #237 lineTo [320, 0.5] -> [320, 0]  (device lineWidth 2, EVEN)
+  #238 moveTo [0, 448.5] -> [0, 448]  (device lineWidth 2, EVEN)
+  #239 lineTo [320, 448.5] -> [320, 448]  (device lineWidth 2, EVEN)
+
+== at rest, a hole where south was: 711 calls, 0 moved
+
+== mid-drag with the tint ON: the preview pieces, west selected: 648 calls, 16 moved
+  #265 moveTo [0.5, 0] -> [0, 0]  (device lineWidth 2, EVEN)
+  #266 lineTo [0.5, 448] -> [0, 448]  (device lineWidth 2, EVEN)
+  #267 moveTo [320.5, 0] -> [320, 0]  (device lineWidth 2, EVEN)
+  #268 lineTo [320.5, 448] -> [320, 448]  (device lineWidth 2, EVEN)
+  #269 moveTo [0, 0.5] -> [0, 0]  (device lineWidth 2, EVEN)
+  #270 lineTo [320, 0.5] -> [320, 0]  (device lineWidth 2, EVEN)
+  #271 moveTo [0, 448.5] -> [0, 448]  (device lineWidth 2, EVEN)
+  #272 lineTo [320, 448.5] -> [320, 448]  (device lineWidth 2, EVEN)
+  #273 moveTo [400.5, 96] -> [400, 96]  (device lineWidth 2, EVEN)
+  #274 lineTo [400.5, 192] -> [400, 192]  (device lineWidth 2, EVEN)
+  #275 moveTo [496.5, 96] -> [496, 96]  (device lineWidth 2, EVEN)
+  #276 lineTo [496.5, 192] -> [496, 192]  (device lineWidth 2, EVEN)
+  #277 moveTo [400, 96.5] -> [400, 96]  (device lineWidth 2, EVEN)
+  #278 lineTo [496, 96.5] -> [496, 96]  (device lineWidth 2, EVEN)
+  #279 moveTo [400, 192.5] -> [400, 192]  (device lineWidth 2, EVEN)
+  #280 lineTo [496, 192.5] -> [496, 192]  (device lineWidth 2, EVEN)
+
+== mid-drag with the tint ON, at dpr 1.35: 648 calls, 16 moved
+  #265 moveTo [0.37037037037037035, 0] -> [0, 0]  (device lineWidth 2.0, EVEN)
+  #266 lineTo [0.37037037037037035, 448] -> [0, 448]  (device lineWidth 2.0, EVEN)
+  #267 moveTo [320.3703703703703, 0] -> [320, 0]  (device lineWidth 2.0, EVEN)
+  #268 lineTo [320.3703703703703, 448] -> [320, 448]  (device lineWidth 2.0, EVEN)
+  #269 moveTo [0, 0.37037037037037035] -> [0, 0]  (device lineWidth 2.0, EVEN)
+  #270 lineTo [320, 0.37037037037037035] -> [320, 0]  (device lineWidth 2.0, EVEN)
+  #271 moveTo [0, 448.5185185185185] -> [0, 448.1481481481481]  (device lineWidth 2.0, EVEN)
+  #272 lineTo [320, 448.5185185185185] -> [320, 448.1481481481481]  (device lineWidth 2.0, EVEN)
+  #273 moveTo [400.3703703703703, 96] -> [400, 96]  (device lineWidth 2.0, EVEN)
+  #274 lineTo [400.3703703703703, 192] -> [400, 192]  (device lineWidth 2.0, EVEN)
+  #275 moveTo [496.66666666666663, 96] -> [496.29629629629625, 96]  (device lineWidth 2.0, EVEN)
+  #276 lineTo [496.66666666666663, 192] -> [496.29629629629625, 192]  (device lineWidth 2.0, EVEN)
+  #277 moveTo [400, 96.66666666666666] -> [400, 96.29629629629629]  (device lineWidth 2.0, EVEN)
+  #278 lineTo [496, 96.66666666666666] -> [496, 96.29629629629629]  (device lineWidth 2.0, EVEN)
+  #279 moveTo [400, 192.2222222222222] -> [400, 191.85185185185185]  (device lineWidth 2.0, EVEN)
+  #280 lineTo [496, 192.2222222222222] -> [496, 191.85185185185185]  (device lineWidth 2.0, EVEN)
+
+TOTAL moved calls: 40
+VERDICT: every moved call is stroke geometry (moveTo/lineTo/strokeRect) under an EVEN device lineWidth; op sequence, call counts, matrices and reports unchanged

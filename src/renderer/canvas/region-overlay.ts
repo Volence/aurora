@@ -59,7 +59,11 @@
 // CSS transform (`setTransform(dpr, ...)`) and snaps in device space, never
 // resetting to identity: that reset is the defect
 // `docs/reviews/2026-09-12-dpr-guides-offset.md` is about and
-// `canvas/device-grid.ts` is the fix.
+// `canvas/device-grid.ts` is the fix. Every stroke goes through
+// `snapStrokeEdges`, so BOTH edges of the selected region's 2 px outline and of
+// the dragged rect sit on whole device pixels at every dpr (ROADMAP row 239 (a),
+// ruled 2026-09-28; `snapStroke` had centred them on a half-pixel and half-covered
+// a device column at each edge).
 //
 // ═══ TWO DRAWS: THE FULL OVERLAY, AND THE GESTURE ONLY ═══
 //
@@ -80,7 +84,7 @@ import {
   REGION_UNASSIGNED_FILL, REGION_UNASSIGNED_LABEL_BG, REGION_UNASSIGNED_LABEL_TEXT,
 } from './canvas-colors';
 import { worldYToCanvasY } from './effects-guides';
-import { snapLength, snapStroke } from './device-grid';
+import { snapLength, snapStrokeEdges } from './device-grid';
 import { REGION_GRAB_PX } from '../../core/editing/region-marquee';
 import {
   coverage, isEmptyRect, rectArea, sortRects,
@@ -313,7 +317,7 @@ export function drawRegionOverlay(
   const holes = cover.unassigned;
   if (holes.length > 0) {
     ctx.strokeStyle = REGION_UNASSIGNED_FILL;
-    ctx.lineWidth = snapStroke(0, REGION_OUTLINE_PX, dpr).width;
+    ctx.lineWidth = snapStrokeEdges(0, REGION_OUTLINE_PX, dpr).width;
     for (const hole of holes) {
       const c = toCanvas(hole, vp);
       if (!intersects(c, canvasBox)) continue;
@@ -327,7 +331,7 @@ export function drawRegionOverlay(
       hatch(ctx, box, -1, REGION_HATCH_PX);
       ctx.restore();
       ctx.strokeRect(
-        snapStroke(c.x, REGION_OUTLINE_PX, dpr).at, snapStroke(c.y, REGION_OUTLINE_PX, dpr).at,
+        snapStrokeEdges(c.x, REGION_OUTLINE_PX, dpr).at, snapStrokeEdges(c.y, REGION_OUTLINE_PX, dpr).at,
         snapLength(c.w, dpr), snapLength(c.h, dpr),
       );
     }
@@ -358,20 +362,20 @@ export function drawRegionOverlay(
     ctx.clip();
     ctx.strokeStyle = hue;
     ctx.globalAlpha = REGION_HATCH_ALPHA;
-    ctx.lineWidth = snapStroke(0, REGION_OUTLINE_PX, dpr).width;
+    ctx.lineWidth = snapStrokeEdges(0, REGION_OUTLINE_PX, dpr).width;
     hatch(ctx, clampToCanvas(box, canvasBox), regionHatchSlope(i), REGION_HATCH_PX);
     counts.hatches += 1;
     ctx.restore();
 
     const lw = selected ? REGION_OUTLINE_SELECTED_PX : REGION_OUTLINE_PX;
     ctx.strokeStyle = hue;
-    ctx.lineWidth = snapStroke(0, lw, dpr).width;
+    ctx.lineWidth = snapStrokeEdges(0, lw, dpr).width;
     ctx.beginPath();
     for (const s of regionOutlineSegments(rects)) {
       const a = toCanvas({ x: s.x1, y: s.y1, w: 0, h: 0 }, vp);
       const b = toCanvas({ x: s.x2, y: s.y2, w: 0, h: 0 }, vp);
       const vertical = s.x1 === s.x2;
-      const at = snapStroke(vertical ? a.x : a.y, lw, dpr).at;
+      const at = snapStrokeEdges(vertical ? a.x : a.y, lw, dpr).at;
       ctx.moveTo(vertical ? at : a.x, vertical ? a.y : at);
       ctx.lineTo(vertical ? at : b.x, vertical ? b.y : at);
     }
@@ -464,13 +468,13 @@ export function drawRegionGesture(
     const bounds = unionBounds(rects);
     if (bounds === null || !intersects(toCanvas(bounds, vp), canvasBox)) continue;
     ctx.strokeStyle = hueOf(id);
-    ctx.lineWidth = snapStroke(0, REGION_OUTLINE_PX, dpr).width;
+    ctx.lineWidth = snapStrokeEdges(0, REGION_OUTLINE_PX, dpr).width;
     ctx.beginPath();
     for (const s of regionOutlineSegments(rects)) {
       const a = toCanvas({ x: s.x1, y: s.y1, w: 0, h: 0 }, vp);
       const b = toCanvas({ x: s.x2, y: s.y2, w: 0, h: 0 }, vp);
       const vertical = s.x1 === s.x2;
-      const at = snapStroke(vertical ? a.x : a.y, REGION_OUTLINE_PX, dpr).at;
+      const at = snapStrokeEdges(vertical ? a.x : a.y, REGION_OUTLINE_PX, dpr).at;
       ctx.moveTo(vertical ? at : a.x, vertical ? a.y : at);
       ctx.lineTo(vertical ? at : b.x, vertical ? b.y : at);
     }
@@ -484,9 +488,9 @@ export function drawRegionGesture(
     if (intersects(c, canvasBox)) {
       const lw = REGION_OUTLINE_SELECTED_PX;
       ctx.strokeStyle = hueOf(input.dragged.id);
-      ctx.lineWidth = snapStroke(0, lw, dpr).width;
+      ctx.lineWidth = snapStrokeEdges(0, lw, dpr).width;
       ctx.strokeRect(
-        snapStroke(c.x, lw, dpr).at, snapStroke(c.y, lw, dpr).at,
+        snapStrokeEdges(c.x, lw, dpr).at, snapStrokeEdges(c.y, lw, dpr).at,
         snapLength(c.w, dpr), snapLength(c.h, dpr),
       );
       gestureOutlines += 1;

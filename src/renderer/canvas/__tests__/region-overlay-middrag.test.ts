@@ -41,9 +41,21 @@ const golden = JSON.parse(readFileSync(
 /** JSON's view of a value: what the golden was written through (it also folds -0 to 0). */
 const roundTrip = (v: unknown): unknown => JSON.parse(JSON.stringify(v));
 
-describe('row 208 control: with the tint ON the full overlay issues exactly master\'s calls', () => {
-  it('the golden was recorded from master 6072f9df and names the same cases (anti-vacuous)', () => {
-    expect(golden.generatedFrom).toMatch(/^master 6072f9df/);
+// ⚠ THE GOLDEN WAS RE-RECORDED FOR ROADMAP ROW 239 (a), RULED 2026-09-28 by the overseer
+// under the owner's 2026-09-18 look permission: EVEN WIDTHS MOVED TO WHOLE-PIXEL CENTRES.
+// The selected region's 2 CSS px outline now draws through `snapStrokeEdges`, so its
+// segments sit on `round(v * dpr) / dpr` where master's sat half a device pixel further.
+// It was re-recorded by a one-off generator in the original's shape (text:
+// docs/reviews/239-even-chrome/golden-generator.ts.txt; on the pre-239 tree it reproduced
+// the old file byte for byte but for `generatedFrom`). EXACTLY 40 calls moved, in the
+// three cases with west selected, all moveTo/lineTo of a 2-device-px stroke, with every
+// op, count, matrix and report unchanged
+// (docs/reviews/239-even-chrome/golden-moved-region-overlay.txt). So row 208's control
+// still holds what it held: with the tint ON the full overlay's calls, mid-drag and at
+// rest, are the pre-208 calls, and only row 239's even strokes differ from 6072f9df.
+describe('row 208 control: with the tint ON the full overlay issues exactly master\'s calls, but for row 239\'s even-width strokes', () => {
+  it('the golden is master 6072f9df\'s re-recorded for row 239 (a) and names the same cases (anti-vacuous)', () => {
+    expect(golden.generatedFrom).toMatch(/^row 239 \(a\) .*every other call as master 6072f9df/);
     expect(Object.keys(golden.cases).sort()).toEqual(fullCases().map((c) => c.name).sort());
     // A mid-drag case is in the set, or "nothing changed mid-drag" was never asked.
     expect(fullCases().some((c) => c.name.startsWith('mid-drag'))).toBe(true);
