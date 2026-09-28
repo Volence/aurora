@@ -1,0 +1,14 @@
+diff --git a/src/renderer/components/classic/ClassicLevelViewport.tsx b/src/renderer/components/classic/ClassicLevelViewport.tsx
+index 94c20f9b..ae8fc145 100644
+--- a/src/renderer/components/classic/ClassicLevelViewport.tsx
++++ b/src/renderer/components/classic/ClassicLevelViewport.tsx
+@@ -936,7 +936,8 @@ export default function ClassicLevelViewport() {
+         }
+         // On the device grid (row 237 (b)): 1 CSS px, one whole device column.
+         ctx.strokeStyle = STAMP_PREVIEW_STROKE;
+-        strokeRectOnDeviceGrid(ctx, hx, hy, CHUNK_PX, CHUNK_PX, 1, dpr);
++        ctx.lineWidth = 1 * invZoom;
++        ctx.strokeRect(hx, hy, CHUNK_PX, CHUNK_PX);
+         ctx.restore();
+       }
+     } else if (armedId != null && plane === 'fg') {

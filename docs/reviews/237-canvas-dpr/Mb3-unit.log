@@ -1,0 +1,203 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b
+
+ ✓ src/renderer/components/classic/__tests__/classic-overlays.test.ts (17 tests) 9ms
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts (124 tests | 2 failed) 53ms
+     ✓ 1 CSS px at dpr 1, zoom 1, camera 0,0 2ms
+     ✓ 1 CSS px at dpr 1, zoom 2, camera 3032,472 0ms
+     ✓ 1 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     ✓ 1 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1 CSS px at dpr 1.25, zoom 1, camera 0,0 0ms
+     ✓ 1 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     ✓ 1 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     ✓ 1 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     ✓ 1 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     ✓ 1 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     ✓ 1 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     ✓ 1 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     ✓ 1 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     ✓ 1 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     ✓ 1 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     ✓ 1 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     ✓ 1 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     ✓ 1 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     ✓ 1 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     ✓ 1 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 2ms
+     ✓ 2 CSS px at dpr 1, zoom 1, camera 0,0 0ms
+     ✓ 2 CSS px at dpr 1, zoom 2, camera 3032,472 0ms
+     ✓ 2 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     ✓ 2 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 2 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 2 CSS px at dpr 1.25, zoom 1, camera 0,0 0ms
+     ✓ 2 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     ✓ 2 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     ✓ 2 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 2 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 2 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     ✓ 2 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     ✓ 2 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     ✓ 2 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 2 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 2 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     ✓ 2 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     ✓ 2 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     ✓ 2 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 2 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 2 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     ✓ 2 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     ✓ 2 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     ✓ 2 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 2 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 2 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     ✓ 2 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     ✓ 2 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     ✓ 2 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 2 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1.5 CSS px at dpr 1, zoom 1, camera 0,0 0ms
+     ✓ 1.5 CSS px at dpr 1, zoom 2, camera 3032,472 0ms
+     ✓ 1.5 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     ✓ 1.5 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1.5 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1.5 CSS px at dpr 1.25, zoom 1, camera 0,0 0ms
+     ✓ 1.5 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     ✓ 1.5 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     ✓ 1.5 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1.5 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1.5 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     ✓ 1.5 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     ✓ 1.5 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     ✓ 1.5 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1.5 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1.5 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     ✓ 1.5 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     ✓ 1.5 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     ✓ 1.5 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1.5 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1.5 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     ✓ 1.5 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     ✓ 1.5 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     ✓ 1.5 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1.5 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ 1.5 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     ✓ 1.5 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     ✓ 1.5 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     ✓ 1.5 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     ✓ 1.5 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ a 1 CSS px outline covers exactly one whole device column at its edge, at every scale 0ms
+     ✓ dpr 1, zoom 1, camera 0,0 2ms
+     ✓ dpr 1, zoom 2, camera 3032,472 1ms
+     ✓ dpr 1, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 1, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 1, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 1.25, zoom 1, camera 0,0 2ms
+     ✓ dpr 1.25, zoom 2, camera 3032,472 1ms
+     ✓ dpr 1.25, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 1.25, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 1.25, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 1.35, zoom 1, camera 0,0 1ms
+     ✓ dpr 1.35, zoom 2, camera 3032,472 1ms
+     ✓ dpr 1.35, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 1.35, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 1.35, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 1.5, zoom 1, camera 0,0 1ms
+     ✓ dpr 1.5, zoom 2, camera 3032,472 1ms
+     ✓ dpr 1.5, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 1.5, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 1.5, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 2, zoom 1, camera 0,0 1ms
+     ✓ dpr 2, zoom 2, camera 3032,472 1ms
+     ✓ dpr 2, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 2, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 2, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ dpr 3, zoom 1, camera 0,0 1ms
+     ✓ dpr 3, zoom 2, camera 3032,472 1ms
+     ✓ dpr 3, zoom 0.5, camera 13,7 1ms
+     ✓ dpr 3, zoom 1.5, camera 10.25,3.5 1ms
+     ✓ dpr 3, zoom 3.3, camera 250.4,99.9 1ms
+     ✓ the census read the component (anti-vacuous) 0ms
+     × no raw strokeRect is left in the component 4ms
+     × the ghost outline, the stamp-drag preview and the collision marquee go through strokeRectOnDeviceGrid 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > every outline ClassicLevelViewport strokes is on the device grid > no raw strokeRect is left in the component
+AssertionError: expected [ '.strokeRect(' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   ".strokeRect(",
++ ]
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:156:49
+    154|
+    155|   it('no raw strokeRect is left in the component', () => {
+    156|     expect(code.match(/\.strokeRect\(/g) ?? []).toEqual([]);
+       |                                                 ^
+    157|   });
+    158|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > every outline ClassicLevelViewport strokes is on the device grid > the ghost outline, the stamp-drag preview and the collision marquee go through strokeRectOnDeviceGrid
+AssertionError: expected 2 to be 3 // Object.is equality
+
+- Expected
++ Received
+
+- 3
++ 2
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:160:68
+    158|
+    159|   it('the ghost outline, the stamp-drag preview and the collision marq…
+    160|     expect((code.match(/strokeRectOnDeviceGrid\(/g) ?? []).length).toB…
+       |                                                                    ^
+    161|   });
+    162| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 139 passed (141)
+   Start at  04:34:09
+   Duration  723ms (transform 870ms, setup 1.05s, import 126ms, tests 61ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (2 module(s) reported).
+
+failure-class: 2 failure record(s) in 1 file(s) (2 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        2   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts
+    [ASSERTION] every outline ClassicLevelViewport strokes is on the device grid > no raw strokeRect is left in the component
+        AssertionError: expected [ '.strokeRect(' ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] every outline ClassicLevelViewport strokes is on the device grid > the ghost outline, the stamp-drag preview and the collision marquee go through strokeRectOnDeviceGrid
+        AssertionError: expected 2 to be 3 // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 2 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 2 of 2 module(s) this run selected finished.
