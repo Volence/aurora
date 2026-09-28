@@ -1052,6 +1052,26 @@ async function rows(d, O, COPY, dpr) {
       J(idCells.map((x) => x.id)) === J(wantIds) && whole && clash === null,
       `cells ${J(idCells)}; clash ${J(clash)}`);
 
+    // ── DP.11r each row's id is on its numbers' line (row 235 (c), overseer ruling) ─
+    // "corridor ehz_to_cpz" wrapped with "corridor" beside the numbers and the id
+    // alone below, reading as a fifth row of blanks. Read from the DOM as laid
+    // out: the id's OWN text (a Range over the text node holding it, found by
+    // the id from the harness's bake) has its first line box at the same top as
+    // the text of that row's first number cell, within 1 px (getClientRects).
+    const idLines = await c.json(String.raw`[...document.querySelectorAll('[data-donors-pool-id]')].map((el) => {
+      const id = el.getAttribute('data-donors-pool-id'); const row = el.getAttribute('data-donors-pool-row');
+      const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n = null; let at = -1;
+      while (tw.nextNode()) { const i = tw.currentNode.data.indexOf(id); if (i >= 0) { n = tw.currentNode; at = i; break; } }
+      const num = document.querySelector('[data-donors-pool-cell="' + row + ':tiles"]');
+      if (!n || !num) return { id, row, idTop: null, numTop: null };
+      const r1 = document.createRange(); r1.setStart(n, at); r1.setEnd(n, at + id.length);
+      const r2 = document.createRange(); r2.selectNodeContents(num);
+      const a = [...r1.getClientRects()]; const b = [...r2.getClientRects()];
+      return { id, row, idTop: a.length ? +a[0].top.toFixed(2) : null, numTop: b.length ? +b[0].top.toFixed(2) : null, idLines: a.length }; })`);
+    check('DP.11r', `every pool row's id sits on the same line box as that row's first number: for each of ${J(wantIds)}, the id text's first line top equals the tiles cell's text top within 1 px`,
+      J(idLines.map((x) => x.id)) === J(wantIds) && idLines.every((x) => x.idTop !== null && x.numTop !== null && Math.abs(x.idTop - x.numTop) <= 1),
+      `rows ${J(idLines)}`);
+
     // ── DP.11f the whole act is fitted as large as the pane allows (row 235 (d)) ─
     // Decided: fit the WHOLE act (DP.11b's corners), not its painted rows. The
     // act must then be as large as that allows: on its binding axis it spans
