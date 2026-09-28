@@ -153,7 +153,19 @@ removed (`68b4767d`); the row rests on the two warning counts.
 
 ## 6. Suite
 
-PENDING: filled after the final run on the committed tree.
+`TMPDIR=<home cache> VITEST_MAX_WORKERS=4 timeout 590 npm test`, foreground, on the committed tree after the docs
+commit (HEAD = the docs commit, master `f8113f7d` merged): **EXIT 0**, every `check:*` gate passed.
+
+- Files: **0 failed / 674 passed / 3 skipped (677)**.
+- Tests: **0 failed / 10504 passed / 20 skipped (10524)**.
+- `run-completeness: COMPLETE, 677 of 677 module(s) this run selected finished.`
+- `skip-report: OK. Every skip named its reason.` (20 skips in 8 files, the same 20 master records.)
+- `failure-class: no failures in this run (677 module(s) reported).`
+
+Against master's own record (row 231 packet: 670 passed / 3 skipped files, 10471 passed / 20 skipped tests):
++4 files and +33 tests, exactly this parcel's rows (19 in the four new files, 14 added to `donor-paste.test.ts`).
+The six `clip-tool-outputs` currency reds the overseer warned of mid-parcel were fixed on master by row 231 before
+the merge; none is red here.
 
 ## 7. Open
 
