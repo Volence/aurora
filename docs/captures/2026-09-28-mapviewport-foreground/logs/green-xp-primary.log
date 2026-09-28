@@ -1,0 +1,71 @@
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370 — dist/main/index.mjs is 0s newer than the newest of 1069 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370/src/renderer/components/MapViewport.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-28T15:06:33.391Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-28T15:06:33.391Z), so window.__dbg is in this bundle
+=== mapviewport-foreground 2026-09-28 harness ===
+    uptime       : 11:06:33 up 5 days, 7 min,  1 user,  load average: 5.47, 5.62, 6.24
+    PARTS        : xp
+    node         : v24.15.0
+    root         : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370
+    in-tree      : yes (the tree under test is /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370; this file lives in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370)
+    ORACLE_SOCKET: /home/volence/.cache/mvf-tmp/mvfg-sock-5yUhwP/o.sock   (private; made by this run)
+    profile      : /home/volence/.cache/mvf-tmp/aurora-harness-profiles/mapviewport-foreground-harness-825549-bf9707ef
+    PORT         : 9437   DISPLAY: xvfb-run -a (never :0)
+    harness      : blob 0279ce53ad2e620f9a653b96c2e09770a943a82e (as committed at HEAD)
+    src on disk  : identical to HEAD
+    aeon source  : AEON_DIR=/home/volence/.cache/mvf-tmp/aeon-src   (live sibling /home/volence/sonic_hacks/aeon: refused if equal)
+    copy         : /home/volence/.cache/mvf-tmp/mvfg-aeon-48Aejf   project "Sonic 4"
+    oracle       : literals from HEAD 4d095fdb134ca874724c1acff48d582c0dfb3038; load.ts, collision-cell-resolve.ts, collision-render.ts bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370/src; profiles decoded from the copy's games/sonic4/data/collision/; FILL {"r":120,"g":220,"b":180,"a":0.5} PRIMARY {"r":120,"g":190,"b":255,"a":0.95} hover-bar bg {"r":17,"g":17,"b":27,"a":0.9}
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /home/volence/.cache/mvf-tmp/aurora-harness-profiles/mapviewport-foreground-harness-825549-bf9707ef — see HAZARD 6
+    X pointer    : PARKED outside the window: display :746 (Xvfb pid 825615); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed   click log: installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1, by a real click on its Explorer row   [load 5.24/5.57/6.22]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row "Oracle Jungle Zone · act1" aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+════════ PART xp ════════
+   GEOMETRY [xp] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":4}
+PASS  [XP.0] PREMISE: Collision facet, the collision brush, Brush 1 and Plane A by real clicks; an ASYMMETRIC shape picked by a real click in the palette; the aims land on cells (5,5), (6,5) and a far cell, derived back from their integer pixels; with the pointer off the map the preview layer is empty   [load 5.11/5.53/6.20]
+        dpr 1; rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":4}; shape {"k":15,"title":"#242 (mirrored to face left) · solid · all","word":13554,"heights":[13,13,13,12,12,12,12,12,11,11,11,11,10,10,10,10]}; aims T {"x":636,"y":426,"world":{"x":88,"y":88},"cell":{"cc":5,"cr":5},"tile":{"col":11,"row":11},"onMap":true} N {"x":700,"y":426,"world":{"x":104,"y":88},"cell":{"cc":6,"cr":5},"tile":{"col":13,"row":11},"onMap":true} F {"x":956,"y":234,"world":{"x":168,"y":40},"cell":{"cc":10,"cr":2},"tile":{"col":21,"row":5},"onMap":true}; layer before {"total":0,"outside":0,"fillOutside":0,"bboxOutside":null,"backing":[876,774],"rect":{"x":284,"y":74,"w":876,"h":774}}
+PASS  [XP.a] THE GHOST IS THE SELECTED SHAPE AT THE HOVERED CELL: on the preview layer, the fill colour (COLLISION_PREVIEW_FILL, HEAD) covers the oracle's silhouette of the brush word (resolveCell over the copy's own tables) and appears nowhere outside it, in the cell or anywhere else on the layer; nothing is drawn beyond the angle mark's reach   [load 4.94/5.49/6.18]
+        box {"x":604,"y":394,"w":64,"h":64}; silhouette 2703 px, fill inside 2552 (coverage 0.944), fill OUTSIDE 0 []; layer: fill outside the box 0, anything beyond reach 30px 0 null
+PASS  [XP.p] the hovered cell is outlined in COLLISION_PREVIEW_PRIMARY (HEAD) on all four edges of its box (the outermost CSS pixel ring inside the cell, corners excluded)   [load 4.94/5.49/6.18]
+        edges {"top":{"n":58,"k":58,"mid":[{"r":127,"g":188,"b":245,"a":255},{"r":127,"g":188,"b":245,"a":255},{"r":0,"g":0,"b":0,"a":0}]},"bottom":{"n":58,"k":58,"mid":[{"r":127,"g":188,"b":245,"a":255},{"r":120,"g":190,"b":252,"a":249},{"r":120,"g":219,"b":179,"a":128}]},"left":{"n":58,"k":58,"mid":[{"r":127,"g":188,"b":245,"a":255},{"r":127,"g":188,"b":245,"a":255},{"r":120,"g":219,"b":179,"a":128}]},"right":{"n":58,"k":58,"mid":[{"r":127,"g":188,"b":245,"a":255},{"r":120,"g":190,"b":252,"a":249},{"r":120,"g":219,"b":179,"a":128}]}}
+PASS  [XP.d] ON SCREEN: inside the hovered box the screenshot is the preview layer composited over the no-ghost reference (the pointer on a far cell) in at least 99% of pixels, and it did change there   [load 4.94/5.49/6.18]
+        reference layer in the box empty true; composite 4096/4096; changed 3186 (fill px 2552); outer ring changed 0 (not judged: the stem may reach there); mismatches []
+PASS  [XP.c] the ghost FOLLOWS the pointer: after one real move into the neighbour cell the silhouette is in the new box, and the old box holds no fill   [load 4.94/5.49/6.18]
+        new box {"x":668,"y":394,"w":64,"h":64}: coverage 0.944, fill outside the silhouette 0; fill left in the old box 0; layer fill outside the new box 0
+PASS  [XP.e] the pointer leaving the map clears the ghost: the whole preview layer is empty (onMouseLeave drops the hover)   [load 4.94/5.49/6.18]
+        layer after the leave {"total":0,"outside":0,"fillOutside":0,"bboxOutside":null,"backing":[876,774],"rect":{"x":284,"y":74,"w":876,"h":774}}; button {"x":1225,"y":158,"hitOk":true,"dpr":1,"rect":{"x":1209,"y":147,"w":32,"h":22}}
+PASS  [XP.b] the ghost carries the brush's FLIP: after a real click on the palette's H the ghost at the same cell is the MIRRORED silhouette (the oracle's for the new word), and no longer the unflipped one   [load 4.94/5.49/6.18]
+        word 13554 -> 12530 (mirrored runs, oracle); against the new silhouette: coverage 0.944, fill outside 0 []; against the OLD silhouette: fill outside 76
+NOTE  [xp.cleanup] H clicked again: word 13554 (started 13554)
+NOTE  [xp.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 825605 (11 process(es)):
+           825605 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           825615 Xvfb :746 -screen 0 1680x1050x24 -nolisten tcp
+           825725 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/home/vol
+           825732 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/home
+           825735 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           825736 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           825738 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           825768 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           825773 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           825777 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           825789 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 49 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 349 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=xp: 8/8 rows PASS · 0 FAIL · 0 UNMEASURABLE · 26.3s ════
+     uptime at end 11:06:59 up 5 days, 8 min,  1 user,  load average: 4.94, 5.49, 6.18
+END-OF-RUN
