@@ -769,15 +769,15 @@ async function rows(d, O, COPY, dpr) {
         const clipact = JSON.parse(readFileSync(join(outDir, 'clipact.json'), 'utf8'));
         // Per section, from the bake's own files: cells a zone claims (key >= 0)
         // whose tile is not aeon's blank (index 0, "the blank tile every act carries").
-        const painted = [];
+        const painted = []; const cells = [];
         for (let n = 0; n < gw * gh; n++) {
           const t = join(outDir, `section_${n}.tiles.bin`); const k = join(outDir, `section_${n}.zonekey.bin`);
-          if (!existsSync(t) || !existsSync(k)) { painted.push(null); continue; }
+          if (!existsSync(t) || !existsSync(k)) { painted.push(null); cells.push(null); continue; }
           const tb = readFileSync(t); const kb = readFileSync(k); let p = 0;
           for (let i = 0; i < kb.length; i++) if (kb.readInt8(i) >= 0 && (tb.readUInt16BE(i * 2) & 0x7ff) !== 0) p++;
-          painted.push(p);
+          painted.push(p); cells.push(kb.length);
         }
-        own = { exit: bk.status, clipact, painted };
+        own = { exit: bk.status, clipact, painted, cells };
       } else own = { exit: bk.status, stderr: String(bk.stderr).slice(-400) };
     } finally { rmSync(outDir, { recursive: true, force: true }); }
     if (!own || own.exit !== 0 || !own.clipact) {
@@ -822,11 +822,18 @@ async function rows(d, O, COPY, dpr) {
       const b = cv.getBoundingClientRect(); const k = cv.width / b.width; const ctx = cv.getContext('2d');
       return ${J(boxes)}.map((q) => { const x0 = Math.ceil((q.x0 + 3) * k), y0 = Math.ceil((q.y0 + 3) * k), x1 = Math.floor((q.x1 - 3) * k), y1 = Math.floor((q.y1 - 3) * k);
         if (x1 <= x0 || y1 <= y0) return { n: q.n, area: 0 };
-        const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data; let drawn = 0;
-        for (let i = 3; i < img.length; i += 4) if (img[i] !== 0) drawn++;
-        return { n: q.n, area: (x1 - x0) * (y1 - y0), share: +(drawn / ((x1 - x0) * (y1 - y0))).toFixed(3) }; }); })()`);
+        const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data; let drawn = 0; let opaque = 0;
+        for (let i = 3; i < img.length; i += 4) { if (img[i] !== 0) drawn++; if (img[i] >= 250) opaque++; }
+        const a = (x1 - x0) * (y1 - y0);
+        return { n: q.n, area: a, share: +(drawn / a).toFixed(3), opaque: +(opaque / a).toFixed(3) }; }); })()`);
+    // ART IS OPAQUE, THE CLIP'S OWN FILL IS NOT: a clip rectangle is filled at
+    // alpha 0.06 (DONOR_MARK_FAINT_FILL), so "any alpha" over a section inside a
+    // clip reads non-blank with NO art drawn (found by a plant that dropped the
+    // bitmaps: 0.506 either way). So a painted section must show OPAQUE pixels
+    // over at least a quarter of the share its painted cells cover (cells hold
+    // transparent pixels too), and an untouched one no pixel at all.
     const canvasOk = !!read && read.every((r) => r.area > 100)
-      && read.filter((r) => own.painted[r.n] > 0).every((r) => r.share > 0.2)
+      && read.filter((r) => own.painted[r.n] > 0).every((r) => r.opaque > 0 && r.opaque >= 0.25 * (own.painted[r.n] / own.cells[r.n]))
       && read.filter((r) => !touched(r.n)).every((r) => r.share === 0)
       && read.some((r) => !touched(r.n));
     check('DP.11b', `the target pane holds the whole ${gw} x ${gh}-section act (both world corners in the pane) and drew it from aeon's bake: each section drew iff the harness's own bake paints a cell there, and the canvas, read back, is non-blank over every painted section and blank over every section no clip or corridor touches`,
