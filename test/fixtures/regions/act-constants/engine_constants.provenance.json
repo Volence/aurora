@@ -6,18 +6,18 @@
     "repo": "git@github.com:Volence/aeon.git",
     "path": "engine/system/constants.emp",
     "branch_that_answers_currency": "origin/master",
-    "revision": "3d369bc7d6feea23b69756ce520b57d182763b0e",
-    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log -1 cffdf716 -- engine/system/constants.emp` names 3d369bc7 at the ONE pin of ROADMAP row 228 (REVENDOR-AEON-AFTER-OVERNIGHT, branch row228-revendor-aeon): aeon origin/master cffdf7168fca5030c45b22b27c5e8c2916e1112c, read 2026-09-28T03:18:20Z after a fetch. act_descriptor.emp is re-vendored at the same pin (`git log -1 cffdf716 -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` names adb700d1), so the pair agrees.",
-    "blob": "b86134bf03624f804991c73ba7488dd76cbff368",
-    "last_changed_by": "3d369bc7 rings: one resident ring frame, streamed on the tick (VRAM-TIER1 C). Since the previous pin cc0921e6, two commits: ff0fba0b (VRAM-TIER1 D+G: the waterline region's extent is DERIVED, adds WATERLINE_SANCTION_TILES = 48, WATERLINE_H_MAX = 64, WATERLINE_REGION_TILES = WATERLINE_H_MAX / 2 and two ensures pinning \"largest power of two within the sanction\"; the VRAM_WATERLINE_STRIPS ensure now reads WATERLINE_REGION_TILES instead of a literal 48; its comment now says $AF00 (slot 1400), which is what BG_TILE_BASE_VRAM + BG_TILE_CAPACITY * 32 already computed, BG_TILE_CAPACITY itself still 376) and 3d369bc7 (adds RING_FRAME_TILES = 4 with a comment). Additions only: no existing constant changed value. No rule-4 leaf moved: SCREEN_WIDTH 320, SCREEN_HEIGHT 224, CAM_SCREEN_HALF_W 160, CAM_SCREEN_HALF_H 112, CAM_MAX_Y_STEP 16, MEASURED by resolving the old and the new pair with src/core/formats/regions/act-constants.ts (their declaration lines moved +7, CAM_MAX_Y_STEP +21).",
-    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> /home/volence/sonic_hacks/aeon engine/system/constants.emp 3d369bc7d6feea23b69756ce520b57d182763b0e - bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
-    "revision_published": "3d369bc7 is an ancestor of aeon origin/master (cffdf716); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run."
+    "revision": "41697d3685fb615322c15e859e55153b97b131c5",
+    "revision_is": "THE PIN OF RECORD IS THE LAST COMMIT THAT TOUCHED THE PATH: `git log -1 0c33e88b -- engine/system/constants.emp` names 41697d36 (single parent, not a merge), on aeon's 2d006c4c landing notice to aurora: aeon origin/master 0c33e88bec4380179a956b129c7da0d704a3ee57, read 2026-09-28T09:21:11Z after a fetch. act_descriptor.emp is unchanged at that tip (`git log -1 0c33e88b -- games/sonic4/data/levels/ojz/act1/act_descriptor.emp` still names adb700d1), so the pair still agrees.",
+    "blob": "2915ee3555b00f9a9c0d185a9daf6268d4cfa442",
+    "last_changed_by": "41697d36 engine(tile cache): arming run is HORIZONTAL only. Since the previous pin 3d369bc7, two commits: bced71c0 (arming run added) and 41697d36; net diff is ADDITIONS ONLY (19 lines, 0 removed): H_PFX_ARM = BLOCK_TILE_SIZE * 8 (128 px) with its comment and an ensure. No existing constant changed value, so no rule-4 leaf moved (SCREEN_WIDTH, SCREEN_HEIGHT, CAM_SCREEN_HALF_W, CAM_SCREEN_HALF_H, CAM_MAX_Y_STEP are untouched declarations; only their line numbers shift).",
+    "resolved_by": "scripts/revendor.mjs <fixture> <this sidecar> /home/volence/sonic_hacks/aeon engine/system/constants.emp 41697d3685fb615322c15e859e55153b97b131c5 - bytes from `git show <rev>:<path>`, re-hashed on this side with `git hash-object` and compared to `git rev-parse <rev>:<path>` before the sidecar was written. Never the sibling working tree.",
+    "revision_published": "41697d36 is an ancestor of aeon origin/master (0c33e88b); test/formats/aeon-fixture-currency.test.ts re-asserts reachability and byte equality at the tip on every run."
   },
   "fixture": {
     "path": "test/fixtures/regions/act-constants/engine_constants.emp",
-    "bytes": 95720,
-    "sha256": "56255424e5a6bcf2f5b2cbf8175a45273d1a35095fe24bee1a933e40060eb889",
-    "git_blob": "b86134bf03624f804991c73ba7488dd76cbff368",
+    "bytes": 97765,
+    "sha256": "d66a47153ebef90a1d75e986b4846031a25143c9d303ea57cd178812cb2ddb83",
+    "git_blob": "2915ee3555b00f9a9c0d185a9daf6268d4cfa442",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
   },
   "paired_with": {
@@ -30,6 +30,7 @@
     "faa16c4e7a61e1748a91d1d3bee9459efc0916ca, 787a9980a474a344f25d96750b0b5dc5a0967c11, PAGECACHE_DIRECT_RESIDENT/BOUNDED",
     "d37c00bb, fe4a94ab, the nine commits in last_changed_by (rows 223+224, pin d3b98868)",
     "99728748, cc0921e6, b8752518 + cc0921e6 (GPL-A3: PAGE_LIVE_UNITS/PAGE_LIVE_COL_OFFSET added, PF_EVICTABLE removed; row 226, pin 11238bb3)",
-    "b86134bf, 3d369bc7, ff0fba0b + 3d369bc7 (WATERLINE_* derived extent, RING_FRAME_TILES added; row 228, pin cffdf716)"
+    "b86134bf, 3d369bc7, ff0fba0b + 3d369bc7 (WATERLINE_* derived extent, RING_FRAME_TILES added; row 228, pin cffdf716)",
+    "2915ee35, 41697d36, bced71c0 + 41697d36 (H_PFX_ARM added; aeon perf/oscillation-thrash 2d006c4c, pin 0c33e88b)"
   ]
 }
