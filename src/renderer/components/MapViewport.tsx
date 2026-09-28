@@ -37,7 +37,10 @@ import type { MapClipboard } from '../../core/editing/map-clipboard';
 import { regionPreviewCanvas, publishPasteGhostReport } from '../canvas/region-preview';
 import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
-import { deviceScale, onDeviceScaleChange, strokeCssRectOnDeviceGrid, strokeCssRectInsetOnDeviceGrid } from '../canvas/device-grid';
+import {
+  deviceScale, onDeviceScaleChange, strokeCssRectOnDeviceGrid, strokeCssRectInsetOnDeviceGrid,
+  segmentsOnDeviceGrid, cameraDeviceMapping, type DeviceMapping,
+} from '../canvas/device-grid';
 import {
   bandPreview, refreshBandPreview, resolveDisplayedBg, resolveBandLens, bandLensCaptionLines,
 } from '../providers/bganim-preview-aeon';
@@ -159,6 +162,40 @@ function collisionPreviewOpts(zoom: number): ShapeDrawOpts {
     cellScreenPx: 16 * zoom,
     showSolidEdges: true,
     showNeedle: true,
+  };
+}
+
+/**
+ * The paint ghost's drawing context (ROADMAP row 240 (a)): `drawCollisionShape`'s FILLS go
+ * to `ctx` unchanged, in world units, and its PATHS (the surface line, the solid edges,
+ * the angle mark) go to `segmentsOnDeviceGrid`, the adapter aeon's committed marks use
+ * (row 239 (d)). So a horizontal or vertical segment is stroked with both edges on whole
+ * device pixels at `deviceStrokeWidth` of its CSS width, and a slanted one (a slope's
+ * surface line, a slope's mark) is drawn where it was, at its unsnapped width.
+ *
+ * ⚠ THE SURFACE LINE IS A POLYLINE and the adapter strokes its straight and slanted
+ * segments as two paths, so where a flat run meets a slope there is no line join, only
+ * two butt ends; the committed overlay draws its surface line as separate segments too.
+ *
+ * The mapping is stated from the camera, never asked of the context, for the reason the
+ * ghost's rects are mapped by hand (row 238 (a)).
+ */
+function shapeCtxOnDeviceGrid(
+  ctx: CanvasRenderingContext2D, dpr: number, mapping: DeviceMapping,
+): ShapeDrawCtx {
+  const path = segmentsOnDeviceGrid(ctx, dpr, mapping);
+  return {
+    get fillStyle() { return ctx.fillStyle as string; },
+    set fillStyle(v: string) { ctx.fillStyle = v; },
+    get strokeStyle() { return path.strokeStyle; },
+    set strokeStyle(v: string) { path.strokeStyle = v; },
+    get lineWidth() { return path.lineWidth; },
+    set lineWidth(v: number) { path.lineWidth = v; },
+    fillRect: (x, y, w, h) => ctx.fillRect(x, y, w, h),
+    beginPath: () => path.beginPath(),
+    moveTo: (x, y) => path.moveTo(x, y),
+    lineTo: (x, y) => path.lineTo(x, y),
+    stroke: () => path.stroke(),
   };
 }
 const overlayRenderer = new OverlayRenderer();
@@ -1009,7 +1046,14 @@ export default function MapViewport() {
 
     // The shape ghost at the cursor cell + a brighter outline.
     const wx = offset.x + primary.cellCol * 16, wy = offset.y + primary.cellRow * 16;
-    if (profile) drawCollisionShape(ctx as unknown as ShapeDrawCtx, wx, wy, 16, profile, collisionPreviewOpts(zoom));
+    // ITS STROKES ON THE DEVICE GRID (ROADMAP row 240 (a)): the surface line, the solid
+    // edges and the angle mark go through `shapeCtxOnDeviceGrid`, so every horizontal or
+    // vertical segment of them has both edges on whole device pixels; the silhouette's
+    // fills and any slanted segment are drawn where they were.
+    if (profile) {
+      drawCollisionShape(shapeCtxOnDeviceGrid(ctx, dpr, cameraDeviceMapping(vpX, vpY, zoom, dpr)),
+        wx, wy, 16, profile, collisionPreviewOpts(zoom));
+    }
     ctx.strokeStyle = COLLISION_PREVIEW_PRIMARY;
     strokeCssRectInsetOnDeviceGrid(ctx, cellCss(wx, vpX), cellCss(wy, vpY), 16 * zoom, 16 * zoom, 1.5, dpr);
 
