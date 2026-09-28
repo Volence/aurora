@@ -14,7 +14,7 @@ import { columnSolidRun } from '../../../core/collision/collision-render';
 import { angleNeedle } from './collision-needle';
 import { angleMarkFromColumns, drawAngleMark, MIN_CELL_PX_FOR_MARK } from '../../../core/collision/collision-angle-mark';
 import type { MarkDrawCtx } from '../../../core/collision/collision-angle-mark';
-import { deviceStrokeWidth } from '../../canvas/device-grid';
+import { snapStroke, snapLength } from '../../canvas/device-grid';
 import { objectFrameRect } from '../../../core/level-classic/object-sprite';
 import { objectArtKey } from '../../../core/project/profiles/object-subtype-rules';
 import { s1ObjectIsInvisible, s1ObjectName } from '../../../core/project/profiles/s1-objects';
@@ -56,6 +56,43 @@ export const HEX_MARKER_SIZE = 16;
  * screen-space quantities too. See `canvas/label-fit.ts` for what a budget is.
  */
 export const MARKER_STROKE_PX = 1;
+
+/**
+ * Outline the rect (x, y, w, h), given in the context's CURRENT user space (the world,
+ * under classic's `setTransform(dpr) / scale(zoom) / translate(-cam)`), as a stroke of
+ * `cssWidth` CSS px ON THE DEVICE GRID (ROADMAP row 237 (b), ruled 2026-09-28).
+ *
+ * Drawn under the canvas's own CSS transform, `setTransform(dpr, 0, 0, dpr, 0, 0)`, and
+ * snapped through the SAME `snapStroke` / `snapLength` MapViewport's chrome uses
+ * (canvas/device-grid.ts, whose docblock is the rule): the top-left corner goes on the
+ * device half-pixel nearest where the unsnapped stroke was centred, the size is a whole
+ * number of device px, and the width is `deviceStrokeWidth(cssWidth, dpr)` device px. So
+ * a 1 CSS px outline covers exactly one device column at every scale, where drawn in
+ * world units at 1.5 it was 1.5 device px centred ON the edge and half-covered the
+ * column either side. At dpr 1 it is the round(v) + 0.5 of MapViewport's chrome.
+ *
+ * The world-to-CSS mapping is read off the transform in force, which must be an
+ * axis-aligned scale and translation (classic's always is), and the transform is left
+ * exactly as it was found.
+ */
+export function strokeRectOnDeviceGrid(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  cssWidth: number,
+  dpr: number,
+): void {
+  const m = ctx.getTransform();
+  const cssX = (x * m.a + m.e) / dpr, cssY = (y * m.d + m.f) / dpr;
+  const cssW = (w * m.a) / dpr, cssH = (h * m.d) / dpr;
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.lineWidth = snapStroke(0, cssWidth, dpr).width;
+  ctx.strokeRect(
+    snapStroke(cssX, cssWidth, dpr).at, snapStroke(cssY, cssWidth, dpr).at,
+    snapLength(cssW, dpr), snapLength(cssH, dpr),
+  );
+  ctx.restore();
+}
 
 function solidityFill(solidity: number): string {
   switch (solidity) {
@@ -155,12 +192,21 @@ export function drawCollision(
       }
     }
   }
-  // Crisp surface line along each column's collidable edge.
+  // Crisp surface line along each column's collidable edge, ON THE DEVICE GRID (row
+  // 237 (b)): drawn under the canvas's CSS transform and snapped through
+  // canvas/device-grid.ts, as strokeRectOnDeviceGrid is. Its row goes on the device
+  // half-pixel nearest the surface (snapStroke), its ends on whole device px
+  // (snapLength, so the 16 segments of a cell tile it with no gap), its width
+  // `deviceStrokeWidth(1, dpr)`: 1 device px at 1, 1.5 and 2, 3 at 3. Drawn in world
+  // units it sat centred ON a device row boundary whenever the surface did, and
+  // half-covered the row either side.
+  const m = ctx.getTransform();
+  const cssX = (wx: number): number => (wx * m.a + m.e) / dpr;
+  const cssY = (wy: number): number => (wy * m.d + m.f) / dpr;
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.strokeStyle = COLLISION_SURFACE_LINE;
-  // One CSS px, snapped to a whole device width by the codebase's rule
-  // (canvas/device-grid.ts): 1 device px at 1, 1.5 and 2, 3 at 3. At dpr 1 this is
-  // the pre-row-194 `1 / a` exactly.
-  ctx.lineWidth = deviceStrokeWidth(1, dpr) / ctx.getTransform().a;
+  ctx.lineWidth = snapStroke(0, 1, dpr).width;
   for (let i = 0; i < 256; i++) {
     const cell = chunk.cells[i];
     // Block 0 first, because that is the order the engine tests in: FindFloor
@@ -180,12 +226,14 @@ export function drawCollision(
       if (!run) continue;
       let surfaceY = h >= 0 ? run.y : run.y + run.h;
       if (cell.yf) surfaceY = 16 - surfaceY;
+      const lineY = snapStroke(cssY(cy + surfaceY), 1, dpr).at;
       ctx.beginPath();
-      ctx.moveTo(cx + c, cy + surfaceY);
-      ctx.lineTo(cx + c + 1, cy + surfaceY);
+      ctx.moveTo(snapLength(cssX(cx + c), dpr), lineY);
+      ctx.lineTo(snapLength(cssX(cx + c + 1), dpr), lineY);
       ctx.stroke();
     }
   }
+  ctx.restore();
 }
 
 /**

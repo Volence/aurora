@@ -1,0 +1,1229 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aed7441f96eb0a46b
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts (124 tests | 123 failed) 34ms
+     × 1 CSS px at dpr 1, zoom 1, camera 0,0 3ms
+     × 1 CSS px at dpr 1, zoom 2, camera 3032,472 0ms
+     × 1 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     × 1 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     × 1 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     × 1 CSS px at dpr 1.25, zoom 1, camera 0,0 0ms
+     × 1 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     × 1 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     × 1 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     × 1 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     × 1 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     × 1 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     × 1 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     × 1 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     × 1 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     × 1 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     × 1 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     × 1 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     × 1 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     × 1 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     × 1 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     × 1 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     × 1 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     × 1 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     × 1 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     × 1 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     × 1 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     × 1 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     × 1 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     × 1 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     × 2 CSS px at dpr 1, zoom 1, camera 0,0 0ms
+     × 2 CSS px at dpr 1, zoom 2, camera 3032,472 0ms
+     × 2 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     × 2 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     × 2 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     × 2 CSS px at dpr 1.25, zoom 1, camera 0,0 2ms
+     × 2 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     × 2 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     × 2 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     × 2 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     × 2 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     × 2 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     × 2 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     × 2 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     × 2 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     × 2 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     × 2 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     × 2 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     × 2 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     × 2 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     × 2 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     × 2 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     × 2 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     × 2 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     × 2 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     × 2 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     × 2 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     × 2 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     × 2 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     × 2 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     × 1.5 CSS px at dpr 1, zoom 1, camera 0,0 0ms
+     × 1.5 CSS px at dpr 1, zoom 2, camera 3032,472 0ms
+     × 1.5 CSS px at dpr 1, zoom 0.5, camera 13,7 0ms
+     × 1.5 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     × 1.5 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     × 1.5 CSS px at dpr 1.25, zoom 1, camera 0,0 0ms
+     × 1.5 CSS px at dpr 1.25, zoom 2, camera 3032,472 0ms
+     × 1.5 CSS px at dpr 1.25, zoom 0.5, camera 13,7 0ms
+     × 1.5 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     × 1.5 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     × 1.5 CSS px at dpr 1.35, zoom 1, camera 0,0 0ms
+     × 1.5 CSS px at dpr 1.35, zoom 2, camera 3032,472 0ms
+     × 1.5 CSS px at dpr 1.35, zoom 0.5, camera 13,7 0ms
+     × 1.5 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     × 1.5 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     × 1.5 CSS px at dpr 1.5, zoom 1, camera 0,0 0ms
+     × 1.5 CSS px at dpr 1.5, zoom 2, camera 3032,472 0ms
+     × 1.5 CSS px at dpr 1.5, zoom 0.5, camera 13,7 0ms
+     × 1.5 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     × 1.5 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     × 1.5 CSS px at dpr 2, zoom 1, camera 0,0 0ms
+     × 1.5 CSS px at dpr 2, zoom 2, camera 3032,472 0ms
+     × 1.5 CSS px at dpr 2, zoom 0.5, camera 13,7 0ms
+     × 1.5 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     × 1.5 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     × 1.5 CSS px at dpr 3, zoom 1, camera 0,0 0ms
+     × 1.5 CSS px at dpr 3, zoom 2, camera 3032,472 0ms
+     × 1.5 CSS px at dpr 3, zoom 0.5, camera 13,7 0ms
+     × 1.5 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     × 1.5 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     × a 1 CSS px outline covers exactly one whole device column at its edge, at every scale 0ms
+     × dpr 1, zoom 1, camera 0,0 3ms
+     × dpr 1, zoom 2, camera 3032,472 0ms
+     × dpr 1, zoom 0.5, camera 13,7 0ms
+     × dpr 1, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1.25, zoom 1, camera 0,0 1ms
+     × dpr 1.25, zoom 2, camera 3032,472 0ms
+     × dpr 1.25, zoom 0.5, camera 13,7 0ms
+     × dpr 1.25, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1.25, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1.35, zoom 1, camera 0,0 0ms
+     × dpr 1.35, zoom 2, camera 3032,472 0ms
+     × dpr 1.35, zoom 0.5, camera 13,7 0ms
+     × dpr 1.35, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1.35, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 1.5, zoom 1, camera 0,0 0ms
+     × dpr 1.5, zoom 2, camera 3032,472 0ms
+     × dpr 1.5, zoom 0.5, camera 13,7 0ms
+     × dpr 1.5, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 1.5, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 2, zoom 1, camera 0,0 0ms
+     × dpr 2, zoom 2, camera 3032,472 3ms
+     × dpr 2, zoom 0.5, camera 13,7 0ms
+     × dpr 2, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 2, zoom 3.3, camera 250.4,99.9 0ms
+     × dpr 3, zoom 1, camera 0,0 0ms
+     × dpr 3, zoom 2, camera 3032,472 0ms
+     × dpr 3, zoom 0.5, camera 13,7 0ms
+     × dpr 3, zoom 1.5, camera 10.25,3.5 0ms
+     × dpr 3, zoom 3.3, camera 250.4,99.9 0ms
+     ✓ the census read the component (anti-vacuous) 0ms
+     × no raw strokeRect is left in the component 1ms
+     × the ghost outline, the stamp-drag preview and the collision marquee go through strokeRectOnDeviceGrid 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 123 ⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 1, camera 0,0
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 2, camera 3032,472
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 0.5, camera 13,7
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9
+TypeError: strokeRectOnDeviceGrid is not a function
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:68:11
+     66|           // A layout cell: cell (12, 2), 256 world px square.
+     67|           const wx = 12 * 256, wy = 2 * 256, ws = 256;
+     68|           strokeRectOnDeviceGrid(r.ctx, wx, wy, ws, ws, cssWidth, dpr);
+       |           ^
+     69|           expect(r.strokes.length).toBe(1);
+     70|           const s = r.strokes[0];
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > a 1 CSS px outline covers exactly one whole device column at its edge, at every scale
+TypeError: strokeRectOnDeviceGrid is not a function
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:89:7
+     87|     for (const dpr of DPRS) {
+     88|       const r = underWorld(dpr, { zoom: 2, x: 3032, y: 472 });
+     89|       strokeRectOnDeviceGrid(r.ctx, 3072, 512, 256, 256, 1, dpr);
+       |       ^
+     90|       const s = r.strokes[0];
+     91|       const left = Math.min(...s.pts.map((p) => p[0]));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1, zoom 1, camera 0,0
+AssertionError: segment row 8: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1, zoom 2, camera 3032,472
+AssertionError: segment row -928: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1, zoom 0.5, camera 13,7
+AssertionError: expected 0.5 to be close to 1.5, received difference is 1, but expected 5e-10
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:127:23
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+       |                       ^
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+    129|           }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1, zoom 1.5, camera 10.25,3.5
+AssertionError: segment row 6.75: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1, zoom 3.3, camera 250.4,99.9
+AssertionError: segment row -303.27000000000004: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.25, zoom 1, camera 0,0
+AssertionError: segment row 10: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.25, zoom 2, camera 3032,472
+AssertionError: segment row -1160: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.25, zoom 0.5, camera 13,7
+AssertionError: segment row 0.625: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.25, zoom 1.5, camera 10.25,3.5
+AssertionError: segment row 8.4375: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.25, zoom 3.3, camera 250.4,99.9
+AssertionError: segment row -379.08750000000003: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.35, zoom 1, camera 0,0
+AssertionError: segment row 10.8: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.35, zoom 2, camera 3032,472
+AssertionError: segment row -1252.8000000000002: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.35, zoom 0.5, camera 13,7
+AssertionError: segment row 0.6749999999999998: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.35, zoom 1.5, camera 10.25,3.5
+AssertionError: segment row 9.1125: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.35, zoom 3.3, camera 250.4,99.9
+AssertionError: segment row -409.41450000000003: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.5, zoom 1, camera 0,0
+AssertionError: segment row 12: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.5, zoom 2, camera 3032,472
+AssertionError: segment row -1392: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.5, zoom 0.5, camera 13,7
+AssertionError: segment row 0.75: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.5, zoom 1.5, camera 10.25,3.5
+AssertionError: segment row 10.125: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 1.5, zoom 3.3, camera 250.4,99.9
+AssertionError: segment row -454.905: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 2, zoom 1, camera 0,0
+AssertionError: segment row 16: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 2, zoom 2, camera 3032,472
+AssertionError: segment row -1856: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 2, zoom 0.5, camera 13,7
+AssertionError: segment row 1: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 2, zoom 1.5, camera 10.25,3.5
+AssertionError: expected 13.5 to be close to 14.5, received difference is 1, but expected 5e-10
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:127:23
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+       |                       ^
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+    129|           }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 2, zoom 3.3, camera 250.4,99.9
+AssertionError: segment row -606.5400000000001: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 3, zoom 1, camera 0,0
+AssertionError: segment row 24: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 3, zoom 2, camera 3032,472
+AssertionError: segment row -2784: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 3, zoom 0.5, camera 13,7
+AssertionError: expected 1.5 to be close to 2.5, received difference is 1, but expected 5e-10
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:127:23
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+       |                       ^
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+    129|           }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 3, zoom 1.5, camera 10.25,3.5
+AssertionError: segment row 20.25: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > drawCollision: the surface line is on the device grid > dpr 3, zoom 3.3, camera 250.4,99.9
+AssertionError: segment row -909.81: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:126:51
+    124|           expect(s.pts.length).toBe(2);
+    125|           for (const [x, y] of s.pts) {
+    126|             expect(onHalf(y), `segment row ${y}`).toBe(true);
+       |                                                   ^
+    127|             expect(y).toBeCloseTo(Math.round(devY) + 0.5, 9);
+    128|             expect(isWhole(x), `segment end ${x}`).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > every outline ClassicLevelViewport strokes is on the device grid > no raw strokeRect is left in the component
+AssertionError: expected [ Array(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   ".strokeRect(",
++   ".strokeRect(",
++   ".strokeRect(",
++ ]
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:156:49
+    154|
+    155|   it('no raw strokeRect is left in the component', () => {
+    156|     expect(code.match(/\.strokeRect\(/g) ?? []).toEqual([]);
+       |                                                 ^
+    157|   });
+    158|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/123]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts > every outline ClassicLevelViewport strokes is on the device grid > the ghost outline, the stamp-drag preview and the collision marquee go through strokeRectOnDeviceGrid
+AssertionError: expected +0 to be 3 // Object.is equality
+
+- Expected
++ Received
+
+- 3
++ 0
+
+ ❯ src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts:160:68
+    158|
+    159|   it('the ghost outline, the stamp-drag preview and the collision marq…
+    160|     expect((code.match(/strokeRectOnDeviceGrid\(/g) ?? []).length).toB…
+       |                                                                    ^
+    161|   });
+    162| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/123]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  123 failed | 1 passed (124)
+   Start at  04:32:10
+   Duration  845ms (transform 466ms, setup 550ms, import 63ms, tests 34ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 123 failure record(s) in 1 file(s) (123 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION       32   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED    91   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/classic/__tests__/classic-strokes-device-grid.test.ts
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 2 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.25, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.35, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 1.5, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 2, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 1, camera 0,0
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 2, camera 3032,472
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 0.5, camera 13,7
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 1.5, camera 10.25,3.5
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > 1.5 CSS px at dpr 3, zoom 3.3, camera 250.4,99.9
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [UNCLASSIFIED] strokeRectOnDeviceGrid: a world rect outlined on whole device pixels > a 1 CSS px outline covers exactly one whole device column at its edge, at every scale
+        TypeError: strokeRectOnDeviceGrid is not a function
+        why this bucket: TypeError with no signature this reporter recognises
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1, zoom 1, camera 0,0
+        AssertionError: segment row 8: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1, zoom 2, camera 3032,472
+        AssertionError: segment row -928: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1, zoom 0.5, camera 13,7
+        AssertionError: expected 0.5 to be close to 1.5, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1, zoom 1.5, camera 10.25,3.5
+        AssertionError: segment row 6.75: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1, zoom 3.3, camera 250.4,99.9
+        AssertionError: segment row -303.27000000000004: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.25, zoom 1, camera 0,0
+        AssertionError: segment row 10: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.25, zoom 2, camera 3032,472
+        AssertionError: segment row -1160: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.25, zoom 0.5, camera 13,7
+        AssertionError: segment row 0.625: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.25, zoom 1.5, camera 10.25,3.5
+        AssertionError: segment row 8.4375: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.25, zoom 3.3, camera 250.4,99.9
+        AssertionError: segment row -379.08750000000003: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.35, zoom 1, camera 0,0
+        AssertionError: segment row 10.8: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.35, zoom 2, camera 3032,472
+        AssertionError: segment row -1252.8000000000002: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.35, zoom 0.5, camera 13,7
+        AssertionError: segment row 0.6749999999999998: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.35, zoom 1.5, camera 10.25,3.5
+        AssertionError: segment row 9.1125: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.35, zoom 3.3, camera 250.4,99.9
+        AssertionError: segment row -409.41450000000003: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.5, zoom 1, camera 0,0
+        AssertionError: segment row 12: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.5, zoom 2, camera 3032,472
+        AssertionError: segment row -1392: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.5, zoom 0.5, camera 13,7
+        AssertionError: segment row 0.75: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.5, zoom 1.5, camera 10.25,3.5
+        AssertionError: segment row 10.125: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 1.5, zoom 3.3, camera 250.4,99.9
+        AssertionError: segment row -454.905: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 2, zoom 1, camera 0,0
+        AssertionError: segment row 16: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 2, zoom 2, camera 3032,472
+        AssertionError: segment row -1856: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 2, zoom 0.5, camera 13,7
+        AssertionError: segment row 1: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 2, zoom 1.5, camera 10.25,3.5
+        AssertionError: expected 13.5 to be close to 14.5, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 2, zoom 3.3, camera 250.4,99.9
+        AssertionError: segment row -606.5400000000001: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 3, zoom 1, camera 0,0
+        AssertionError: segment row 24: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 3, zoom 2, camera 3032,472
+        AssertionError: segment row -2784: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 3, zoom 0.5, camera 13,7
+        AssertionError: expected 1.5 to be close to 2.5, received difference is 1, but expected 5e-10
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 3, zoom 1.5, camera 10.25,3.5
+        AssertionError: segment row 20.25: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] drawCollision: the surface line is on the device grid > dpr 3, zoom 3.3, camera 250.4,99.9
+        AssertionError: segment row -909.81: expected false to be true // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] every outline ClassicLevelViewport strokes is on the device grid > no raw strokeRect is left in the component
+        AssertionError: expected [ Array(3) ] to deeply equal []
+        why this bucket: name is AssertionError
+    [ASSERTION] every outline ClassicLevelViewport strokes is on the device grid > the ghost outline, the stamp-drag preview and the collision marquee go through strokeRectOnDeviceGrid
+        AssertionError: expected +0 to be 3 // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 32 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 1 of 1 module(s) this run selected finished.
