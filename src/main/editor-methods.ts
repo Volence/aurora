@@ -75,7 +75,7 @@ const BG_ROWS_LEGACY = BG_LAYOUT_WORDS_LEGACY / BG_WIDTH;
  * entry that names a tile and no flip has named an unflipped picture. Only the
  * field nothing in any picker depicts gets a third state.
  */
-export const entrySchema = z.object({
+export const entrySchema = z.strictObject({
   tile: z.number().int().describe('tileset tile index'),
   pal: z.number().int().min(0).max(3).describe('palette line 0-3'),
   pri: z.boolean().optional().describe(
@@ -91,7 +91,7 @@ export const entrySchema = z.object({
 
 // ---- Classic (Sonic 1) schemas ----
 // A 16x16 block's 8x8 tile cell (Mega Drive pattern-name fields).
-const blockCellSchema = z.object({
+const blockCellSchema = z.strictObject({
   tile: z.number().int().min(0).describe('tile-pool index'),
   xf: z.boolean(),
   yf: z.boolean(),
@@ -99,7 +99,7 @@ const blockCellSchema = z.object({
   pri: z.boolean().describe('priority bit'),
 });
 // One object placement in an S1 objpos list.
-const s1ObjectSchema = z.object({
+const s1ObjectSchema = z.strictObject({
   x: z.number().int().min(0).max(0xffff),
   y: z.number().int().min(0).max(0x0fff),
   xflip: z.boolean(),
@@ -115,33 +115,35 @@ export interface EditorMethod {
   description: string;
   params: z.ZodRawShape;        // {} for no-arg methods
   result: 'json' | 'image';
-  /**
-   * REFUSE unknown keys instead of stripping them. `z.object(shape)` STRIPS an
-   * undeclared key, so a stale caller sending a retired parameter gets the rest
-   * of its request carried out and no refusal; a strict method answers
-   * INVALID_PARAMS naming the key (zod's `unrecognized_keys`) on BOTH roads,
-   * because both build the schema through `methodSchema` below.
-   *
-   * Opt-in per method, and set on `paint_collision` only (ROADMAP row 225(a)):
-   * its retired `crossover`/`crossoverSpan` keys used to be stripped and the
-   * shape painted. Every other method still strips; the census of them is in
-   * row 225, and widening strictness to them is the overseer's call.
-   */
-  strict?: true;
 }
 
 /**
  * THE one place a method's params shape becomes a zod object, read by the MCP
- * server and the Aether adapter alike so the two roads cannot disagree about
- * whether an unknown key is refused. A non-strict method returns its RAW shape
- * for MCP (the SDK builds the object itself, which is what it always did), so
- * only a strict method's registration changes.
+ * server (through `mcpInputSchema`) and the Aether adapter alike, so the two
+ * roads cannot disagree about whether an unknown key is refused.
+ *
+ * EVERY method is strict, and there is deliberately no per-method switch.
+ * `z.object(shape)` STRIPS an undeclared key: a stale caller sending a retired
+ * parameter gets the rest of its request carried out and no refusal (that is
+ * how `paint_collision` painted a shape while silently dropping a stale
+ * `crossover`, ROADMAP row 225(a)). A strict object answers INVALID_PARAMS
+ * naming the key (zod's `unrecognized_keys`) on both roads instead.
+ *
+ * Row 225(a) first shipped this as an opt-in `strict?: true` flag on one
+ * method. The overseer ruled that an unknown key is refused on every method
+ * (row 225, 2026-09-28), and an opt-in (or an opt-out) is a field the next
+ * method can forget or set without anyone asking why, so the flag is gone:
+ * strictness is not a property a registry entry can choose. The nested
+ * objects inside `params` are `z.strictObject` too, because a strip inside a
+ * strict parent is the same silent erase one level down;
+ * `agent-road-schema-gate.test.ts` walks every method's schema and refuses
+ * any object anywhere in it that would strip.
  */
 export function methodSchema(m: EditorMethod): z.ZodObject<z.ZodRawShape> {
-  return m.strict ? z.strictObject(m.params) : z.object(m.params);
+  return z.strictObject(m.params);
 }
-export function mcpInputSchema(m: EditorMethod): z.ZodRawShape | z.ZodObject<z.ZodRawShape> {
-  return m.strict ? methodSchema(m) : m.params;
+export function mcpInputSchema(m: EditorMethod): z.ZodObject<z.ZodRawShape> {
+  return methodSchema(m);
 }
 
 export const EDITOR_METHODS: EditorMethod[] = [
@@ -181,7 +183,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
   { name: 'paint_region', kind: 'paint-region', result: 'json',
     params: { section: z.number().int().min(0), x: z.number().int().min(0), y: z.number().int().min(0), w: z.number().int().min(1), h: z.number().int().min(1), entries: z.array(entrySchema) },
     description: 'Paint a w*h tile rectangle of a section with nametable entries (row-major). Each entry names a PICTURE: tile, palette and flips come from the entry, and an omitted "pri" leaves that cell\'s existing priority bit alone (pass pri:false to clear it). One undo step. Reply includes updated VRAM budget.' },
-  { name: 'paint_collision', kind: 'paint-collision', result: 'json', strict: true,
+  { name: 'paint_collision', kind: 'paint-collision', result: 'json',
     params: {
       section: z.number().int().min(0),
       // "both" is a MODE, not a third plane: it writes A and B in ONE undo
@@ -652,7 +654,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
   // regenerate the shifted banks. Bank-by-bank authoring stays a human door.
   { name: 'set_bg_override_tiles', kind: 'set-bg-override-tiles', result: 'json',
     params: {
-      tiles: z.array(z.object({
+      tiles: z.array(z.strictObject({
         index: z.number().int().min(0).describe('slot in the BG override tile blob'),
         pixels: z.array(z.number().int().min(0).max(TILE_PIXEL_MAX)).length(TILE_PIXELS)
           .describe(`${TILE_PIXELS} palette indices, row-major 8x8`),
@@ -672,7 +674,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'untouched. One undo step.' },
 
   { name: 'screenshot', kind: 'screenshot', result: 'image',
-    params: { region: z.object({ x: z.number().int().min(0), y: z.number().int().min(0), w: z.number().int().min(1), h: z.number().int().min(1) }).optional(), showBg: z.boolean().optional().describe('render the background plane during capture') },
+    params: { region: z.strictObject({ x: z.number().int().min(0), y: z.number().int().min(0), w: z.number().int().min(1), h: z.number().int().min(1) }).optional(), showBg: z.boolean().optional().describe('render the background plane during capture') },
     description: 'PNG of the map canvas (current viewport). Optional region crop in canvas device pixels (not tile/world coords).' },
 
   // ---- Classic (Sonic 1 disassembly) project surface (Task 16) ----
@@ -690,16 +692,16 @@ export const EDITOR_METHODS: EditorMethod[] = [
     params: { plane: z.enum(['fg', 'bg']), x: z.number().int().min(0), y: z.number().int().min(0), chunkIds: z.array(z.array(z.number().int().min(0).max(255))).describe('row-major 2D grid of chunk ids (S1 engine ids: 0 = air/blank, 1..N = the N chunks); placed with the top-left cell at (x,y)') },
     description: 'Stamp a rectangular region of a layout plane with a 2D grid of chunk ids (top-left at x,y). Chunk ids are 1-based (0 = air). One undo step.' },
   { name: 'edit_chunk', kind: 'classic-edit-chunk', result: 'json',
-    params: { chunkId: z.number().int().min(1).max(255).describe('S1 engine chunk id (1-based; id 1 = the first map256 chunk; 0 is air/blank and not editable)'), cells: z.array(z.object({ index: z.number().int().min(0).max(255), word: z.number().int().min(0).max(0xffff) })).describe('block-cell edits: cell index 0-255, packed S1 chunk-block word') },
+    params: { chunkId: z.number().int().min(1).max(255).describe('S1 engine chunk id (1-based; id 1 = the first map256 chunk; 0 is air/blank and not editable)'), cells: z.array(z.strictObject({ index: z.number().int().min(0).max(255), word: z.number().int().min(0).max(0xffff) })).describe('block-cell edits: cell index 0-255, packed S1 chunk-block word') },
     description: 'Set individual 16x16 block cells of one chunk (batched). chunkId is a 1-based engine id (0 = air, not editable). One undo step.' },
   { name: 'edit_block', kind: 'classic-edit-block', result: 'json',
-    params: { blockId: z.number().int().min(0), def: z.object({ cells: z.array(blockCellSchema).length(4).describe('exactly 4 tile cells, TL/TR/BL/BR') }) },
+    params: { blockId: z.number().int().min(0), def: z.strictObject({ cells: z.array(blockCellSchema).length(4).describe('exactly 4 tile cells, TL/TR/BL/BR') }) },
     description: 'Replace one 16x16 block\'s 4-tile-cell definition. One undo step.' },
   { name: 'add_chunk', kind: 'classic-add-chunk', result: 'json',
-    params: { cells: z.array(z.object({ index: z.number().int().min(0).max(255), word: z.number().int().min(0).max(0xffff) })).optional().describe('optional sparse seed: block-cell edits (index 0-255, packed S1 chunk-block word) over a blank base; omit for an all-blank chunk') },
+    params: { cells: z.array(z.strictObject({ index: z.number().int().min(0).max(255), word: z.number().int().min(0).max(0xffff) })).optional().describe('optional sparse seed: block-cell edits (index 0-255, packed S1 chunk-block word) over a blank base; omit for an all-blank chunk') },
     description: 'Append a NEW 256-cell chunk to the pool (grows it). Reply includes the new 1-based ENGINE id. Refuses at the 127-chunk cap (engine ids 1..$7F; the layout loop bit makes $80+ unaddressable). One undo step.' },
   { name: 'add_block', kind: 'classic-add-block', result: 'json',
-    params: { def: z.object({ cells: z.array(blockCellSchema).length(4).describe('exactly 4 tile cells, TL/TR/BL/BR') }).optional().describe('optional seed definition; omit for four blank tile-0 cells') },
+    params: { def: z.strictObject({ cells: z.array(blockCellSchema).length(4).describe('exactly 4 tile cells, TL/TR/BL/BR') }).optional().describe('optional seed definition; omit for four blank tile-0 cells') },
     description: 'Append a NEW 16x16 block to the pool (grows it). Reply includes the new 0-based '
       + `block id. Refuses at the ${MAX_BLOCK_REF + 1}-block cap (10-bit block refs). One undo step.` },
   { name: 'place_object', kind: 'classic-place-object', result: 'json',
@@ -712,7 +714,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
     params: { index: z.number().int().min(0) },
     description: 'Delete the object placement at the given index. One undo step.' },
   { name: 'set_colind', kind: 'classic-set-colind', result: 'json',
-    params: { entries: z.array(z.object({ blockId: z.number().int().min(0), value: z.number().int().min(0).max(255) })).describe('block id → collision-shape index edits') },
+    params: { entries: z.array(z.strictObject({ blockId: z.number().int().min(0), value: z.number().int().min(0).max(255) })).describe('block id → collision-shape index edits') },
     description: 'Set block→collision-shape indices (batched). One undo step.' },
   // NAMED `set_block_collision`, NOT `paint_collision` — aeon already owns that
   // name in this flat registry with different semantics (a collision-plane cell
@@ -766,7 +768,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
     params: {
       name: z.string().regex(CANVAS_NAME_PATTERN, 'a canvas name is 1-64 chars of letters, digits, - and _, starting with a letter or digit (no path, no extension)')
         .describe('canvas name under .aurora/canvas (no path, no extension)'),
-      targets: z.array(z.object({
+      targets: z.array(z.strictObject({
         chunkFileIndex: z.number().int().min(0).nullable().describe('0-based FILE index of the chunk to replace (engine id minus one), or null to append'),
       })).optional().describe('one per whole 256x256 chunk of the canvas, row-major; omit to append them all'),
       paletteResolution: z.enum(['none', 'use-act-colours', 'adopt-into-zone']).optional()
@@ -840,7 +842,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
   { name: 'import_art_sheet', kind: 'classic-import-art-sheet', result: 'json',
     params: {
       path: z.string().min(1).describe('absolute path to an INDEXED (paletted) PNG'),
-      targets: z.array(z.object({
+      targets: z.array(z.strictObject({
         chunkFileIndex: z.number().int().min(0).nullable().describe('0-based FILE index of the chunk to replace (engine id minus one), or null to append'),
       })).optional().describe('one per whole 256x256 chunk of the sheet, row-major; omit to append them all'),
       collision: z.boolean().optional().describe('give the new art flat ($FF) collision in the same undo step'),

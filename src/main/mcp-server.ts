@@ -54,19 +54,22 @@ function buildServer(getWindow: () => BrowserWindow | null): McpServer {
     // `get_project_report`, `list_classic_levels`, `save_project`,
     // `aether_status`, `build_and_run`) could not cross the IPC hop at all. The
     // Aether road was unaffected throughout — `adapter.ts` runs
-    // `z.object(m.params).safeParse` for every method and spreads the PARSED data,
-    // and an empty object schema strips rather than passes — which is why the road
+    // `methodSchema(m).safeParse` for every method and spreads the PARSED data,
+    // and an empty object schema never passes an extra key on — which is why the road
     // that carries most of the traffic hid this one.
     //
-    // An empty raw shape is not a no-op registration: `z.object({})` strips every
-    // key, so the callback receives `{}` and the payload is exactly `{ kind }`.
+    // An empty shape is not a no-op registration: the callback receives the
+    // parsed `{}` (an extra key is refused), so the payload is exactly `{ kind }`.
     // The advertised surface does not move either — the SDK already substitutes
     // `EMPTY_OBJECT_JSON_SCHEMA` in `tools/list` for a tool with no input schema,
     // which is what an empty shape compiles to. `agent-road-schema-gate.test.ts`
     // asserts both halves, and asserts them over EDITOR_METHODS rather than over
     // a list of tool names, so a method added later is covered by construction.
-    // A `strict` method registers a strict ZodObject (unknown keys REFUSED,
-    // ROADMAP row 225(a)); every other method registers its raw shape as before.
+    // Since ROADMAP row 225 every method registers a STRICT ZodObject (the one
+    // builder in editor-methods.ts): an unknown key is REFUSED with an input
+    // validation error naming it, never stripped. The empty-shape case above is
+    // unchanged by that: a zero-param tool still has an input schema, and the
+    // callback still receives the parsed `{}`.
     const config = { description: m.description, inputSchema: mcpInputSchema(m) };
     server.registerTool(m.name, config, async (args: Record<string, unknown> = {}) => {
       const result = await forward({ kind: m.kind, ...args } as AgentRequest);

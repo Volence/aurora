@@ -108,8 +108,8 @@ describe('registry conformance', () => {
   });
 
   it('declares every param as a zod schema', () => {
-    // The adapter builds `z.object(m.params)` and MCP hands `m.params` to
-    // registerTool as the input schema. A non-schema value in there is a
+    // Both roads build `methodSchema(m)` (a strict object over `m.params`),
+    // the adapter to safeParse and MCP as registerTool's input schema. A non-schema value in there is a
     // `z.ZodRawShape` type error only if it is not `any` — and it survives
     // module load either way, failing at the first call that parses params.
     for (const m of EDITOR_METHODS) {
@@ -128,7 +128,7 @@ describe('registry conformance', () => {
     // what makes this invisible: unlike the kind->case mapping, there is NO
     // compiler backstop here at all.
     //
-    // A caller cannot reach this — zod strips undeclared keys, so `parsed.data`
+    // A caller cannot reach this — the strict schema refuses undeclared keys, so `parsed.data`
     // only ever holds what the entry itself declared. That is exactly why it
     // belongs here rather than in a runtime guard: the mistake is made by
     // whoever WRITES a registry entry, and it would ship green.
