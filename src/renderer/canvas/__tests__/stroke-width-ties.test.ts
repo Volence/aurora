@@ -52,14 +52,20 @@ function oracle(css: Q, dpr: Q): { width: number; widthTie: boolean; parityTie: 
 }
 
 // The CSS widths the renderers stroke at, as exact rationals: the marks' core 1.25 and
-// casing 3, each also times ARROW_WIDTH_SCALE (1.6 = 8/5) for the stem; the 1 px chrome;
-// the 1.5 px outlines; and a sub-half width below the parity's even floor.
+// casing 3; the stem's core, 1.25 times ARROW_WIDTH_SCALE (1.6 = 8/5), and its casing,
+// that core plus the bar's margin 1.75 (= 15/4, ROADMAP row 240 (c), `stemWidths`: it
+// was 3 x 1.6 before); the 1 px chrome; the 1.5 px outlines; and a sub-half width below
+// the parity's even floor. `world` is the arithmetic a width reaches the adapter by in
+// world units (`u` is the caller's zoom), where it is not `base / u * scale`.
 const SCALE: Q = q(8, 5);
-const WIDTHS: { name: string; base: Q; scale: Q }[] = [
+const WIDTHS: { name: string; base: Q; scale: Q; world?: (u: number) => number }[] = [
   { name: 'bar core 1.25', base: q(5, 4), scale: q(1) },
   { name: 'bar casing 3', base: q(3), scale: q(1) },
   { name: 'stem core 1.25 x 1.6', base: q(5, 4), scale: SCALE },
-  { name: 'stem casing 3 x 1.6', base: q(3), scale: SCALE },
+  {
+    name: 'stem casing 1.25 x 1.6 + (3 - 1.25)', base: q(15, 4), scale: q(1),
+    world: (u) => (1.25 / u) * ARROW_WIDTH_SCALE + (3 / u - 1.25 / u),
+  },
   { name: '1 px chrome', base: q(1), scale: q(1) },
   { name: '1.5 px outline', base: q(3, 2), scale: q(1) },
   { name: '2 px chrome', base: q(2), scale: q(1) },
@@ -118,25 +124,25 @@ describe('deviceStrokeWidth on exact inputs follows the rule', () => {
  * The device width `segmentsOnDeviceGrid` strokes a horizontal segment at, when the caller
  * sets its lineWidth in WORLD units as the renderers do.
  */
-function aeonPathWidth(base: number, scale: number, zoom: number, dpr: number): number {
+function aeonPathWidth(base: number, scale: number, zoom: number, dpr: number, world?: (u: number) => number): number {
   const r = recordingContext();
   r.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   r.ctx.scale(zoom, zoom);
   const p = segmentsOnDeviceGrid(r.ctx, dpr, cameraDeviceMapping(0, 0, zoom, dpr));
-  p.lineWidth = scale === 1 ? base / zoom : (base / zoom) * scale;
+  p.lineWidth = world ? world(zoom) : scale === 1 ? base / zoom : (base / zoom) * scale;
   p.beginPath(); p.moveTo(0, 5); p.lineTo(10, 5); p.stroke();
   return r.strokes[0].width;
 }
 
 /** Classic's path: the mapping read off `setTransform(dpr) / scale(zoom)`, and its
  *  `zoomScale = getTransform().a / dpr` dividing the width (classic-overlays drawCollision). */
-function classicPathWidth(base: number, scale: number, zoom: number, dpr: number): number {
+function classicPathWidth(base: number, scale: number, zoom: number, dpr: number, world?: (u: number) => number): number {
   const r = recordingContext();
   r.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   r.ctx.scale(zoom, zoom);
   const zoomScale = r.ctx.getTransform().a / dpr;
   const p = segmentsOnDeviceGrid(r.ctx, dpr);
-  p.lineWidth = scale === 1 ? base / zoomScale : (base / zoomScale) * scale;
+  p.lineWidth = world ? world(zoomScale) : scale === 1 ? base / zoomScale : (base / zoomScale) * scale;
   p.beginPath(); p.moveTo(0, 5); p.lineTo(10, 5); p.stroke();
   return r.strokes[0].width;
 }
@@ -149,7 +155,7 @@ for (const [name, path] of [['aeon (cameraDeviceMapping)', aeonPathWidth], ['cla
         const label = `${w.name}, dpr ${val(d)}${o.widthTie ? ' (WIDTH TIE)' : ''}${o.parityTie ? ' (PARITY TIE)' : ''}`;
         it(label, () => {
           const bad = ZOOMS
-            .map((z) => ({ z, got: path(val(w.base), val(w.scale), z, val(d)) }))
+            .map((z) => ({ z, got: path(val(w.base), val(w.scale), z, val(d), w.world) }))
             .filter(({ got }) => Math.abs(got - o.width) > 1e-9)
             .map(({ z, got }) => `zoom ${z}: ${got}`);
           expect(bad, `want ${o.width} device px at every zoom`).toEqual([]);

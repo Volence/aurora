@@ -34,7 +34,7 @@ import {
   COLLISION_ANGLE_TICK, COLLISION_ANGLE_CASING,
 } from '../../../canvas/canvas-colors';
 import { drawObjects, drawStart, drawPriority, drawCollision } from '../classic-overlays';
-import { DETAIL_CELL_PX } from '../../../../core/collision/collision-angle-mark';
+import { ARROW_WIDTH_SCALE, DETAIL_CELL_PX } from '../../../../core/collision/collision-angle-mark';
 import type { LevelDoc } from '../../../../core/level-classic/model';
 import { monoMeasureText } from '../../../../test/mono-measure';
 import { expectedCentre, edgesWhole } from '../../../canvas/__tests__/grid-edges';
@@ -263,13 +263,21 @@ describe('drawCollision: the angle mark', () => {
       // The BAR's core (1.25 CSS px) and casing (3) are both ODD device widths at every
       // dpr, so they share one centre line.
       expect(core[0].pts[0][1]).toBeCloseTo(casing[0].pts[0][1], 9);
-      // The STEM's core is 1.25 x ARROW_WIDTH_SCALE = 2 CSS px (EVEN at every dpr) and
-      // its casing 3 x 1.6 = 4.8 CSS px (rounds to 5: ODD at every dpr). Under the
-      // ruling's parity-aware centring they cannot both have whole-pixel edges AND share
-      // a centre: they sit exactly half a device px apart, so the casing shows one more
-      // device px on one side than the other. Held here as a measured consequence, not
-      // hidden; the packet reports it.
-      expect(Math.abs(core[1].pts[0][0] - casing[1].pts[0][0]), 'stem core vs casing centre, device px').toBeCloseTo(0.5, 9);
+      // The STEM's core is 1.25 x ARROW_WIDTH_SCALE = 2 CSS px (EVEN at every dpr). Its
+      // casing was 3 x 1.6 = 4.8 CSS px (ODD at every dpr), which sat exactly half a
+      // device px off the core's centre; row 238 held that 0.5 here as a measured
+      // consequence. ROADMAP row 240 (c) (overseer, 2026-09-28) ruled the stem
+      // CONCENTRIC, moving the casing and never the core: the casing is now the core plus
+      // the bar's own casing margin, (3 - 1.25) / 2, on each side, which is EVEN too. So
+      // the two share a centre and the casing's two margins are equal.
+      const stemCore = 1.25 * ARROW_WIDTH_SCALE, stemCasing = stemCore + (3 - 1.25);
+      expect(core[1].width).toBeCloseTo(deviceStrokeWidth(stemCore, dpr), 9);
+      expect(casing[1].width).toBeCloseTo(deviceStrokeWidth(stemCasing, dpr), 9);
+      expect(Math.abs(core[1].pts[0][0] - casing[1].pts[0][0]), 'stem core vs casing centre, device px').toBeCloseTo(0, 6);
+      const left = (core[1].pts[0][0] - core[1].width / 2) - (casing[1].pts[0][0] - casing[1].width / 2);
+      const right = (casing[1].pts[0][0] + casing[1].width / 2) - (core[1].pts[0][0] + core[1].width / 2);
+      expect(left, 'the stem casing\'s two margins, device px').toBeCloseTo(right, 6);
+      expect(left).toBeCloseTo((deviceStrokeWidth(stemCasing, dpr) - deviceStrokeWidth(stemCore, dpr)) / 2, 6);
     });
   }
 
