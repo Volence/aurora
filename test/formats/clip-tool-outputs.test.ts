@@ -27,7 +27,7 @@ import { resolve } from 'node:path';
 import { POOL_ROW_FIELDS, readPoolRows } from '../../src/core/formats/donors/clipact-pool';
 import { clipToolArgv } from '../../src/main/clip-tool';
 import {
-  BAKE_JSON_SCHEMA, readBakeJson, readValidateJson, subjectsLabel, VALIDATE_JSON_SCHEMA,
+  BAKE_JSON_SCHEMA, FILL_SUBJECT_LABEL, readBakeJson, readValidateJson, subjectsLabel, VALIDATE_JSON_SCHEMA,
 } from '../../src/core/formats/donors/clip-validate-json';
 import { peerRepo, resolveRev, readAtRev } from '../support/peer-repo';
 
@@ -287,6 +287,68 @@ describe('validate --json: accepted, refused and CRASHED are three answers', () 
     expect(readValidateJson(null, '', '').kind).toBe('crashed');
     // An aeon that predates --json: exit 1 and its usage text, not JSON.
     expect(readValidateJson(1, "ERROR: unknown argument '--json'\nUsage: ...\n", '').kind).toBe('crashed');
+  });
+});
+
+/**
+ * ROW 232. aeon names a K9 refusal's subject `shaft` and a K8 refusal's `fill`
+ * (clip_manifest.py's `subject()`; census in clip-validate-json.ts's header).
+ * Before row 232 the reader took only clip/corridor, so these REAL refusals on
+ * the woven act read as "aeon crashed". Every expectation is read from aeon's
+ * own stdout in validate-json.cases.json (the three s2_woven cases).
+ */
+describe('validate --json on a woven act: shaft and fill refusals are REFUSALS, not crashes', () => {
+  type Doc = { refusals: { rule: string | null; subjects: { kind: string; index: number; id: string | null }[]; message: string }[] };
+  const doc = (k: string) => JSON.parse(CASES[k].stdout) as Doc;
+  const K8 = 'refuse_k8_fill_no_why';
+  const K9 = 'refuse_k9_shaft_ledge_pitch';
+  const K9_PAIR = 'refuse_k9_shaft_dup_clip_id';
+
+  it('the vendored cases are what they claim: aeon tagged them K8 and K9, and named a fill and a shaft (so no row below is vacuous)', () => {
+    expect(doc(K8).refusals.map((r) => [r.rule, r.subjects.map((s) => s.kind)])).toEqual([['K8', ['fill']]]);
+    expect(doc(K9).refusals.map((r) => [r.rule, r.subjects.map((s) => s.kind)])).toEqual([['K9', ['shaft']]]);
+    expect(doc(K9_PAIR).refusals.map((r) => [r.rule, r.subjects.map((s) => s.kind)])).toEqual([['K9', ['clip', 'shaft']]]);
+  });
+
+  for (const k of [K8, K9, K9_PAIR]) {
+    it(`${k}: REFUSED under aeon's rule, with aeon's subjects, never "crashed"`, () => {
+      const c = CASES[k];
+      const v = readValidateJson(c.exit, c.stdout, c.stderr);
+      expect(v.kind === 'crashed' ? v.why : v.kind).toBe('refused');
+      if (v.kind !== 'refused') return;
+      expect(v.refusals.map((r) => r.rule)).toEqual(doc(k).refusals.map((r) => r.rule));
+      expect(v.refusals[0].subjects).toEqual(doc(k).refusals[0].subjects);
+    });
+  }
+
+  it('a person reads the shaft by kind, index and id, the clip beside it the same way, and the fill as the act\'s fill', () => {
+    const label = (k: string) => {
+      const v = readValidateJson(CASES[k].exit, CASES[k].stdout, CASES[k].stderr);
+      return v.kind === 'refused' ? subjectsLabel(v.refusals[0].subjects) : `(${v.kind})`;
+    };
+    const plain = (s: { kind: string; index: number; id: string | null }) => `${s.kind} ${s.index} ${s.id}`;
+    expect(label(K9)).toBe(plain(doc(K9).refusals[0].subjects[0]));
+    expect(label(K9_PAIR)).toBe(doc(K9_PAIR).refusals[0].subjects.map(plain).join(' and '));
+    // aeon's fill subject is always index 0, id null; its label carries neither.
+    expect(doc(K8).refusals[0].subjects).toEqual([{ kind: 'fill', index: 0, id: null }]);
+    expect(label(K8)).toBe(FILL_SUBJECT_LABEL);
+  });
+
+  it('a subject kind aeon does not emit is still a CRASH, and the crash names the kind', () => {
+    const planted = CASES[K9].stdout.replace('"kind": "shaft"', '"kind": "tunnel"');
+    expect(planted).not.toBe(CASES[K9].stdout);
+    const v = readValidateJson(1, planted, '');
+    expect(v.kind).toBe('crashed');
+    expect(v.kind === 'crashed' && v.why).toMatch(/kind is "tunnel"/);
+  });
+
+  it('a fill subject that is not aeon\'s one fill (index 0, id null) is a CRASH, not a second fill', () => {
+    for (const [from, to] of [['"index": 0', '"index": 1'], ['"id": null', '"id": "fill_b"']]) {
+      const planted = CASES[K8].stdout.replace(/"refusals": \[[\s\S]*?\]\s*\}\s*\]/, (m) => m.replace(from, to));
+      expect(planted).not.toBe(CASES[K8].stdout);
+      const v = readValidateJson(1, planted, '');
+      expect(v.kind === 'crashed' && v.why, `${from} -> ${to}`).toMatch(/fill subject is/);
+    }
   });
 });
 

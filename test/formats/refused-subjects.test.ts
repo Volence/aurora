@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseClipManifest } from '../../src/core/formats/donors/clip-manifest-doc';
-import { readBakeJson, readValidateJson, type ClipNote } from '../../src/core/formats/donors/clip-validate-json';
+import { FILL_SUBJECT_LABEL, readBakeJson, readValidateJson, type ClipNote } from '../../src/core/formats/donors/clip-validate-json';
 import { resolveRefusedSubjects, subjectsLabelOnPane } from '../../src/core/formats/donors/refused-subjects';
 
 const DIR = resolve(__dirname, '../fixtures/clips');
@@ -74,15 +74,47 @@ describe('a refusal\'s subjects, placed on the pane\'s manifest', () => {
 
   it('a subject of a kind the pane does not draw (aeon\'s shaft, K9) is OFF the pane, never placed on a corridor at that index', () => {
     // aeon's real R10 clip+corridor answer with the corridor subject's kind read as aeon's
-    // `shaft` (which the reader does not pass yet, ROADMAP row 232): same index, so a lookup
-    // in the wrong list would land on s2_ehz_cpz's corridor 0.
+    // `shaft` (an R10 overlap can name a shaft, clip_manifest.py's `_subject_of`): same
+    // index, so a lookup in the wrong list would land on s2_ehz_cpz's corridor 0.
     const r = refusalsOf('validate', VALIDATE.refuse_r10_clip_corridor).map((n) => ({
-      ...n, subjects: n.subjects.map((s) => (s.kind === 'corridor' ? { ...s, kind: 'shaft' as unknown as 'corridor' } : s)),
+      ...n, subjects: n.subjects.map((s) => (s.kind === 'corridor' ? { ...s, kind: 'shaft' as const } : s)),
     }));
     const doc = parseClipManifest(vendored('s2_ehz_cpz'));
-    const shaft = r[0].subjects.find((s) => (s.kind as string) === 'shaft')!;
+    const shaft = r[0].subjects.find((s) => s.kind === 'shaft')!;
     expect(doc.corridors[shaft.index]).toBeDefined();
     expect(resolveRefusedSubjects(r, doc).offPane.map((o) => o.subject)).toEqual([shaft]);
+  });
+
+  // ROW 232: aeon's REAL K8/K9 refusals on the woven act, placed on the manifest aeon
+  // judged (each case's `manifest`, recorded by gen_validate_json.py).
+  const judged = (k: string) => parseClipManifest(JSON.stringify(VALIDATE[k].manifest));
+
+  it('a real K9 pair (a clip and a shaft sharing an id): the CLIP is outlined at its own rectangle, the shaft is named off the pane', () => {
+    const k = 'refuse_k9_shaft_dup_clip_id';
+    const r = refusalsOf('validate', VALIDATE[k]);
+    const [clip, shaft] = r[0].subjects;
+    expect([clip.kind, shaft.kind]).toEqual(['clip', 'shaft']);
+    // Anti-vacuous: the shaft's index is ALSO a clip's index on this manifest, and that clip
+    // carries the same id, so a lookup that ignored the kind would outline the clip twice.
+    const doc = judged(k);
+    expect(doc.clips[shaft.index].id).toBe(shaft.id);
+    const got = resolveRefusedSubjects(r, doc);
+    const raw = VALIDATE[k].manifest as { clips: Array<{ dst_rect: RawRect }> };
+    expect(got.placed.map((p) => ({ rule: p.rule, subject: p.subject, rect: p.rect })))
+      .toEqual([{ rule: r[0].rule, subject: clip, rect: raw.clips[clip.index].dst_rect }]);
+    expect(got.offPane).toEqual([{ rule: r[0].rule, subject: shaft }]);
+    expect(subjectsLabelOnPane(r[0].subjects, doc)).toBe(`clip ${clip.index} ${clip.id} and shaft ${shaft.index} ${shaft.id} (not on this pane)`);
+  });
+
+  it('a real K9 (one shaft) and a real K8 (the fill): nothing outlined, each subject named off the pane, none dropped', () => {
+    for (const k of ['refuse_k9_shaft_ledge_pitch', 'refuse_k8_fill_no_why']) {
+      const r = refusalsOf('validate', VALIDATE[k]);
+      expect(r[0].subjects.length, k).toBe(1);
+      const got = resolveRefusedSubjects(r, judged(k));
+      expect({ placed: got.placed, offPane: got.offPane }, k).toEqual({ placed: [], offPane: [{ rule: r[0].rule, subject: r[0].subjects[0] }] });
+    }
+    const fill = refusalsOf('validate', VALIDATE.refuse_k8_fill_no_why)[0];
+    expect(subjectsLabelOnPane(fill.subjects, judged('refuse_k8_fill_no_why'))).toBe(`${FILL_SUBJECT_LABEL} (not on this pane)`);
   });
 
   it('an act-level refusal (C3, no subjects) places nothing and names nothing off the pane', () => {

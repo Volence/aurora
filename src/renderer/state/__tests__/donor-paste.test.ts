@@ -26,13 +26,14 @@ import { usePasteStore, type PastePorts } from '../donor-paste';
 import type { ClipToolResult, GuardedWriteFile } from '../../../shared/ipc-types';
 import type { NewClip } from '../../../core/formats/donors/clip-manifest-doc';
 import { refusedOutlines } from '../../components/donors/target-outlines';
+import { subjectsLabelOnPane } from '../../../core/formats/donors/refused-subjects';
 import { useDonorDraft } from '../donor-draft';
 import { useDonorStore } from '../donorStore';
 
 const PINS = readFileSync(resolve(__dirname, '../../../../test/fixtures/clips/s2_two_clip_pins.clips.json'), 'utf8');
 const PINS_PATH = 'games/sonic4/data/clips/s2_two_clip_pins/clips.json';
 const CASES = JSON.parse(readFileSync(resolve(__dirname, '../../../../test/fixtures/clips/aeon-outputs/validate-json.cases.json'), 'utf8')) as
-  Record<string, { exit: number; stdout: string; stderr: string }>;
+  Record<string, { exit: number; stdout: string; stderr: string; manifest?: unknown }>;
 /** One of aeon's real validate --json runs, as the clip-tool channel would return it. */
 function aeonSaid(name: string): Partial<ClipToolResult> {
   const c = CASES[name];
@@ -443,6 +444,27 @@ describe('the target pane outlines what a refusal names (row 213 (b))', () => {
       bakeRefused: null,
     });
     expect(got.map((x) => [x.rect, x.tag])).toEqual([[raw.clips[0].dst_rect, 'R10'], [raw.clips[0].dst_rect, 'R10']]);
+  });
+
+  it('row 232: aeon\'s real K9 pair on the woven act (a clip and a shaft) is a REFUSAL; the clip is outlined, the shaft named off the pane', async () => {
+    // The act on disk is the manifest aeon judged in validate-json.cases.json's
+    // refuse_k9_shaft_dup_clip_id (its `manifest`); the paste appends CLIP after its
+    // clips, so every index aeon named still points where aeon meant.
+    const k = 'refuse_k9_shaft_dup_clip_id';
+    const act = CASES[k].manifest as { clips: Array<{ id: string; dst_rect: unknown }> };
+    const WOVEN_PATH = 'games/sonic4/data/clips/s2_woven/clips.json';
+    const disk: Disk = { files: new Map([[WOVEN_PATH, { text: JSON.stringify(act, null, 2), mtimeMs: 7 }]]), clock: 100 };
+    const p = ports(disk, { validate: (t) => (t.includes('ehz_x') ? aeonSaid(k) : {}) });
+    await usePasteStore.getState().selectAct('s2_woven', p);
+    const o = await usePasteStore.getState().paste(CLIP, p);
+    const r = JSON.parse(CASES[k].stdout).refusals[0] as { rule: string; subjects: Array<{ kind: string; index: number; id: string }> };
+    const [clip, shaft] = r.subjects;
+    expect(o.kind === 'crashed' ? o.text : o.kind).toBe('refused');
+    expect(outlinesNow()).toEqual([{ rect: act.clips[clip.index].dst_rect, tone: 'warning', dashed: true, tag: r.rule }]);
+    // The words DonorPasteSection shows beside the refusal (its data-donors-note-subjects span).
+    expect(o.kind === 'refused' && subjectsLabelOnPane(o.refusals[0].subjects, o.judged))
+      .toBe(`clip ${clip.index} ${clip.id} and shaft ${shaft.index} ${shaft.id} (not on this pane)`);
+    expect(p.writes).toEqual([]);
   });
 
   it('an EDIT of the drafted clip clears the refusal and its outlines', async () => {
