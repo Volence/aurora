@@ -86,6 +86,11 @@ for name, base, m in plan:
     p = f"{out}/{name}.clips.json"
     json.dump(d, open(p, "w"), indent=2)
     run(name, p)
+    if base == "s2_woven":
+        # Row 232: the woven cases also carry the manifest aeon judged (the mutated
+        # woven act, as written above), so the target pane's refused-subject rows
+        # place the subjects on THAT manifest rather than re-deriving the mutation.
+        bundle[name]["manifest"] = d
 open(f"{out}/notjson.clips.json", "w").write("{ this is not json")
 run("crash_not_json", f"{out}/notjson.clips.json")
 run("crash_missing_path", f"{out}/no_such_file.json")

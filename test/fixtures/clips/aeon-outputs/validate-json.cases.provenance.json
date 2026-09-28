@@ -29,13 +29,13 @@
   },
   "fixture": {
     "path": "test/fixtures/clips/aeon-outputs/validate-json.cases.json",
-    "command": "EMPYREAN_SUITE_ROOT=<suite> python3 test/fixtures/clips/aeon-outputs/gen_validate_json.py <scratch>/vj2 <this file>, run from the materialised copy: twelve real subprocesses of `python3 tools/clip_manifest.py validate <path> --donor-root <copy>/games/sonic4/data/donors --json`, each {exit, stdout, stderr} verbatim",
+    "command": "EMPYREAN_SUITE_ROOT=<suite> python3 test/fixtures/clips/aeon-outputs/gen_validate_json.py <scratch>/vj2 <this file>, run from the materialised copy: twelve real subprocesses of `python3 tools/clip_manifest.py validate <path> --donor-root <copy>/games/sonic4/data/donors --json`, each {exit, stdout, stderr} verbatim; the three s2_woven cases (row 232) also carry `manifest`, the mutated manifest the generator wrote and aeon judged",
     "why_these": "an acceptance, an acceptance with a W3 naming two clips, R7 (one clip), R10 clip/clip and clip/corridor (pair rules), R12 after a W2 (a warning kept under a refusal), the untagged top-level refusal (rule null, no subjects), and the two CRASHES aeon documents (not JSON; a missing path): exit 1, empty stdout, a traceback; and (row 232) the two subject kinds that are neither clip nor corridor: K8 naming the FILL, K9 naming a SHAFT, and a K9 pair naming a clip AND a shaft in one refusal",
-    "sha256": "ec488cd7463cc4495d9fdbd390b55f8dfb786c4770e89301bbf94dad490d8a7a"
+    "sha256": "258519a33beca227527452fe2edf05f668acea0b0fe577bcf53bb602f4c945f5"
   },
   "generator": {
     "path": "test/fixtures/clips/aeon-outputs/gen_validate_json.py",
     "what": "the generator fixture.command runs; the mutations are aeon's own from tools/test_clip_manifest_json.py at 1d9afb25, bar the three s2_woven ones (row 232), each commented in the generator with the rule it trips",
-    "sha256": "3438c4caf6cba39fea3604932af3315b083d4d41fa21bd0943352948576963dc"
+    "sha256": "cfa483ac273cd0d54776be8786851f8c71cb449da7ac377e1cf50e96e81d84af"
   }
 }
