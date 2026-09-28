@@ -14,6 +14,11 @@ import { STRIP_ROWS, STRIP_COLS, WIDE_STRIP_SIZE } from '../../../formats/s4-str
 import { packCollisionCell } from '../../../collision/collision-cell-word';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../model/s4-types';
 import type { Tile } from '../../../model/s4-types';
+import { createChunkDef } from '../../../model/s4-types';
+import { auditReservedBits } from '../../../collision/reserved-bits-audit';
+import { copyFromSection, buildPasteCommand } from '../../../editing/map-clipboard';
+import { buildStampCommand } from '../../../editing/map-stamp';
+import { EditHistory } from '../../../editing/history';
 
 // Fixture helpers copied VERBATIM from aeon-load.test.ts (tests must not import
 // each other).
@@ -1089,5 +1094,90 @@ describe('a bglib manifest naming entries whose bodies are absent', () => {
     const idx = plan.files.find((f) => f.path === IDX);
     expect(parseBgLibraryIndex(new TextDecoder().decode(idx!.bytes)))
       .toEqual([{ id: ABSENT, name: 'In-game forest (engine v15)' }]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ROADMAP row 225(c): PASTE AND CHUNK STAMP COPY WHOLE WORDS, SO A RETIRED MARK
+// (bits 15:14) CAN BE COPIED INSIDE AURORA. Neither is blocked at paste time (by
+// ruling); the claim is that the audit and the save refusal still CATCH the copy.
+// The paste row removes the original so ONLY the copy carries the bits: a
+// refusal that fired on the original alone would otherwise pass it vacuously.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('row 225(c): a mark copied by paste or chunk stamp is still audited and refused at save', () => {
+  const MARK = 2;                                  // any non-zero value of bits 15:14
+  const SHAPED = packCollisionCell({ shape: 0x33, xFlip: false, yFlip: false, solidity: 'all' });
+  const MARKED = (SHAPED | (MARK << PLANE_RESERVED_SHIFT)) & 0xFFFF;
+  // Source cell (16px units) and destination tile origin (even, as pasteBaseStep demands).
+  const SRC_CELL = { col: 3, row: 2 };
+  const DST_TILE = { col: 40, row: 20 };
+
+  async function loadAct(files: Map<string, Uint8Array>) {
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    const act = r.project.zones.find((z) => z.id === 'ojz')!.acts.find((x) => x.id === 'act1')!;
+    return { fa, r, act, sec: act.sections[0]! };
+  }
+  const plan = (x: Awaited<ReturnType<typeof loadAct>>) => buildAeonSavePlan(
+    x.fa, x.r.config, x.r.project, 'ojz', 'act1', { legacyAtlasMerged: x.r.legacyAtlasMerged });
+  /** The refusal names the destination cell in both vocabularies, read off
+   *  DST_TILE rather than typed: aeon's 8px editor cell and Aurora's 16px cell. */
+  const namesDst = new RegExp(`refusing to save ojz/act1: .*plane A editor cell \\(${DST_TILE.col}, ${DST_TILE.row}\\) `
+    + `= 16px cell \\(col ${DST_TILE.col >> 1}, row ${DST_TILE.row >> 1}\\).*Nothing was written`);
+  const dstIndices = [...cellTileIndices(DST_TILE.col >> 1, DST_TILE.row >> 1, SECTION_TILES_WIDE)]
+    .sort((p, q) => p - q);
+
+  it('PASTE: a copied mark lands on every sub-tile of the destination cell, the audit counts exactly those, and the save refuses naming it', async () => {
+    const files = authoredFixture();
+    const a = Uint16Array.from(AUTHORED_A);
+    const srcIdx = cellTileIndices(SRC_CELL.col, SRC_CELL.row, SECTION_TILES_WIDE);
+    a[srcIdx[0]!] = MARKED;                        // copyFromSection reads a cell's top-left word
+    files.set(COLL_A_PATH, serializeCollAttr(a));
+    const x = await loadAct(files);
+    expect(planeReservedBits(x.sec.collisionEdit![srcIdx[0]!])).toBe(MARK);
+
+    const clip = copyFromSection(x.sec, SRC_CELL.col * 2, SRC_CELL.row * 2, 2, 2);
+    expect(clip.artOnly).toBe(false);
+    const cmd = buildPasteCommand({ clip, section: x.sec, sectionIndex: 0,
+      baseCol: DST_TILE.col, baseRow: DST_TILE.row, layers: 'collision', description: 'paste' });
+    expect(cmd, 'the paste changed nothing').not.toBeNull();
+    new EditHistory().execute(cmd!, x.act);
+    // Remove the ORIGINAL, keeping its shape, so only the copy carries the bits.
+    x.sec.collisionEdit![srcIdx[0]!] = SHAPED;
+
+    const audit = auditReservedBits(x.sec.collisionEdit, x.sec.collisionEditB, SECTION_TILES_WIDE, 0);
+    expect(audit.reservedA).toBe(dstIndices.length);
+    expect(audit.reservedB).toBe(0);
+    expect(audit.sample.map((c) => c.index)).toEqual(dstIndices);
+    await expect(plan(x)).rejects.toThrow(namesDst);
+  });
+
+  it('CHUNK STAMP: a chunk carrying a mark stamps it into the section, the audit counts it, and the save refuses naming it', async () => {
+    const x = await loadAct(authoredFixture());
+    // Anti-vacuous: the loaded act carries no mark at all before the stamp.
+    expect(auditReservedBits(x.sec.collisionEdit, x.sec.collisionEditB, SECTION_TILES_WIDE, 0).reservedA).toBe(0);
+    const chunk = createChunkDef('marked', 'Marked', 2, 2);
+    chunk.collisionA[0] = MARKED;
+    const cmd = buildStampCommand({ chunk, section: x.sec, sectionIndex: 0,
+      baseCol: DST_TILE.col, baseRow: DST_TILE.row, artOnly: false, description: 'stamp', detached: true });
+    expect(cmd, 'the stamp changed nothing').not.toBeNull();
+    new EditHistory().execute(cmd!, x.act);
+
+    const audit = auditReservedBits(x.sec.collisionEdit, x.sec.collisionEditB, SECTION_TILES_WIDE, 0);
+    expect(audit.reservedA).toBe(dstIndices.length);
+    expect(audit.sample.map((c) => c.index)).toEqual(dstIndices);
+    await expect(plan(x)).rejects.toThrow(namesDst);
+  });
+
+  it('control: the same stamp with bits 15:14 clear saves (the refusal is about the copied bits)', async () => {
+    const x = await loadAct(authoredFixture());
+    const chunk = createChunkDef('clean', 'Clean', 2, 2);
+    chunk.collisionA[0] = SHAPED;
+    const cmd = buildStampCommand({ chunk, section: x.sec, sectionIndex: 0,
+      baseCol: DST_TILE.col, baseRow: DST_TILE.row, artOnly: false, description: 'stamp', detached: true });
+    expect(cmd, 'the stamp changed nothing').not.toBeNull();
+    new EditHistory().execute(cmd!, x.act);
+    expect(x.sec.collisionEdit![dstIndices[0]!]).toBe(SHAPED);
+    await expect(plan(x)).resolves.toBeDefined();
   });
 });
