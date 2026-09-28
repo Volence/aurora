@@ -45,7 +45,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createServer, request, type Server } from 'http';
 import { AddressInfo } from 'net';
-import { EDITOR_METHODS } from '../editor-methods';
+import { z } from 'zod';
+import { EDITOR_METHODS, methodSchema } from '../editor-methods';
 import { RETIRED_PAINT_COLLISION_KEYS } from '../../core/agent/validation';
 
 /** Every payload handed to `requestAgent`, in call order. */
@@ -135,10 +136,11 @@ function allowedKeys(m: (typeof EDITOR_METHODS)[number]): Set<string> {
 
 describe('every road into the agent handler carries only what a schema declared', () => {
   // A CONTROL FIRST. If this row cannot go red the loops below prove nothing:
-  // it shows the harness actually observes the payload, and that an off-schema
-  // key on a schema-BEARING method is dropped rather than forwarded.
-  it('CONTROL: the harness sees the payload, and a declared method drops an undeclared key', async () => {
-    await callMcp('get_tiles', { start: 0, count: 1, bogus: 'off-schema' });
+  // it shows the harness actually observes the payload. (Until row 225 it also
+  // sent an off-schema key and expected it DROPPED; every method now refuses
+  // one instead, which the row-225 block below asserts per method.)
+  it('CONTROL: the harness sees the payload, carrying exactly the declared keys', async () => {
+    await callMcp('get_tiles', { start: 0, count: 1 });
     expect(captured.length, 'nothing reached the bridge: the harness is not observing').toBe(1);
     expect(Object.keys(captured[0] as object).sort()).toEqual(['count', 'kind', 'start']);
   });
@@ -279,6 +281,145 @@ describe('paint_collision refuses a retired key on both roads (row 225(a))', () 
       const unrec = issues.find((i) => i.code === 'unrecognized_keys');
       expect(unrec?.keys, 'the refusal does not name the offending key').toEqual([key]);
       expect(unrec?.message).toContain(key);
+    });
+  }
+});
+
+// ===========================================================================
+// ROADMAP row 225, the overseer's ruling: an unknown key is REFUSED, never
+// silently erased, on EVERY method and inside every nested object. The method
+// list is the registry itself, so a method added later is covered without
+// anyone editing this file.
+// ===========================================================================
+
+/** A key no method declares. Checked against the registry below, not assumed. */
+const UNKNOWN = 'row225_unknown_key';
+
+/** The Aether refusal's `unrecognized_keys` issues, or [] when there are none. */
+function unrecognized(res: Record<string, unknown>): Array<{ keys?: string[]; path?: unknown[] }> {
+  const issues = (res.error as { data?: { issues?: Array<{ code: string; keys?: string[]; path?: unknown[] }> } } | undefined)
+    ?.data?.issues ?? [];
+  return issues.filter((i) => i.code === 'unrecognized_keys');
+}
+
+describe('every registered method refuses an unknown key on both roads (row 225)', () => {
+  it('the registry is not empty and no method declares the probe key (loud if it cannot measure)', () => {
+    expect(EDITOR_METHODS.length).toBeGreaterThan(0);
+    for (const m of EDITOR_METHODS) expect(allowedKeys(m).has(UNKNOWN), `${m.name} declares ${UNKNOWN}`).toBe(false);
+  });
+
+  // For a method with required params, `{ [UNKNOWN]: 1 }` would be refused for
+  // the missing params alone, so "nothing reached the bridge" cannot tell a
+  // strict schema from a stripping one there. The discriminating assertion is
+  // the one NAMING the key: zod reports `unrecognized_keys` alongside any
+  // missing-param issues, and a stripping schema never reports it at all.
+  for (const m of EDITOR_METHODS) {
+    it(`MCP road: ${m.name} refuses ${UNKNOWN} by name, and nothing reaches the bridge`, async () => {
+      const res = await callMcp(m.name, { [UNKNOWN]: 1 });
+      expect(captured, `${m.name} forwarded a request carrying an unknown key`).toEqual([]);
+      const text = JSON.stringify(res);
+      expect(text).toMatch(/Input validation error/);
+      expect(text, `${m.name}'s refusal does not name the unknown key`).toMatch(new RegExp(`Unrecognized key[^"]*\\\\"${UNKNOWN}`));
+    });
+
+    it(`Aether road: ${m.name} refuses ${UNKNOWN} as INVALID_PARAMS naming it`, async () => {
+      const res = await callAether(m.name, { [UNKNOWN]: 1 });
+      expect(captured, `${m.name} forwarded a request carrying an unknown key`).toEqual([]);
+      expect(res.error).toMatchObject({ code: -32602, message: 'invalid params' });
+      expect(unrecognized(res).map((i) => i.keys), `${m.name} did not name the unknown key`).toEqual([[UNKNOWN]]);
+    });
+  }
+});
+
+/**
+ * Every object ANYWHERE in a method's schema (params, and anything nested
+ * inside arrays, optionals, nullables, unions) as `{ path, strict }`. zod v4
+ * marks a strict object by a `never` catchall; `z.object` has none and strips.
+ * Walked generically over each schema's `_zod.def`, so a wrapper this list
+ * does not name is still descended into.
+ */
+function objectsIn(schema: z.ZodType, path: string, out: Array<{ path: string; strict: boolean }>, seen = new Set<unknown>()): void {
+  if (seen.has(schema)) return;
+  seen.add(schema);
+  const def = (schema as unknown as { _zod: { def: Record<string, unknown> } })._zod.def;
+  if (def.type === 'object') {
+    const catchall = def.catchall as z.ZodType | undefined;
+    const catchallType = (catchall as unknown as { _zod?: { def: { type: string } } } | undefined)?._zod?.def.type;
+    out.push({ path, strict: catchallType === 'never' });
+    for (const [k, v] of Object.entries(def.shape as Record<string, z.ZodType>)) objectsIn(v, `${path}.${k}`, out, seen);
+    return;
+  }
+  for (const [k, v] of Object.entries(def)) {
+    const kids = Array.isArray(v) ? v : [v];
+    for (const kid of kids) if (kid instanceof z.ZodType) objectsIn(kid, `${path}<${k}>`, out, seen);
+  }
+}
+
+describe('no object anywhere inside a method schema strips an unknown key (row 225)', () => {
+  const all = EDITOR_METHODS.flatMap((m) => {
+    const out: Array<{ path: string; strict: boolean }> = [];
+    objectsIn(methodSchema(m), m.name, out);
+    return out;
+  });
+
+  it('the walk reaches nested objects, not only the method roots (loud if it cannot measure)', () => {
+    const paths = all.map((o) => o.path);
+    // One nested object per named shared schema, found by the walk rather than listed as found.
+    expect(paths).toContain('paint_region.entries<element>');
+    expect(paths).toContain('edit_block.def.cells<element>');
+    expect(paths).toContain('place_object.entry');
+    expect(all.length).toBeGreaterThan(EDITOR_METHODS.length);
+  });
+
+  it('every object, root and nested, is strict', () => {
+    expect(all.filter((o) => !o.strict).map((o) => o.path), 'these objects STRIP an unknown key').toEqual([]);
+  });
+});
+
+/**
+ * The three shared nested schemas, driven down both roads with an otherwise
+ * VALID request, so the unknown nested key is the only thing wrong with it.
+ * Before row 225 each of these was stripped inside the parent and forwarded.
+ */
+describe('a nested unknown key is refused on both roads (row 225)', () => {
+  const cell = { tile: 0, xf: false, yf: false, pal: 0, pri: false };
+  const cases: Array<{ schema: string; method: string; valid: Record<string, unknown>; poisoned: Record<string, unknown>; path: unknown[] }> = [
+    { schema: 'entrySchema', method: 'paint_region',
+      valid: { section: 0, x: 0, y: 0, w: 1, h: 1, entries: [{ tile: 0, pal: 0 }] },
+      poisoned: { section: 0, x: 0, y: 0, w: 1, h: 1, entries: [{ tile: 0, pal: 0, [UNKNOWN]: 1 }] },
+      path: ['entries', 0] },
+    { schema: 'blockCellSchema', method: 'edit_block',
+      valid: { blockId: 0, def: { cells: [cell, cell, cell, cell] } },
+      poisoned: { blockId: 0, def: { cells: [cell, cell, { ...cell, [UNKNOWN]: 1 }, cell] } },
+      path: ['def', 'cells', 2] },
+    { schema: 's1ObjectSchema', method: 'place_object',
+      valid: { entry: { x: 0, y: 0, xflip: false, yflip: false, respawn: false, id: 1, subtype: 0 } },
+      poisoned: { entry: { x: 0, y: 0, xflip: false, yflip: false, respawn: false, id: 1, subtype: 0, [UNKNOWN]: 1 } },
+      path: ['entry'] },
+  ];
+
+  for (const c of cases) {
+    it(`CONTROL, ${c.schema} via ${c.method}: the valid request is forwarded on both roads`, async () => {
+      const mcp = await callMcp(c.method, c.valid);
+      expect(JSON.stringify(mcp)).not.toMatch(/Input validation error/);
+      const aether = await callAether(c.method, c.valid);
+      expect(aether.error, `the valid ${c.method} was refused on the Aether road`).toBeUndefined();
+      expect(captured.length).toBe(2);
+    });
+
+    it(`MCP road: ${c.schema} via ${c.method} refuses a nested unknown key by name`, async () => {
+      const res = await callMcp(c.method, c.poisoned);
+      expect(captured, `the nested key was stripped and ${c.method} forwarded`).toEqual([]);
+      const text = JSON.stringify(res);
+      expect(text).toMatch(/Input validation error/);
+      expect(text).toMatch(new RegExp(`Unrecognized key[^"]*\\\\"${UNKNOWN}`));
+    });
+
+    it(`Aether road: ${c.schema} via ${c.method} refuses a nested unknown key at its path`, async () => {
+      const res = await callAether(c.method, c.poisoned);
+      expect(captured, `the nested key was stripped and ${c.method} forwarded`).toEqual([]);
+      expect(res.error).toMatchObject({ code: -32602, message: 'invalid params' });
+      expect(unrecognized(res)).toEqual([expect.objectContaining({ keys: [UNKNOWN], path: c.path })]);
     });
   }
 });
