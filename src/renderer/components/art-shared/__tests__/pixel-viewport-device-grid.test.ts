@@ -73,13 +73,14 @@ describe('PixelViewport grids are on the backing store\'s pixel grid (row 240 (a
   for (const c of ALL) {
     it(`zoom ${c.zoom}, origin ${c.originX},${c.originY}`, () => {
       const { f, r } = frameAt(c);
-      const W = 16, H = 8, step = 8;
+      // The pixel grid (step 1), so a fractional zoom puts lines between store pixels.
+      const W = 3, H = 2, step = 1;
       drawGridLines(f, W, H, step, 'grid');
       const lines = r.strokes.filter((s) => s.style === 'grid');
-      expect(lines.length, 'x lines 0, 8, 16 and y lines 0, 8').toBe(5);
+      expect(lines.length, 'x lines 0..3 and y lines 0..2').toBe(7);
       const want: ['x' | 'y', number][] = [
-        ...[0, 8, 16].map((g): ['x' | 'y', number] => ['x', c.originX + g * c.zoom]),
-        ...[0, 8].map((g): ['x' | 'y', number] => ['y', c.originY + g * c.zoom]),
+        ...[0, 1, 2, 3].map((g): ['x' | 'y', number] => ['x', c.originX + g * c.zoom]),
+        ...[0, 1, 2].map((g): ['x' | 'y', number] => ['y', c.originY + g * c.zoom]),
       ];
       lines.forEach((s, i) => {
         expect(s.width).toBeCloseTo(1, 9);
