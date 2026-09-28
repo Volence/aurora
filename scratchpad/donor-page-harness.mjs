@@ -125,6 +125,15 @@
 //         copy's s2_woven: a real click on the act shows aeon's refusal naming
 //         the shaft "(not on this pane)", no dashed outline, no warning pixel on
 //         the target canvas. SHOT_DIR saves donor-page-k9-shaft-*.png.
+//   ROW 236 (a), RULED 2026-09-28: every refusal outline names itself on the
+//   pane's hover as "<rule tag>: <subject label>". DP.7o, DP.10 and DP.12o now
+//   expect that `hover` on each dashed outline (from the harness's own subjects).
+//   DP.12h at whole-act scale (the shaft's K9 tag hidden, no room), a REAL mouse
+//         move (CDP Input.dispatchMouseEvent) to an integer client pixel inside
+//         shaft 0's rectangle: the target canvas's title, the pane's hover
+//         text, read off the app, is exactly "K9: shaft 0 <id>" (rule and
+//         subject from the harness's own validate). SHOT_DIR saves
+//         donor-page-k9-shaft-hover*.png.
 //
 // EXPECTATIONS COME FROM THE TREE: CONVERTER_COMMAND, marqueeRect, marqueeReadout,
 // clipsManifestPath and suggestDestination are bundled from the tree under test
@@ -796,7 +805,9 @@ async function rows(d, O, COPY, dpr) {
   const s7o = await d.waitFor((s) => (dashedOf(s.targetPane) ?? []).length > 0, 'the refused outlines', 40, 250, { soft: true });
   await sleep(300);
   const dash7 = dashedOf(s7o.targetPane);
-  const want7 = [{ rect: clip0, tone: 'warning', dashed: true, tag: 'R10' }, { rect: refusedRect, tone: 'warning', dashed: true, tag: 'R10' }];
+  // Row 236 (a): each named on hover "<rule>: <kind> <index> <id>" (ids: the file on disk and the draft, as DP.7s).
+  const want7 = [{ rect: clip0, tone: 'warning', dashed: true, tag: 'R10', hover: `R10: clip 0 ${firstId}` },
+    { rect: refusedRect, tone: 'warning', dashed: true, tag: 'R10', hover: `R10: clip 1 ${s7a.draft.clipId}` }];
   const edge7 = await edgeRead(refusedRect);
   check('DP.7o', 'the R10 refusal outlines BOTH subjects: the pane painted two dashed warning outlines tagged R10 (clip 0 as on disk, clip 1 the draft), and the canvas edge, read back, shows the warning colour in DASHES where it showed none just before the refusal',
     J(dash7) === J(want7) && edgeBefore.warn === 0 && edge7.warn > 0.2 * edge7.n && edge7.warn < 0.9 * edge7.n && edge7.runs >= 3,
@@ -1172,7 +1183,7 @@ async function rows(d, O, COPY, dpr) {
     const WOVEN = 's2_woven';
     const wPath = join(COPY, O.clipsManifestPath(WOVEN));
     if (!existsSync(wPath)) {
-      for (const id of ['DP.12a', 'DP.12o', 'DP.12t', 'DP.12n']) check(id, `a real shaft refusal on ${WOVEN}`, 'UNMEASURABLE', `${wPath} is not in the copy`);
+      for (const id of ['DP.12a', 'DP.12o', 'DP.12h', 'DP.12t', 'DP.12n']) check(id, `a real shaft refusal on ${WOVEN}`, 'UNMEASURABLE', `${wPath} is not in the copy`);
       return;
     }
     const wBytes = readFileSync(wPath);
@@ -1180,14 +1191,14 @@ async function rows(d, O, COPY, dpr) {
     const wMan = JSON.parse(wText);
     const shaft0 = (wMan.shafts ?? [])[0] ?? null;
     if (!shaft0) {
-      for (const id of ['DP.12a', 'DP.12o', 'DP.12t', 'DP.12n']) check(id, `a real shaft refusal on ${WOVEN}`, 'UNMEASURABLE', `${WOVEN} on disk has no shaft`);
+      for (const id of ['DP.12a', 'DP.12o', 'DP.12h', 'DP.12t', 'DP.12n']) check(id, `a real shaft refusal on ${WOVEN}`, 'UNMEASURABLE', `${WOVEN} on disk has no shaft`);
       return;
     }
     const actBtn = await d.realClick(`document.querySelector('[data-donors-act="${WOVEN}"]')`);
     const sw = await d.waitFor((s) => s.paste.target && s.paste.target.actId === WOVEN && !s.paste.busy && s.draft.dst !== null && s.paste.baked,
       `${WOVEN} chosen, baked, with a placed draft`, 480, 250, { soft: true });
     if (!sw.paste.target || sw.paste.target.actId !== WOVEN || !sw.draft.dst || !sw.paste.baked) {
-      for (const id of ['DP.12a', 'DP.12o', 'DP.12t']) check(id, `a real K9 paste on ${WOVEN}`, 'UNMEASURABLE', `the premise is not there: act click ${J(actBtn)}; state ${J({ target: sw.paste.target, draft: sw.draft, baked: sw.paste.baked, note: sw.paste.bakeNote })}`);
+      for (const id of ['DP.12a', 'DP.12o', 'DP.12h', 'DP.12t']) check(id, `a real K9 paste on ${WOVEN}`, 'UNMEASURABLE', `the premise is not there: act click ${J(actBtn)}; state ${J({ target: sw.paste.target, draft: sw.draft, baked: sw.paste.baked, note: sw.paste.bakeNote })}`);
     } else {
       const idBox = await d.realClick('document.querySelector("[data-donors-clip-id]")');
       await c.evalExpr('(() => { const el = document.querySelector("[data-donors-clip-id]"); el.setSelectionRange(0, el.value.length); })()');
@@ -1225,10 +1236,15 @@ async function rows(d, O, COPY, dpr) {
         `draft ${J(s1.draft)}; harness's own validate exit ${own && own.exit}, refusal ${J(ownR)}; page outcome ${J(s12.paste.outcome && { kind: s12.paste.outcome.kind, stage: s12.paste.outcome.stage })}; DOM ${J(dom12)}; want subjects ${J(want12)}`);
 
       const s12o = await d.waitFor((s) => (dashedOf(s.targetPane) ?? []).length > 1, 'the K9 outlines', 40, 250, { soft: true });
+      // The shaft's K9 tag as the paint report printed it (a box), or null when hidden.
+      const tagOnShaftNow = (P) => (P && Array.isArray(P.labels) ? P.labels : []).find((l) => l.kind === 'tag' && l.text === 'K9' && l.box
+        && P.outlines[l.outline] && J(P.outlines[l.outline].rect) === J(shaft0.dst_rect)) ?? null;
       await sleep(300);
       const P12 = s12o.targetPane;
       const dash12 = dashedOf(P12);
-      const wantDash12 = [{ rect: draftRect, tone: 'warning', dashed: true, tag: 'K9' }, { rect: shaft0.dst_rect, tone: 'warning', dashed: true, tag: 'K9' }];
+      // Row 236 (a): each named on hover "<rule>: <kind> <index> <id>", the subjects of the harness's own validate.
+      const wantDash12 = [{ rect: draftRect, tone: 'warning', dashed: true, tag: 'K9', hover: `K9: clip ${pastedIndex} ${shaft0.id}` },
+        { rect: shaft0.dst_rect, tone: 'warning', dashed: true, tag: 'K9', hover: `K9: shaft 0 ${shaft0.id}` }];
       const ringAfter = await ringRead(shaft0.dst_rect);
       const L12 = P12 && Array.isArray(P12.labels) ? P12.labels : [];
       const shaftTag = L12.find((l) => l.kind === 'tag' && l.text === 'K9' && P12.outlines[l.outline] && J(P12.outlines[l.outline].rect) === J(shaft0.dst_rect)) ?? null;
@@ -1241,6 +1257,38 @@ async function rows(d, O, COPY, dpr) {
         J(dash12) === J(wantDash12) && ringAfter.n > 0 && ringAfter.warn - ringBefore.warn > 0.2 * ringAfter.n,
         `dpr ${dpr}; view ${J(P12 && P12.view)}; dashed ${J(dash12)}; want ${J(wantDash12)}; ring before ${J(ringBefore)}, after ${J(ringAfter)}; `
           + `the shaft's K9 tag at whole-act scale (NOT judged here, see DP.12t): ${J(shaftTag)} read ${J(tagR)}`);
+
+      // DP.12h (row 236 (a), ruled): at whole-act scale the layout hides the
+      // shaft's K9 tag and the shaft has no id outline beneath it, so the pane's
+      // HOVER is what names it. A REAL mouse move (CDP, not a dispatched DOM
+      // event) to an integer client pixel at the shaft's centre; the world point
+      // it hit is derived back through the pane's own view; the canvas's title
+      // (what ZonePane's hover writes) is read off the app. The expectation is
+      // the shaft subject of the harness's OWN validate, as "<rule>: <kind>
+      // <index> <id>", and nothing else: no clip or corridor on disk covers
+      // the point (checked here from the file).
+      const Th = await d.pane('target');
+      const ch = d.clientOf(Th, shaft0.dst_rect.x + shaft0.dst_rect.w / 2, shaft0.dst_rect.y + shaft0.dst_rect.h / 2);
+      const hoverAt = { x: Math.round(ch.x), y: Math.round(ch.y) };
+      const hitW = d.worldAt(Th, hoverAt.x, hoverAt.y);
+      const inR = (r, p) => p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
+      const coveredOnDisk = [...(wMan.clips ?? []), ...(wMan.corridors ?? [])].filter((x) => x.dst_rect && inR(x.dst_rect, hitW)).map((x) => x.id);
+      const titleExpr = `(() => { const cv = document.querySelector('[data-zone-pane-canvas="target"]'); return cv ? cv.title : null; })()`;
+      const titleBefore = await c.evalExpr(titleExpr);
+      await d.mouse('mouseMoved', hoverAt.x, hoverAt.y);
+      await sleep(1500);
+      const titleH = await c.evalExpr(titleExpr);
+      const shaftSubj = ownR && Array.isArray(ownR.subjects) ? ownR.subjects.find((x) => x.kind === 'shaft') : null;
+      const wantHover = shaftSubj ? `${ownR.rule}: ${shaftSubj.kind} ${shaftSubj.index} ${shaftSubj.id}` : null;
+      const Ph = (await d.st()).targetPane;
+      const tagHiddenH = !tagOnShaftNow(Ph);
+      await shot('k9-shaft-hover');
+      await shot('k9-shaft-hover-pane', { x: Th.rect.left, y: Th.rect.top, width: Th.rect.width, height: Th.rect.height, scale: 2 });
+      check('DP.12h', `at whole-act scale (the shaft's K9 tag hidden for lack of room), a REAL mouse move to shaft 0's centre: the pane's hover text, read off the app, is exactly ${J(wantHover)} (the harness's own validate), and no clip or corridor on disk is under that point`,
+        !!wantHover && wantHover === `K9: shaft 0 ${shaft0.id}` && tagHiddenH && Number.isInteger(hoverAt.x) && inR(shaft0.dst_rect, hitW)
+          && coveredOnDisk.length === 0 && typeof titleH === 'string' && J(titleH.split('\n')) === J([wantHover]),
+        `dpr ${dpr}; view ${J(Th && Th.view)}; aim ${J(hoverAt)} -> world ${J(hitW)} (shaft ${J(shaft0.dst_rect)}); on disk under it ${J(coveredOnDisk)}; `
+          + `tag hidden ${tagHiddenH}; title before ${J(titleBefore)}, after ${J(titleH)}; want ${J(wantHover)}`);
 
       // DP.12t: at whole-act scale a shaft is a few screen px wide, and the label
       // layout (pane-labels.ts) hides a chip with no room inside its rectangle.
@@ -1371,7 +1419,8 @@ async function rows(d, O, COPY, dpr) {
     !!own && own.validateExit === 0 && own.bakeExit === 1 && !!ownRefusal && ownRefusal.rule === 'C4' && !!(paste10 && paste10.hitOk)
       && s10.paste.outcome.kind === 'refused' && s10.paste.outcome.stage === 'bake'
       && !!dom10 && dom10.stage === 'bake' && dom10.rule === ownRefusal.rule && dom10.subjects === wantSubj10
-      && J(dashedOf(s10o.targetPane)) === J([{ rect: rect10, tone: 'warning', dashed: true, tag: ownRefusal.rule }])
+      && J(dashedOf(s10o.targetPane)) === J([{ rect: rect10, tone: 'warning', dashed: true, tag: ownRefusal.rule,
+        hover: `${ownRefusal.rule}: ${ownRefusal.subjects[0].kind} ${ownRefusal.subjects[0].index} ${ownRefusal.subjects[0].id}` }])
       && edge10before.warn === 0 && edge10.warn > 0.2 * edge10.n && edge10.runs >= 3
       && !existsSync(join(COPY, O.clipsManifestPath(ACT10))),
     `painted cell ${J(cell)} (section ${secN10}, shift ${SHIFT}); harness's own validate exit ${own && own.validateExit}, bake exit ${own && own.bakeExit}, refusal ${J(ownRefusal).slice(0, 300)}; `
