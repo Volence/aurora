@@ -84,9 +84,15 @@ describe('CollisionLegend AngleSwatch: the store follows a scale change with no 
       expect(d.setScale(dpr), `the move to ${dpr} reached no listener`).toBeGreaterThan(0);
       expect(sizeOf(canvas), `swatch store after the move to ${dpr}`)
         .toEqual({ width: Math.round(SWATCH * dpr), height: Math.round(SWATCH * dpr) });
+      // Since ROADMAP row 239 (d) the mark is stroked through `segmentsOnDeviceGrid`,
+      // which restates the same CSS transform inside its own save / restore, so the
+      // repaint sets it more than once. Every one of them must be the new scale's.
       const setT = rec.calls.filter((c) => c.op === 'setTransform');
-      expect(setT.map((c) => c.args), `the repaint at ${dpr} did not set the new scale's transform`)
-        .toEqual([[dpr, 0, 0, dpr, 0, 0]]);
+      expect(setT.length, `the repaint at ${dpr} set no transform`).toBeGreaterThan(0);
+      for (const c of setT) {
+        expect(c.args, `the repaint at ${dpr} set a transform other than the new scale's`)
+          .toEqual([dpr, 0, 0, dpr, 0, 0]);
+      }
       expect(rec.strokes.length, `nothing was painted after the move to ${dpr}`).toBeGreaterThan(0);
     }
   });
