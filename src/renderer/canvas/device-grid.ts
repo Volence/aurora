@@ -67,8 +67,8 @@ export interface SnappedStroke {
 }
 
 /**
- * How close, in device px (and in CSS px for the parity), a width must be to a tie to BE
- * the tie. See `deviceStrokeWidth`.
+ * How close, in device px (and in CSS px for the parity), a width or a position must be to
+ * a tie to BE the tie. See `deviceStrokeWidth` (widths) and `devicePixel` (positions).
  */
 export const STROKE_TIE_EPS = 1e-9;
 
@@ -116,6 +116,41 @@ export function deviceStrokeWidth(cssWidth: number, dpr: number): number {
 }
 
 /**
+ * The device pixel a DEVICE coordinate rounds to: the nearest whole number, a tie going
+ * UP (toward +infinity).
+ *
+ * ═══ POSITION TIES ARE DETECTED, NOT LEFT TO THE FLOAT (ROADMAP row 242) ═══
+ *
+ * Where a stroke goes is one rounding of `cssAt * dpr`, and so is every `snapLength` end
+ * and size. A device coordinate of exactly k + 0.5 is a tie, and it used to be decided by
+ * floating-point noise in the caller's arithmetic rather than by a rule: aeon's
+ * `cameraDeviceMapping` puts world 48 at zoom 3.3, camera 13, dpr 1 on
+ * 115.49999999999997, where the exact value is (48 - 13) * 3.3 = 115.5, so `Math.round`
+ * put that line on 115 while the same tie reached exactly went on 116
+ * (canvas/__tests__/stroke-width-ties.test.ts, row 242's sweep).
+ *
+ * A coordinate within `STROKE_TIE_EPS` of k + 0.5 is now a tie, and a tie goes UP. That
+ * is `Math.round`'s own half-up, the answer every EXACT tie already got, so the fix moves
+ * only the noisy cases onto it (row 240 chose half-up for the parity tie for the same
+ * reason). The same tolerance serves: it is in device px, and the device coordinates the
+ * renderers round are camera-relative, where the noise is a few ulps of numbers in the
+ * thousands (about 1e-12), far inside 1e-9, while a real non-tie is a rational with a
+ * small denominator and sits far outside it.
+ *
+ * The rule decides only WHERE. The width is `deviceStrokeWidth`'s and is laid around the
+ * centre this picks, so both edges of a snapped stroke move together and a tie never
+ * changes a stroke's width. Nothing that is not within `STROKE_TIE_EPS` of a tie changes.
+ */
+export function devicePixel(device: number): number {
+  // `Math.round` already sends an exact tie, and noise ABOVE one, up. Only noise BELOW a
+  // tie (device - r just under 0.5) went down; move exactly those. Every other answer is
+  // `Math.round`'s own value, -0 included, so dpr-chrome.test.ts's `Object.is` against
+  // master's arithmetic still holds.
+  const r = Math.round(device);
+  return device - r >= 0.5 - STROKE_TIE_EPS ? r + 1 : r;
+}
+
+/**
  * Where a crisp stroke of `cssWidth` nearest the CSS coordinate `cssAt` goes: its centre
  * on a device half-pixel and its width a whole number of device pixels, both expressed
  * back in CSS px for the canvas's CSS transform.
@@ -126,7 +161,7 @@ export function deviceStrokeWidth(cssWidth: number, dpr: number): number {
  */
 export function snapStroke(cssAt: number, cssWidth: number, dpr: number): SnappedStroke {
   return {
-    at: (Math.round(cssAt * dpr) + 0.5) / dpr,
+    at: (devicePixel(cssAt * dpr) + 0.5) / dpr,
     width: deviceStrokeWidth(cssWidth, dpr) / dpr,
   };
 }
@@ -138,6 +173,7 @@ export function snapStroke(cssAt: number, cssWidth: number, dpr: number): Snappe
  * `deviceStrokeWidth(cssWidth, dpr)` device px, as for `snapStroke`; an ODD width centres
  * on the device half-pixel `snapStroke` picks (the same answer, so every 1 px line is
  * unchanged), and an EVEN width centres on the whole device pixel `round(cssAt * dpr)`.
+ * Both round through `devicePixel`, so a position tie goes up (ROADMAP row 242).
  *
  * At dpr 1 a 2 px stroke on an integer edge E therefore covers columns E-1 and E, which
  * is exactly what the world-unit `2 / zoom` outlines drew before rows 237/238 snapped
@@ -148,17 +184,18 @@ export function snapStroke(cssAt: number, cssWidth: number, dpr: number): Snappe
  */
 export function snapStrokeEdges(cssAt: number, cssWidth: number, dpr: number): SnappedStroke {
   const w = deviceStrokeWidth(cssWidth, dpr);
-  const c = Math.round(cssAt * dpr);
+  const c = devicePixel(cssAt * dpr);
   return { at: (w % 2 === 1 ? c + 0.5 : c) / dpr, width: w / dpr };
 }
 
 /**
  * A CSS length or edge rounded to a whole number of device pixels, in CSS px: the device
  * spelling of the `Math.round(v)` the chrome used to do at dpr 1, and the same number
- * there.
+ * there. A tie goes up by `devicePixel`'s rule (ROADMAP row 242), whether the value is an
+ * end (a segment's, a label's corner) or a size (a rect's): one rounding, one rule.
  */
 export function snapLength(cssLength: number, dpr: number): number {
-  return Math.round(cssLength * dpr) / dpr;
+  return devicePixel(cssLength * dpr) / dpr;
 }
 
 /**
@@ -244,9 +281,9 @@ export function strokeCssRectInsetOnDeviceGrid(
 ): void {
   const w = deviceStrokeWidth(cssWidth, dpr);
   const lo = (edgeCss: number): number =>
-    snapStrokeEdges((Math.round(edgeCss * dpr) + Math.floor(w / 2)) / dpr, cssWidth, dpr).at;
+    snapStrokeEdges((devicePixel(edgeCss * dpr) + Math.floor(w / 2)) / dpr, cssWidth, dpr).at;
   const hi = (edgeCss: number): number =>
-    snapStrokeEdges((Math.round(edgeCss * dpr) - Math.ceil(w / 2)) / dpr, cssWidth, dpr).at;
+    snapStrokeEdges((devicePixel(edgeCss * dpr) - Math.ceil(w / 2)) / dpr, cssWidth, dpr).at;
   const l = lo(cssX), t = lo(cssY), r = hi(cssX + cssW), b = hi(cssY + cssH);
   ctx.save();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
