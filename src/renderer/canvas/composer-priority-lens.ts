@@ -80,6 +80,16 @@ export function drawComposerPriority(ctx: Ctx, doc: ComposerDoc, zoom: number): 
     fill: PRIORITY_FILL,
     edge: PRIORITY_EDGE,
     invZoom: 1,
+    // THE BOUNDARY STROKES GO ON THIS CANVAS'S PIXEL GRID (ROADMAP row 239 (d)), and
+    // that grid's scale is 1, NOT the display's: PixelViewport sizes the composer's
+    // backing store in CSS px (`width={... * zoom}`, no `devicePixelRatio`) and lets
+    // the browser scale the whole bitmap (`imageRendering: 'pixelated'`). So `1` is
+    // the one number that maps a CSS px onto a backing-store px here; the display's
+    // dpr would stroke under a `setTransform(dpr)` this canvas does not have. Master
+    // centred the 1 px line ON the tile boundary, half-covering the pixel on each
+    // side; on this grid it covers one whole pixel. What the browser's upscale then
+    // does at a fractional dpr is not a stroke's to decide.
+    dpr: 1,
   });
 }
 
