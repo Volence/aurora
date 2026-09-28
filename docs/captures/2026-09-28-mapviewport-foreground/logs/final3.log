@@ -1,0 +1,111 @@
+
+> aurora@0.1.0 harness:mapviewport-foreground
+> node scratchpad/mapviewport-foreground-harness.mjs
+
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370
+build: FRESH in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370 — dist/main/index.mjs is 0s newer than the newest of 1069 .ts/.tsx under /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370/src (/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370/src/renderer/components/MapViewport.tsx)
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-28T15:23:08.399Z), so window.__dbg is in this bundle
+build flavour: DEBUG (VITE_AURORA_DEBUG=1 at 2026-09-28T15:23:08.399Z), so window.__dbg is in this bundle
+=== mapviewport-foreground 2026-09-28 harness ===
+    uptime       : 11:26:05 up 5 days, 27 min,  1 user,  load average: 7.09, 6.04, 6.16
+    PARTS        : xp,gate,hb,panel
+    node         : v24.15.0
+    root         : /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370
+    in-tree      : yes (the tree under test is /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370; this file lives in /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370)
+    ORACLE_SOCKET: /home/volence/.cache/mvf-tmp/mvfg-sock-I3cr5L/o.sock   (private; made by this run)
+    profile      : /home/volence/.cache/mvf-tmp/aurora-harness-profiles/mapviewport-foreground-harness-3741897-2208b3ff
+    PORT         : 9437   DISPLAY: xvfb-run -a (never :0)
+    harness      : blob 0279ce53ad2e620f9a653b96c2e09770a943a82e (as committed at HEAD)
+    src on disk  : identical to HEAD
+    aeon source  : AEON_DIR=/home/volence/.cache/mvf-tmp/aeon-src   (live sibling /home/volence/sonic_hacks/aeon: refused if equal)
+    copy         : /home/volence/.cache/mvf-tmp/mvfg-aeon-HAWa85   project "Sonic 4"
+    oracle       : literals from HEAD 4d095fdb134ca874724c1acff48d582c0dfb3038; load.ts, collision-cell-resolve.ts, collision-render.ts bundled from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a32618199bd57a370/src; profiles decoded from the copy's games/sonic4/data/collision/; FILL {"r":120,"g":220,"b":180,"a":0.5} PRIMARY {"r":120,"g":190,"b":255,"a":0.95} hover-bar bg {"r":17,"g":17,"b":27,"a":0.9}
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /home/volence/.cache/mvf-tmp/aurora-harness-profiles/mapviewport-foreground-harness-3741897-2208b3ff — see HAZARD 6
+    X pointer    : PARKED outside the window: display :746 (Xvfb pid 3741963); python exit 0; screen 1680x1050 pointer (840, 525) -> (1679, 1049)
+    dpr at start : 1   window {"ow":1400,"oh":900,"iw":1400,"ih":872,"sx":140,"sy":75}
+    move log     : installed   click log: installed
+
+──── setup: open the aeon copy (__dbg.aeon.open, setup only), then ojz act1 by a real Explorer click ────
+PASS  [SETUP.0] the aeon copy is open on ojz act1, by a real click on its Explorer row   [load 6.69/5.98/6.15]
+        open "threw: Runtime.evaluate: {\"code\":-32000,\"message\":\"Promise was collected\"}"; row "Oracle Jungle Zone · act1" aim {"x":120,"y":149,"hitOk":true,"dpr":1,"rect":{"x":4,"y":139,"w":231,"h":20}}; state {"open":true,"zone":"ojz","act":"act1","sections":9,"gridWidth":3,"gridHeight":3,"tool":"view","dirty":false,"dirtyActs":[]}
+
+════════ PART xp ════════
+   GEOMETRY [xp] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":4}
+PASS  [XP.0] PREMISE: Collision facet, the collision brush, Brush 1 and Plane A by real clicks; an ASYMMETRIC shape picked by a real click in the palette; the aims land on cells (5,5), (6,5) and a far cell, derived back from their integer pixels; with the pointer off the map the preview layer is empty   [load 6.32/5.94/6.13]
+        dpr 1; rect {"x":284,"y":74,"w":876,"h":774,"dpr":1}; view {"x":0,"y":0,"zoom":4}; shape {"k":15,"title":"#242 (mirrored to face left) · solid · all","word":13554,"heights":[13,13,13,12,12,12,12,12,11,11,11,11,10,10,10,10]}; aims T {"x":636,"y":426,"world":{"x":88,"y":88},"cell":{"cc":5,"cr":5},"tile":{"col":11,"row":11},"onMap":true} N {"x":700,"y":426,"world":{"x":104,"y":88},"cell":{"cc":6,"cr":5},"tile":{"col":13,"row":11},"onMap":true} F {"x":956,"y":234,"world":{"x":168,"y":40},"cell":{"cc":10,"cr":2},"tile":{"col":21,"row":5},"onMap":true}; layer before {"total":0,"outside":0,"fillOutside":0,"bboxOutside":null,"backing":[876,774],"rect":{"x":284,"y":74,"w":876,"h":774}}
+PASS  [XP.a] THE GHOST IS THE SELECTED SHAPE AT THE HOVERED CELL: on the preview layer, the fill colour (COLLISION_PREVIEW_FILL, HEAD) covers the oracle's silhouette of the brush word (resolveCell over the copy's own tables) and appears nowhere outside it, in the cell or anywhere else on the layer; nothing is drawn beyond the angle mark's reach   [load 6.32/5.94/6.13]
+        box {"x":604,"y":394,"w":64,"h":64}; silhouette 2703 px, fill inside 2552 (coverage 0.944), fill OUTSIDE 0 []; layer: fill outside the box 0, anything beyond reach 30px 0 null
+PASS  [XP.p] the hovered cell is outlined in COLLISION_PREVIEW_PRIMARY (HEAD) on all four edges of its box (the outermost CSS pixel ring inside the cell, corners excluded)   [load 6.32/5.94/6.13]
+        edges {"top":{"n":58,"k":58,"mid":[{"r":127,"g":188,"b":245,"a":255},{"r":127,"g":188,"b":245,"a":255},{"r":0,"g":0,"b":0,"a":0}]},"bottom":{"n":58,"k":58,"mid":[{"r":127,"g":188,"b":245,"a":255},{"r":120,"g":190,"b":252,"a":249},{"r":120,"g":219,"b":179,"a":128}]},"left":{"n":58,"k":58,"mid":[{"r":127,"g":188,"b":245,"a":255},{"r":127,"g":188,"b":245,"a":255},{"r":120,"g":219,"b":179,"a":128}]},"right":{"n":58,"k":58,"mid":[{"r":127,"g":188,"b":245,"a":255},{"r":120,"g":190,"b":252,"a":249},{"r":120,"g":219,"b":179,"a":128}]}}
+PASS  [XP.d] ON SCREEN: inside the hovered box the screenshot is the preview layer composited over the no-ghost reference (the pointer on a far cell) in at least 99% of pixels, and it did change there   [load 6.32/5.94/6.13]
+        reference layer in the box empty true; composite 4096/4096; changed 3186 (fill px 2552); outer ring changed 0 (not judged: the stem may reach there); mismatches []
+PASS  [XP.c] the ghost FOLLOWS the pointer: after one real move into the neighbour cell the silhouette is in the new box, and the old box holds no fill   [load 6.32/5.94/6.13]
+        new box {"x":668,"y":394,"w":64,"h":64}: coverage 0.944, fill outside the silhouette 0; fill left in the old box 0; layer fill outside the new box 0
+PASS  [XP.e] the pointer leaving the map clears the ghost: the whole preview layer is empty (onMouseLeave drops the hover)   [load 6.32/5.94/6.13]
+        layer after the leave {"total":0,"outside":0,"fillOutside":0,"bboxOutside":null,"backing":[876,774],"rect":{"x":284,"y":74,"w":876,"h":774}}; button {"x":1225,"y":158,"hitOk":true,"dpr":1,"rect":{"x":1209,"y":147,"w":32,"h":22}}
+PASS  [XP.b] the ghost carries the brush's FLIP: after a real click on the palette's H the ghost at the same cell is the MIRRORED silhouette (the oracle's for the new word), and no longer the unflipped one   [load 6.32/5.94/6.13]
+        word 13554 -> 12530 (mirrored runs, oracle); against the new silhouette: coverage 0.944, fill outside 0 []; against the OLD silhouette: fill outside 76
+NOTE  [xp.cleanup] H clicked again: word 13554 (started 13554)
+NOTE  [xp.strays] no mouse event reached the page at a position this harness did not send
+
+════════ PART gate ════════
+   GEOMETRY [gate effects] dpr 1; map canvas rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+PASS  [GT.0] PREMISE: the Effects facet and scene ojz_act1_start by real clicks; layer 2's guide is drawn (cyan on screen) at the canvas row the report gives for its world_y   [load 5.98/5.87/6.10]
+        dpr 1; rect {"x":284,"y":106,"w":816,"h":742,"dpr":1}; view {"x":0,"y":0,"zoom":1}; row {"index":2,"worldY":80,"canvasY":80,"enabled":true,"onScreen":true,"notice":null}; world_y 80; offset k 0; press (584, 186) pixel rgb(60,165,180)
+PASS  [GT.c] CONTROL, Effects facet: a real press on layer 2's row dragged 40px down takes the guide (world_y 80 -> 120), and one Ctrl+Z puts it back   [load 5.82/5.84/6.09]
+        after the drag 120; after Ctrl+Z 80
+   GEOMETRY [gate layout] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+PASS  [GT.a] THE GATE: in the LAYOUT facet the same press on layer 2's world row, dragged the same way, does NOT take the guide (world_y stays 80); it goes to the armed marquee tool, whose committed selection contains the pressed tile   [load 5.82/5.84/6.09]
+        Layout rect {"x":284,"y":74,"w":876,"h":721,"dpr":1} view {"x":0,"y":0,"zoom":1}; press (584, 154) -> tile {"col":37,"row":10}; world_y after 80; marquee {"sectionIndex":0,"col":36,"row":10,"w":6,"h":6,"aligned":true}
+NOTE  [gate.strays] no mouse event reached the page at a position this harness did not send
+
+════════ PART hb ════════
+   GEOMETRY [hb] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":8,"y":88,"zoom":1}
+   resize by Emulation.setDeviceMetricsOverride (Browser.getWindowForTarget refused: Browser.getWindowForTarget: {"code":-32601,"message":"'Browser.getWindowForTarget' wasn't found"})
+   GEOMETRY [hb 1400] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":8,"y":88,"zoom":1}
+   GEOMETRY [hb 1100] dpr 1; map canvas rect {"x":284,"y":74,"w":576,"h":721,"dpr":1}; view {"x":8,"y":88,"zoom":1}
+   GEOMETRY [hb 900] dpr 1; map canvas rect {"x":284,"y":74,"w":376,"h":721,"dpr":1}; view {"x":8,"y":88,"zoom":1}
+   GEOMETRY [hb 700] dpr 1; map canvas rect {"x":284,"y":74,"w":176,"h":721,"dpr":1}; view {"x":8,"y":88,"zoom":1}
+NOTE  [HB.resize] innerWidth after restore 1400 (started 1400)
+   HB @1400: {"onMap":true,"lines":1,"bar":{"l":284,"t":770,"r":1160,"b":795,"w":876,"h":25},"cont":{"l":284,"t":74,"r":1160,"b":795,"overflow":"hidden"},"canvas":{"w":876,"h":721},"scroll":[876,876],"inside":true,"whiteSpace":"normal","text":"Sec 0 | Tile (17, 27) | Pos 136, 216 | Coll A #210 top 23° ▇▇▇▆▆▆▆▅▅▅▅▄▄▄▄▄"}
+   HB @1100: {"onMap":true,"lines":1,"bar":{"l":284,"t":770,"r":860,"b":795,"w":576,"h":25},"cont":{"l":284,"t":74,"r":860,"b":795,"overflow":"hidden"},"canvas":{"w":576,"h":721},"scroll":[576,576],"inside":true,"whiteSpace":"normal","text":"Sec 0 | Tile (17, 27) | Pos 136, 216 | Coll A #210 top 23° ▇▇▇▆▆▆▆▅▅▅▅▄▄▄▄▄"}
+   HB @900: {"onMap":true,"lines":2,"bar":{"l":284,"t":754,"r":660,"b":795,"w":376,"h":41},"cont":{"l":284,"t":74,"r":660,"b":795,"overflow":"hidden"},"canvas":{"w":376,"h":721},"scroll":[376,376],"inside":true,"whiteSpace":"normal","text":"Sec 0 | Tile (17, 27) | Pos 136, 216 | Coll A #210 top 23° ▇▇▇▆▆▆▆▅▅▅▅▄▄▄▄▄"}
+   HB @700: {"onMap":true,"lines":3,"bar":{"l":284,"t":738,"r":460,"b":795,"w":176,"h":57},"cont":{"l":284,"t":74,"r":460,"b":795,"overflow":"hidden"},"canvas":{"w":176,"h":721},"scroll":[188,176],"inside":false,"whiteSpace":"normal","text":"Sec 0 | Tile (17, 27) | Pos 136, 216 | Coll A #210 top 23° ▇▇▇▆▆▆▆▅▅▅▅▄▄▄▄▄"}
+PASS  [HBW.a] NOTHING OF THE READOUT IS CUT at the window widths [1400,1100,900] (the first is the app's own default): at each, the bar shows the longest arm (a known collision cell), every line box of its text lies inside the map container (overflow "hidden"), and its scrollWidth does not exceed its clientWidth   [load 5.46/5.76/6.06]
+        cell {"cc":8,"cr":13,"i":6672,"w":4306}; [{"W":1400,"lines":1,"inside":true,"scroll":[876,876],"h":25,"canvasW":876,"collArm":true},{"W":1100,"lines":1,"inside":true,"scroll":[576,576],"h":25,"canvasW":576,"collArm":true},{"W":900,"lines":2,"inside":true,"scroll":[376,376],"h":41,"canvasW":376,"collArm":true}]
+NOTE  [HBW.find] FINDING (not counted), window 700 px: the readout IS CUT: [{"W":700,"lines":3,"inside":false,"scroll":[188,176],"h":57,"canvasW":176,"collArm":true}]; line boxes [{"l":296,"t":743,"r":472,"b":759},{"l":296,"t":759,"r":432.08,"b":775},{"l":296,"t":775,"r":472,"b":791}]
+   GEOMETRY [hb default again] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":8,"y":88,"zoom":1}
+NOTE  [HB.numbers] text rgb(184,190,206) at 11px "JetBrains Mono", line-height normal, bar 25 px tall; background {"r":17,"g":17,"b":27,"a":0.9}; padding pixels sampled 198, brightest rgb(15,15,24) -> contrast 10.25, darkest rgb(15,15,24) -> 10.25; bounds the 0.9 background allows: over black rgb(15,15,24) -> 10.25, over WHITE rgb(41,41,50) -> 7.75
+NOTE  [HB.lines] lines per window width: [{"W":1400,"lines":1,"barH":25,"mapH":721},{"W":1100,"lines":1,"barH":25,"mapH":721},{"W":900,"lines":2,"barH":41,"mapH":721},{"W":700,"lines":3,"barH":57,"mapH":721}]
+NOTE  [hb.strays] no mouse event reached the page at a position this harness did not send
+
+════════ PART panel ════════
+   GEOMETRY [panel] dpr 1; map canvas rect {"x":284,"y":74,"w":876,"h":721,"dpr":1}; view {"x":0,"y":0,"zoom":1}
+NOTE  [CLV] tool stamp-chunk; hover aim {"x":384,"y":134,"world":{"x":100,"y":60},"cell":{"cc":6,"cr":3},"tile":{"col":12,"row":7},"onMap":true}; the readout at the default window, no scrolling: {"text":"Under cursor: no chunk link","rect":{"l":1169,"t":747.84375,"w":143.1875,"h":15},"win":{"w":1400,"h":872},"scroller":{"t":74,"b":795,"scrollTop":0,"scrollHeight":1146,"clientHeight":721},"inWindow":true,"inScroller":true,"hitIsIt":true}
+NOTE  [panel.strays] no mouse event reached the page at a position this harness did not send
+cleanup: tree under pid 3741953 (11 process(es)):
+           3741953 /bin/sh /usr/bin/xvfb-run -a -s -screen 0 1680x1050x24 /home/volence/sonic_hacks/aurora/no
+           3741963 Xvfb :746 -screen 0 1680x1050x24 -nolisten tcp
+           3742024 node /home/volence/sonic_hacks/aurora/node_modules/.bin/electron --user-data-dir=/home/vol
+           3742031 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --user-data-dir=/home
+           3742034 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3742035 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3742037 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+           3742063 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3742069 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote --no-zy
+           3742071 /proc/self/exe --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US
+           3742079 /home/volence/sonic_hacks/aurora/node_modules/electron/dist/electron --type=zygote
+cleanup: ORDERED — app 2 pid(s) SIGTERMed first, gone in 50 ms; then the wrapper group with the X server already released by xvfb-run's own cleanup, tree gone in 0 ms; teardown 350 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+
+════ PARTS=xp,gate,hb,panel: 12/12 rows PASS · 0 FAIL · 0 UNMEASURABLE · 49.4s ════
+     uptime at end 11:26:55 up 5 days, 28 min,  1 user,  load average: 5.59, 5.78, 6.07
+END-OF-RUN
