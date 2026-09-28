@@ -269,26 +269,56 @@ export function serializeClipManifest(doc: ClipManifestDoc): string {
 }
 
 /**
+ * One of the act's shafts as the raw manifest carries it: `id` null when it is
+ * not a string (as aeon's `subject()` gives it), `dst` null when its `dst_rect`
+ * cannot be read.
+ */
+export interface ShaftEntry { id: string | null; dst: ClipRect | null }
+
+/**
+ * The act's shafts, one entry per position in `raw.shafts`, so the index is
+ * aeon's (a subject's `index`) and a malformed entry never shifts the rest: null
+ * for an entry that is not an object. Read from the raw manifest, leniently: the
+ * document has no shaft VIEW, and a manifest whose shaft aeon would refuse (K9)
+ * still opens, as it did before any shaft was read.
+ */
+export function shaftEntries(doc: ClipManifestDoc | null): Array<ShaftEntry | null> {
+  if (!doc) return [];
+  return (Array.isArray(doc.raw.shafts) ? doc.raw.shafts : []).map((s) => {
+    if (!isObj(s)) return null;
+    let dst: ClipRect | null = null;
+    try { dst = rectOf(s.dst_rect, 'shaft'); } catch { /* unreadable: aeon refuses it first */ }
+    return { id: typeof s.id === 'string' ? s.id : null, dst };
+  });
+}
+
+/**
+ * The act's world rectangle: its grid in sections, from the origin. The target
+ * pane draws exactly this (DonorTargetPane's worldW x worldH), so "on the pane"
+ * means overlapping it.
+ */
+export function actWorldRect(doc: Pick<ClipManifestDoc, 'gridW' | 'gridH'>): ClipRect {
+  return { x: 0, y: 0, w: doc.gridW * SECTION_PIXEL_SIZE, h: doc.gridH * SECTION_PIXEL_SIZE };
+}
+
+/**
  * Every rectangle already placed in the act, as aeon's R10 counts them: clips,
  * corridors AND shafts (tools/clip_manifest.py, "R10 / K2 -- dst overlap, over
- * clips, corridors AND shafts"). Shafts are read from the raw manifest (the
- * document has no view of them, and the target pane does not draw them). Before
- * ROADMAP row 235 (a) they were left out here, so a suggestion on a woven act
- * could land on a shaft and be refused R10. A shaft entry without a readable
- * `dst_rect` is skipped: aeon refuses that manifest by another rule first.
+ * clips, corridors AND shafts"). Shafts are read from the raw manifest
+ * (`shaftEntries`; the target pane draws no standing shaft). Before ROADMAP row
+ * 235 (a) they were left out here, so a suggestion on a woven act could land on
+ * a shaft and be refused R10. A shaft entry without a readable `dst_rect` is
+ * skipped: aeon refuses that manifest by another rule first.
  */
 export function placedRects(doc: ClipManifestDoc | null): ClipRect[] {
   if (!doc) return [];
   const shafts: ClipRect[] = [];
-  for (const s of Array.isArray(doc.raw.shafts) ? doc.raw.shafts : []) {
-    if (!isObj(s)) continue;
-    try { shafts.push(rectOf(s.dst_rect, 'shaft')); } catch { /* aeon refuses it first */ }
-  }
+  for (const s of shaftEntries(doc)) if (s?.dst) shafts.push(s.dst);
   return [...doc.clips.map((c) => c.dst), ...doc.corridors.map((c) => c.dst), ...shafts];
 }
 
 /** aeon's R10 overlap: the same four strict comparisons (tools/clip_manifest.py). */
-function overlaps(a: ClipRect, b: ClipRect): boolean {
+export function overlaps(a: ClipRect, b: ClipRect): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 

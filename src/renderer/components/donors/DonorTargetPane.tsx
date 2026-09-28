@@ -25,7 +25,7 @@ import { createIpcFileAccess } from '../../state/classic-file-access';
 import { composeWindow, drawnPixels, rgbaLines, tileRgbaLookup, type TileRgbaLookup } from '../../canvas/donor-compose';
 import { parseNametable } from '../../../core/formats/s4-nametable';
 import { parseTiles } from '../../../core/formats/tiles';
-import { snapDestination } from '../../../core/formats/donors/clip-manifest-doc';
+import { actWorldRect, snapDestination } from '../../../core/formats/donors/clip-manifest-doc';
 import { SECTION_PIXEL_SIZE, SECTION_TILES_WIDE } from '../../../core/model/s4-types';
 import type { FileAccess } from '../../../core/project/adapter';
 import { targetPaneOutlines } from './target-outlines';
@@ -126,8 +126,8 @@ export default function DonorTargetPane(): React.ReactElement {
       </div>
     );
   }
-  const W = target.doc.gridW * SECTION_PIXEL_SIZE;
-  const H = target.doc.gridH * SECTION_PIXEL_SIZE;
+  // The same world a refused shaft must overlap to be outlined (refused-subjects.ts).
+  const { w: W, h: H } = actWorldRect(target.doc);
   const note = drawError ? `Aurora could not draw the composed act: ${drawError}`
     : bakeNote ?? (target.doc.clips.length === 0 ? `${target.actId} has no clips yet.` : null);
   return (

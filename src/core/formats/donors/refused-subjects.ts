@@ -6,7 +6,7 @@
 // names every subject it could NOT place, so none is silently dropped.
 //
 // A SUBJECT IS PLACED BY (kind, index), CHECKED BY id. The index is the
-// subject's position in aeon's `clips` or `corridors` list, which is the order
+// subject's position in aeon's `clips`, `corridors` or `shafts` list, which is the order
 // the manifest carries them (the pane's doc is that manifest, or for a paste,
 // the manifest with the new clip appended, which is exactly what aeon judged).
 // The id is not unique in a refused manifest (aeon's K1 refuses a duplicate id,
@@ -16,15 +16,19 @@
 // outlined on the wrong rectangle. `id: null` (a clip with no id) is placed by
 // index alone.
 //
-// A `shaft` or `fill` subject (ROADMAP row 232) is never placed: the pane draws
-// neither, so each is named "not on this pane" (`subjectRect` says why). A K9
-// pair of a clip and a shaft outlines the clip and names the shaft.
+// A `shaft` subject (ROADMAP row 232) is placed at its `dst_rect` (row 233 (a),
+// ruled), looked up among the act's SHAFTS by the same (index, id) rule; one whose
+// rectangle is not on the pane is named "not on this pane". The `fill` subject
+// is never placed (`subjectRect` says why). A K9 pair of a clip and a shaft
+// outlines both.
 //
 // The look call (overseer, 2026-09-28, under the owner's 2026-09-18 permission):
 // a 2px dashed outline in the page's existing warning colour, labelled with the
-// rule tag; a pair rule outlines both; cleared with the refusal.
+// rule tag; a pair rule outlines both; cleared with the refusal. Row 233 (a),
+// ruled by the overseer 2026-09-28 under the same permission: a refused shaft
+// takes exactly that look.
 
-import type { ClipManifestDoc, ClipRect } from './clip-manifest-doc';
+import { actWorldRect, overlaps, shaftEntries, type ClipManifestDoc, type ClipRect } from './clip-manifest-doc';
 import { subjectLabel, type ClipNote, type ClipSubject } from './clip-validate-json';
 
 /** The label a refusal's outline carries: its rule tag, or "untagged" for aeon's `rule: null`. */
@@ -35,30 +39,32 @@ export function ruleTag(rule: string | null): string {
 /** The subject's rectangle in `doc`, or null when it is not on the pane. */
 export function subjectRect(doc: ClipManifestDoc | null, s: ClipSubject): ClipRect | null {
   if (!doc) return null;
-  // Only the two kinds the pane draws are placed (target-outlines.ts draws the
-  // act's clips and corridors, nothing else). Since ROADMAP row 232 the reader
-  // also passes aeon's `shaft` (K7/K9, and either side of an R10 or K8 pair)
-  // and `fill` (K8) subjects. Neither is placed, each for its own reason:
-  //   * a shaft HAS a rectangle (its `dst_rect`), but the pane draws no shafts
-  //     and ClipManifestDoc has no shaft view; outlining one would be the first
-  //     shaft the pane ever shows, a look nobody has ruled (row 232's packet,
-  //     Open). Until then it is named "not on this pane", never looked up in
-  //     the clips or corridors list at the same index;
+  // Each kind is looked up in ITS OWN list, never another kind's at the same
+  // index. Since ROADMAP row 232 the reader also passes aeon's `shaft` (K7/K9,
+  // and either side of an R10 or K8 pair) and `fill` (K8) subjects:
+  //   * a shaft is placed at its `dst_rect` (row 233 (a), ruled 2026-09-28): an
+  //     outline shows WHERE the problem is, and a shaft has a place. It exists
+  //     only while the refusal stands, so the pane still draws no standing
+  //     shaft. Read from the raw manifest (`shaftEntries`); a shaft whose
+  //     rectangle is unreadable, or does not overlap the pane's world (aeon's K9
+  //     "runs past the act"), is named "not on this pane";
   //   * the fill is the act's background rectangle, around every clip, corridor
   //     and shaft (aeon's s2_woven fill is the whole act): an outline of it
   //     would frame the pane, not point at anything. Named, never outlined.
-  let hit: { id: string; dst: ClipRect } | undefined;
+  let hit: { id: string | null; dst: ClipRect | null } | null | undefined;
   switch (s.kind) {
     case 'clip': hit = doc.clips[s.index]; break;
     case 'corridor': hit = doc.corridors[s.index]; break;
-    case 'shaft': case 'fill': return null;
+    case 'shaft': hit = shaftEntries(doc)[s.index]; break;
+    case 'fill': return null;
     default: {
       const never: never = s.kind;
       return never;
     }
   }
-  if (!hit) return null;
+  if (!hit?.dst) return null;
   if (s.id !== null && hit.id !== s.id) return null;
+  if (s.kind === 'shaft' && !overlaps(hit.dst, actWorldRect(doc))) return null;
   return hit.dst;
 }
 

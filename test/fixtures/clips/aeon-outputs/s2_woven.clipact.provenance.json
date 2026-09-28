@@ -4,10 +4,10 @@
   "aeon": {
     "repo": "git@github.com:Volence/aeon.git",
     "branch_that_answers_currency": "origin/master",
-    "revision": "b85e60d2352242161607ea2cd25c2d9e799e86a7",
-    "revision_is": "the ONE pin of ROADMAP row 231 (REVENDOR-AEON-WOVEN-CROSSING-PATH, branch parcel/revendor-clips-77fc6fb6): aeon origin/master b85e60d2352242161607ea2cd25c2d9e799e86a7 read 2026-09-28T04:09:57Z after a fetch, taken as the pin itself (the tree every tool below ran in); b85e60d2 and cd6739e9 are lane-status/lane-log commits on top of 77fc6fb6, the merge of WOVEN-CROSSING-PATH. Since the previous capture (cffdf716): tools/clip_manifest.py moved at f8796a92 (K11: a corridor's optional `path_lines`, each exactly {mouth, donor_obj03, why}, one per mouth, shape-checked by the loader, and Corridor.as_json writes `path_lines` only when a corridor has some); games/sonic4/data/clips/s2_woven/clips.json moved at f8796a92 (the mtz_to_cpz corridor declares one path line at its east mouth, donor Obj03 at (6536, 1152)). tools/s2_layer_lines.py, tools/path_b_floor_witness.py and tools/test_s2_layer_lines.py moved too; no marker pins them. tools/clip_act_bake.py, tools/collision_pipeline.py, tools/fg_page_order.py and the s2_ehz_cpz, s2_two_clip and s2_ehz_boot clips.json did not move. Blobs at the pin: clip_act_bake 958958b5, clip_manifest d1cd32ad, collision_pipeline dbbe59de, fg_page_order 68e303fc, s2_ehz_cpz clips.json c993be2a, s2_two_clip clips.json 2ff33b48, s2_ehz_boot clips.json 9e4104d0, s2_woven clips.json 30e2fc14.",
+    "revision": "8dbd134bbeeabc6700defcd15f4d51db71f64042",
+    "revision_is": "ROADMAP row 233(c) (REFUSED-SHAFT-FOLLOWUPS-FROM-232, branch parcel/refused-shaft-233): aeon 8dbd134bbeeabc6700defcd15f4d51db71f64042, the CLIP-MANIFEST-OWNER-LABEL code commit (merged to aeon origin/master at e6b4c555), derived after a fetch at 2026-09-28T07:25:40Z as `git log -1 --format=%H origin/master -- tools/clip_manifest.py` (origin/master was 751eaa1b). Only tools/clip_manifest.py moved since the previous pins (d1cd32ad -> 4392dc52): R3, K1 and K9 now print the stored owner label (clips[i] / corridors[i] / shafts[i]) and K1 drops 'or an earlier corridor'. Measured, not typed: every other pinned input of all six markers in this directory has the same blob at 8dbd134b, e6b4c555 and origin/master 751eaa1b as it had at the previous pin. Previous pins: e47493aa (validate-json) and b85e60d2 (the five siblings); all six now share this one pin.",
     "re_measure": "when tool_path's blob at aeon origin/master differs from tool_blob, or any inputs[].path's blob differs from its inputs[].blob, or any inputs_by_value constant's value differs from its pinned value, materialise that revision as below, re-run fixture.command, re-vendor the fixture and update its sha256, tool_blob, inputs[].blob, the inputs_by_value values and revision here (and in the sibling markers of test/fixtures/clips/aeon-outputs/)",
-    "materialised_by": "git -C <aeon> archive -o <tar> b85e60d2352242161607ea2cd25c2d9e799e86a7, extracted into $HOME/.cache/aurora-revendor-aeon/tree (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
+    "materialised_by": "git -C <aeon> archive -o <tar> 8dbd134bbeeabc6700defcd15f4d51db71f64042, extracted into $HOME/.cache/aurora-revendor-aeon/tree (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
     "tool_path": "tools/clip_act_bake.py",
     "tool_blob": "958958b55f90ea710e8dd61c3d967e3c8ca0a276",
     "tool_last_changed_at": "d796ad94",
@@ -119,7 +119,7 @@
       },
       {
         "path": "tools/clip_manifest.py",
-        "blob": "d1cd32ad93613814bc76a1feca41368e2bbdccd2"
+        "blob": "4392dc528fc6294e036b3600a230c4aceecc6074"
       },
       {
         "path": "art/palettes/SonicAndTails.bin",
@@ -203,12 +203,12 @@
       }
     ],
     "what_this_capture_measured": "pool.tiles 2894, pool.pages 49. tiles_added sums to 2858 over 8 per_clip rows, 26 over 4 per_corridor rows, 9 over 7 per_shaft rows and 0 over 1 per_fill row (id \"fill\", index 0); 2858 + 26 + 9 + 0 + 1 (the blank) = 2894, so aeon's four-list invariant holds. Aurora before row 229 summed only per_clip and per_corridor and reported 2885 against 2894. Wall-clock `placement.seconds` and its refine_rounds seconds vary run to run and are the only fields a re-run is expected to move.",
-    "what_changed_at_this_pin": "Re-captured at b85e60d2: beyond wall-clock seconds (placement.seconds 0.472 -> 0.452, refine_rounds[0].seconds 0.206 -> 0.197), ONE content change: corridors[1] (mtz_to_cpz) gains `path_lines` [{donor_obj03 {x 6536, y 1152}, mouth \"east\", why ...}], copied from the manifest by Corridor.as_json. Pool unchanged: pool.tiles 2894, pool.pages 49; tiles_added 2858 over 8 per_clip, 26 over 4 per_corridor, 9 over 7 per_shaft, 0 over 1 per_fill; 2858 + 26 + 9 + 0 + 1 = 2894."
+    "what_changed_at_this_pin": "Re-captured at 8dbd134b for row 233(c): ONLY wall-clock seconds differ from the b85e60d2 capture (placement.seconds 0.452 -> 0.508, refine_rounds[0].seconds 0.197 -> 0.223); an acceptance prints no R3/K1/K9 text and the owner-label change moves no baked field. Only the clip_manifest.py input pin moved. Before row 233: Re-captured at b85e60d2: beyond wall-clock seconds (placement.seconds 0.472 -> 0.452, refine_rounds[0].seconds 0.206 -> 0.197), ONE content change: corridors[1] (mtz_to_cpz) gains `path_lines` [{donor_obj03 {x 6536, y 1152}, mouth \"east\", why ...}], copied from the manifest by Corridor.as_json. Pool unchanged: pool.tiles 2894, pool.pages 49; tiles_added 2858 over 8 per_clip, 26 over 4 per_corridor, 9 over 7 per_shaft, 0 over 1 per_fill; 2858 + 26 + 9 + 0 + 1 = 2894."
   },
   "fixture": {
     "path": "test/fixtures/clips/aeon-outputs/s2_woven.clipact.json",
     "command": "python3 tools/clip_act_bake.py bake games/sonic4/data/clips/s2_woven/clips.json --out <scratch>/bake_s2_woven --json (exit 0, stdout {ok: true, refusals: [], schema: 1, warnings: [W3 ...]}); the clipact.json it wrote, verbatim",
     "why_this_one": "the woven act (one of the two clip manifests at the pin with shafts and a fill, beside s2_woven_2d; measured by grepping every games/sonic4/data/clips/*/clips.json in the copy): 7 shafts and 1 neutral fill, and 9 of the act's tiles are added by shafts, so a reader that sums two lists disagrees with pool.tiles by exactly those 9.",
-    "sha256": "da5219d870975812210064ccbef0e75c21921ef55f94b801f126df8b0e2b764c"
+    "sha256": "c05f276583e3c34636ad62524f2118fa6b34c180d32fb20e7b8eac78b5706f93"
   }
 }

@@ -107,6 +107,24 @@
 //         binding axis it spans the pane less the tree's FIT_MARGIN_PX (bundled
 //         from pane-view.ts) each side; the painted share is printed.
 //   DP.10t now reads the id and tag chips from the paint report, not typed bands.
+//   ROW 233 (a)/(b), 2026-09-28: a refused SHAFT on the target pane (the ruled
+//   look: dashed, warning, rule tag; "(not on this pane)" when off the pane):
+//   DP.12a a REAL paste on s2_woven whose clip id is shaft 0's: aeon's loader
+//         refuses K9 naming the pasted clip and shaft 0 (the harness's own
+//         validate of the same manifest); the page shows aeon's words, the
+//         owner printed as its label "clips[N]" (aeon 8dbd134b), and both
+//         subjects plainly; nothing is written.
+//   DP.12o two dashed warning outlines tagged K9, the draft's and shaft 0's at
+//         its dst_rect on disk; the canvas, read back on a ring inside the
+//         shaft's rectangle, gains the warning colour; the shaft's K9 tag chip
+//         holds warning and text pixels.
+//   DP.12t zoomed in by real wheel steps at the shaft (at whole-act scale the
+//         layout has no room for its tag and hides it), the shaft's K9 tag
+//         prints on a chip inside its outline and reads back from the canvas.
+//   DP.12n aeon's recorded refuse_k9_shaft_past_act manifest written to the
+//         copy's s2_woven: a real click on the act shows aeon's refusal naming
+//         the shaft "(not on this pane)", no dashed outline, no warning pixel on
+//         the target canvas. SHOT_DIR saves donor-page-k9-shaft-*.png.
 //
 // EXPECTATIONS COME FROM THE TREE: CONVERTER_COMMAND, marqueeRect, marqueeReadout,
 // clipsManifestPath and suggestDestination are bundled from the tree under test
@@ -206,6 +224,7 @@ async function loadOracle() {
   const view = await bundle('src/renderer/components/donors/pane-view.ts');
   for (const [m, f] of [[tree, 'CONVERTER_COMMAND'], [tree, 'parseZoneManifest'], [marq, 'marqueeRect'], [marq, 'marqueeReadout'],
     [doc, 'clipsManifestPath'], [doc, 'suggestDestination'], [doc, 'newClipManifest'], [doc, 'zoneSong'], [doc, 'zoneSongLine'],
+    [doc, 'parseClipManifest'], [doc, 'withClip'], [doc, 'serializeClipManifest'],
     [view, 'FIT_MARGIN_PX']]) {
     if (m[f] === undefined) throw new Error(`ORACLE: ${f} missing from the tree`);
   }
@@ -1093,6 +1112,207 @@ async function rows(d, O, COPY, dpr) {
     await sleep(300);
     await shot(`real-${actId}-readout`);
   }
+
+  // ── DP.12 ROW 233: a REAL K9 refusal naming a SHAFT, on the woven act ──
+  // The canvas READ BACK on a ring 1 CSS px inside a world rectangle's four
+  // edges (the centre of the 2-px outline stroke), counting DONOR_MARK_WARN
+  // pixels. Unlike `edgeRead` it does not need a wide rectangle: a shaft is
+  // narrow at whole-act scale. Aimed through the pane's own view and rect.
+  async function ringRead(r) {
+    const T = await d.pane('target');
+    const x0 = T.rect.left + (r.x - T.view.ox) * T.view.scale; const x1 = T.rect.left + (r.x + r.w - T.view.ox) * T.view.scale;
+    const y0 = T.rect.top + (r.y - T.view.oy) * T.view.scale; const y1 = T.rect.top + (r.y + r.h - T.view.oy) * T.view.scale;
+    const got = await c.json(String.raw`(() => { const cv = document.querySelector('[data-zone-pane-canvas="target"]'); if (!cv) return null;
+      const b = cv.getBoundingClientRect(); const k = cv.width / b.width; const ctx = cv.getContext('2d');
+      const X0 = Math.round((${x0} - b.left + 1) * k), X1 = Math.round((${x1} - b.left - 1) * k);
+      const Y0 = Math.round((${y0} - b.top + 1) * k), Y1 = Math.round((${y1} - b.top - 1) * k);
+      if (X1 <= X0 || Y1 <= Y0 || X0 < 0 || Y0 < 0 || X1 >= cv.width || Y1 >= cv.height) return { n: 0, warn: 0, box: [X0, Y0, X1, Y1] };
+      let n = 0, warn = 0;
+      for (const a of [ctx.getImageData(X0, Y0, X1 - X0 + 1, 1).data, ctx.getImageData(X0, Y1, X1 - X0 + 1, 1).data,
+        ctx.getImageData(X0, Y0, 1, Y1 - Y0 + 1).data, ctx.getImageData(X1, Y0, 1, Y1 - Y0 + 1).data]) {
+        for (let i = 0; i < a.length; i += 4) { n++;
+          if (Math.abs(a[i] - ${WARN_RGB[0]}) < 12 && Math.abs(a[i + 1] - ${WARN_RGB[1]}) < 12 && Math.abs(a[i + 2] - ${WARN_RGB[2]}) < 12) warn++; }
+      }
+      return { n, warn, k, box: [X0, Y0, X1, Y1] }; })()`);
+    return got;
+  }
+  // Every DONOR_MARK_WARN pixel on the whole target canvas.
+  async function canvasWarn() {
+    return c.json(String.raw`(() => { const cv = document.querySelector('[data-zone-pane-canvas="target"]'); if (!cv) return null;
+      const a = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let warn = 0;
+      for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - ${WARN_RGB[0]}) < 12 && Math.abs(a[i + 1] - ${WARN_RGB[1]}) < 12 && Math.abs(a[i + 2] - ${WARN_RGB[2]}) < 12) warn++;
+      return { n: a.length / 4, warn }; })()`);
+  }
+  const noteDom = () => c.json(String.raw`(() => { const n = document.querySelector('[data-donors-refusal-note]');
+    return n ? { rule: (n.querySelector('[data-donors-note-rule]') || {}).textContent, subjects: (n.querySelector('[data-donors-note-subjects]') || {}).textContent,
+      message: (n.querySelector('[data-donors-refusal]') || {}).textContent,
+      stage: (document.querySelector('[data-donors-stage]') || { getAttribute: () => null }).getAttribute('data-donors-stage') } : null; })()`);
+  // aeon's message leads with "<rule> <manifest path>:" when it names the file; the
+  // path is the caller's temp file, so two callers compare what follows it.
+  const pathless = (msg) => String(msg ?? '').replace(/^(\S+) \S+\.json: /, '$1 : ');
+
+  // ROW 233 (a) and (b), 2026-09-28. Every expectation is aeon's own answer
+  // (its CLI, run by the harness in the copy) or the copy's clips.json on disk.
+  //   DP.12a a REAL paste on s2_woven whose clip id is shaft 0's (the page checks
+  //          ids against clips and corridors only, so it sends it): aeon's
+  //          loader refuses K9 naming the pasted clip AND shaft 0, and the page
+  //          shows aeon's words (owner printed as its label, "clips[N]", aeon
+  //          8dbd134b) and both subjects plainly; nothing is written.
+  //   DP.12o the pair gives TWO dashed warning outlines tagged K9, the draft's
+  //          and shaft 0's at its dst_rect on disk; the canvas, read back on a
+  //          ring inside shaft 0's rectangle, shows the warning colour where
+  //          the same ring read just before the paste did not, and the K9 tag
+  //          chip on the shaft's outline holds warning and text pixels.
+  //   DP.12n a shaft whose dst_rect lies wholly past the act (aeon's own
+  //          recorded case refuse_k9_shaft_past_act, written to the copy's
+  //          s2_woven): a REAL click on the act shows aeon's bake refusal naming
+  //          the shaft "(not on this pane)", no dashed outline, and no warning
+  //          pixel anywhere on the target canvas.
+  async function wovenShaftRefusals() {
+    const WOVEN = 's2_woven';
+    const wPath = join(COPY, O.clipsManifestPath(WOVEN));
+    if (!existsSync(wPath)) {
+      for (const id of ['DP.12a', 'DP.12o', 'DP.12t', 'DP.12n']) check(id, `a real shaft refusal on ${WOVEN}`, 'UNMEASURABLE', `${wPath} is not in the copy`);
+      return;
+    }
+    const wBytes = readFileSync(wPath);
+    const wText = wBytes.toString('utf8');
+    const wMan = JSON.parse(wText);
+    const shaft0 = (wMan.shafts ?? [])[0] ?? null;
+    if (!shaft0) {
+      for (const id of ['DP.12a', 'DP.12o', 'DP.12t', 'DP.12n']) check(id, `a real shaft refusal on ${WOVEN}`, 'UNMEASURABLE', `${WOVEN} on disk has no shaft`);
+      return;
+    }
+    const actBtn = await d.realClick(`document.querySelector('[data-donors-act="${WOVEN}"]')`);
+    const sw = await d.waitFor((s) => s.paste.target && s.paste.target.actId === WOVEN && !s.paste.busy && s.draft.dst !== null && s.paste.baked,
+      `${WOVEN} chosen, baked, with a placed draft`, 480, 250, { soft: true });
+    if (!sw.paste.target || sw.paste.target.actId !== WOVEN || !sw.draft.dst || !sw.paste.baked) {
+      for (const id of ['DP.12a', 'DP.12o', 'DP.12t']) check(id, `a real K9 paste on ${WOVEN}`, 'UNMEASURABLE', `the premise is not there: act click ${J(actBtn)}; state ${J({ target: sw.paste.target, draft: sw.draft, baked: sw.paste.baked, note: sw.paste.bakeNote })}`);
+    } else {
+      const idBox = await d.realClick('document.querySelector("[data-donors-clip-id]")');
+      await c.evalExpr('(() => { const el = document.querySelector("[data-donors-clip-id]"); el.setSelectionRange(0, el.value.length); })()');
+      await d.typeText(shaft0.id);
+      const s1 = await d.waitFor((s) => s.draft.clipId === shaft0.id && s.draft.dst !== null, `the draft named ${shaft0.id}`, 40, 250, { soft: true });
+      const draftRect = s1.draft.dst ? { x: s1.draft.dst.x, y: s1.draft.dst.y, w: m.w, h: m.h } : null;
+      // The candidate the page will send, rebuilt by the tree's own document code
+      // (as DP.10 does) and judged by the HARNESS with aeon's own loader.
+      const cand = O.serializeClipManifest(O.withClip(O.parseClipManifest(wText),
+        { id: s1.draft.clipId, donor: 's2disasm', zone: 'EHZ', src: { x: m.x, y: m.y, w: m.w, h: m.h }, dst: draftRect }));
+      const candDir = mkdtempSync(join(os.tmpdir(), 'donor-page-k9-'));
+      let own = null;
+      try {
+        writeFileSync(join(candDir, 'clips.json'), cand);
+        const vv = aeonTool(COPY, ['tools/clip_manifest.py', 'validate', join(candDir, 'clips.json'), '--donor-root', donorsDir, '--json']);
+        own = { exit: vv.status, doc: (() => { try { return JSON.parse(vv.stdout); } catch { return null; } })() };
+      } finally { rmSync(candDir, { recursive: true, force: true }); }
+      const ownR = own && own.doc && own.doc.refusals && own.doc.refusals[0];
+      const pastedIndex = wMan.clips.length;
+      const wantOwnSubjects = [{ id: shaft0.id, index: pastedIndex, kind: 'clip' }, { id: shaft0.id, index: 0, kind: 'shaft' }];
+      await sleep(300);
+      const ringBefore = await ringRead(shaft0.dst_rect);
+      const paste12 = await d.realClick('document.querySelector("[data-donors-paste-button]")');
+      const s12 = await d.waitFor((s) => s.paste.outcome && !s.paste.busy, 'the K9 outcome', 240, 250, { soft: true });
+      const dom12 = await noteDom();
+      const want12 = `clip ${pastedIndex} ${shaft0.id} and shaft 0 ${shaft0.id}`;
+      const label = `clips[${pastedIndex}]`;
+      check('DP.12a', `a REAL paste on ${WOVEN} with clip id ${J(shaft0.id)} (shaft 0's): aeon's loader refuses K9 naming the pasted clip and shaft 0 (the harness's own validate of the same manifest), the page shows aeon's words, which name the owner as ${J(label)}, and both subjects plainly; ${WOVEN}'s clips.json on disk is byte-identical`,
+        !!(idBox && idBox.hitOk) && !!(paste12 && paste12.hitOk) && !!own && own.exit === 1 && !!ownR && ownR.rule === 'K9'
+          && J(ownR.subjects.map((x) => ({ id: x.id, index: x.index, kind: x.kind }))) === J(wantOwnSubjects)
+          && ownR.message.includes(`already used by ${label};`)
+          && !!s12.paste.outcome && s12.paste.outcome.kind === 'refused' && !!dom12 && dom12.stage === 'validate' && dom12.rule === 'K9'
+          && dom12.subjects === want12 && pathless(dom12.message) === pathless(ownR.message)
+          && Buffer.compare(readFileSync(wPath), wBytes) === 0,
+        `draft ${J(s1.draft)}; harness's own validate exit ${own && own.exit}, refusal ${J(ownR)}; page outcome ${J(s12.paste.outcome && { kind: s12.paste.outcome.kind, stage: s12.paste.outcome.stage })}; DOM ${J(dom12)}; want subjects ${J(want12)}`);
+
+      const s12o = await d.waitFor((s) => (dashedOf(s.targetPane) ?? []).length > 1, 'the K9 outlines', 40, 250, { soft: true });
+      await sleep(300);
+      const P12 = s12o.targetPane;
+      const dash12 = dashedOf(P12);
+      const wantDash12 = [{ rect: draftRect, tone: 'warning', dashed: true, tag: 'K9' }, { rect: shaft0.dst_rect, tone: 'warning', dashed: true, tag: 'K9' }];
+      const ringAfter = await ringRead(shaft0.dst_rect);
+      const L12 = P12 && Array.isArray(P12.labels) ? P12.labels : [];
+      const shaftTag = L12.find((l) => l.kind === 'tag' && l.text === 'K9' && P12.outlines[l.outline] && J(P12.outlines[l.outline].rect) === J(shaft0.dst_rect)) ?? null;
+      const read12 = await labelRead(P12);
+      const tagR = shaftTag && shaftTag.box && read12 ? read12.find((r) => r.i === L12.indexOf(shaftTag)) : null;
+      await shot('k9-shaft-pair');
+      const T12 = await d.pane('target');
+      await shot('k9-shaft-pair-pane', { x: T12.rect.left, y: T12.rect.top, width: T12.rect.width, height: T12.rect.height, scale: 2 });
+      check('DP.12o', `the K9 pair gives TWO dashed warning outlines tagged K9, the draft's and shaft 0's at its dst_rect on disk ${J(shaft0.dst_rect)}; the canvas, read back on a ring inside the shaft's rectangle, shows the warning colour where it did not before the paste`,
+        J(dash12) === J(wantDash12) && ringAfter.n > 0 && ringAfter.warn - ringBefore.warn > 0.2 * ringAfter.n,
+        `dpr ${dpr}; view ${J(P12 && P12.view)}; dashed ${J(dash12)}; want ${J(wantDash12)}; ring before ${J(ringBefore)}, after ${J(ringAfter)}; `
+          + `the shaft's K9 tag at whole-act scale (NOT judged here, see DP.12t): ${J(shaftTag)} read ${J(tagR)}`);
+
+      // DP.12t: at whole-act scale a shaft is a few screen px wide, and the label
+      // layout (pane-labels.ts) hides a chip with no room inside its rectangle.
+      // REAL wheel steps at the shaft's centre zoom in until the layout prints the
+      // shaft's K9 tag; the canvas is read back inside that chip.
+      const Tz0 = await d.pane('target');
+      const cz = d.clientOf(Tz0, shaft0.dst_rect.x + shaft0.dst_rect.w / 2, shaft0.dst_rect.y + shaft0.dst_rect.h / 2);
+      const wheelAt = { x: Math.round(cz.x), y: Math.round(cz.y) };
+      let steps = 0; let Pz = null; let tagZ = null;
+      const tagOnShaft = (P) => (P && Array.isArray(P.labels) ? P.labels : []).find((l) => l.kind === 'tag' && l.text === 'K9' && l.box
+        && P.outlines[l.outline] && J(P.outlines[l.outline].rect) === J(shaft0.dst_rect)) ?? null;
+      while (steps < 16) {
+        await c.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: wheelAt.x, y: wheelAt.y, deltaX: 0, deltaY: -100 });
+        steps++;
+        await sleep(200);
+        Pz = (await d.st()).targetPane;
+        tagZ = tagOnShaft(Pz);
+        if (tagZ) break;
+      }
+      await sleep(200);
+      Pz = (await d.st()).targetPane;
+      tagZ = tagOnShaft(Pz);
+      const readZ = await labelRead(Pz);
+      const tagZR = tagZ && readZ ? readZ.find((r) => r.i === Pz.labels.indexOf(tagZ)) : null;
+      const ringZ = await ringRead(shaft0.dst_rect);
+      const Tz = await d.pane('target');
+      await shot('k9-shaft-pair-zoomed', { x: Tz.rect.left, y: Tz.rect.top, width: Tz.rect.width, height: Tz.rect.height, scale: 2 });
+      check('DP.12t', `zoomed in by REAL wheel steps at shaft 0's centre, the pane prints the shaft's K9 rule tag on a chip inside its outline, and the canvas, read back inside that chip, holds warning-colour text pixels and nothing foreign; the shaft's ring still reads the warning colour`,
+        !!tagZ && !!tagZR && tagZR.n > 0 && tagZR.foreign === 0 && tagZR.text > 0 && tagZR.warn > 5
+          && J(dashedOf(Pz)) === J(wantDash12) && ringZ.n > 0 && ringZ.warn > 0.2 * ringZ.n,
+        `wheel at ${J(wheelAt)} x ${steps}; view ${J(Pz && Pz.view)}; tag ${J(tagZ)} read ${J(tagZR)}; ring ${J(ringZ)}; dashed ${J(dashedOf(Pz))}`);
+    }
+
+    // DP.12n: aeon's own recorded past-the-act case, read from the tree under test.
+    const cases = JSON.parse(readFileSync(join(RUN.root, 'test/fixtures/clips/aeon-outputs/validate-json.cases.json'), 'utf8'));
+    const pastMan = cases.refuse_k9_shaft_past_act ? cases.refuse_k9_shaft_past_act.manifest : null;
+    if (!pastMan) { check('DP.12n', 'a shaft past the act is named, not outlined', 'UNMEASURABLE', 'the tree has no refuse_k9_shaft_past_act case'); return; }
+    writeFileSync(wPath, `${JSON.stringify(pastMan, null, 2)}\n`);
+    const own2run = aeonTool(COPY, ['tools/clip_manifest.py', 'validate', wPath, '--donor-root', donorsDir, '--json']);
+    const own2 = (() => { try { return JSON.parse(own2run.stdout); } catch { return null; } })();
+    const r2 = own2 && own2.refusals && own2.refusals[0];
+    const secRun = aeonTool(COPY, ['-c', 'import sys; sys.path.insert(0, "tools"); import clip_manifest as CM; print(CM.geometry_constants()["SECTION_SIZE"])']);
+    const SEC = Number(String(secRun.stdout).trim());
+    const s2sub = r2 && r2.subjects && r2.subjects[0];
+    const s2rect = s2sub && s2sub.kind === 'shaft' && pastMan.shafts[s2sub.index] ? pastMan.shafts[s2sub.index].dst_rect : null;
+    const worldW = pastMan.act.grid_w * SEC; const worldH = pastMan.act.grid_h * SEC;
+    const offWorld = !!s2rect && (s2rect.x >= worldW || s2rect.y >= worldH || s2rect.x + s2rect.w <= 0 || s2rect.y + s2rect.h <= 0);
+    // Another act first, so the click on s2_woven reads the file anew.
+    const away = (await d.st()).paste.acts.find((a) => a !== WOVEN) ?? null;
+    if (away) {
+      await d.realClick(`document.querySelector('[data-donors-act="${away}"]')`);
+      await d.waitFor((s) => s.paste.target && s.paste.target.actId === away && !s.paste.busy, `${away} chosen`, 480, 250, { soft: true });
+    }
+    const back = await d.realClick(`document.querySelector('[data-donors-act="${WOVEN}"]')`);
+    const sn = await d.waitFor((s) => s.paste.target && s.paste.target.actId === WOVEN && !s.paste.busy && s.paste.bakeNoteKind !== null
+      && s.targetPane && s.targetPane.paints > 0, `${WOVEN} (past the act) chosen and judged`, 480, 250, { soft: true });
+    await sleep(500);
+    const snP = (await d.st()).targetPane;
+    const noteText = await c.evalExpr('(document.querySelector("[data-donors-bake-note]") || {}).textContent || null');
+    const noteKind = await c.evalExpr('(document.querySelector("[data-donors-bake-note]") || { getAttribute: () => null }).getAttribute("data-donors-bake-note")');
+    const wantLine = r2 ? `${r2.rule} (${s2sub.kind} ${s2sub.index} ${s2sub.id} (not on this pane)): ${r2.message}` : null;
+    const cw = await canvasWarn();
+    await shot('k9-shaft-off-pane');
+    check('DP.12n', `a shaft wholly past the act (aeon's recorded refuse_k9_shaft_past_act, written to the copy's ${WOVEN}): a REAL click on the act shows aeon's refusal naming the shaft "(not on this pane)" (the harness's own validate of the file on disk: K9, that shaft, outside the ${pastMan.act.grid_w} x ${pastMan.act.grid_h}-section world); no dashed outline, and no warning pixel on the target canvas`,
+      !!(back && back.hitOk) && own2run.status === 1 && !!r2 && r2.rule === 'K9' && r2.subjects.length === 1 && offWorld && Number.isInteger(SEC)
+        && noteKind === 'refused' && typeof noteText === 'string' && !!wantLine && noteText.split('\n').includes(wantLine)
+        && J(dashedOf(snP)) === '[]' && !!cw && cw.n > 0 && cw.warn === 0,
+      `away ${J(away)}; harness's own validate exit ${own2run.status}, refusal ${J(r2)}; SECTION_SIZE ${SEC}; shaft rect ${J(s2rect)} vs world ${worldW} x ${worldH}; `
+        + `state ${J({ note: sn.paste.bakeNoteKind })}; DOM kind ${J(noteKind)} text ${J(noteText)}; want line ${J(wantLine)}; dashed ${J(dashedOf(snP))}; canvas ${J(cw)}`);
+  }
+
+  await wovenShaftRefusals();
 
   // ── DP.10 a real bake refusal, on screen ────────────────────────────────
   // aeon's own C4 paint (tools/test_clip_bake_json.py, and gen_bake_json.py
