@@ -131,6 +131,7 @@ export const NORMAL_LEN = 6.5;
 /**
  * How much thicker the stem is drawn than the caller's stated width — which is
  * the tangent bar's width, so this is also the ratio between the two elements.
+ * It scales the stem's CORE only; its casing keeps the bar's margin (`stemWidths`).
  *
  * Emphasis is applied by making the dominant element bolder, never by thinning
  * the quiet one: the tangent keeps exactly the widths the previous parcel
@@ -427,7 +428,9 @@ export interface MarkDrawOpts {
    *  context — pass `1.25 / zoom` to get a screen-constant hairline). This is
    *  the TANGENT's width; the stem is drawn at ARROW_WIDTH_SCALE times it. */
   coreWidth: number;
-  /** Casing stroke width, same units. Must exceed coreWidth to show. */
+  /** Casing stroke width, same units. Must exceed coreWidth to show. This is the
+   *  TANGENT's casing; the stem's is the stem's core plus this casing's margin on each
+   *  side (`stemWidths`, ROADMAP row 240 (c)), not this times ARROW_WIDTH_SCALE. */
   casingWidth: number;
   /**
    * How many SCREEN pixels this caller's 16px collision cell occupies.
@@ -439,6 +442,33 @@ export interface MarkDrawOpts {
    * deciding for itself what to draw.
    */
   cellScreenPx: number;
+}
+
+/**
+ * The stem's core and casing widths, in the caller's units, from the BAR's.
+ *
+ * The CORE is the bar's core times ARROW_WIDTH_SCALE: the stem out-weighs the bar by
+ * being bolder (see ARROW_WIDTH_SCALE).
+ *
+ * The CASING is that core plus the BAR's own casing margin on each side, so the stem's
+ * outline is exactly as heavy as the bar's and the two read as one mark (ROADMAP row
+ * 240 (c), ruled by the overseer 2026-09-28). It used to be the bar's casing times
+ * ARROW_WIDTH_SCALE as well. At the map's widths that is 3 x 1.6 = 4.8 CSS px, an ODD
+ * device width at every dpr, around a 1.25 x 1.6 = 2 CSS px core, an EVEN one: with both
+ * edges of each on whole device pixels (canvas/device-grid.ts `snapStrokeEdges`) they
+ * cannot share a centre, and the casing showed one more device pixel on one side than
+ * the other. The margin is 0.875 CSS px, so the casing is 2 + 1.75 = 3.75 CSS px, which
+ * rounds to an EVEN device width like the core, so both centre on the same whole device
+ * pixel. The ruling moves the casing, never the core: a heavier core (3) would make the
+ * arrow heavier than the bar it belongs to, and a heavier casing (6) its outline.
+ *
+ * Concentricity is a property of THESE widths, not of the formula: it holds because
+ * 3.75 and 2 round to the same parity. canvas/__tests__/stem-concentric.test.ts holds
+ * it at every dpr the suite sweeps, under both callers' mappings.
+ */
+export function stemWidths(coreWidth: number, casingWidth: number): { coreWidth: number; casingWidth: number } {
+  const core = coreWidth * ARROW_WIDTH_SCALE;
+  return { coreWidth: core, casingWidth: core + (casingWidth - coreWidth) };
 }
 
 /**
@@ -499,14 +529,16 @@ export function drawAngleMark(
     ctx.stroke();
   };
 
+  const stem = stemWidths(opts.coreWidth, opts.casingWidth);
+
   ctx.strokeStyle = opts.casing;
   if (withBar) { ctx.lineWidth = opts.casingWidth; barPath(); }
-  ctx.lineWidth = opts.casingWidth * ARROW_WIDTH_SCALE;
+  ctx.lineWidth = stem.casingWidth;
   stemPath();
 
   ctx.strokeStyle = opts.color;
   if (withBar) { ctx.lineWidth = opts.coreWidth; barPath(); }
-  ctx.lineWidth = opts.coreWidth * ARROW_WIDTH_SCALE;
+  ctx.lineWidth = stem.coreWidth;
   stemPath();
 
   return tier;

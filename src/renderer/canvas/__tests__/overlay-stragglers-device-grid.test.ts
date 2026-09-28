@@ -149,6 +149,11 @@ function expectSegmentsOnGrid(s: DeviceStroke, cssWidth: number, dpr: number): v
   }
 }
 
+/** The stem's core (the bar's 1.25 CSS px core at the stem's scale) and its casing (that
+ *  core plus the bar's casing margin, (3 - 1.25) / 2, on each side: ROADMAP row 240 (c)). */
+const STEM_CORE = 1.25 * ARROW_WIDTH_SCALE;
+const STEM_CASING = STEM_CORE + (3 - 1.25);
+
 // ═══ site 3: OverlayRenderer's angle marks ═══════════════════════════════════════════
 describe('site 3: aeon OverlayRenderer angle marks are on the device grid (row 239 (d))', () => {
   const mark = angleMark(FLAT)!;
@@ -168,12 +173,15 @@ describe('site 3: aeon OverlayRenderer angle marks are on the device grid (row 2
         expect(core.length, 'bar + stem cores (stem only below the detail tier)').toBe(detail ? 2 : 1);
         expect(casing.length, 'bar + stem casings').toBe(detail ? 2 : 1);
         const stemCore = core[core.length - 1], stemCasing = casing[casing.length - 1];
-        // The stem: vertical, at the column nearest the unsnapped anchor.
-        expectSegmentsOnGrid(stemCore, 1.25 * ARROW_WIDTH_SCALE, dpr);
-        expectSegmentsOnGrid(stemCasing, 3 * ARROW_WIDTH_SCALE, dpr);
+        // The stem: vertical, at the column nearest the unsnapped anchor. Its casing is
+        // its core plus the bar's casing margin on each side (ROADMAP row 240 (c)), so
+        // the two share one centre (stem-concentric.test.ts sweeps every dpr and zoom).
+        expectSegmentsOnGrid(stemCore, STEM_CORE, dpr);
+        expectSegmentsOnGrid(stemCasing, STEM_CASING, dpr);
         const ax = dev(cx + mark.ax, v.x, v, dpr);
-        expect(stemCore.pts[0][0]).toBeCloseTo(expectedCentre(ax, 1.25 * ARROW_WIDTH_SCALE, dpr), 9);
-        expect(stemCasing.pts[0][0]).toBeCloseTo(expectedCentre(ax, 3 * ARROW_WIDTH_SCALE, dpr), 9);
+        expect(stemCore.pts[0][0]).toBeCloseTo(expectedCentre(ax, STEM_CORE, dpr), 9);
+        expect(stemCasing.pts[0][0]).toBeCloseTo(expectedCentre(ax, STEM_CASING, dpr), 9);
+        expect(stemCasing.pts[0][0], 'the stem is concentric in its casing').toBeCloseTo(stemCore.pts[0][0], 6);
         if (detail) {
           // The bar: horizontal, on the row nearest the unsnapped surface.
           expectSegmentsOnGrid(core[0], 1.25, dpr);
