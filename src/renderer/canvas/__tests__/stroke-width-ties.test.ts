@@ -64,10 +64,13 @@ const WIDTHS: { name: string; base: Q; scale: Q }[] = [
   { name: '0.4 px (below the even floor)', base: q(2, 5), scale: q(1) },
 ];
 const DPRS: Q[] = [q(1), q(5, 4), q(27, 20), q(3, 2), q(8, 5), q(7, 4), q(2), q(5, 2), q(3), q(4)];
-// Zooms the map can reach (clamped to [0.125, 8], continuous under the wheel), including
-// the keyboard's x1.5 chain from 1.
+// Zooms the map can reach (clamped to [0.125, 8], continuous under the wheel): named
+// ones, the keyboard's x1.5 chain from 1, and an even sweep of the whole range, because
+// which zooms put noise on a tie is not a pattern a short list catches (the bar casing at
+// dpr 2 goes thicker at none of the 1/16 steps and at some of the sweep's).
 const ZOOMS: number[] = [0.125, 0.25, 0.5, 0.75, 1, 1.0625, 1.5, 2, 2.125, 2.25, 3, 3.3, 3.375, 3.625, 5.0625, 7.59375, 8,
-  1 / 1.5, 1 / 1.5 / 1.5];
+  1 / 1.5, 1 / 1.5 / 1.5,
+  ...Array.from({ length: 400 }, (_, i) => 0.125 + (7.875 * i) / 399)];
 
 describe('the premise: the rational inputs contain ties, and the float paths put noise on them', () => {
   it('the oracle finds width ties among the renderers\' widths (anti-vacuous)', () => {
