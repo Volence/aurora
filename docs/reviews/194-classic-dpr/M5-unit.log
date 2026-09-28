@@ -1,0 +1,71 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ab34b6ed775224009
+
+ ❯ src/renderer/components/classic/__tests__/classic-overlays.test.ts (17 tests | 1 failed) 10ms
+     ✓ does not throw and skips drawImage when the sprite bitmap is detached (width 0) 2ms
+     ✓ draws the sprite when its bitmap is live (width > 0) 0ms
+     ✓ falls back to the ring markers (no drawImage) for a detached ring sprite ($25) 0ms
+     ✓ draws a ghost marker (labelled box, no hex) for an invisible id with no sprite 0ms
+     ✓ resolves the composed sprite by (id, subtype) key for a rule object 0ms
+     ✓ draws the bar along angleNeedle, not its vertical mirror 1ms
+     ✓ honours the chunk cell flips the heights already honour 0ms
+     ✓ the stem leaves the surface on the open side (up, for a floor) 0ms
+     ✓ the mark sits on the surface, not at the cell centre 0ms
+     ✓ at a cell size under DETAIL_CELL_PX the stem is drawn ALONE 0ms
+     ✓ is suppressed when a cell is too small to hold it 0ms
+     × at a device scale of 1.5 the tier is decided in CSS px, exactly as at 1 3ms
+     ✓ draws nothing for block 0, which the engine never consults 0ms
+     ✓ veils exactly the high tile: at TL unflipped, mirrored to TR when the CHUNK cell is x-flipped 1ms
+     ✓ outlines the lone high tile on its interior boundaries only 0ms
+     ✓ draws NOTHING when every tile is low priority (anti-vacuous) 0ms
+     ✓ draws nothing for air ($00) and offsets veils by the layout cell 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-overlays.test.ts > drawCollision angle mark > at a device scale of 1.5 the tier is decided in CSS px, exactly as at 1
+AssertionError: the device scale leaked into the tier: expected 4 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 4
+
+ ❯ src/renderer/components/classic/__tests__/classic-overlays.test.ts:249:79
+    247|     drawCollision(at15.ctx, collisionDoc(false, false), 0, 0, 1, true,…
+    248|     expect(corePts(at1.pts).length).toBe(2);
+    249|     expect(corePts(at15.pts).length, 'the device scale leaked into the…
+       |                                                                               ^
+    250|   });
+    251| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 16 passed (17)
+   Start at  04:08:29
+   Duration  532ms (transform 345ms, setup 405ms, import 48ms, tests 10ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 1 failure record(s) in 1 file(s) (1 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        1   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/classic/__tests__/classic-overlays.test.ts
+    [ASSERTION] drawCollision angle mark > at a device scale of 1.5 the tier is decided in CSS px, exactly as at 1
+        AssertionError: the device scale leaked into the tier: expected 4 to be 2 // Object.is equality
+        why this bucket: name is AssertionError
+
+failure-class: 1 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 1 of 1 module(s) this run selected finished.

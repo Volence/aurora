@@ -1,0 +1,13 @@
+diff --git a/src/renderer/components/classic/viewport-math.ts b/src/renderer/components/classic/viewport-math.ts
+index 6f93b4cd..8b111c34 100644
+--- a/src/renderer/components/classic/viewport-math.ts
++++ b/src/renderer/components/classic/viewport-math.ts
+@@ -153,7 +153,7 @@ export interface ClassicBackingStore {
+  * `screenToWorld` reads `clientX - rect.left` in CSS pixels, as before.
+  */
+ export function classicBackingStore(rectWidth: number, rectHeight: number, dpr: number): ClassicBackingStore {
+-  const deviceWidth = Math.max(1, Math.floor(rectWidth * dpr));
++  const deviceWidth = Math.max(1, Math.round(rectWidth * dpr));
+   const deviceHeight = Math.max(1, Math.floor(rectHeight * dpr));
+   return { deviceWidth, deviceHeight, cssWidth: deviceWidth / dpr, cssHeight: deviceHeight / dpr, dpr };
+ }

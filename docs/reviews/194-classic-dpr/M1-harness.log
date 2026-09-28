@@ -1,0 +1,103 @@
+
+> aurora@0.1.0 harness:classic-canvas-dpr
+> node scratchpad/classic-canvas-dpr-harness.mjs
+
+root: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ab34b6ed775224009
+      pinned: AURORA_BUILT_TREE=/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ab34b6ed775224009
+
+=== session: classic canvas at --force-device-scale-factor=1 (port 9364 verified free) ===
+guard: discovery snapshot taken before launch:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+guard: private profile for this RUN: /home/volence/.cache/aurora-tmp-194/aurora-harness-profiles/classic-canvas-dpr-harness-484847-1649caba — see HAZARD 6
+      provenance  app entry /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ab34b6ed775224009/dist/main/index.mjs (the root:/pinned: lines above name the tree)
+PASS  s1.0  PREMISE: --force-device-scale-factor=1 took, GHZ1 ready, the camera set is the camera published, and an A|B chunk edge is on screen
+        dpr 1; level {"status":"ready","zone":"ghz","act":1}; camera set {"camX":3114,"camY":455,"ZOOM":2} read {"x":3114,"y":455,"zoom":2}; boundary {"col":13,"row":2,"A":45,"B":49}; grid {"width":48,"height":5}
+      s1.0  canvas geometry: {"dpr":1,"left":284,"top":106,"width":856,"height":742,"clientWidth":856,"clientHeight":742,"bw":856,"bh":742,"innerWidth":1400,"innerHeight":872,"styleWidth":"856px","styleHeight":"742px","imageRendering":"pixelated"}
+PASS  s1.1  the backing store is the CSS box times devicePixelRatio (within one device px)
+        canvas.width 856 vs rect.width*dpr 856.000 (clientWidth*dpr 856.000); canvas.height 742 vs rect.height*dpr 742.000 (clientHeight*dpr 742.000)
+      s1.2  screenshot: 1400x872 device px (innerWidth*dpr 1400.0); window [688,452,48x48] device px; shot saved m1-scale1.png
+      s1.2  device row across the A|B edge (8 px each side): 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12 929200 929200 929200 929200 ffff00 ffff00 ffff00 ffff00
+      s1.2  backing-store source region: 56x56 at 400,342; 9 colours; translucent 0
+PASS  s1.2  every on-screen pixel around the chunk edge is a colour the backing store drew (no filtered blends)
+        0 of 2304 device px are colours the store never drew (0 distinct); window holds 9 colours and 220 neighbour changes (anti-vacuous: >=2 and >=10); screenshot in device px: true
+PASS  s1.3  a real right-click 2 CSS px either side of the A|B edge eyedrops A on the left and B on the right
+        aim A {"x":710,"y":476,"wx":3327,"wy":640,"col":12,"row":2} -> 45 (want 45); aim B {"x":714,"y":476,"wx":3329,"wy":640,"col":13,"row":2} -> 49 (want 49); aims derive to the intended cells: true
+PASS  s1.4  a real hover over cell A (stamp tool, chunk B armed) changes exactly cell A's rectangle in the backing store
+        tool stamp-chunk; armed 49; camera {"x":2900,"y":269,"zoom":1}; hover (711,477) -> world {"x":3327,"y":640} cell {"col":12,"row":2}; changed {"n":17492,"minX":171,"minY":242,"maxX":428,"maxY":499}; cell A in backing px {"minX":172,"minY":243,"maxX":427,"maxY":498} wholly inside the store: true (ratio 1.0000, tolerance 2)
+   flush check armed: profile /home/volence/.cache/aurora-tmp-194/aurora-harness-profiles/classic-canvas-dpr-harness-484847-1649caba/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session 193B, unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 100ms
+cleanup: tree under pid 484872 (1 process(es)):
+           484872 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (203B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (203B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+
+=== session: classic canvas at --force-device-scale-factor=1.5 (port 9364 verified free) ===
+guard: pinned Ozone to x11 (--ozone-platform=x11) — see HAZARD 5
+      provenance  app entry /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ab34b6ed775224009/dist/main/index.mjs (the root:/pinned: lines above name the tree)
+PASS  s1.5.0  PREMISE: --force-device-scale-factor=1.5 took, GHZ1 ready, the camera set is the camera published, and an A|B chunk edge is on screen
+        dpr 1.5; level {"status":"ready","zone":"ghz","act":1}; camera set {"camX":3184,"camY":505,"ZOOM":2} read {"x":3184,"y":505,"zoom":2}; boundary {"col":13,"row":2,"A":45,"B":49}; grid {"width":48,"height":5}
+      s1.5.0  canvas geometry: {"dpr":1.5,"left":284,"top":106,"width":576,"height":542,"clientWidth":576,"clientHeight":542,"bw":864,"bh":813,"innerWidth":1120,"innerHeight":672,"styleWidth":"576px","styleHeight":"542px","imageRendering":"pixelated"}
+PASS  s1.5.1  the backing store is the CSS box times devicePixelRatio (within one device px)
+        canvas.width 864 vs rect.width*dpr 864.000 (clientWidth*dpr 864.000); canvas.height 813 vs rect.height*dpr 813.000 (clientHeight*dpr 813.000)
+      s1.5.2  screenshot: 1680x1008 device px (innerWidth*dpr 1680.0); window [822,528,72x72] device px; shot saved m1-scale1.5.png
+      s1.5.2  device row across the A|B edge (8 px each side): 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12 0a0c12 929200 929200 929200 929200 929200 929200 ffff00 ffff00
+      s1.5.2  backing-store source region: 80x80 at 392,365; 9 colours; translucent 0
+PASS  s1.5.2  every on-screen pixel around the chunk edge is a colour the backing store drew (no filtered blends)
+        0 of 5184 device px are colours the store never drew (0 distinct); window holds 9 colours and 330 neighbour changes (anti-vacuous: >=2 and >=10); screenshot in device px: true
+FAIL  s1.5.3  a real right-click 2 CSS px either side of the A|B edge eyedrops A on the left and B on the right
+        aim A {"x":570,"y":376,"wx":3327,"wy":640,"col":12,"row":2} -> 49 (want 45); aim B {"x":574,"y":376,"wx":3329,"wy":640,"col":13,"row":2} -> 49 (want 49); aims derive to the intended cells: true
+FAIL  s1.5.4  a real hover over cell A (stamp tool, chunk B armed) changes exactly cell A's rectangle in the backing store
+        tool stamp-chunk; armed 49; camera {"x":3040,"y":369,"zoom":1}; hover (571,377) -> world {"x":3327,"y":640} cell {"col":12,"row":2}; changed {"n":14470,"minX":431,"minY":597,"maxX":816,"maxY":812}; cell A in backing px {"minX":48,"minY":214.5,"maxX":431,"maxY":597.5} wholly inside the store: true (ratio 1.5000, tolerance 2)
+   flush check armed: profile /home/volence/.cache/aurora-tmp-194/aurora-harness-profiles/classic-canvas-dpr-harness-484847-1649caba/Local Storage/leveldb
+        observed: held open by the launched tree (11 pid(s))
+        stored session 193B, unchanged while the marker was placed; already committed on Chromium's own timer: false
+   window.close() -> the app exited on its own after 100ms
+cleanup: tree under pid 526909 (1 process(es)):
+           526909 (gone)
+cleanup: ORDERED — app 0 pid(s) SIGTERMed first, gone in 0 ms; then the wrapper group with the X server absent, tree gone in 0 ms; teardown 300 ms of a 4000 ms grace
+cleanup: SIGKILLed 0; survivors after kill: none
+cleanup: restored /home/volence/.aurora/mcp.json (203B restored)
+cleanup: restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+cleanup: restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+cleanup: restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+cleanup: restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   restored /home/volence/.aurora/mcp.json (203B restored)
+   restored /home/volence/.sonic-level-editor/mcp.json (203B restored)
+   restored /home/volence/.config/Electron/recent-projects.json (1922B restored)
+   restored /home/volence/.config/sonic-level-editor/recent-projects.json (233B restored)
+   restored /home/volence/.config/aurora/recent-projects.json (362B restored)
+   discovery on disk after restore:
+        /home/volence/.aurora/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.sonic-level-editor/mcp.json 203B [pid 2739689 DEAD — STALE FILE] "{\n  \"url\": \"http://127.0.0.1:38473/mcp\",\n  \"port\": 38473,\n  \"pid\": 2739689,\n  \"aether\": \"http://127.0.0.
+        /home/volence/.config/Electron/recent-projects.json 1922B [10 recent entries] "[\n  {\n    \"path\": \"/tmp/claude-1000/-home-volence-sonic-hacks-aurora/8f814147-7d93-4b83-af7d-553f55cdd87a/scratchp
+        /home/volence/.config/sonic-level-editor/recent-projects.json 233B [2 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/s4_engine\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 1781815
+        /home/volence/.config/aurora/recent-projects.json 362B [3 recent entries] "[\n  {\n    \"path\": \"/home/volence/sonic_hacks/aeon\",\n    \"name\": \"Sonic 4\",\n    \"lastOpened\": 178904638805
+   port free after teardown: true
+   flush check: this session's last write is on disk: true (it was NOT before the close — the close is what carried it)
+
+8/10 checks passed

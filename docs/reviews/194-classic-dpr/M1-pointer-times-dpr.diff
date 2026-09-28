@@ -1,0 +1,13 @@
+diff --git a/src/renderer/components/classic/ClassicLevelViewport.tsx b/src/renderer/components/classic/ClassicLevelViewport.tsx
+index 86b3af11..28147504 100644
+--- a/src/renderer/components/classic/ClassicLevelViewport.tsx
++++ b/src/renderer/components/classic/ClassicLevelViewport.tsx
+@@ -1147,7 +1147,7 @@ export default function ClassicLevelViewport() {
+     const canvas = canvasRef.current;
+     if (!canvas) return null;
+     const rect = canvas.getBoundingClientRect();
+-    return screenToWorld(camRef.current, e.clientX - rect.left, e.clientY - rect.top);
++    return screenToWorld(camRef.current, (e.clientX - rect.left) * sizeRef.current.dpr, (e.clientY - rect.top) * sizeRef.current.dpr);
+   }, []);
+ 
+   // The layout cell (col,row) under a mouse event, using the shared camera math.

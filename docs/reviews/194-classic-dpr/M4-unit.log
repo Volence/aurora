@@ -1,0 +1,574 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ab34b6ed775224009
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts (32 tests | 14 failed) 11ms
+     × 640.5x480.25 at 1 4ms
+     × 640.5x480.25 at 1.25 0ms
+     × 640.5x480.25 at 1.35 0ms
+     × 640.5x480.25 at 1.5 0ms
+     ✓ 640.5x480.25 at 2 0ms
+     × 640.5x480.25 at 3 0ms
+     ✓ 856x742 at 1 0ms
+     ✓ 856x742 at 1.25 0ms
+     × 856x742 at 1.35 0ms
+     ✓ 856x742 at 1.5 0ms
+     ✓ 856x742 at 2 0ms
+     ✓ 856x742 at 3 0ms
+     ✓ 576x542 at 1 0ms
+     ✓ 576x542 at 1.25 0ms
+     × 576x542 at 1.35 0ms
+     ✓ 576x542 at 1.5 0ms
+     ✓ 576x542 at 2 0ms
+     ✓ 576x542 at 3 0ms
+     ✓ 1x1 at 1 0ms
+     ✓ 1x1 at 1.25 0ms
+     ✓ 1x1 at 1.35 0ms
+     × 1x1 at 1.5 0ms
+     ✓ 1x1 at 2 0ms
+     ✓ 1x1 at 3 0ms
+     ✓ 333.33x99.9 at 1 0ms
+     × 333.33x99.9 at 1.25 0ms
+     × 333.33x99.9 at 1.35 0ms
+     × 333.33x99.9 at 1.5 0ms
+     × 333.33x99.9 at 2 0ms
+     × 333.33x99.9 at 3 0ms
+     × at a factor of 1 it is exactly the pre-fix floor(rect), so a 100% display is unchanged 1ms
+     ✓ a zero or collapsed box still yields a one-pixel store, never zero 0ms
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts (19 tests | 12 failed) 201ms
+     × at 1 the store is floor(CSS box x 1) device px, and the CSS box is that over 1 173ms
+     × at 1.25 the store is floor(CSS box x 1.25) device px, and the CSS box is that over 1.25 2ms
+     × at 1.35 the store is floor(CSS box x 1.35) device px, and the CSS box is that over 1.35 2ms
+     × at 1.5 the store is floor(CSS box x 1.5) device px, and the CSS box is that over 1.5 2ms
+     ✓ at 2 the store is floor(CSS box x 2) device px, and the CSS box is that over 2 1ms
+     × at 3 the store is floor(CSS box x 3) device px, and the CSS box is that over 3 1ms
+     × a device ratio of undefined sizes the store at one device px per CSS px 2ms
+     × a device ratio of 0 sizes the store at one device px per CSS px 2ms
+     × a device ratio of -2 sizes the store at one device px per CSS px 1ms
+     × a device ratio of NaN sizes the store at one device px per CSS px 2ms
+     × a device ratio of Infinity sizes the store at one device px per CSS px 1ms
+     × a device ratio of 2 sizes the store at one device px per CSS px 1ms
+     × a device ratio of null sizes the store at one device px per CSS px 1ms
+     ✓ at 1 every draw starts from the device transform with smoothing off 1ms
+     ✓ at 1.5 every draw starts from the device transform with smoothing off 1ms
+     ✓ at 2 every draw starts from the device transform with smoothing off 1ms
+     ✓ at 1 a right-click either side of x=256 eyedrops the chunk under it 2ms
+     ✓ at 1.5 a right-click either side of x=256 eyedrops the chunk under it 1ms
+     ✓ at 2 a right-click either side of x=256 eyedrops the chunk under it 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 26 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1
+AssertionError: expected 641 to be 640 // Object.is equality
+
+- Expected
++ Received
+
+- 640
++ 641
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1.25
+AssertionError: expected 801 to be 800 // Object.is equality
+
+- Expected
++ Received
+
+- 800
++ 801
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1.35
+AssertionError: expected 865 to be 864 // Object.is equality
+
+- Expected
++ Received
+
+- 864
++ 865
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1.5
+AssertionError: expected 961 to be 960 // Object.is equality
+
+- Expected
++ Received
+
+- 960
++ 961
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 3
+AssertionError: expected 1922 to be 1921 // Object.is equality
+
+- Expected
++ Received
+
+- 1921
++ 1922
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 1.35
+AssertionError: expected 1156 to be 1155 // Object.is equality
+
+- Expected
++ Received
+
+- 1155
++ 1156
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 1.35
+AssertionError: expected 778 to be 777 // Object.is equality
+
+- Expected
++ Received
+
+- 777
++ 778
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 1.5
+AssertionError: expected 2 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1.25
+AssertionError: expected 417 to be 416 // Object.is equality
+
+- Expected
++ Received
+
+- 416
++ 417
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1.35
+AssertionError: expected 450 to be 449 // Object.is equality
+
+- Expected
++ Received
+
+- 449
++ 450
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1.5
+AssertionError: expected 500 to be 499 // Object.is equality
+
+- Expected
++ Received
+
+- 499
++ 500
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 2
+AssertionError: expected 667 to be 666 // Object.is equality
+
+- Expected
++ Received
+
+- 666
++ 667
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 3
+AssertionError: expected 1000 to be 999 // Object.is equality
+
+- Expected
++ Received
+
+- 999
++ 1000
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:25:31
+     23|         // Whole device pixels: an unsigned long attribute can hold no…
+     24|         expect(Number.isInteger(s.deviceWidth) && Number.isInteger(s.d…
+     25|         expect(s.deviceWidth).toBe(Math.max(1, Math.floor(rw * dpr)));
+       |                               ^
+     26|         expect(s.deviceHeight).toBe(Math.max(1, Math.floor(rh * dpr)));
+     27|         // THE CSS BOX IS THE STORE OVER THE FACTOR, EXACTLY, so the t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-backing-store.test.ts > classicBackingStore: device-sized store, CSS box derived back from it > at a factor of 1 it is exactly the pre-fix floor(rect), so a 100% display is unchanged
+AssertionError: expected [ 641, 480, 641, 480 ] to deeply equal [ 640, 480, 640, 480 ]
+
+- Expected
++ Received
+
+  [
+-   640,
++   641,
+    480,
+-   640,
++   641,
+    480,
+  ]
+
+ ❯ src/renderer/components/classic/__tests__/classic-backing-store.test.ts:45:10
+     43|       const s = classicBackingStore(rw, rh, 1);
+     44|       expect([s.deviceWidth, s.deviceHeight, s.cssWidth, s.cssHeight])
+     45|         .toEqual([Math.max(1, Math.floor(rw)), Math.max(1, Math.floor(…
+       |          ^
+     46|           Math.max(1, Math.floor(rw)), Math.max(1, Math.floor(rh))]);
+     47|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1 the store is floor(CSS box x 1) device px, and the CSS box is that over 1
+AssertionError: expected { width: 641, height: 480 } to deeply equal { width: 640, height: 480 }
+
+- Expected
++ Received
+
+  {
+    "height": 480,
+-   "width": 640,
++   "width": 641,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:185:60
+    183|       const w = Math.floor(VIEWPORT.width * dpr);
+    184|       const h = Math.floor(VIEWPORT.height * dpr);
+    185|       expect({ width: el(s).width, height: el(s).height }).toEqual({ w…
+       |                                                            ^
+    186|       // The CSS box is set EXPLICITLY, to exactly the store over the …
+    187|       // canvas with no CSS width takes its attribute as its CSS size,…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.25 the store is floor(CSS box x 1.25) device px, and the CSS box is that over 1.25
+AssertionError: expected { width: 801, height: 600 } to deeply equal { width: 800, height: 600 }
+
+- Expected
++ Received
+
+  {
+    "height": 600,
+-   "width": 800,
++   "width": 801,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:185:60
+    183|       const w = Math.floor(VIEWPORT.width * dpr);
+    184|       const h = Math.floor(VIEWPORT.height * dpr);
+    185|       expect({ width: el(s).width, height: el(s).height }).toEqual({ w…
+       |                                                            ^
+    186|       // The CSS box is set EXPLICITLY, to exactly the store over the …
+    187|       // canvas with no CSS width takes its attribute as its CSS size,…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.35 the store is floor(CSS box x 1.35) device px, and the CSS box is that over 1.35
+AssertionError: expected { width: 865, height: 648 } to deeply equal { width: 864, height: 648 }
+
+- Expected
++ Received
+
+  {
+    "height": 648,
+-   "width": 864,
++   "width": 865,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:185:60
+    183|       const w = Math.floor(VIEWPORT.width * dpr);
+    184|       const h = Math.floor(VIEWPORT.height * dpr);
+    185|       expect({ width: el(s).width, height: el(s).height }).toEqual({ w…
+       |                                                            ^
+    186|       // The CSS box is set EXPLICITLY, to exactly the store over the …
+    187|       // canvas with no CSS width takes its attribute as its CSS size,…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.5 the store is floor(CSS box x 1.5) device px, and the CSS box is that over 1.5
+AssertionError: expected { width: 961, height: 720 } to deeply equal { width: 960, height: 720 }
+
+- Expected
++ Received
+
+  {
+    "height": 720,
+-   "width": 960,
++   "width": 961,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:185:60
+    183|       const w = Math.floor(VIEWPORT.width * dpr);
+    184|       const h = Math.floor(VIEWPORT.height * dpr);
+    185|       expect({ width: el(s).width, height: el(s).height }).toEqual({ w…
+       |                                                            ^
+    186|       // The CSS box is set EXPLICITLY, to exactly the store over the …
+    187|       // canvas with no CSS width takes its attribute as its CSS size,…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 3 the store is floor(CSS box x 3) device px, and the CSS box is that over 3
+AssertionError: expected { width: 1922, height: 1440 } to deeply equal { width: 1921, height: 1440 }
+
+- Expected
++ Received
+
+  {
+    "height": 1440,
+-   "width": 1921,
++   "width": 1922,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:185:60
+    183|       const w = Math.floor(VIEWPORT.width * dpr);
+    184|       const h = Math.floor(VIEWPORT.height * dpr);
+    185|       expect({ width: el(s).width, height: el(s).height }).toEqual({ w…
+       |                                                            ^
+    186|       // The CSS box is set EXPLICITLY, to exactly the store over the …
+    187|       // canvas with no CSS width takes its attribute as its CSS size,…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/26]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of undefined sizes the store at one device px per CSS px
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of 0 sizes the store at one device px per CSS px
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of -2 sizes the store at one device px per CSS px
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of NaN sizes the store at one device px per CSS px
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of Infinity sizes the store at one device px per CSS px
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of 2 sizes the store at one device px per CSS px
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of null sizes the store at one device px per CSS px
+AssertionError: expected { width: 641, height: 480 } to deeply equal { width: 640, height: 480 }
+
+- Expected
++ Received
+
+  {
+    "height": 480,
+-   "width": 640,
++   "width": 641,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:199:10
+    197|       const s = await mountClassic(hostile);
+    198|       expect({ width: el(s).width, height: el(s).height })
+    199|         .toEqual({ width: Math.floor(VIEWPORT.width), height: Math.flo…
+       |          ^
+    200|     });
+    201|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/26]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  26 failed | 25 passed (51)
+   Start at  04:08:23
+   Duration  702ms (transform 755ms, setup 820ms, import 44ms, tests 212ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (2 module(s) reported).
+
+failure-class: 26 failure record(s) in 2 file(s) (26 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION       26   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/classic/__tests__/classic-backing-store.test.ts
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1
+        AssertionError: expected 641 to be 640 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1.25
+        AssertionError: expected 801 to be 800 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1.35
+        AssertionError: expected 865 to be 864 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 1.5
+        AssertionError: expected 961 to be 960 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 640.5x480.25 at 3
+        AssertionError: expected 1922 to be 1921 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 856x742 at 1.35
+        AssertionError: expected 1156 to be 1155 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 576x542 at 1.35
+        AssertionError: expected 778 to be 777 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 1x1 at 1.5
+        AssertionError: expected 2 to be 1 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1.25
+        AssertionError: expected 417 to be 416 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1.35
+        AssertionError: expected 450 to be 449 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 1.5
+        AssertionError: expected 500 to be 499 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 2
+        AssertionError: expected 667 to be 666 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > 333.33x99.9 at 3
+        AssertionError: expected 1000 to be 999 // Object.is equality
+        why this bucket: name is AssertionError
+    [ASSERTION] classicBackingStore: device-sized store, CSS box derived back from it > at a factor of 1 it is exactly the pre-fix floor(rect), so a 100% display is unchanged
+        AssertionError: expected [ 641, 480, 641, 480 ] to deeply equal [ 640, 480, 640, 480 ]
+        why this bucket: name is AssertionError
+
+  src/renderer/components/classic/__tests__/classic-device-scale.test.ts
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1 the store is floor(CSS box x 1) device px, and the CSS box is that over 1
+        AssertionError: expected { width: 641, height: 480 } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.25 the store is floor(CSS box x 1.25) device px, and the CSS box is that over 1.25
+        AssertionError: expected { width: 801, height: 600 } to deeply equal { width: 800, height: 600 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.35 the store is floor(CSS box x 1.35) device px, and the CSS box is that over 1.35
+        AssertionError: expected { width: 865, height: 648 } to deeply equal { width: 864, height: 648 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.5 the store is floor(CSS box x 1.5) device px, and the CSS box is that over 1.5
+        AssertionError: expected { width: 961, height: 720 } to deeply equal { width: 960, height: 720 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 3 the store is floor(CSS box x 3) device px, and the CSS box is that over 3
+        AssertionError: expected { width: 1922, height: 1440 } to deeply equal { width: 1921, height: 1440 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of undefined sizes the store at one device px per CSS px
+        AssertionError: expected { width: 641, height: 480 } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of 0 sizes the store at one device px per CSS px
+        AssertionError: expected { width: 641, height: 480 } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of -2 sizes the store at one device px per CSS px
+        AssertionError: expected { width: 641, height: 480 } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of NaN sizes the store at one device px per CSS px
+        AssertionError: expected { width: 641, height: 480 } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of Infinity sizes the store at one device px per CSS px
+        AssertionError: expected { width: 641, height: 480 } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of 2 sizes the store at one device px per CSS px
+        AssertionError: expected { width: 641, height: 480 } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of null sizes the store at one device px per CSS px
+        AssertionError: expected { width: 641, height: 480 } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+
+failure-class: 26 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 2 of 2 module(s) this run selected finished.

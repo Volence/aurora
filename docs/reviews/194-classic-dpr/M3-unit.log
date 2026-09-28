@@ -1,0 +1,309 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ab34b6ed775224009
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts (19 tests | 5 failed) 268ms
+     ✓ at 1 the store is floor(CSS box x 1) device px, and the CSS box is that over 1 233ms
+     ✓ at 1.25 the store is floor(CSS box x 1.25) device px, and the CSS box is that over 1.25 2ms
+     ✓ at 1.35 the store is floor(CSS box x 1.35) device px, and the CSS box is that over 1.35 2ms
+     ✓ at 1.5 the store is floor(CSS box x 1.5) device px, and the CSS box is that over 1.5 2ms
+     ✓ at 2 the store is floor(CSS box x 2) device px, and the CSS box is that over 2 2ms
+     ✓ at 3 the store is floor(CSS box x 3) device px, and the CSS box is that over 3 1ms
+     ✓ a device ratio of undefined sizes the store at one device px per CSS px 1ms
+     × a device ratio of 0 sizes the store at one device px per CSS px 6ms
+     × a device ratio of -2 sizes the store at one device px per CSS px 1ms
+     × a device ratio of NaN sizes the store at one device px per CSS px 1ms
+     × a device ratio of Infinity sizes the store at one device px per CSS px 1ms
+     × a device ratio of 2 sizes the store at one device px per CSS px 1ms
+     ✓ a device ratio of null sizes the store at one device px per CSS px 1ms
+     ✓ at 1 every draw starts from the device transform with smoothing off 1ms
+     ✓ at 1.5 every draw starts from the device transform with smoothing off 2ms
+     ✓ at 2 every draw starts from the device transform with smoothing off 3ms
+     ✓ at 1 a right-click either side of x=256 eyedrops the chunk under it 2ms
+     ✓ at 1.5 a right-click either side of x=256 eyedrops the chunk under it 1ms
+     ✓ at 2 a right-click either side of x=256 eyedrops the chunk under it 2ms
+ ❯ src/renderer/components/__tests__/map-device-scale.test.ts (17 tests | 5 failed) 393ms
+     ✓ at a scale factor of 1 the store is the CSS box times the factor  370ms
+     ✓ at a scale factor of 1.25 the store is the CSS box times the factor 1ms
+     ✓ at a scale factor of 1.35 the store is the CSS box times the factor 1ms
+     ✓ at a scale factor of 2 the store is the CSS box times the factor 1ms
+     ✓ at a scale factor of 3 the store is the CSS box times the factor 1ms
+     ✓ a scale factor that changes between draws is picked up on the next draw 1ms
+     ✓ a device ratio of undefined falls back to one CSS pixel per device pixel 1ms
+     × a device ratio of 0 falls back to one CSS pixel per device pixel 5ms
+     × a device ratio of -2 falls back to one CSS pixel per device pixel 1ms
+     × a device ratio of NaN falls back to one CSS pixel per device pixel 1ms
+     × a device ratio of Infinity falls back to one CSS pixel per device pixel 1ms
+     × a device ratio of 2 falls back to one CSS pixel per device pixel 1ms
+     ✓ a device ratio of null falls back to one CSS pixel per device pixel 1ms
+     ✓ CANNOT MEASURE the drawing transform, and says so rather than implying it 1ms
+     ✓ F7 with no cursor ever seen issues no warp and says why 1ms
+     ✓ F7 after a real hover warps to that point 2ms
+     ✓ a hover AT the corner warps, because the corner is a position and not an absence 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/__tests__/map-device-scale.test.ts > VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a device ratio of 0 falls back to one CSS pixel per device pixel
+AssertionError: expected { width: +0, height: +0 } to deeply equal { width: 641, height: 480 }
+
+- Expected
++ Received
+
+  {
+-   "height": 480,
+-   "width": 641,
++   "height": 0,
++   "width": 0,
+  }
+
+ ❯ src/renderer/components/__tests__/map-device-scale.test.ts:267:30
+    265|     it(`a device ratio of ${String(hostile)} falls back to one CSS pix…
+    266|       const s = await mountMap(hostile);
+    267|       expect(backingSize(s)).toEqual({
+       |                              ^
+    268|         width: Math.round(VIEWPORT.width),
+    269|         height: Math.round(VIEWPORT.height),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  src/renderer/components/__tests__/map-device-scale.test.ts > VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a device ratio of -2 falls back to one CSS pixel per device pixel
+AssertionError: expected { width: -1281, height: -960 } to deeply equal { width: 641, height: 480 }
+
+- Expected
++ Received
+
+  {
+-   "height": 480,
+-   "width": 641,
++   "height": -960,
++   "width": -1281,
+  }
+
+ ❯ src/renderer/components/__tests__/map-device-scale.test.ts:267:30
+    265|     it(`a device ratio of ${String(hostile)} falls back to one CSS pix…
+    266|       const s = await mountMap(hostile);
+    267|       expect(backingSize(s)).toEqual({
+       |                              ^
+    268|         width: Math.round(VIEWPORT.width),
+    269|         height: Math.round(VIEWPORT.height),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  src/renderer/components/__tests__/map-device-scale.test.ts > VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a device ratio of NaN falls back to one CSS pixel per device pixel
+AssertionError: expected { width: NaN, height: NaN } to deeply equal { width: 641, height: 480 }
+
+- Expected
++ Received
+
+  {
+-   "height": 480,
+-   "width": 641,
++   "height": NaN,
++   "width": NaN,
+  }
+
+ ❯ src/renderer/components/__tests__/map-device-scale.test.ts:267:30
+    265|     it(`a device ratio of ${String(hostile)} falls back to one CSS pix…
+    266|       const s = await mountMap(hostile);
+    267|       expect(backingSize(s)).toEqual({
+       |                              ^
+    268|         width: Math.round(VIEWPORT.width),
+    269|         height: Math.round(VIEWPORT.height),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  src/renderer/components/__tests__/map-device-scale.test.ts > VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a device ratio of Infinity falls back to one CSS pixel per device pixel
+AssertionError: expected { width: Infinity, height: Infinity } to deeply equal { width: 641, height: 480 }
+
+- Expected
++ Received
+
+  {
+-   "height": 480,
+-   "width": 641,
++   "height": Infinity,
++   "width": Infinity,
+  }
+
+ ❯ src/renderer/components/__tests__/map-device-scale.test.ts:267:30
+    265|     it(`a device ratio of ${String(hostile)} falls back to one CSS pix…
+    266|       const s = await mountMap(hostile);
+    267|       expect(backingSize(s)).toEqual({
+       |                              ^
+    268|         width: Math.round(VIEWPORT.width),
+    269|         height: Math.round(VIEWPORT.height),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  src/renderer/components/__tests__/map-device-scale.test.ts > VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a device ratio of 2 falls back to one CSS pixel per device pixel
+AssertionError: expected { width: 1281, height: 961 } to deeply equal { width: 641, height: 480 }
+
+- Expected
++ Received
+
+  {
+-   "height": 480,
+-   "width": 641,
++   "height": 961,
++   "width": 1281,
+  }
+
+ ❯ src/renderer/components/__tests__/map-device-scale.test.ts:267:30
+    265|     it(`a device ratio of ${String(hostile)} falls back to one CSS pix…
+    266|       const s = await mountMap(hostile);
+    267|       expect(backingSize(s)).toEqual({
+       |                              ^
+    268|         width: Math.round(VIEWPORT.width),
+    269|         height: Math.round(VIEWPORT.height),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of 0 sizes the store at one device px per CSS px
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of -2 sizes the store at one device px per CSS px
+AssertionError: expected { width: 1, height: 1 } to deeply equal { width: 640, height: 480 }
+
+- Expected
++ Received
+
+  {
+-   "height": 480,
+-   "width": 640,
++   "height": 1,
++   "width": 1,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:199:10
+    197|       const s = await mountClassic(hostile);
+    198|       expect({ width: el(s).width, height: el(s).height })
+    199|         .toEqual({ width: Math.floor(VIEWPORT.width), height: Math.flo…
+       |          ^
+    200|     });
+    201|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of NaN sizes the store at one device px per CSS px
+AssertionError: expected { width: NaN, height: NaN } to deeply equal { width: 640, height: 480 }
+
+- Expected
++ Received
+
+  {
+-   "height": 480,
+-   "width": 640,
++   "height": NaN,
++   "width": NaN,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:199:10
+    197|       const s = await mountClassic(hostile);
+    198|       expect({ width: el(s).width, height: el(s).height })
+    199|         .toEqual({ width: Math.floor(VIEWPORT.width), height: Math.flo…
+       |          ^
+    200|     });
+    201|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of Infinity sizes the store at one device px per CSS px
+AssertionError: expected { width: Infinity, height: Infinity } to deeply equal { width: 640, height: 480 }
+
+- Expected
++ Received
+
+  {
+-   "height": 480,
+-   "width": 640,
++   "height": Infinity,
++   "width": Infinity,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:199:10
+    197|       const s = await mountClassic(hostile);
+    198|       expect({ width: el(s).width, height: el(s).height })
+    199|         .toEqual({ width: Math.floor(VIEWPORT.width), height: Math.flo…
+       |          ^
+    200|     });
+    201|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of 2 sizes the store at one device px per CSS px
+AssertionError: expected { width: 1281, height: 960 } to deeply equal { width: 640, height: 480 }
+
+- Expected
++ Received
+
+  {
+-   "height": 480,
+-   "width": 640,
++   "height": 960,
++   "width": 1281,
+  }
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:199:10
+    197|       const s = await mountClassic(hostile);
+    198|       expect({ width: el(s).width, height: el(s).height })
+    199|         .toEqual({ width: Math.floor(VIEWPORT.width), height: Math.flo…
+       |          ^
+    200|     });
+    201|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  10 failed | 26 passed (36)
+   Start at  04:08:10
+   Duration  913ms (transform 1.13s, setup 835ms, import 49ms, tests 660ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (2 module(s) reported).
+
+failure-class: 10 failure record(s) in 2 file(s) (10 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION       10   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/__tests__/map-device-scale.test.ts
+    [ASSERTION] VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a device ratio of 0 falls back to one CSS pixel per device pixel
+        AssertionError: expected { width: +0, height: +0 } to deeply equal { width: 641, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a device ratio of -2 falls back to one CSS pixel per device pixel
+        AssertionError: expected { width: -1281, height: -960 } to deeply equal { width: 641, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a device ratio of NaN falls back to one CSS pixel per device pixel
+        AssertionError: expected { width: NaN, height: NaN } to deeply equal { width: 641, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a device ratio of Infinity falls back to one CSS pixel per device pixel
+        AssertionError: expected { width: Infinity, height: Infinity } to deeply equal { width: 641, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] VIEWPORT-NO-DPR: the map backing store is sized in device pixels > a device ratio of 2 falls back to one CSS pixel per device pixel
+        AssertionError: expected { width: 1281, height: 961 } to deeply equal { width: 641, height: 480 }
+        why this bucket: name is AssertionError
+
+  src/renderer/components/classic/__tests__/classic-device-scale.test.ts
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of 0 sizes the store at one device px per CSS px
+        AssertionError: expected { width: 1, height: 1 } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of -2 sizes the store at one device px per CSS px
+        AssertionError: expected { width: 1, height: 1 } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of NaN sizes the store at one device px per CSS px
+        AssertionError: expected { width: NaN, height: NaN } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of Infinity sizes the store at one device px per CSS px
+        AssertionError: expected { width: Infinity, height: Infinity } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > a device ratio of 2 sizes the store at one device px per CSS px
+        AssertionError: expected { width: 1281, height: 960 } to deeply equal { width: 640, height: 480 }
+        why this bucket: name is AssertionError
+
+failure-class: 10 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 2 of 2 module(s) this run selected finished.

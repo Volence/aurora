@@ -1,0 +1,13 @@
+diff --git a/src/renderer/components/classic/ClassicLevelViewport.tsx b/src/renderer/components/classic/ClassicLevelViewport.tsx
+index 86b3af11..b89f202d 100644
+--- a/src/renderer/components/classic/ClassicLevelViewport.tsx
++++ b/src/renderer/components/classic/ClassicLevelViewport.tsx
+@@ -651,7 +651,7 @@ export default function ClassicLevelViewport() {
+     // display show the same hard pixel edges. It was `setTransform(1, ...)` on a
+     // CSS-sized store, which the browser then stretched and filtered. `dpr` is the
+     // factor measure() SIZED the store at, never a fresh read (see sizeRef).
+-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
++    ctx.setTransform(1, 0, 0, 1, 0, 0);
+     ctx.fillStyle = CANVAS_VOID;
+     ctx.fillRect(0, 0, w, h);
+     if (!doc) return;

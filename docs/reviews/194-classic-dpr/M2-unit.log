@@ -1,0 +1,111 @@
+
+ RUN  v4.1.4 /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-ab34b6ed775224009
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts (19 tests | 2 failed) 265ms
+     ✓ at 1 the store is floor(CSS box x 1) device px, and the CSS box is that over 1 220ms
+     ✓ at 1.25 the store is floor(CSS box x 1.25) device px, and the CSS box is that over 1.25 4ms
+     ✓ at 1.35 the store is floor(CSS box x 1.35) device px, and the CSS box is that over 1.35 2ms
+     ✓ at 1.5 the store is floor(CSS box x 1.5) device px, and the CSS box is that over 1.5 2ms
+     ✓ at 2 the store is floor(CSS box x 2) device px, and the CSS box is that over 2 2ms
+     ✓ at 3 the store is floor(CSS box x 3) device px, and the CSS box is that over 3 1ms
+     ✓ a device ratio of undefined sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of 0 sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of -2 sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of NaN sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of Infinity sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of 2 sizes the store at one device px per CSS px 2ms
+     ✓ a device ratio of null sizes the store at one device px per CSS px 2ms
+     ✓ at 1 every draw starts from the device transform with smoothing off 2ms
+     × at 1.5 every draw starts from the device transform with smoothing off 7ms
+     × at 2 every draw starts from the device transform with smoothing off 2ms
+     ✓ at 1 a right-click either side of x=256 eyedrops the chunk under it 6ms
+     ✓ at 1.5 a right-click either side of x=256 eyedrops the chunk under it 2ms
+     ✓ at 2 a right-click either side of x=256 eyedrops the chunk under it 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.5 every draw starts from the device transform with smoothing off
+AssertionError: expected [ 1, +0, +0, 1, +0, +0 ] to deeply equal [ 1.5, +0, +0, 1.5, +0, +0 ]
+
+- Expected
++ Received
+
+  [
+-   1.5,
++   1,
+    0,
+    0,
+-   1.5,
++   1,
+    0,
+    0,
+  ]
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:208:50
+    206|       const transforms = s.calls.filter((c) => c.op === 'setTransform'…
+    207|       expect(transforms.length, 'the draw pass never set a base transf…
+    208|       for (const t of transforms) expect(t.args).toEqual([dpr, 0, 0, d…
+       |                                                  ^
+    209|       const blits = s.calls.filter((c) => c.op === 'drawImage');
+    210|       expect(blits.length, 'no chunk was blitted: this row measured an…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/renderer/components/classic/__tests__/classic-device-scale.test.ts > CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 2 every draw starts from the device transform with smoothing off
+AssertionError: expected [ 1, +0, +0, 1, +0, +0 ] to deeply equal [ 2, +0, +0, 2, +0, +0 ]
+
+- Expected
++ Received
+
+  [
+-   2,
++   1,
+    0,
+    0,
+-   2,
++   1,
+    0,
+    0,
+  ]
+
+ ❯ src/renderer/components/classic/__tests__/classic-device-scale.test.ts:208:50
+    206|       const transforms = s.calls.filter((c) => c.op === 'setTransform'…
+    207|       expect(transforms.length, 'the draw pass never set a base transf…
+    208|       for (const t of transforms) expect(t.args).toEqual([dpr, 0, 0, d…
+       |                                                  ^
+    209|       const blits = s.calls.filter((c) => c.op === 'drawImage');
+    210|       expect(blits.length, 'no chunk was blitted: this row measured an…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 17 passed (19)
+   Start at  04:07:24
+   Duration  933ms (transform 625ms, setup 562ms, import 19ms, tests 265ms, environment 0ms)
+
+
+skip-report: no tests were skipped in this run (1 module(s) reported).
+
+failure-class: 2 failure record(s) in 1 file(s) (2 failed test(s); a hook or collection failure has no failed test of its own).
+
+  ASSERTION        2   A FINDING regardless of what the machine was doing. Load does not fake these.
+  TIMEOUT          0   LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE. Re-run on a quiet box to judge,
+                       but load OPENS narrow windows as well as inventing delays, so a timeout
+                       that repeats on a quiet box is a finding, and one that does not is not proof
+                       of nothing.
+  UNCLASSIFIED     0   NO SIGNATURE THIS REPORTER RECOGNISES. Read these yourself; they are not
+                       folded into either bucket above.
+
+  src/renderer/components/classic/__tests__/classic-device-scale.test.ts
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 1.5 every draw starts from the device transform with smoothing off
+        AssertionError: expected [ 1, +0, +0, 1, +0, +0 ] to deeply equal [ 1.5, +0, +0, 1.5, +0, +0 ]
+        why this bucket: name is AssertionError
+    [ASSERTION] CLASSIC-CANVAS-BLUR-DPR: the backing store follows the display scale > at 2 every draw starts from the device transform with smoothing off
+        AssertionError: expected [ 1, +0, +0, 1, +0, +0 ] to deeply equal [ 2, +0, +0, 2, +0, +0 ]
+        why this bucket: name is AssertionError
+
+failure-class: 2 assertion failure(s) above are findings NOW. A busy machine
+  is not an explanation for any of them.
+
+run-completeness: COMPLETE, 1 of 1 module(s) this run selected finished.

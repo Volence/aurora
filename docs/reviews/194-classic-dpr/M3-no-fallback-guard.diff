@@ -1,0 +1,11 @@
+diff --git a/src/renderer/canvas/device-grid.ts b/src/renderer/canvas/device-grid.ts
+index fa44c512..c43acae0 100644
+--- a/src/renderer/canvas/device-grid.ts
++++ b/src/renderer/canvas/device-grid.ts
+@@ -105,5 +105,5 @@ export function snapLength(cssLength: number, dpr: number): number {
+  */
+ export function deviceScale(): number {
+   const dpr = typeof window === 'undefined' ? undefined : window.devicePixelRatio;
+-  return typeof dpr === 'number' && Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
++  return (dpr as number) ?? 1;
+ }
