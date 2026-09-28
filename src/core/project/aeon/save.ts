@@ -27,6 +27,7 @@ import { legacyAtlasPath } from './load';
 import {
   projectDataRoot,
   type LoadedS4Config,
+  type S4ProjectConfig,
 } from '../../config/s4-config';
 import { serializeBgTiles } from '../../formats/bg-tiles';
 import {
@@ -87,8 +88,27 @@ export interface AeonSavePlan {
    * completed; see `state/aeon-save.ts`.
    */
   ledgers: { scenePaths: string[]; presetPaths: string[] };
-  /** True when project.json was retargeted (it is then also present in files). */
+  /** True when project.json was retargeted (it is then also present in files,
+   *  at `PROJECT_JSON_PATH`, and `plannedConfig` holds what it says). */
   configChanged: boolean;
+  /**
+   * The project.json this plan writes, as a parsed document: a COPY of the
+   * session's `config.raw` with this plan's retargets applied, or null when the
+   * plan retargets nothing (`configChanged` false).
+   *
+   * ⚠ THE PLAN NEVER WRITES `config.raw` ITSELF (ROADMAP row 241). The session
+   * copy is what every later plan compares against to decide whether
+   * project.json needs writing, so it must say what project.json on DISK says.
+   * Until 2026-09-28 the plan retargeted `config.raw` in place, before it could
+   * still throw (the scene/preset id-collision refusals below) and before the
+   * glue had written anything; a save refused there left the rewrite in memory,
+   * the next save saw no difference, left project.json out, and wrote the
+   * tileset to the editor path while project.json on disk still named the old
+   * file. The glue adopts this copy with `adoptPlannedConfig` once project.json
+   * has actually reached disk (written, or found already saying it), and not
+   * before.
+   */
+  plannedConfig: S4ProjectConfig | null;
   /**
    * The planned writes (each also in `files`) to a file SHARED BY EVERY ZONE,
    * each with the sentence the save's report must name it by. Today that is at
@@ -176,6 +196,27 @@ export function removalsFor(
   return known
     .filter(p => !keeping.has(p) && !refused.has(p))
     .map(path => ({ path, what: describe(path) }));
+}
+
+/** The project-relative path of the project file a plan writes when it
+ *  retargets a pointer (see `AeonSavePlan.plannedConfig`). */
+export const PROJECT_JSON_PATH = 'project.json';
+
+/**
+ * Make `plan.plannedConfig` the session's config: call it ONLY once the plan's
+ * project.json is on disk (written, or already saying the same thing), so that
+ * the session copy never says something the file does not. A no-op for a plan
+ * that retargets nothing.
+ *
+ * `config.zones` is re-pointed with `config.raw`, keeping the aliasing
+ * `LoadedS4Config` documents (`zones` IS `raw.zones`). Readers of either see
+ * the adopted document; nothing in the renderer holds a zone object across a
+ * save (they look zones up by id from the store each time).
+ */
+export function adoptPlannedConfig(config: LoadedS4Config, plan: AeonSavePlan): void {
+  if (!plan.plannedConfig) return;
+  config.raw = plan.plannedConfig;
+  config.zones = plan.plannedConfig.zones;
 }
 
 export async function buildAeonSavePlan(
@@ -445,6 +486,12 @@ export async function buildAeonSavePlan(
   // engine repos get games/<game>/data/editor/, never a repo-root data/ dir.
   const dataRoot = projectDataRoot(config.raw);
   let configChanged = false;
+  // THE WORKING COPY every retarget below writes into; never `config.raw` (see
+  // `AeonSavePlan.plannedConfig`, row 241). A deep copy, because the retargets
+  // reach into zones[] and acts[] objects the session shares with
+  // `config.zones`. project.json is plain parsed JSON, so structuredClone
+  // carries every field the editor does not model, in order.
+  const raw: S4ProjectConfig = structuredClone(config.raw);
 
   // THE ACT'S GRID DIMENSIONS, back into project.json.
   //
@@ -470,7 +517,7 @@ export async function buildAeonSavePlan(
   // second reader to protect — unlike `tileset`/`bgLayout`, the dimensions name
   // no file, and aeon's own act descriptor is authored under
   // games/*/data/levels/ rather than read from this key.
-  const rawActGrid = config.raw.zones.find(rz => rz.id === zone.id)
+  const rawActGrid = raw.zones.find(rz => rz.id === zone.id)
     ?.acts.find(ra => ra.id === act.id);
   if (rawActGrid
     && (rawActGrid.gridWidth !== act.gridWidth || rawActGrid.gridHeight !== act.gridHeight)) {
@@ -480,7 +527,7 @@ export async function buildAeonSavePlan(
   }
 
   for (const projZone of project.zones) {
-    const rawZone = config.raw.zones.find(rz => rz.id === projZone.id);
+    const rawZone = raw.zones.find(rz => rz.id === projZone.id);
     const tilesetDest = rawZone?.editorTilesetPath || `${dataRoot}editor/${projZone.id}_tiles.bin`;
     const tileBytes = serializeTiles(projZone.tileset.tiles);
     files.push({ path: tilesetDest, bytes: tileBytes });
@@ -615,7 +662,7 @@ export async function buildAeonSavePlan(
   // painting) vanish on reload, because the configured bgLayout/bgTiles may
   // point into the engine's regenerated data/generated tree.
   if (act.bgLayout && act.bgTiles) {
-    const rawAct = config.raw.zones.find(rz => rz.id === zone.id)
+    const rawAct = raw.zones.find(rz => rz.id === zone.id)
       ?.acts.find(ra => ra.id === act.id);
     const editorBgLayoutPath = rawAct?.editorBgLayout || `${dataRoot}editor/${zone.id}_${act.id}_bg.bin`;
     const editorBgTilesPath = rawAct?.editorBgTiles || `${dataRoot}editor/${zone.id}_${act.id}_bg_tiles.bin`;
@@ -781,8 +828,8 @@ export async function buildAeonSavePlan(
     // ruling supersedes that — every JSON file Aurora writes into aeon's tree
     // ends in exactly one newline, this one included — so a source without
     // the byte gains it on its first pointer rewrite, once.
-    const projectJsonBytes = new TextEncoder().encode(jsonFileText(JSON.stringify(config.raw, null, 2)));
-    files.push({ path: 'project.json', bytes: projectJsonBytes, compare: 'json' });
+    const projectJsonBytes = new TextEncoder().encode(jsonFileText(JSON.stringify(raw, null, 2)));
+    files.push({ path: PROJECT_JSON_PATH, bytes: projectJsonBytes, compare: 'json' });
   }
 
   // RE-ENTRY HAZARD closure: the load-time atlas migration re-runs any
@@ -813,7 +860,7 @@ export async function buildAeonSavePlan(
   if (config.chunkLibraryPath && opts.legacyAtlasMerged) {
     const atlasTruncatePath = legacyAtlasPath(config.chunkLibraryPath);
     const liveTilesetPaths = new Set<string>();
-    for (const rz of config.raw.zones) {
+    for (const rz of raw.zones) {
       liveTilesetPaths.add(rz.tileset);
       if (rz.editorTilesetPath) liveTilesetPaths.add(rz.editorTilesetPath);
     }
@@ -829,6 +876,7 @@ export async function buildAeonSavePlan(
     // whatever it could not actually remove before assigning it.
     ledgers: { scenePaths: scenePathsKept, presetPaths: presetPathsKept },
     configChanged,
+    plannedConfig: configChanged ? raw : null,
     shared,
     refusals,
   };

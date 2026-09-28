@@ -293,10 +293,13 @@ describe('a zone palette edit survives save and reopen', () => {
    *  the only authored copy and mirrors it into the generated tree on build. */
   it('writes the zone palette to the path project.json names, and retargets nothing', async () => {
     const files = fixtureFiles();
-    const { plan, before } = await editSaveReopen(files, () => {});
+    const { plan, after } = await editSaveReopen(files, () => {});
 
     expect(plan.files.map((f) => f.path)).toContain(PALETTE_PATH);
-    expect(before.config.raw.zones[0].palette, 'the save moved the palette pointer')
+    // Read from the REOPENED project.json, not the session's config: since row
+    // 241 the plan retargets a copy and never the session's `config.raw`, so
+    // `before.config.raw` could no longer show a moved pointer at all.
+    expect(after.config.raw.zones[0].palette, 'the save moved the palette pointer')
       .toBe(PALETTE_PATH);
     const written = plan.files.filter((f) => f.path === PALETTE_PATH);
     expect(written, 'the palette is planned more than once').toHaveLength(1);
