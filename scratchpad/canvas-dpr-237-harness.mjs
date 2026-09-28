@@ -46,6 +46,26 @@
 //        RED on master: a 1 CSS px stroke centred on the edge is 1.5 device px wide at
 //        1.5, so it covers 75% of X-1 and 75% of X, both blends.
 //
+//   m.s  ROW 238 (a): AEON MapViewport's OWN STAMP GHOST, launched at
+//        --force-device-scale-factor=<s> (STROKE_SCALES), an aeon COPY, the Layout facet
+//        and the Stamp Chunk tool armed by real clicks and a real `k`, a chunk picked by a
+//        real click in the chunk grid, zoom 2 at an integer camera. A real hover paints the
+//        ghost and its 2 CSS px SELECTION_MARQUEE outline on #map-preview-canvas. Two real
+//        screenshots, hover off and on. C is the device column the shared rule centres the
+//        ghost's left edge on (snapStroke: round(edge x dpr) + 0.5, so column C), R the
+//        device row for its top edge. At zoom 2 with an integer camera the unsnapped
+//        edge sits ON a device boundary at 1.5 (an even CSS x times 1.5 is an integer):
+//        master drew 3 device px centred there, half-covering C-2 and C+1.
+//        m.s.1 column C-2 untouched on every sampled row (nothing past one partial column).
+//        m.s.2 column C-1 changed on every sampled row and NEVER at full strength: the
+//              half-covered outer column the shared rule gives every EVEN-width line.
+//              ⚠ So the ghost edge is NOT on whole device pixels, and this row says so
+//              rather than claiming it. The brief asked for whole device pixels here; a
+//              2 CSS px stroke is 2 device px at 1 and 1.5 (deviceStrokeWidth's parity
+//              rule), centred on a half-pixel, which cannot give them. See the packet.
+//        m.s.3 column C at full strength on every sampled row.
+//        m.s.4-6 the same three for the top edge (rows R-2, R-1, R).
+//
 // Every mouse event is a real `Input.dispatchMouseEvent` at an INTEGER client pixel,
 // and every expectation is derived back from that integer. No number crosses sessions.
 //
@@ -54,14 +74,14 @@
 //
 // Run:  VITE_AURORA_DEBUG=1 npm run build
 //       ELECTRON_BIN=<main checkout>/node_modules/.bin/electron AURORA_BUILT_TREE=<this tree> \
-//       AEON_DIR=<a copy of aeon> npm run harness:canvas-dpr-237  [PARTS=ac,am,bs] [STROKE_SCALES=1.5]
+//       AEON_DIR=<a copy of aeon> npm run harness:canvas-dpr-237  [PARTS=ac,am,bs,ms] [STROKE_SCALES=1.5]
 // Read the `root:` / `pinned:` lines first: if they name a tree other than the one you
 // built, the run measured somebody else's app and is void.
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { session, openProjectAndAct, sleep, ROOT, MAIN } from './canvas-cdp-harness.mjs';
 import { checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
 
-const PARTS = new Set((process.env.PARTS ?? 'ac,am,bs').split(',').map((s) => s.trim()));
+const PARTS = new Set((process.env.PARTS ?? 'ac,am,bs,ms').split(',').map((s) => s.trim()));
 const STROKE_SCALES = (process.env.STROKE_SCALES ?? '1.5').split(',').map((s) => Number(s.trim()));
 const SHOT_DIR = process.env.SHOT_DIR ?? `${ROOT}/scratchpad/shots-canvas-dpr-237`;
 const TAG = process.env.TAG ?? 'run';
@@ -69,9 +89,9 @@ mkdirSync(SHOT_DIR, { recursive: true });
 const J = (v) => JSON.stringify(v);
 
 let AEONDIR = null;
-if (PARTS.has('am')) {
+if (PARTS.has('am') || PARTS.has('ms')) {
   AEONDIR = checkoutOverride('aeon')?.value ?? null;
-  if (!AEONDIR || !existsSync(AEONDIR)) throw new Error('AEON_DIR must point at a COPY of an aeon tree (part am): UNMEASURABLE without it');
+  if (!AEONDIR || !existsSync(AEONDIR)) throw new Error('AEON_DIR must point at a COPY of an aeon tree (parts am, ms): UNMEASURABLE without it');
   if (AEONDIR === siblingDefaultPathOrUnresolved('aeon')) throw new Error('AEON_DIR names the live aeon tree: make a copy');
 }
 
@@ -364,11 +384,159 @@ async function partStrokes(scale) {
   }, { electronArgs: [`--force-device-scale-factor=${scale}`] });
 }
 
+/** SELECTION_MARQUEE, read from source so the full-strength test follows the constant. */
+async function marqueeColour() {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(`${ROOT}/src/renderer/canvas/canvas-colors.ts`, 'utf8');
+  const m = /export const SELECTION_MARQUEE = '#([0-9a-fA-F]{6})'/.exec(src);
+  if (!m) throw new Error('SELECTION_MARQUEE is not an opaque #rrggbb literal any more: the full-strength test cannot be derived, UNMEASURABLE');
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+async function key(c, k) {
+  const p = { key: k, code: `Key${k.toUpperCase()}`, windowsVirtualKeyCode: k.toUpperCase().charCodeAt(0) };
+  await c.send('Input.dispatchKeyEvent', { type: 'keyDown', ...p });
+  await c.send('Input.dispatchKeyEvent', { type: 'keyUp', ...p });
+  await sleep(400);
+}
+
+async function partMapStrokes(scale) {
+  const P = `m.s${scale}`;
+  const rgb = await marqueeColour();
+  // An opaque stroke over any pixel is the stroke colour itself (+-1 for the PNG round trip).
+  const full = (px) => px.every((v, i) => Math.abs(v - rgb[i]) <= 1);
+  await session(`${P}: aeon MapViewport stamp-ghost outline at --force-device-scale-factor=${scale}`, async (c) => {
+    console.log(`      provenance  app entry ${MAIN}; aeon COPY ${AEONDIR}`);
+    await c.evalExpr('localStorage.clear(); 1');
+    await c.evalExpr(`window.__dbg.aeon.open(${J(AEONDIR)})`).catch((e) => note(P, 'aeon open threw', e.message));
+    let st = null;
+    for (let i = 0; i < 50; i++) {
+      st = await c.json('window.__dbg.aeon.state()').catch(() => null);
+      if (st && st.open && st.sections > 0) break;
+      await sleep(400);
+    }
+    if (!st || !st.open) throw new Error(`aeon copy did not open: ${J(st)}: UNMEASURABLE`);
+    await c.evalExpr(`window.__dbg.activate(${J(st.zone)}, ${J(st.act)})`);
+    await sleep(2500);
+    const facetBtn = await c.json(String.raw`(() => {
+      const b = [...document.querySelectorAll('[aria-label="Facets"] button')].find((e) => e.textContent.trim() === 'Layout');
+      if (!b) return null; const r = b.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+    })()`);
+    if (!facetBtn) throw new Error('no Layout facet button: UNMEASURABLE');
+    await realClick(c, facetBtn);
+    await sleep(800);
+    // Focus the map (a real click on an empty corner would stamp, so a real move only),
+    // then the real `k` chord arms Stamp Chunk and mounts the chunk grid.
+    await mouseEv(c, 'mouseMoved', 4, 4);
+    await key(c, 'k');
+    await sleep(600);
+    // Pick a chunk with art by a REAL click in the chunk grid.
+    const CELLS = String.raw`[...document.querySelectorAll('button')].filter((b) => b.title && !/^tile /i.test(b.title) && !/blank/i.test(b.title)
+      && b.querySelector(':scope > canvas') && b.getBoundingClientRect().width > 0)`;
+    const nCells = await c.evalExpr(`${CELLS}.length`);
+    let chunk = null;
+    for (let n = 0; n < Math.min(nCells, 40) && !chunk; n++) {
+      const aim = await c.json(String.raw`(() => { const b = ${CELLS}[${n}]; if (!b) return null; b.scrollIntoView({ block: 'nearest' });
+        const r = b.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+      if (!aim) continue;
+      await sleep(150);
+      await realClick(c, aim);
+      const id = await c.json('window.__dbg.aeon.selectedChunk()');
+      const info = id ? await c.json(`window.__dbg.aeon.chunkInfo(${J(id)})`) : null;
+      if (info && info.nonzeroTiles > 0) chunk = { id, info, aim };
+    }
+    const st1 = await c.json('window.__dbg.aeon.state()');
+    // Camera: zoom 2, integer, the ghost's top-left 40 world px in from the canvas corner.
+    const Z = 2;
+    const g0 = await geom(c, 'map-preview-canvas');
+    if (!g0 || !chunk) throw new Error(`no ghost canvas (${J(g0)}) or no chunk with art picked in ${nCells} cells: UNMEASURABLE`);
+    const wT = chunk.info.widthTiles, hT = chunk.info.heightTiles;
+    const baseCol = wT * 4, baseRow = hT * 4;               // section 0, chunk-aligned, well inside it
+    const gx = baseCol * 8, gy = baseRow * 8;                // the ghost's world top-left
+    const camX = gx - 40, camY = gy - 40;
+    await c.evalExpr(`window.__dbg.setView(${camX}, ${camY}, ${Z})`);
+    await sleep(700);
+    const cam = await c.json('window.__dbg.view()');
+    const g = await geom(c, 'map-preview-canvas');
+    const devLeft = g.left * g.dpr, devTop = g.top * g.dpr;
+    const devAligned = Math.abs(devLeft - Math.round(devLeft)) < 1e-6 && Math.abs(devTop - Math.round(devTop)) < 1e-6;
+    // The unsnapped edge, in device px from the canvas origin, and the shared rule's column.
+    const cssEdgeX = (gx - cam.x) * cam.zoom, cssEdgeY = (gy - cam.y) * cam.zoom;
+    const C = Math.round(devLeft) + Math.round(cssEdgeX * g.dpr);
+    const Rw = Math.round(devTop) + Math.round(cssEdgeY * g.dpr);
+    const onBoundary = Number.isInteger(cssEdgeX * g.dpr) && Number.isInteger(cssEdgeY * g.dpr);
+    check(`${P}.0`, `PREMISE: dpr ${scale} took, the Layout facet and Stamp Chunk armed by real input, a chunk with art picked by a real click, camera set, the canvas on whole device px, the unsnapped ghost edges ON device boundaries`,
+      Math.abs(g.dpr - scale) < 1e-6 && st1.tool === 'stamp-chunk' && !!chunk
+        && cam.x === camX && cam.y === camY && cam.zoom === Z && devAligned && onBoundary,
+      `dpr ${g.dpr}; tool ${st1.tool}; chunk ${J(chunk)}; camera ${J(cam)}; canvas device origin ${devLeft},${devTop}; ghost world ${gx},${gy}; unsnapped edge device ${cssEdgeX * g.dpr},${cssEdgeY * g.dpr} from the origin; C ${C} R ${Rw}`);
+    // Hover inside the chunk's footprint, integer, derived back to its base.
+    const hx = Math.round(g.left + (gx + wT * 4 - cam.x) * cam.zoom), hy = Math.round(g.top + (gy + hT * 4 - cam.y) * cam.zoom);
+    const hw = { x: cam.x + (hx - g.left) / cam.zoom, y: cam.y + (hy - g.top) / cam.zoom };
+    const hoverBase = { col: Math.floor(Math.floor(hw.x / 8) / wT) * wT, row: Math.floor(Math.floor(hw.y / 8) / hT) * hT };
+    if (hoverBase.col !== baseCol || hoverBase.row !== baseRow) throw new Error(`the hover aim snaps to ${J(hoverBase)}, not ${baseCol},${baseRow}: UNMEASURABLE`);
+    const off = (await c.send('Page.captureScreenshot', { format: 'png' })).data;
+    await mouseEv(c, 'mouseMoved', hx, hy);
+    await sleep(700);
+    const on = (await c.send('Page.captureScreenshot', { format: 'png' })).data;
+    writeFileSync(`${SHOT_DIR}/${TAG}-map-scale${scale}-hover-off.png`, Buffer.from(off, 'base64'));
+    writeFileSync(`${SHOT_DIR}/${TAG}-map-scale${scale}-hover-on.png`, Buffer.from(on, 'base64'));
+    note(P, 'hover', `(${hx},${hy}) -> world ${J(hw)} base ${J(hoverBase)}; shots ${TAG}-map-scale${scale}-hover-{off,on}.png`);
+    const SPAN = Math.min(60, Math.round(Math.min(wT, hT) * 8 * cam.zoom * g.dpr) - 12);
+    const S0 = 6;
+    if (SPAN < 20) throw new Error(`the ghost is too small to sample (${SPAN} device px): UNMEASURABLE`);
+    const winV = { x: C - 3, y: Rw + S0, w: 7, h: SPAN };
+    const winH = { x: C + S0, y: Rw - 3, w: SPAN, h: 7 };
+    const read = async (b64, w) => c.evalExpr(`${SHOT_WINDOW}(${J(b64)}, ${w.x}, ${w.y}, ${w.w}, ${w.h})`);
+    const vOff = await read(off, winV), vOn = await read(on, winV);
+    const hOff = await read(off, winH), hOn = await read(on, winH);
+    const shotIsDevice = vOn.natW === Math.round(g.innerWidth * g.dpr) && vOn.natH === Math.round(g.innerHeight * g.dpr);
+    const same = (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+    const stats = (offW, onW, w, k, vertical) => {
+      let changed = 0, fullN = 0;
+      const n = vertical ? w.h : w.w;
+      for (let t = 0; t < n; t++) {
+        const i = vertical ? t * w.w + k : k * w.w + t;
+        if (!same(offW.px[i], onW.px[i])) changed++;
+        if (full(onW.px[i])) fullN++;
+      }
+      return { changed, full: fullN };
+    };
+    const cols = [0, 1, 2, 3, 4, 5, 6].map((k) => stats(vOff, vOn, winV, k, true));
+    const rws = [0, 1, 2, 3, 4, 5, 6].map((k) => stats(hOff, hOn, winH, k, false));
+    const fmt = (arr, base) => arr.map((q, k) => `${base}${k - 3 >= 0 ? '+' : ''}${k - 3}: changed ${q.changed}/${SPAN}, full ${q.full}/${SPAN}`).join('; ');
+    note(P, 'left edge, per device column', fmt(cols, 'C'));
+    note(P, 'top edge, per device row', fmt(rws, 'R'));
+    const hexs = (px) => px.map((q) => ((q[0] << 16) | (q[1] << 8) | q[2]).toString(16).padStart(6, '0')).join(' ');
+    const mid = Math.floor(winV.h / 2);
+    note(P, 'one device row across the left edge, C-3..C+3, hover off', hexs(vOff.px.slice(mid * 7, mid * 7 + 7)));
+    note(P, 'one device row across the left edge, C-3..C+3, hover on ', hexs(vOn.px.slice(mid * 7, mid * 7 + 7)));
+    check(`${P}.1`, 'left edge: device column C-2 is untouched by the hover on every sampled row',
+      shotIsDevice && cols[1].changed === 0 && cols[3].full === SPAN,
+      `C-2 changed on ${cols[1].changed}/${SPAN}; anti-vacuous: C full on ${cols[3].full}/${SPAN}; screenshot in device px: ${shotIsDevice} (${vOn.natW}x${vOn.natH})`);
+    check(`${P}.2`, 'left edge: device column C-1 is changed on every sampled row and never at full strength (the half-covered column of an even-width line: NOT whole device px, by the shared rule)',
+      shotIsDevice && cols[2].changed === SPAN && cols[2].full === 0,
+      `C-1 changed ${cols[2].changed}/${SPAN}, full ${cols[2].full}/${SPAN}`);
+    check(`${P}.3`, 'left edge: device column C is the stroke at full strength on every sampled row',
+      shotIsDevice && cols[3].full === SPAN, `C full on ${cols[3].full}/${SPAN}`);
+    check(`${P}.4`, 'top edge: device row R-2 is untouched by the hover on every sampled column',
+      shotIsDevice && rws[1].changed === 0 && rws[3].full === SPAN,
+      `R-2 changed on ${rws[1].changed}/${SPAN}; anti-vacuous: R full on ${rws[3].full}/${SPAN}`);
+    check(`${P}.5`, 'top edge: device row R-1 is changed on every sampled column and never at full strength (half-covered, by the shared rule)',
+      shotIsDevice && rws[2].changed === SPAN && rws[2].full === 0,
+      `R-1 changed ${rws[2].changed}/${SPAN}, full ${rws[2].full}/${SPAN}`);
+    check(`${P}.6`, 'top edge: device row R is the stroke at full strength on every sampled column',
+      shotIsDevice && rws[3].full === SPAN, `R full on ${rws[3].full}/${SPAN}`);
+    await mouseEv(c, 'mouseMoved', 4, 4);
+  }, { electronArgs: [`--force-device-scale-factor=${scale}`] });
+}
+
 let aborted = null;
 try {
   if (PARTS.has('ac')) await partClassic();
   if (PARTS.has('am')) await partAeon();
   if (PARTS.has('bs')) for (const s of STROKE_SCALES) await partStrokes(s);
+  if (PARTS.has('ms')) for (const s of STROKE_SCALES) await partMapStrokes(s);
 } catch (e) {
   aborted = e;
   console.log(`\nHARNESS ABORTED: ${e.stack ?? e.message}`);
