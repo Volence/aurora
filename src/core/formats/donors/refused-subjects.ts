@@ -17,8 +17,9 @@
 // index alone.
 //
 // A `shaft` subject (ROADMAP row 232) is placed at its `dst_rect` (row 233 (a),
-// ruled), looked up among the act's SHAFTS by the same (index, id) rule; one whose
-// rectangle is not on the pane is named "not on this pane". The `fill` subject
+// ruled), looked up among the act's SHAFTS by the same (index, id) rule. A subject
+// of ANY kind whose rectangle does not overlap the pane's world (`actWorldRect`)
+// is named "not on this pane" (row 236 (b); before it, only shafts). The `fill` subject
 // is never placed (`subjectRect` says why). A K9 pair of a clip and a shaft
 // outlines both.
 //
@@ -46,8 +47,10 @@ export function subjectRect(doc: ClipManifestDoc | null, s: ClipSubject): ClipRe
   //     outline shows WHERE the problem is, and a shaft has a place. It exists
   //     only while the refusal stands, so the pane still draws no standing
   //     shaft. Read from the raw manifest (`shaftEntries`); a shaft whose
-  //     rectangle is unreadable, or does not overlap the pane's world (aeon's K9
-  //     "runs past the act"), is named "not on this pane";
+  //     rectangle is unreadable is named "not on this pane";
+  //   * a clip, corridor or shaft whose rectangle does not overlap the pane's
+  //     world (aeon's R8 / K2 / K9 "runs past the act") is named "not on this
+  //     pane" (row 236 (b));
   //   * the fill is the act's background rectangle, around every clip, corridor
   //     and shaft (aeon's s2_woven fill is the whole act): an outline of it
   //     would frame the pane, not point at anything. Named, never outlined.
@@ -64,7 +67,9 @@ export function subjectRect(doc: ClipManifestDoc | null, s: ClipSubject): ClipRe
   }
   if (!hit?.dst) return null;
   if (s.id !== null && hit.id !== s.id) return null;
-  if (s.kind === 'shaft' && !overlaps(hit.dst, actWorldRect(doc))) return null;
+  // Row 236 (b): any kind whose rectangle misses the pane's world (aeon's R8 / K2 / K9
+  // "runs past the act") would be an outline nobody can see, so it is named instead.
+  if (!overlaps(hit.dst, actWorldRect(doc))) return null;
   return hit.dst;
 }
 

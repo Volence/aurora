@@ -10,8 +10,8 @@
 //     gives two outlines. A refused SHAFT is outlined at its dst_rect the same
 //     way (row 233 (a), ruled); the pane draws no standing shaft, so it shows
 //     one only while a refusal names it. A subject not on the pane (the fill, a
-//     shaft past the act) draws nothing here and is named "not on this pane"
-//     in the refusal text (refused-subjects.ts).
+//     clip, corridor or shaft wholly past the act) draws nothing here and is
+//     named "not on this pane" in the refusal text (refused-subjects.ts).
 //
 // Cleared with the refusal: a paste refusal by the next paste, an edit of the
 // draft or marquee, or leaving the page (donor-paste.ts `clearRefusal`); a
