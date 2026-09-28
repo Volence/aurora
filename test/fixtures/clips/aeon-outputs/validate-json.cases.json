@@ -42,6 +42,7 @@
             "y": 0
           },
           "id": "wfz_deck",
+          "music": "SONG_S2_WFZ",
           "src_rect": {
             "h": 1408,
             "w": 6144,
@@ -170,6 +171,7 @@
             "y": 4304
           },
           "id": "ooz_east",
+          "music": "SONG_S2_OOZ",
           "src_rect": {
             "h": 1840,
             "w": 3072,
@@ -509,6 +511,7 @@
             "y": 0
           },
           "id": "wfz_deck",
+          "music": "SONG_S2_WFZ",
           "src_rect": {
             "h": 1408,
             "w": 6144,
@@ -637,6 +640,7 @@
             "y": 4304
           },
           "id": "ooz_east",
+          "music": "SONG_S2_OOZ",
           "src_rect": {
             "h": 1840,
             "w": 3072,
@@ -977,6 +981,7 @@
             "y": 0
           },
           "id": "wfz_deck",
+          "music": "SONG_S2_WFZ",
           "src_rect": {
             "h": 1408,
             "w": 6144,
@@ -1105,6 +1110,7 @@
             "y": 4304
           },
           "id": "ooz_east",
+          "music": "SONG_S2_OOZ",
           "src_rect": {
             "h": 1840,
             "w": 3072,
@@ -1445,6 +1451,7 @@
             "y": 0
           },
           "id": "wfz_deck",
+          "music": "SONG_S2_WFZ",
           "src_rect": {
             "h": 1408,
             "w": 6144,
@@ -1573,6 +1580,7 @@
             "y": 4304
           },
           "id": "ooz_east",
+          "music": "SONG_S2_OOZ",
           "src_rect": {
             "h": 1840,
             "w": 3072,
