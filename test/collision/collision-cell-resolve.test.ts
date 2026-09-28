@@ -109,6 +109,8 @@ function mockCtx() {
   const ctx = {
     lineWidth: 0, font: '', textAlign: '' as CanvasTextAlign, fillStyle: '', strokeStyle: '',
     save() {}, restore() {}, translate() {}, scale() {}, beginPath() {}, fill() {},
+    // The diff outline is stroked under the canvas's CSS transform (row 240 (a)).
+    setTransform() {},
     moveTo() {}, lineTo() {},
     stroke() { calls.stroke++; },
     fillRect() { calls.fillRect++; },
