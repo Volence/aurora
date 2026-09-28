@@ -41,6 +41,7 @@
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../core/model/s4-types';
 import { solidOnBothPlanes } from '../../core/collision/both-planes-paint';
 import { BOTH_PLANES_FILL, BOTH_PLANES_EDGE } from './canvas-colors';
+import { cameraDeviceMapping } from './device-grid';
 import { drawTileLens, type TileLensDrawn } from './tile-lens';
 import type { LensViewport } from './priority-lens';
 
@@ -70,6 +71,9 @@ export function drawSectionBothPlanes(
   planeB: ArrayLike<number> | null,
   offsetX: number,
   offsetY: number,
+  /** The map canvas's device scale: the boundary strokes go on the device grid
+   *  (ROADMAP row 239 (d)). Required, never defaulted, for classic's reason. */
+  dpr: number,
 ): TileLensDrawn {
   if (!planeB) return { veils: 0, segments: 0 };
   const { x: vpX, y: vpY, width, height, zoom } = viewport;
@@ -93,6 +97,10 @@ export function drawSectionBothPlanes(
     },
     fill: BOTH_PLANES_FILL, edge: BOTH_PLANES_EDGE,
     invZoom: 1 / zoom,
+    // ON THE DEVICE GRID (ROADMAP row 239 (d)), under the mapping OverlayRenderer.render
+    // draws in, stated from this viewport rather than asked of the context.
+    dpr,
+    toDevice: cameraDeviceMapping(vpX, vpY, zoom, dpr),
   });
 }
 

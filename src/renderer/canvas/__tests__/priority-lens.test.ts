@@ -19,6 +19,8 @@ function recCtx() {
     set fillStyle(v: string) { styles.push(v); },
     set strokeStyle(v: string) { styles.push(v); },
     beginPath() {}, stroke() {}, moveTo() {}, lineTo() {},
+    // The edges stroke on the device grid since ROADMAP row 239 (d).
+    save() {}, restore() {}, setTransform() {},
     fillRect(x: number, y: number, w: number, h: number) { rects.push({ x, y, w, h }); },
   };
   return { ctx: ctx as unknown as CanvasRenderingContext2D, rects, styles };
@@ -43,7 +45,7 @@ describe('drawSectionPriority: the tile geometry', () => {
   it('veils a high tile at its WORLD position (section offset + tile * 8)', () => {
     const { ctx, rects } = recCtx();
     // Tile (10, 4) of a section whose world origin is (2048, 0).
-    const drawn = drawSectionPriority(ctx, vp(2048, 0, 320, 224), nametable([[10, 4]]), 2048, 0);
+    const drawn = drawSectionPriority(ctx, vp(2048, 0, 320, 224), nametable([[10, 4]]), 2048, 0, 1);
     expect(rects).toEqual([{ x: 2048 + 10 * LENS_TILE_PX, y: 4 * LENS_TILE_PX, w: 8, h: 8 }]);
     expect(drawn.veils).toBe(1);
   });
@@ -53,19 +55,19 @@ describe('drawSectionPriority: the tile geometry', () => {
     // that veiled "every non-empty tile" passes the row above and fails here.
     const nt = nametable([[10, 4]], true);
     const { ctx, rects } = recCtx();
-    drawSectionPriority(ctx, vp(0, 0, 320, 224), nt, 0, 0);
+    drawSectionPriority(ctx, vp(0, 0, 320, 224), nt, 0, 0, 1);
     expect(rects).toEqual([{ x: 80, y: 32, w: 8, h: 8 }]);
   });
 
   it('uses the SAME colours as classic\'s lens: one language, not two', () => {
     const { ctx, styles } = recCtx();
-    drawSectionPriority(ctx, vp(0, 0, 320, 224), nametable([[1, 1]]), 0, 0);
+    drawSectionPriority(ctx, vp(0, 0, 320, 224), nametable([[1, 1]]), 0, 0, 1);
     expect(styles).toEqual([PRIORITY_FILL, PRIORITY_EDGE]);
   });
 
   it('draws nothing for a section with no high tiles (anti-vacuous)', () => {
     const { ctx, rects } = recCtx();
-    const drawn = drawSectionPriority(ctx, vp(0, 0, 320, 224), nametable([], true), 0, 0);
+    const drawn = drawSectionPriority(ctx, vp(0, 0, 320, 224), nametable([], true), 0, 0, 1);
     expect(rects).toEqual([]);
     expect(drawn).toEqual({ veils: 0, segments: 0 });
   });
@@ -75,7 +77,7 @@ describe('drawSectionPriority: the viewport window', () => {
   it('SKIPS a section that is entirely off-screen', () => {
     const { ctx, rects } = recCtx();
     // Camera on section 0; the nametable belongs to a section at world x=2048.
-    const drawn = drawSectionPriority(ctx, vp(0, 0, 320, 224), nametable([[10, 4]]), 2048, 0);
+    const drawn = drawSectionPriority(ctx, vp(0, 0, 320, 224), nametable([[10, 4]]), 2048, 0, 1);
     expect(rects).toEqual([]);
     expect(drawn.veils).toBe(0);
   });
@@ -91,7 +93,7 @@ describe('drawSectionPriority: the viewport window', () => {
         return Reflect.get(t, k);
       },
     }) as unknown as Uint16Array;
-    drawSectionPriority(ctx, vp(0, 0, 320, 224), proxy, 0, 0);
+    drawSectionPriority(ctx, vp(0, 0, 320, 224), proxy, 0, 0, 1);
     // The window: ceil(320/8) = 40 cols (+1 when the edge is not tile-aligned),
     // ceil(224/8) = 28 rows. Two passes (veil + stroke) probe it, and the
     // stroke pass probes up to 5 tiles per marked tile — but NOTHING is marked
@@ -108,7 +110,7 @@ describe('drawSectionPriority: the viewport window', () => {
       get(t, k) { if (typeof k === 'string' && /^\d+$/.test(k)) probes++; return Reflect.get(t, k); },
     }) as unknown as Uint16Array;
     const { ctx } = recCtx();
-    drawSectionPriority(ctx, { x: 0, y: 0, width: 320, height: 224, zoom: 0.5 }, proxy, 0, 0);
+    drawSectionPriority(ctx, { x: 0, y: 0, width: 320, height: 224, zoom: 0.5 }, proxy, 0, 0, 1);
     const cols = Math.ceil(640 / 8), rows = Math.ceil(448 / 8);
     expect(probes).toBe(2 * cols * rows);
   });
@@ -120,7 +122,7 @@ describe('drawSectionPriority: the viewport window', () => {
     // interior would be 4, and this must be 3.
     const nt = nametable([[40, 4], [41, 4]]);
     const { ctx } = recCtx();
-    const drawn = drawSectionPriority(ctx, vp(0, 0, 328, 224), nt, 0, 0);
+    const drawn = drawSectionPriority(ctx, vp(0, 0, 328, 224), nt, 0, 0, 1);
     expect(drawn.veils).toBe(1);   // only tile 40 is inside the window
     expect(drawn.segments).toBe(3); // top, bottom, left — the right side continues
   });

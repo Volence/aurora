@@ -18,6 +18,7 @@ import { angleMark, drawAngleMark, markTier, MIN_CELL_PX_FOR_MARK, BAR_HALF, NOR
 import type { MarkDrawCtx } from '../../core/collision/collision-angle-mark';
 import { resolveCell, resolvePlaneWords, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
 import { publishCollisionMarkReport, ROW_CAP } from './collision-mark-report';
+import { cameraDeviceMapping, segmentsOnDeviceGrid, strokeCssRectOnDeviceGrid } from './device-grid';
 import type { CollisionMarkRow } from './collision-mark-report';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -86,6 +87,14 @@ export class OverlayRenderer {
     sections: SectionOverlayInfo[],
     options: OverlayOptions,
     viewport: { x: number; y: number; width: number; height: number; zoom: number },
+    /**
+     * The map canvas's device scale (MapViewport's `deviceScale()`, the same number its
+     * base `setTransform(dpr)` was built from). REQUIRED, for the reason classic's
+     * `drawCollision` gave at row 194: a default of 1 would be silently wrong on every
+     * other display. The angle marks, the object boxes and the two lenses' edges are
+     * stroked on the device grid with it (ROADMAP row 239 (d)).
+     */
+    dpr: number,
     objectSprites?: Map<string, ObjectPreview>,
     collisionProfiles?: CollisionProfileSet | null,
   ): LensPasses {
@@ -127,10 +136,10 @@ export class OverlayRenderer {
           ? resolvePlaneWords(info.section.collisionEditB, info.section.engineCollisionB, len)
           : null;
         if (options.showCollision && options.showCollisionPathB && b) {
-          this.drawCollisionOverlay(ctx, viewport, a, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles, b);
+          this.drawCollisionOverlay(ctx, viewport, a, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles, b, dpr);
         } else {
           const coll = (options.showCollisionPathB ? (b ?? a) : a);
-          this.drawCollisionOverlay(ctx, viewport, coll, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles, null);
+          this.drawCollisionOverlay(ctx, viewport, coll, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles, null, dpr);
         }
       }
       // THE PRIORITY LENS, over the art and UNDER the object/ring markers: it
@@ -138,7 +147,7 @@ export class OverlayRenderer {
       // legible on top of it. Windowed to the viewport inside
       // drawSectionPriority — see priority-lens.ts for the 3.1M-probe reason.
       if (options.showPriority) {
-        const drawn = drawSectionPriority(ctx, viewport, info.section.tileGrid.nametable, info.offsetX, info.offsetY);
+        const drawn = drawSectionPriority(ctx, viewport, info.section.tileGrid.nametable, info.offsetX, info.offsetY, dpr);
         lens.veils += drawn.veils;
         lens.segments += drawn.segments;
       }
@@ -158,7 +167,7 @@ export class OverlayRenderer {
           : null;
         if (options.showSolidBothPlanes) {
           if (hasB) bothLens.sectionsWithPlaneB++;
-          const drawn = drawSectionBothPlanes(ctx, viewport, a, b, info.offsetX, info.offsetY);
+          const drawn = drawSectionBothPlanes(ctx, viewport, a, b, info.offsetX, info.offsetY, dpr);
           bothLens.veils += drawn.veils;
           bothLens.segments += drawn.segments;
         }
@@ -167,7 +176,7 @@ export class OverlayRenderer {
         this.drawRings(ctx, info.section.rings, viewport, info.offsetX, info.offsetY);
       }
       if (options.showObjects) {
-        this.drawObjects(ctx, info.section.objects, viewport, info.offsetX, info.offsetY, objectSprites);
+        this.drawObjects(ctx, info.section.objects, viewport, info.offsetX, info.offsetY, dpr, objectSprites);
       }
     }
 
@@ -285,6 +294,7 @@ export class OverlayRenderer {
     profiles: CollisionProfileSet | null,
     showAngles: boolean,
     diffWith: Uint16Array | null,
+    dpr: number,
   ): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
     const vpW = width / zoom, vpH = height / zoom;
@@ -299,6 +309,15 @@ export class OverlayRenderer {
     const startRow = Math.max(0, Math.floor(localVpY / 16));
     const endCol = Math.min(cellsW, Math.ceil((localVpX + vpW) / 16));
     const endRow = Math.min(cellsH, Math.ceil((localVpY + vpH) / 16));
+    // THE ANGLE MARKS ARE STROKED ON THE DEVICE GRID (ROADMAP row 239 (d)), through the
+    // adapter classic's overlay hands the same shared `drawAngleMark` (row 238 (c)): an
+    // axis-aligned bar or stem has both edges on whole device pixels, and a slanted one
+    // (every slope) is drawn where it was, since the rule is about device rows and
+    // columns. Built once per call: the transform is the same for every cell. The
+    // mapping is stated from the camera (`cameraDeviceMapping`: this method runs under
+    // `render`'s `scale(zoom) / translate(-vp)` on MapViewport's `setTransform(dpr)`),
+    // never asked of the context, for the reason MapViewport's ghost gives (row 238 (a)).
+    const markPath = segmentsOnDeviceGrid(ctx, dpr, cameraDeviceMapping(vpX, vpY, zoom, dpr));
 
     for (let cr = startRow; cr < endRow; cr++) {
       for (let cc = startCol; cc < endCol; cc++) {
@@ -359,7 +378,7 @@ export class OverlayRenderer {
               if (mark) {
                 // The TIER comes back from the draw, not from a second copy of
                 // markTier here — the publish must report what was painted.
-                const tier = drawAngleMark(ctx as unknown as MarkDrawCtx, cx, cy, 16, mark, {
+                const tier = drawAngleMark(markPath as unknown as MarkDrawCtx, cx, cy, 16, mark, {
                   color: COLLISION_ANGLE_TICK,
                   casing: COLLISION_ANGLE_CASING,
                   coreWidth: 1.25 / zoom,
@@ -404,6 +423,7 @@ export class OverlayRenderer {
     viewport: { x: number; y: number; width: number; height: number; zoom: number },
     offsetX: number,
     offsetY: number,
+    dpr: number,
     objectSprites?: Map<string, ObjectPreview>,
   ): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
@@ -440,8 +460,19 @@ export class OverlayRenderer {
       ctx.fillStyle = OBJECT_BOX_FILL;
       ctx.fillRect(wx - half, wy - half, OBJECT_BOX_SIZE, OBJECT_BOX_SIZE);
       ctx.strokeStyle = OBJECT_BOX_STROKE;
-      ctx.lineWidth = OBJECT_BOX_STROKE_WIDTH;
-      ctx.strokeRect(wx - half, wy - half, OBJECT_BOX_SIZE, OBJECT_BOX_SIZE);
+      // ON THE DEVICE GRID (ROADMAP row 239 (d)), centred on the box's edge as it always
+      // was, at the WORLD width it always had (`OBJECT_BOX_STROKE_WIDTH` world px, so
+      // `* zoom` CSS px): both edges of every side on whole device pixels.
+      //
+      // ⚠ NEVER LESS THAN HALF A CSS PX. Below zoom 0.5 that width is under half a CSS
+      // px, and the parity rule (`deviceStrokeWidth`) reads anything that rounds to 0 as
+      // EVEN, whose smallest width is 2 device px: the faintest border would become the
+      // heaviest. Half a CSS px rounds to 1, an ODD width, so the border stays the
+      // smallest whole stroke the display has (1 device px up to dpr 2.x).
+      // The rect is mapped to CSS px from the camera, as the marks' mapping is.
+      strokeCssRectOnDeviceGrid(ctx as CanvasRenderingContext2D,
+        (wx - half - vpX) * zoom, (wy - half - vpY) * zoom, OBJECT_BOX_SIZE * zoom, OBJECT_BOX_SIZE * zoom,
+        Math.max(OBJECT_BOX_STROKE_WIDTH * zoom, 0.5), dpr);
 
       // The label is sized in SCREEN pixels — `8 * invZoom` world px — which is
       // the convention `classic-overlays.drawObjects` has always used. Under the

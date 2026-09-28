@@ -1497,7 +1497,7 @@ export default function MapViewport() {
         sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
       }
 
-      const lens = overlayRenderer.render(ctx, sectionInfos, overlayOpts, viewport, state.objectSprites, state.collisionProfiles);
+      const lens = overlayRenderer.render(ctx, sectionInfos, overlayOpts, viewport, dpr, state.objectSprites, state.collisionProfiles);
       // THE PRIORITY LENS REPORT — published from the draw body, like the
       // guides' and the frame's, so `active` and `veils` describe what HAPPENED
       // rather than what would happen. `reason: 'off'` with the toggle off is a
