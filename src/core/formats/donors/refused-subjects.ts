@@ -31,7 +31,13 @@ export function ruleTag(rule: string | null): string {
 /** The subject's rectangle in `doc`, or null when it is not on the pane. */
 export function subjectRect(doc: ClipManifestDoc | null, s: ClipSubject): ClipRect | null {
   if (!doc) return null;
-  const hit = s.kind === 'clip' ? doc.clips[s.index] : doc.corridors[s.index];
+  // Only the two kinds the pane draws are placed. aeon also names `shaft` (K9)
+  // and `fill` (K8) subjects, which the reader does not pass yet (ROADMAP row
+  // 232) and the pane does not draw; read as a string so such a subject, if it
+  // ever arrives, is named "not on this pane" and never looked up in another
+  // kind's list.
+  const kind: string = s.kind;
+  const hit = kind === 'clip' ? doc.clips[s.index] : kind === 'corridor' ? doc.corridors[s.index] : undefined;
   if (!hit) return null;
   if (s.id !== null && hit.id !== s.id) return null;
   return hit.dst;

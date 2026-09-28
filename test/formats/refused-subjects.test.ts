@@ -72,6 +72,19 @@ describe('a refusal\'s subjects, placed on the pane\'s manifest', () => {
     expect({ placed: got.placed.length, offPane: got.offPane.length }).toEqual({ placed: 0, offPane: 1 });
   });
 
+  it('a subject of a kind the pane does not draw (aeon\'s shaft, K9) is OFF the pane, never placed on a corridor at that index', () => {
+    // aeon's real R10 clip+corridor answer with the corridor subject's kind read as aeon's
+    // `shaft` (which the reader does not pass yet, ROADMAP row 232): same index, so a lookup
+    // in the wrong list would land on s2_ehz_cpz's corridor 0.
+    const r = refusalsOf('validate', VALIDATE.refuse_r10_clip_corridor).map((n) => ({
+      ...n, subjects: n.subjects.map((s) => (s.kind === 'corridor' ? { ...s, kind: 'shaft' as unknown as 'corridor' } : s)),
+    }));
+    const doc = parseClipManifest(vendored('s2_ehz_cpz'));
+    const shaft = r[0].subjects.find((s) => (s.kind as string) === 'shaft')!;
+    expect(doc.corridors[shaft.index]).toBeDefined();
+    expect(resolveRefusedSubjects(r, doc).offPane.map((o) => o.subject)).toEqual([shaft]);
+  });
+
   it('an act-level refusal (C3, no subjects) places nothing and names nothing off the pane', () => {
     const r = refusalsOf('bake', BAKE.refuse_c3_act_level);
     expect(r[0].subjects).toEqual([]);
