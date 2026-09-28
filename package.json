@@ -183,6 +183,7 @@
     "harness:live-palette-e2e": "node scratchpad/live-palette-e2e-harness.mjs",
     "harness:mapviewport-baseline": "node scratchpad/mapviewport-baseline-harness.mjs",
     "harness:classic-canvas-dpr": "node scratchpad/classic-canvas-dpr-harness.mjs",
+    "harness:canvas-dpr-237": "node scratchpad/canvas-dpr-237-harness.mjs",
     "harness:classic-wheel-passive": "node scratchpad/classic-wheel-passive-harness.mjs",
     "harness:map-wheel-passive": "node scratchpad/map-wheel-passive-harness.mjs",
     "harness:map-behaviour-fixes": "node scratchpad/map-behaviour-fixes-harness.mjs",
