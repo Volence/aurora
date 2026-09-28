@@ -10,7 +10,14 @@
     "materialised_by": "git -C <aeon> archive -o <tar> b85e60d2352242161607ea2cd25c2d9e799e86a7, extracted into $HOME/.cache/aurora-revendor-aeon/tree (outside /tmp and outside any peer's live tree; the copy has no .git); EMPYREAN_SUITE_ROOT=<suite> python3 tools/s2_zone_convert.py convert --all-six there (exit 0, 6 zones, 2219040 cells round-tripped, 0 differing, 0 FAILED). fixture.command was run from that copy with EMPYREAN_SUITE_ROOT exported as well.",
     "tool_path": "tools/clip_act_bake.py",
     "tool_blob": "958958b55f90ea710e8dd61c3d967e3c8ca0a276",
-    "inputs_are": "the documents fixture.command names (the clips.json it bakes; the currency row requires every one of them here) and tools/clip_manifest.py, which clip_act_bake.py imports and whose change alone moved zone_table[2].synthesised in the s2_ehz_cpz output (measured at row 218). NOT pinned: the bake's other imports (collision_pipeline, fg_page_order, ojz_strip_gen, tile_dedupe and theirs) and the donor conversion; a change there moves the output with this row green.",
+    "inputs_are": "Every aeon-COMMITTED file the recorded run reads, pinned by blob at `revision` (ROADMAP row 219, measured, not typed): (1) the clip manifests the recorded run names (derived by the completeness row from fixture.command and the generator's `plan`); (2) every aeon module the run LOADED, i.e. the import closure of tool_path as executed; (3) the donor conversion (tools/s2_zone_convert.py, named in materialised_by) and every module it loaded, because the donor trees the tools read (games/sonic4/data/donors/, gitignored in aeon) are that conversion's output, not committed files; (4) the data files those modules opened (engine/system/constants.emp, project.json, and whichever of art/palettes/SonicAndTails.bin, games/sonic4/player/knuckles.emp and games/sonic4/data/collision/base_s2/*.bin this run opens). HOW MEASURED: the recorded command and the conversion were re-run in the materialised copy at e47493aa with a sys.addaudithook `open` hook in every Python process (sitecustomize on PYTHONPATH), and every opened path inside the copy was kept bar the donor trees and the scratch outputs; every file kept has the same blob at b85e60d2, e47493aa and origin/master 28880431. The completeness row re-derives the static import closure of tool_path and the conversion tool at `revision` (git objects) and requires every module in it to be pinned here or listed in closure_not_loaded. NOT PINNED, stated: (a) closure_not_loaded, modules the tools import only inside functions this run never called (measured by the same trace); (b) the donor SOURCES, outside aeon: the conversion reads the suite's s2disasm (art, collision, level, mappings, s2.asm, s2.constants.asm) and s2-simonwai-disasm (HPZ), and the bake reads s2disasm level/objects/*_1.bin and s2.asm directly; those are other repositories' working trees, read by path, which the currency row (aeon origin/master) cannot see; observed at capture clean at s2disasm HEAD e45ebf332f39987424ca3102e50c717628f71269 and s2-simonwai-disasm HEAD 0113ca4775115689edc87d4115ed9cb51f220e02; (c) anything opened below Python (a C extension's fopen), which the audit hook cannot see; the modules traced read their files through Python's open (checked: no np.fromfile/memmap in them).",
+    "closure_not_loaded": [
+      "tools/gen_collision_data.py",
+      "tools/ojz_block_gen.py",
+      "tools/ojz_entity_gen.py",
+      "tools/s4lz.py"
+    ],
+    "closure_not_loaded_is": "modules in the static import closure of tool_path and the conversion tool at `revision` that the recorded run and the conversion never loaded (they are imported inside functions the run did not call: the audit trace above). Not pinned: a change there cannot move this output unless a pinned file starts calling it, and that change moves a pinned blob.",
     "inputs": [
       {
         "path": "games/sonic4/data/clips/s2_ehz_cpz/clips.json",
@@ -19,6 +26,86 @@
       {
         "path": "tools/clip_manifest.py",
         "blob": "d1cd32ad93613814bc76a1feca41368e2bbdccd2"
+      },
+      {
+        "path": "art/palettes/SonicAndTails.bin",
+        "blob": "188e07ba51f628ab374fb615fbdc3bad4809cc6d"
+      },
+      {
+        "path": "engine/system/constants.emp",
+        "blob": "b86134bf03624f804991c73ba7488dd76cbff368"
+      },
+      {
+        "path": "games/sonic4/data/collision/base_s2/angles.bin",
+        "blob": "19f2ef62f17ba89387f9b219189bd242c9d63f4a"
+      },
+      {
+        "path": "games/sonic4/data/collision/base_s2/heightmaps.bin",
+        "blob": "2e99ce143ef2e36780efc80e914db8a9d2cd68de"
+      },
+      {
+        "path": "project.json",
+        "blob": "02c8ac91338dbaeffd6669645f4ee580541e2135"
+      },
+      {
+        "path": "tools/act_grid.py",
+        "blob": "afadb9f05ef88f3f570a0a22eb66463629df9b3f"
+      },
+      {
+        "path": "tools/collision_pipeline.py",
+        "blob": "dbbe59de49fb4535df468f42b58228d4ff10f606"
+      },
+      {
+        "path": "tools/donor_provenance.py",
+        "blob": "fd0e44090da9b9edbebc9e8cfb5f3464cab5bfdb"
+      },
+      {
+        "path": "tools/fg_page_order.py",
+        "blob": "68e303fc9567e91270301e0c6d9266fc4868b4ad"
+      },
+      {
+        "path": "tools/fg_working_set.py",
+        "blob": "a46845039d061d1f4448707bebed3be42f05a352"
+      },
+      {
+        "path": "tools/import_s2_collision.py",
+        "blob": "703b5d9f827edb17b7abf5dd47166ab05b5e21a1"
+      },
+      {
+        "path": "tools/layer_lines.py",
+        "blob": "0fb833d1f3f85bad3de58a8c47581f49e423382f"
+      },
+      {
+        "path": "tools/ojz_common.py",
+        "blob": "26836a613d6af0e73dc25c31724d83f7839fa3c6"
+      },
+      {
+        "path": "tools/ojz_strip_gen.py",
+        "blob": "37788812c670c1c0142e898e7ebf09cecc593b86"
+      },
+      {
+        "path": "tools/s2_donor.py",
+        "blob": "2e3b0603e2551af4e124eb58a37c86af11ff6f28"
+      },
+      {
+        "path": "tools/s2_layer_lines.py",
+        "blob": "dd4005d29d50aecf7d3965e9d9959de7b555afaa"
+      },
+      {
+        "path": "tools/s2_zone_convert.py",
+        "blob": "94a6580feaca67192e01131c11639e3c4491eaf3"
+      },
+      {
+        "path": "tools/suite_paths.py",
+        "blob": "176ca5c7387d6aae8af6a25593264c5895ddb403"
+      },
+      {
+        "path": "tools/tile_dedupe.py",
+        "blob": "0fe738a3fa93d218ec79d085a8e0e2d2ecf5c821"
+      },
+      {
+        "path": "tools/vram_map.py",
+        "blob": "ec01292e055bc42a0103d357995331b04f45833d"
       }
     ],
     "what_changed_at_this_pin": "Re-captured at b85e60d2: ONLY wall-clock `placement.seconds` differs from the cffdf716 capture (0.05 -> 0.046). Pool, per-clip and per-corridor rows, corridors, zone_separation and collision unchanged; no corridor carries path_lines, so Corridor.as_json writes nothing new here."

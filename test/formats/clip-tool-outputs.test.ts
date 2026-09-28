@@ -38,7 +38,10 @@ const clipact = (name: string) => JSON.parse(readFileSync(resolve(DIR, `${name}.
 };
 const CASES = JSON.parse(readFileSync(resolve(DIR, 'validate-json.cases.json'), 'utf8')) as Record<string, { exit: number; stdout: string; stderr: string }>;
 interface Marker {
-  aeon: { revision: string; tool_path: string; tool_blob: string; re_measure: string; inputs?: { path: string; blob: string }[] };
+  aeon: {
+    revision: string; tool_path: string; tool_blob: string; re_measure: string; materialised_by: string;
+    inputs?: { path: string; blob: string }[]; closure_not_loaded?: string[];
+  };
   fixture: { path: string; sha256: string; command: string };
   generator?: { path: string };
 }
@@ -532,6 +535,73 @@ describe('CURRENCY: the INPUTS those tools read, at aeon origin/master', () => {
       const pinned = (m.aeon.inputs ?? []).map((i) => i.path);
       expect(named.filter((p) => !pinned.includes(p)), `${m.fixture.path}: read by the recorded run but NOT pinned`).toEqual([]);
       for (const i of m.aeon.inputs ?? []) expect(i.blob, `${i.path}`).toMatch(/^[0-9a-f]{40}$/);
+    });
+
+    // ROADMAP row 219 (c): the manifests are not all an output reads. The tool imports
+    // aeon modules, and the donor trees it reads are the donor conversion's output
+    // (gitignored in aeon), so that conversion and ITS modules are inputs too. The
+    // closure is derived HERE from aeon's own sources at the marker's revision (git
+    // objects), from tool_path and from the conversion tool the marker's
+    // materialised_by names; every module in it is pinned, or listed as measured
+    // not-loaded. Each pinned blob is also held to the marker's OWN revision, so a
+    // blob cannot have been typed or taken from some other tree.
+    it(`${m.fixture.path}: every aeon module the tool and the donor conversion import is pinned (or measured not loaded), each at the marker's revision`, (ctx) => {
+      const conv = /python3 (tools\/[a-z0-9_]+\.py) convert --all-six/.exec(m.aeon.materialised_by);
+      expect(conv, `${m.fixture.path}: materialised_by names no donor conversion`).not.toBeNull();
+      const aeon = peerRepo('aeon');
+      if (aeon === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR); CANNOT MEASURE ${m.fixture.path}'s import closure`);
+        return;
+      }
+      const rev = resolveRev(aeon, m.aeon.revision);
+      if (rev === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: ${m.aeon.revision} does not resolve in ${aeon} (unfetched?); CANNOT MEASURE ${m.fixture.path}'s import closure`);
+        return;
+      }
+      const closure = new Set<string>();
+      /** Modules some module imports at COLUMN 0: loaded whenever that module is, so never "not loaded" beside a pinned importer. */
+      const topLevel = new Map<string, Set<string>>();
+      const todo = [m.aeon.tool_path, conv![1]];
+      while (todo.length > 0) {
+        const p = todo.pop()!;
+        if (closure.has(p)) continue;
+        const at = readAtRev(aeon, rev, p);
+        expect(at.ok, at.ok ? '' : at.why).toBe(true);
+        if (!at.ok) return;
+        closure.add(p);
+        const names = new Set<string>();
+        for (const x of at.text.matchAll(/^[ \t]*import[ \t]+([^\n#]+)/gm)) {
+          for (const part of x[1].split(',')) { const t = part.trim().split(/\s+/)[0]; if (t) names.add(t.split('.')[0]); }
+        }
+        for (const x of at.text.matchAll(/^[ \t]*from[ \t]+([A-Za-z_]\w*)[ \t]+import\b/gm)) names.add(x[1]);
+        const top = new Set<string>();
+        for (const x of at.text.matchAll(/^import[ \t]+([^\n#]+)/gm)) {
+          for (const part of x[1].split(',')) { const t = part.trim().split(/\s+/)[0]; if (t) top.add(`tools/${t.split('.')[0]}.py`); }
+        }
+        for (const x of at.text.matchAll(/^from[ \t]+([A-Za-z_]\w*)[ \t]+import\b/gm)) top.add(`tools/${x[1]}.py`);
+        topLevel.set(p, top);
+        // A name is an aeon module when tools/<name>.py exists at the revision; stdlib and numpy are not there.
+        for (const n of names) if (!closure.has(`tools/${n}.py`) && readAtRev(aeon, rev, `tools/${n}.py`).ok) todo.push(`tools/${n}.py`);
+      }
+      // Anti-vacuous: the conversion and the tool each pull in aeon modules of their own.
+      expect(closure.size, `${m.fixture.path}: closure found no module beyond its two roots`).toBeGreaterThan(2);
+      const pinned = new Set([m.aeon.tool_path, ...(m.aeon.inputs ?? []).map((i) => i.path)]);
+      const notLoaded = m.aeon.closure_not_loaded ?? [];
+      expect(notLoaded.filter((p) => pinned.has(p)), `${m.fixture.path}: listed as not loaded AND pinned`).toEqual([]);
+      expect([...closure].filter((p) => !pinned.has(p) && !notLoaded.includes(p)).sort(),
+        `${m.fixture.path}: imported by the tool or the donor conversion at ${m.aeon.revision}, but neither pinned in aeon.inputs nor measured not loaded`).toEqual([]);
+      // "Not loaded" is the trace's word and this row cannot re-trace; what it CAN refute is a
+      // module listed not-loaded that a pinned (so loaded) module imports at column 0.
+      const contradicted: string[] = [];
+      for (const [p, top] of topLevel) if (pinned.has(p)) for (const q of top) if (notLoaded.includes(q)) contradicted.push(`${q} (imported at top level by ${p})`);
+      expect(contradicted, `${m.fixture.path}: listed as not loaded, but a loaded module imports it unconditionally`).toEqual([]);
+      const wrong: string[] = [];
+      for (const i of m.aeon.inputs ?? []) {
+        const at = readAtRev(aeon, rev, i.path);
+        if (!at.ok) wrong.push(`${i.path}: ${at.why}`);
+        else if (at.blob !== i.blob) wrong.push(`${i.path}: pinned ${i.blob}, but at the marker's own revision ${rev} it is ${at.blob}`);
+      }
+      expect(wrong, `${m.fixture.path}: a pinned blob is not the file at the revision the marker names`).toEqual([]);
     });
 
     it(`${m.fixture.path}: each pinned input at aeon origin/master is the blob it was captured from`, (ctx) => {
