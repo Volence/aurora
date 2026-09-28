@@ -74,6 +74,11 @@ export interface LoadedS4Config {
    * retarget zone tileset paths and write the file back without losing
    * fields the editor doesn't model. Note: `zones` above shares the same
    * objects as `raw.zones`, so mutations through either are visible to both.
+   *
+   * It says what project.json ON DISK says. The save plan retargets a COPY and
+   * the glue swaps it in (both fields, keeping the aliasing) only once
+   * project.json has reached disk: `adoptPlannedConfig` in
+   * core/project/aeon/save.ts, ROADMAP row 241.
    */
   raw: S4ProjectConfig;
   // A `rawTrailingNewline` flag used to live here, carrying the source file's

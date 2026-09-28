@@ -12,7 +12,9 @@
 // edits were gone. Multi-act is a designed configuration, so the loop is the
 // fix rather than a note to remember later.
 
-import { buildAeonSavePlan, sharedWritesNote, type AeonSaveRemoval } from '../../core/project/aeon/save';
+import {
+  adoptPlannedConfig, buildAeonSavePlan, PROJECT_JSON_PATH, sharedWritesNote, type AeonSaveRemoval,
+} from '../../core/project/aeon/save';
 import { planFileNeedsWrite } from '../../core/project/aeon/save-skip';
 import { noteEffectsScenesPersisted } from '../../core/formats/effects/scene';
 import { noteEffectsPresetsPersisted } from '../../core/formats/effects/preset';
@@ -109,12 +111,25 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
           config.basePath, plan.files.map((f) => f.path),
         ) ?? [];
       } catch { existing = []; }
+      // THE SESSION'S CONFIG MOVES WITH PROJECT.JSON ON DISK, NOT WITH THE PLAN
+      // (ROADMAP row 241). The plan retargets a copy; it becomes the session's
+      // `config.raw` here, the moment project.json is on disk — written below,
+      // or skipped because the file already says it. A plan that throws, or a
+      // write refused before project.json, leaves the session copy saying what
+      // the file says, so the next save plans the retarget again instead of
+      // finding it "already current" and writing the tileset to a path
+      // project.json does not name. Adopted per act, so a later act's plan in
+      // this same save compares against what the earlier act wrote.
       for (let i = 0; i < plan.files.length; i++) {
         const f = plan.files[i];
         const old = existing[i]?.bytes ?? null;
-        if (!planFileNeedsWrite(f.compare, old, f.bytes)) continue;
+        if (!planFileNeedsWrite(f.compare, old, f.bytes)) {
+          if (f.path === PROJECT_JSON_PATH) adoptPlannedConfig(config, plan);
+          continue;
+        }
         await window.api.writeBinaryFile(config.basePath, f.path,
           f.bytes.buffer.slice(f.bytes.byteOffset, f.bytes.byteOffset + f.bytes.byteLength) as ArrayBuffer);
+        if (f.path === PROJECT_JSON_PATH) adoptPlannedConfig(config, plan);
         inProgressFiles++;
         const shared = plan.shared.find((s) => s.path === f.path);
         if (shared) sharedWritten.set(shared.path, shared.what);
