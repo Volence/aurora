@@ -96,6 +96,16 @@ export function resolveRefusedSubjects(refusals: readonly ClipNote[], doc: ClipM
   return out;
 }
 
+/**
+ * What a refusal's outline names itself by on the pane's hover: its rule tag and
+ * its subject label, "K9: shaft 0 wfz_to_ehz" (row 236 (a), ruled by the overseer
+ * 2026-09-28 under the owner's 2026-09-18 permission, for every kind). `rule` is a
+ * rule tag already (`ruleTag`), as `RefusedRect.rule` carries it.
+ */
+export function refusalHoverName(rule: string, s: ClipSubject): string {
+  return `${rule}: ${subjectLabel(s)}`;
+}
+
 /** The words a refusal on this pane marks a subject it could not place with. */
 export const NOT_ON_THIS_PANE = 'not on this pane';
 

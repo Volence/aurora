@@ -37,6 +37,12 @@ export interface PaneOutline {
   tone?: 'accent' | 'warning' | 'faint';
   dashed?: boolean;
   tag?: string;
+  /**
+   * What the pane's hover names this outline by, when it is not `label`: a
+   * refused-subject outline's "<rule tag>: <subject label>" (row 236 (a)).
+   * Never drawn on the canvas; the on-canvas words are `label` and `tag`.
+   */
+  hover?: string;
 }
 
 /** The dash of a refused-subject outline, in screen pixels. */
