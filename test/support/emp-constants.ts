@@ -104,6 +104,16 @@ export class ConstantSource {
     return this.raw.has(name);
   }
 
+  /** Every name `get` has resolved so far: the asked-for names and all they depend on. */
+  resolved(): string[] {
+    return [...this.values.keys()];
+  }
+
+  /** Every name defined, with the file that won it (first definition). */
+  definitions(): { name: string; file: string }[] {
+    return [...this.raw].map(([name, d]) => ({ name, file: d.file }));
+  }
+
   /** `get`: resolve a name, loudly (never a default). */
   get(name: string): bigint {
     const done = this.values.get(name);
@@ -231,6 +241,19 @@ export function layerLinesConstant(text: string, file: string, name: string): bi
   if (!m) throw new EmpParseError(`L5 ${file} no longer defines ${name}`);
   const v = m[1];
   return v.startsWith('$') ? BigInt(`0x${v.slice(1)}`) : BigInt(v);
+}
+
+/**
+ * The index of the line that FIRST defines `name` under ConstantSource's own match (the
+ * definition that wins), or -1. For planting an edit on exactly that line.
+ */
+export function definingLine(text: string, name: string): number {
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const m = CONST_RE.exec(lines[i].split('//')[0].trim());
+    if (m && m[1] === name) return i;
+  }
+  return -1;
 }
 
 // ---------------------------------------------------------------------------

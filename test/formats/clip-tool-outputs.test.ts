@@ -30,7 +30,7 @@ import {
   BAKE_JSON_SCHEMA, FILL_SUBJECT_LABEL, readBakeJson, readValidateJson, subjectsLabel, VALIDATE_JSON_SCHEMA,
 } from '../../src/core/formats/donors/clip-validate-json';
 import { peerRepo, resolveRev, readAtRev } from '../support/peer-repo';
-import { ConstantSource, EMP_PARSES, EmpParseError, PARSER_SOURCE_LINES, readerValues, type EmpReader } from '../support/emp-constants';
+import { ConstantSource, definingLine, EMP_PARSES, EmpParseError, PARSER_SOURCE_LINES, readerValues, type EmpReader } from '../support/emp-constants';
 
 const DIR = resolve(__dirname, '../fixtures/clips/aeon-outputs');
 const clipact = (name: string) => JSON.parse(readFileSync(resolve(DIR, `${name}.clipact.json`), 'utf8')) as {
@@ -721,6 +721,90 @@ describe('CURRENCY: the INPUTS those tools read, at aeon origin/master', () => {
           expect(Object.keys(r.values).length, `${b.path}: an empty ${r.parse} reader`).toBeGreaterThan(0);
           expect(readerValues(r, text), `${b.path}: a pinned value is not ${r.parse}'s answer at the marker's own revision ${rev}`).toEqual(r.values);
         }
+      }
+    });
+
+    // ROADMAP row 234's whole point, as a census rather than one plant: over constants.emp
+    // at the marker's revision, an edit to ANY constant no reader resolves leaves every
+    // pinned value where it was (the file's blob moves, the pin does not), and an edit to
+    // any pinned constant's winning line, or an earlier definition of it, moves it.
+    it(`${m.fixture.path}: GREEN on every unread constant's edit, RED on every pinned constant's edit or shadowing (census at the marker's revision)`, (ctx) => {
+      const byValue = m.aeon.inputs_by_value ?? [];
+      expect(byValue.length, `${m.fixture.path}: no aeon.inputs_by_value`).toBeGreaterThan(0);
+      const aeon = peerRepo('aeon');
+      if (aeon === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR); CANNOT MEASURE ${m.fixture.path}'s value-pin census`);
+        return;
+      }
+      const rev = resolveRev(aeon, m.aeon.revision);
+      if (rev === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: ${m.aeon.revision} does not resolve in ${aeon} (unfetched?); CANNOT MEASURE ${m.fixture.path}'s value-pin census`);
+        return;
+      }
+      const cache = new Map<string, string>();
+      const atRev = (p: string) => {
+        if (!cache.has(p)) {
+          const at = readAtRev(aeon, rev, p);
+          if (!at.ok) throw new Error(`${m.fixture.path}: ${at.why}`);
+          cache.set(p, at.text);
+        }
+        return cache.get(p)!;
+      };
+      for (const b of byValue) {
+        const base = atRev(b.path);
+        const withText = (t: string) => (p: string) => (p === b.path ? t : atRev(p));
+        const all = () => b.readers.map((r) => readerValues(r, withText(current)));
+        let current = base;
+        const lines = base.split('\n');
+        const edit = (i: number, line: string) => [...lines.slice(0, i), line, ...lines.slice(i + 1)].join('\n');
+        // What the readers resolve: the pinned names and everything their expressions reach.
+        const closure = new Set<string>();
+        for (const r of b.readers) {
+          if (r.parse === 'ConstantSource') {
+            const s = new ConstantSource();
+            for (const p of r.loads) s.loadText(atRev(p), p);
+            for (const n of Object.keys(r.values)) s.get(n);
+            for (const n of s.resolved()) closure.add(n);
+          } else for (const n of Object.keys(r.values)) closure.add(n);
+        }
+        const defs = new ConstantSource();
+        defs.loadText(base, b.path);
+        const unread = defs.definitions().map((d) => d.name).filter((n) => !closure.has(n));
+        // Anti-vacuous: the file defines far more than the tools read.
+        expect(unread.length, `${b.path}: no constant outside the readers' closure to edit`).toBeGreaterThan(0);
+        const moved: string[] = [];
+        for (const n of unread) {
+          const i = definingLine(base, n);
+          const expr = /=\s*(.+?)\s*$/.exec(lines[i].split('//')[0])![1];
+          current = edit(i, `pub const ${n} = (${expr}) + 1`);
+          expect(current, `${n}: the edit changed nothing`).not.toBe(base);
+          const got = all();
+          b.readers.forEach((r, k) => { for (const [name, v] of Object.entries(r.values)) if (got[k][name] !== v) moved.push(`editing unread ${n} moved ${name}: ${v} -> ${got[k][name]}`); });
+        }
+        expect(moved, `${b.path}: an edit to a constant no reader resolves moved a pinned value (the pin would red on an unrelated edit)`).toEqual([]);
+        const still: string[] = [];
+        let planted = 0;
+        b.readers.forEach((r, k) => {
+          for (const [name, v] of Object.entries(r.values)) {
+            // (1) its winning line, by the parse's own notion of "winning line".
+            const i = r.parse === 'ConstantSource' ? definingLine(base, name)
+              : lines.findIndex((l) => new RegExp(`^pub const ${name}\\s*=\\s*(\\$[0-9A-Fa-f]+|\\d+)\\b`).test(l));
+            const plants: [string, string][] = [];
+            if (i >= 0) plants.push([`edit ${name}'s line`, edit(i, `pub const ${name} = ${v + 1}`)]);
+            // (2) an EARLIER definition: first definition wins, in both parses.
+            plants.push([`shadow ${name} above its definition`, `pub const ${name} = ${v + 1}\n${base}`]);
+            for (const [what, t] of plants) {
+              planted++;
+              current = t;
+              const got = all()[k][name];
+              if (got === v) still.push(`${what}: ${r.parse} still reads ${v}`);
+            }
+          }
+        });
+        current = base;
+        expect(planted, `${b.path}: no pinned constant was planted`).toBeGreaterThan(0);
+        expect(still, `${b.path}: an edit to a pinned constant did NOT move its value (the pin would stay green on a real change)`).toEqual([]);
+        process.stdout.write(`clip-tool-outputs value-pin census: ${m.fixture.path}: ${unread.length} unread constants edited, 0 pins moved; ${planted} plants on pinned constants, each moved (at ${rev})\n`);
       }
     });
 
